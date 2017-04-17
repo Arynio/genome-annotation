@@ -67,3 +67,24 @@ Step 4b. Subset the VCF file in order to keep only INDELs.
 java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g -Xmx64g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T SelectVariants --selectType INDEL -nct 8 -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa -V lp_all_pop_recal_round-1.vcf -o lp_all_pop_recal_round-1_indels.vcf
 
 ```
+
+#Tag SNPs
+Step 5a. Tag SNPs which don't reach certain quality thresholds (QD: QualbyDepth; FS: FisherStrand; MQ: root mean square of Mapping Quality; MQRankSum: Mann-Whitney Rank Sum Test for Mappin Qualities; ReadPosRankSum: Mann-Whitney Rank Sum Test for distance from end of the read).
+
+```{r Tag SNPs, eval=FALSE, engine='bash'}
+
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g -Xmx64g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T VariantFiltration --filterName "snpsfilter" --filterExpression "QD<2.0||MQ<40.0||FS>60.0||MQRankSum<-12.5||ReadPosRankSum<-8.0" -nct 8 -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa -V lp_all_pop_recal_round-1_SNPs.vcf -o lp_all_pop_recal_round-1_SNPs_tagged.vcf
+
+```
+
+#Filter SNPs
+Step 5b. Remove all SNPs tagged in the previous step.
+
+```{r Filter SNPs, eval=FALSE, engine='bash'}
+
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g  -Xmx64g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T SelectVariants -select 'vc.isNotFiltered()' -nct 8 -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa -V lp_all_pop_recal_round-1_SNPs_tagged.vcf -o lp_all_pop_recal_round-1_SNPs_tagged_filtered.vcf
+
+```
+
+#Polarize SNPs
+Step 6. Later on, use VCFtools in order to polarize according to the ancestral genome of preference.
