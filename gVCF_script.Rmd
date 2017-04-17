@@ -51,7 +51,7 @@ java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g -X
 ```
 
 #Extract SNPs
-Step 4. Subset the VCF file in order to keep only SNP variants.
+Step 4a. Subset the VCF file in order to keep only SNP variants.
 
 ```{r Extract SNPs, eval=FALSE, engine='bash'}
 
@@ -59,3 +59,11 @@ java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g -X
 
 ```
 
+#Extract INDELs
+Step 4b. Subset the VCF file in order to keep only INDELs.
+
+```{r Extract INDELs, eval=FALSE, engine='bash'}
+
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g -Xmx64g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T SelectVariants --selectType INDEL -nct 8 -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa -V lp_all_pop_recal_round-1.vcf -o lp_all_pop_recal_round-1_indels.vcf
+
+```
