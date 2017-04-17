@@ -1,0 +1,61 @@
+---
+title: "gVCF_script"
+author: "Dani"
+date: "17 de abril de 2017"
+output: html_document
+---
+
+#Prepare reference genome
+Step 1. Prepare two files with data from the reference genome: a dictionary with contig names and sizes, and a fasta index file. This step should only be performed once (per reference genome).
+
+```{r Prepare reference genome, eval=FALSE, engine='bash'}
+
+cd /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/
+
+java -jar /home/tmp/Software/Picard/picard-tools-1.66/CreateSequenceDictionary.jar \
+ R= lp23.fa \
+ O= lp23.dict
+
+samtools faidx lp23.fa
+```
+
+#Produce gVCF files
+Step 2. Perform a calling per sample to produce a gVCF file with variant information for every position in the genome (variant or not).
+
+```{r Produce gVCF files, eval=FALSE, engine='bash'}
+
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/
+
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa
+POP=("*_lp")
+for pop in ${POP[@]}
+do
+echo "${pop}"
+ls ${pop}_*_recal_round-1.bam  > ${pop/*_lp/lp}_recal_round-1.bam.list;
+INPUT_BAMS_FOR_CALLING=($(cat ${pop/*_lp/lp}_recal_round-1.bam.list)) 
+for id in ${INPUT_BAMS_FOR_CALLING[@]}
+do
+echo "${id}"
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g -Xmx64g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T HaplotypeCaller -nct 8 -R $REF -I ${id} --emitRefConfidence GVCF -o ${id/.bam/.g.vcf.gz}
+done
+done
+```
+
+#Combine gVCF into VCF
+Step 3. Run joint genotyping of all desired gVCF files to produce a multisample VCF file.
+
+```{r Combine gVCF into VCF, eval=FALSE, engine='bash'}
+
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g -Xmx64g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T GenotypeGVCFs -nct 8 -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa $(for var in *.g.vcf.gz; do echo -V ${var}" ";done) -o lp_all_pop_recal_round-1.vcf
+
+```
+
+#Extract SNPs
+Step 4. Subset the VCF file in order to keep only SNP variants.
+
+```{r Extract SNPs, eval=FALSE, engine='bash'}
+
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g -Xmx64g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T SelectVariants --selectType SNP -nct 8 -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa -V lp_all_pop_recal_round-1.vcf -o lp_all_pop_recal_round-1_SNPs.vcf
+
+```
+
