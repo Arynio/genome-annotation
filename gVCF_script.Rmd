@@ -75,7 +75,7 @@ Step 5a. Tag SNPs which don't reach certain quality thresholds (QD: QualbyDepth;
 
 ```{r Tag SNPs, eval=FALSE, engine='bash'}
 
-java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g -Xmx64g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T VariantFiltration --filterName "snpsfilter" --filterExpression "QD<2.0||MQ<40.0||FS>60.0||MQRankSum<-12.5||ReadPosRankSum<-8.0" -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa -V lp_all_pop_recal_round-1_SNPs.vcf -o lp_all_pop_recal_round-1_SNPs_tagged.vcf
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g -Xmx128g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T VariantFiltration --filterName "snpsfilter" --filterExpression "QD<2.0||MQ<40.0||FS>60.0||MQRankSum<-12.5||ReadPosRankSum<-8.0" -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa -V lp_all_pop_recal_round-1_SNPs.vcf -o lp_all_pop_recal_round-1_SNPs_tagged.vcf
 
 ```
 
