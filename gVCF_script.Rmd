@@ -42,13 +42,13 @@ done
 ```
 
 #Combine gVCF into VCF
-Step 3. Run joint genotyping of all desired gVCF files to produce a multisample VCF file. First, I generate a VCF file using all lp gVCF files.
+Step 3. Run joint genotyping of all desired gVCF files to produce a multisample VCF file. First, I generate a VCF file using all lp gVCF files. It doesn't work on compressed files, so I have to unzip all .g.vcf.gz files using the gunzip command, and then repeat.
 
 ```{r Combine gVCF into VCF, eval=FALSE, engine='bash'}
 
 cd /home/dkleinman/datos/c_lp_bamfiles
 
-java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g -Xmx128g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T GenotypeGVCFs -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa $(for var in *.g.vcf.gz; do echo -V ${var}" ";done) -o lp_all_pop_recal_round-1.vcf
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g -Xmx128g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T GenotypeGVCFs -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa $(for var in *.g.vcf; do echo -V ${var}" ";done) -o lp_all_pop_recal_round-1.vcf
 
 ```
 
@@ -57,7 +57,7 @@ Step 4a. Subset the VCF file in order to keep only SNP variants.
 
 ```{r Extract SNPs, eval=FALSE, engine='bash'}
 
-java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g -Xmx64g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T SelectVariants --selectType SNP -nct 8 -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa -V lp_all_pop_recal_round-1.vcf -o lp_all_pop_recal_round-1_SNPs.vcf
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g -Xmx128g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T SelectVariants -selectType SNP -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa -V lp_all_pop_recal_round-1.vcf -o lp_all_pop_recal_round-1_SNPs.vcf
 
 ```
 
@@ -66,7 +66,7 @@ Step 4b. Subset the VCF file in order to keep only INDELs.
 
 ```{r Extract INDELs, eval=FALSE, engine='bash'}
 
-java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g -Xmx64g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T SelectVariants --selectType INDEL -nct 8 -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa -V lp_all_pop_recal_round-1.vcf -o lp_all_pop_recal_round-1_indels.vcf
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g -Xmx64g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T SelectVariants -selectType INDEL -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa -V lp_all_pop_recal_round-1.vcf -o lp_all_pop_recal_round-1_indels.vcf
 
 ```
 
@@ -75,7 +75,7 @@ Step 5a. Tag SNPs which don't reach certain quality thresholds (QD: QualbyDepth;
 
 ```{r Tag SNPs, eval=FALSE, engine='bash'}
 
-java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g -Xmx64g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T VariantFiltration --filterName "snpsfilter" --filterExpression "QD<2.0||MQ<40.0||FS>60.0||MQRankSum<-12.5||ReadPosRankSum<-8.0" -nct 8 -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa -V lp_all_pop_recal_round-1_SNPs.vcf -o lp_all_pop_recal_round-1_SNPs_tagged.vcf
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g -Xmx64g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T VariantFiltration --filterName "snpsfilter" --filterExpression "QD<2.0||MQ<40.0||FS>60.0||MQRankSum<-12.5||ReadPosRankSum<-8.0" -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa -V lp_all_pop_recal_round-1_SNPs.vcf -o lp_all_pop_recal_round-1_SNPs_tagged.vcf
 
 ```
 
@@ -84,7 +84,7 @@ Step 5b. Remove all SNPs tagged in the previous step.
 
 ```{r Filter SNPs, eval=FALSE, engine='bash'}
 
-java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g  -Xmx64g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T SelectVariants -select 'vc.isNotFiltered()' -nct 8 -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa -V lp_all_pop_recal_round-1_SNPs_tagged.vcf -o lp_all_pop_recal_round-1_SNPs_tagged_filtered.vcf
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g  -Xmx64g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T SelectVariants -select 'vc.isNotFiltered()' -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa -V lp_all_pop_recal_round-1_SNPs_tagged.vcf -o lp_all_pop_recal_round-1_SNPs_tagged_filtered.vcf
 
 ```
 
