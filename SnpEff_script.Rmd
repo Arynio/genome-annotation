@@ -1,0 +1,25 @@
+---
+title: "SnpEff_script"
+author: "Dani"
+date: "6 de junio de 2017"
+output: html_document
+---
+
+#Search for the Lynx pardinus database
+Step 1. Search for the Lynx pardinus assembly database in the program's pre-built database. As of June the 6th, 2017, the Lynx pardinus genome isn't included in the snpEff database. Once the snpEff authors include it, a newer version of the database should be downloaded (ask the tech group). A second option would be building our own Lynx pardinus database, although it seems complicated.
+
+```{r Search for the Lynx pardinus database, eval=FALSE, engine='bash'}
+
+java -jar /opt/snpEff/snpEff.jar databases | grep -i pardinus
+
+```
+
+#S
+Step 2. 
+
+```{r Search for the Lynx pardinus database, eval=FALSE, engine='bash'}
+
+
+
+```
+
