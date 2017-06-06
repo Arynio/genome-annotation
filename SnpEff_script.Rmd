@@ -8,18 +8,40 @@ output: html_document
 #Search for the Lynx pardinus database
 Step 1. Search for the Lynx pardinus assembly database in the program's pre-built database. As of June the 6th, 2017, the Lynx pardinus genome isn't included in the snpEff database. Once the snpEff authors include it, a newer version of the database should be downloaded (ask the tech group). A second option would be building our own Lynx pardinus database, although it seems complicated.
 
+
 ```{r Search for the Lynx pardinus database, eval=FALSE, engine='bash'}
+
+S_PATH=/opt/snpEff #software path
+I_PATH= #write here the input path
+O_PATH=/home/dkleinman/datos/snpEff #output path
 
 java -jar /opt/snpEff/snpEff.jar databases | grep -i pardinus
 
 ```
 
-#S
+
+#Build the Lynx pardinus genome database
 Step 2. 
+
+```{r Build the Lynx pardinus genome database, eval=FALSE, engine='bash'}
+
+/home/dkleinman/
+vi snpEffect.config 
+#Originally the config was just in the software folder and I didn't have writing permission. If this is the only config file available, writing permission is required, and when annotating later on, the file should be called using the -c command followed by the path to the file.
+#However, in my case I believe the tech group created a copy of the file in my folder, and this is the one that I was able to edit. I added the following two lines:
+
+# Lynx_pardinus
+LYPA.23.genome : Iberian lynx 
+
+```
+
+
+#Tutorial annotation
+Step 3. Annotate one of the examples that comes with the software
 
 ```{r Search for the Lynx pardinus database, eval=FALSE, engine='bash'}
 
-
+java -Xmx16g -jar $S_PATH/snpEff.jar GRCh37.75 -s $O_PATH/toys/test.chr22.ann $S_PATH/examples/test.chr22.vcf > $O_PATH/toys/test.chr22.ann.vcf
 
 ```
 
