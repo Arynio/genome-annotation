@@ -5,9 +5,9 @@ date: "6 de junio de 2017"
 output: html_document
 ---
 
+
 #Search for the Lynx pardinus database
 Step 1. Search for the Lynx pardinus assembly database in the program's pre-built database. As of June the 6th, 2017, the Lynx pardinus genome isn't included in the snpEff database. Once the snpEff authors include it, a newer version of the database should be downloaded (ask the tech group). A second option would be building our own Lynx pardinus database, although it seems complicated.
-
 
 ```{r Search for the Lynx pardinus database, eval=FALSE, engine='bash'}
 
@@ -21,17 +21,37 @@ java -jar /opt/snpEff/snpEff.jar databases | grep -i pardinus
 
 
 #Build the Lynx pardinus genome database
-Step 2. 
+Step 2. In the end we opt to build our own database since we don't know when they will get themselves to add it. This step should be omitted if the desired database was found in step 1.
+
+##Add entry to the config file
 
 ```{r Build the Lynx pardinus genome database, eval=FALSE, engine='bash'}
 
-/home/dkleinman/
+cd /home/dkleinman/
 vi snpEffect.config 
 #Originally the config was just in the software folder and I didn't have writing permission. If this is the only config file available, writing permission is required, and when annotating later on, the file should be called using the -c command followed by the path to the file.
 #However, in my case I believe the tech group created a copy of the file in my folder, and this is the one that I was able to edit. I added the following two lines:
 
 # Lynx_pardinus
-LYPA.23.genome : Iberian lynx 
+LYPA.23.genome : Iberian lynx #from now on, LYPA.23 is the code for the Lynx pardinus reference genome (in snpEff)
+
+```
+
+##Create directory and move files
+
+```{r Build the Lynx pardinus genome database, eval=FALSE, engine='bash'}
+
+mkdir $S_PATH/data/LYPA.23 #create a directory inside the software's dependencies whose name matches the code
+cd $S_PATH/data/LYPA.23
+
+#same with gff3
+
+
+mkdir $S_PATH/data/genomes #create a directory inside the software's dependencies called genomes
+scp /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa /opt/snpEff/data/genomes #copy the reference genome fasta to the new genomes directory
+mv lp23.fa LYPA.23.fa #rename the file so that it matches the code
+
+
 
 ```
 
