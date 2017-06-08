@@ -5,6 +5,7 @@ date: "6 de junio de 2017"
 output: html_document
 ---
 
+http://snpeff.sourceforge.net/SnpEff_manual.html #I'll be following this manual for all configuration purposes
 
 #Search for the Lynx pardinus database
 Step 1. Search for the Lynx pardinus assembly database in the program's pre-built database. As of June the 6th, 2017, the Lynx pardinus genome isn't included in the snpEff database. Once the snpEff authors include it, a newer version of the database should be downloaded (ask the tech group). A second option would be building our own Lynx pardinus database, although it seems complicated.
@@ -12,7 +13,7 @@ Step 1. Search for the Lynx pardinus assembly database in the program's pre-buil
 ```{r Search for the Lynx pardinus database, eval=FALSE, engine='bash'}
 
 S_PATH=/opt/snpEff #software path
-I_PATH= #write here the input path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
 O_PATH=/home/dkleinman/datos/snpEff #output path
 
 java -jar /opt/snpEff/snpEff.jar databases | grep -i pardinus
@@ -27,10 +28,14 @@ Step 2. In the end we opt to build our own database since we don't know when the
 
 ```{r Build the Lynx pardinus genome database, eval=FALSE, engine='bash'}
 
-cd /home/dkleinman/
-vi snpEffect.config 
 #Originally the config was just in the software folder and I didn't have writing permission. If this is the only config file available, writing permission is required, and when annotating later on, the file should be called using the -c command followed by the path to the file.
-#However, in my case I believe the tech group created a copy of the file in my folder, and this is the one that I was able to edit. I added the following two lines:
+#However, in my case I believe the tech group created a copy of the file in my folder after I sent them an e-mail, and this is the one that I was able to edit.
+
+cd /home/dkleinman/
+mv snpEffect.config $C_PATH #I move the config file that appeared in my folder to a subfolder that I created for snpEff
+vi snpEffect.config  #initiate the editing process
+
+#Following the manual, I added the following two lines:
 
 # Lynx_pardinus
 LYPA.23.genome : Iberian lynx #from now on, LYPA.23 is the code for the Lynx pardinus reference genome (in snpEff)
@@ -44,17 +49,42 @@ LYPA.23.genome : Iberian lynx #from now on, LYPA.23 is the code for the Lynx par
 mkdir $S_PATH/data/LYPA.23 #create a directory inside the software's dependencies whose name matches the code
 cd $S_PATH/data/LYPA.23
 
-#same with gff3
-
+scp /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.all.fix.nr.gff3 $S_PATH/data/LYPA.23/ #copy the annotation file (can be gff or gtf) to the newly created directory. This gff file includes CDS, introns, exons and genes, so it's very basic. A more complex version that Maria created which includes lncRNAs, etc., could be tested in the future.
+mv LYPA23C.all.fix.nr.gff3 genes.gff #rename the file as the tutorial indicates
 
 mkdir $S_PATH/data/genomes #create a directory inside the software's dependencies called genomes
-scp /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa /opt/snpEff/data/genomes #copy the reference genome fasta to the new genomes directory
+cd $S_PATH/data/genomes
+scp /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa $S_PATH/data/genomes #copy the reference genome fasta to the new genomes directory
 mv lp23.fa LYPA.23.fa #rename the file so that it matches the code
-
-
 
 ```
 
+##Build the database
+
+```{r Build the Lynx pardinus genome database, eval=FALSE, engine='bash'}
+
+cd $S_PATH
+screen -S build_snpEff_db #open a dettachable screen in case the database building takes too long
+
+C_PATH=/home/dkleinman/datos/snpEff #redefine the variable, since we're inside a screen
+
+script $C_PATH/data/build_snpEff_db.txt #initiate the log file
+
+S_PATH=/opt/snpEff #redefine the variable, since we're inside a script
+C_PATH=/home/dkleinman/datos/snpEff #redefine the variable, since we're inside a script
+
+cd $S_PATH
+java -jar snpEff.jar build -gff3 -v LYPA.23 -c $C_PATH/snpEff.config -dataDir $S_PATH/data #build the database. Use the -gff3 command for gff files and -gtf22 for gtf files. Use -v for verbose (expanded information on the processes and the warnings/errors that may appear). Use -c to indicate the path to my own config file. Then use -dataDir to override the data directory from the config file (by default the software thinks that the data folder with the genome and the genes files is located where config is, so it's necessary to give it the correct path). Another option would be running it from the config folder and indicating instead the 
+
+ctrl + D #terminate the script
+ctrl + D #terminate the screen
+
+scp -r $S_PATH/data $C_PATH #afterwards I realize anyone can access the data folder so I copy it to my own folder and then I remove the stuff I created inside the original data folder
+cd $S_PATH/data
+rm -r LYPA.23/
+rm -r genomes/
+
+```
 
 #Tutorial annotation
 Step 3. Annotate one of the examples that comes with the software
@@ -64,4 +94,33 @@ Step 3. Annotate one of the examples that comes with the software
 java -Xmx16g -jar $S_PATH/snpEff.jar GRCh37.75 -s $O_PATH/toys/test.chr22.ann $S_PATH/examples/test.chr22.vcf > $O_PATH/toys/test.chr22.ann.vcf
 
 ```
+
+#Toy annotation using the immunocapture VCF
+Step 4. Annotate the immunocapture VCF 
+
+```{r Search for the Lynx pardinus database, eval=FALSE, engine='bash'}
+
+cd $C_PATH
+screen -S immuno_annot_test1 #open a dettachable screen in case the test takes too long
+
+script immunocapture/immuno_annot_test1.txt #initiate the log file
+
+S_PATH=/opt/snpEff #redefine the variable, since we're inside a script
+C_PATH=/home/dkleinman/datos/snpEff #redefine the variable, since we're inside a script
+O_PATH=/home/dkleinman/datos/snpEff #redefine the variable, since we're inside a script
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #write here the input path. This folder only exists in server A, so keep that in mind (I was looking for it for the longest time in server B >.<)
+
+java -Xmx16g -jar $S_PATH/snpEff.jar LYPA.23 -v -s $O_PATH/immunocapture/immunocapture_test1.ann.html $I_PATH/x_lx_xx_n201_filtered.vcf > $O_PATH/immunocapture/immunocapture_test1.ann.vcf #run this code from the directory where the config is located, and from server A (I_PATH doesn't exist in server B). I used the filtered version of the vcf which includes all lynx individuals in the immunocapture; there's also a raw version which can be tested.
+
+ctrl + D #terminate the script
+ctrl + D #terminate the screen
+
+scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/snpEff/immunocapture/immunocapture_test1.ann* /Users/Dani/ownCloud/backup/annotation/snpEff_results/immunocapture/ #execute this command out of the server to import to the pc the output files of this toy run
+
+```
+
+
+
+
+
 
