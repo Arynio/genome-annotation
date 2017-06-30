@@ -36,9 +36,10 @@ INPUT_BAMS_FOR_CALLING=($(cat ${pop/*_lp/lp}_recal_round-1.bam.list))
 for id in ${INPUT_BAMS_FOR_CALLING[@]}
 do
 echo "${id}"
-java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g -Xmx64g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T HaplotypeCaller -nct 8 -R $REF -I ${id} --emitRefConfidence GVCF -o ${id/.bam/.g.vcf.gz}
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g -Xmx64g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T HaplotypeCaller -R $REF -I ${id} --emitRefConfidence GVCF -o ${id/.bam/.g.vcf.gz}
 done
 done
+
 ```
 
 #Combine gVCF into VCF
@@ -49,6 +50,22 @@ Step 3. Run joint genotyping of all desired gVCF files to produce a multisample 
 cd /home/dkleinman/datos/c_lp_bamfiles
 
 java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g -Xmx128g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T GenotypeGVCFs -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa $(for var in *.g.vcf; do echo -V ${var}" ";done) -o lp_all_pop_recal_round-1.vcf
+
+
+################### WARNING
+
+cd /home/dkleinman/datos/c_lp_bamfiles
+
+POP=("*_l*_*_")
+for pop in ${POP[@]}
+do
+echo "${pop}"
+
+ls /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/gVCF_lp/${pop}recal_round-1.g.vcf  > ${pop/*_l*_*_/lp_and_ll}_recal_round-1.g.vcf.list
+ls /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/gVCF_ll/${pop}recal_round-1.g.vcf.gz  >> ${pop/*_l*_*_/lp_and_ll}_recal_round-1.g.vcf.list;
+done
+
+#añadir algo como en el bucle anterior con INPUT_BAMS_FOR_CALLING
 
 ```
 
