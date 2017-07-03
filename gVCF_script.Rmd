@@ -47,25 +47,91 @@ Step 3. Run joint genotyping of all desired gVCF files to produce a multisample 
 
 ```{r Combine gVCF into VCF, eval=FALSE, engine='bash'}
 
+#Option A: when all gVCFs are named the same (same name structure) and in the same folder:
 cd /home/dkleinman/datos/c_lp_bamfiles
 
 java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g -Xmx128g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T GenotypeGVCFs -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa $(for var in *.g.vcf; do echo -V ${var}" ";done) -o lp_all_pop_recal_round-1.vcf
 
 
-################### WARNING
+#Option B: Maria's code to better define the populations and stuff.
 
-cd /home/dkleinman/datos/c_lp_bamfiles
+#List of populations
+#c_lc_zz
+#c_ll_ba
+#c_ll_cr
+#c_ll_ka
+#c_ll_ki
+#c_ll_la
+#c_ll_no
+#c_ll_og
+#c_ll_po
+#c_ll_to
+#c_ll_tu
+#c_ll_vl
+#c_ll_ya
+#c_lp_do
+#c_lp_sm
+#c_lr_zz
+#h_ll_ba
 
-POP=("*_l*_*_")
-for pop in ${POP[@]}
+#Code to define the populations to be used, and then print all gVCFs in a list. This version returns a list of the "original" samples (all samples except for the subsampled version of the 28x ones):
+POPS=(c_ll_ba-c_ll_cr-c_ll_ka-c_ll_ki-c_ll_la-c_ll_no-c_ll_og-c_ll_po-c_ll_to-c_ll_tu-c_ll_vl-c_ll_ya-c_lp_do-c_lp_sm)
+for POP in ${POPS[@]}
 do
-echo "${pop}"
-
-ls /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/gVCF_lp/${pop}recal_round-1.g.vcf  > ${pop/*_l*_*_/lp_and_ll}_recal_round-1.g.vcf.list
-ls /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/gVCF_ll/${pop}recal_round-1.g.vcf.gz  >> ${pop/*_l*_*_/lp_and_ll}_recal_round-1.g.vcf.list;
+echo $POP
+rm "all_c_original_coverage_$POP"_n"$NUMBER_IND".gVCFlist
+IFS='-' read -r -a POPS1 <<< "$POP" # this creates an array stripping by "-"
+for POP1 in "${POPS1[@]}"
+do
+echo "$POP --> $POP1"
+ls /home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs/*${POP1}_*_recal_round-1.g.vcf* | grep -v "tbi" | grep -v "idx" >> "$POP".gVCFlist
+done
+NUMBER_IND=$(printf "%03d" `wc -l "$POP".gVCFlist | cut -f1 -d " "`);
+mv "$POP".gVCFlist "all_c_original_coverage_$POP"_n"$NUMBER_IND".gVCFlist
 done
 
-#añadir algo como en el bucle anterior con INPUT_BAMS_FOR_CALLING
+#Code to define the populations to be used, and then print all gVCFs in a list. This version returns a list of all samples, including both the subsampled (5x) version of those with 28x, and the 28x themselves:
+POPS=(c_ll_ba-c_ll_cr-c_ll_ka-c_ll_ki-c_ll_la-c_ll_no-c_ll_og-c_ll_po-c_ll_to-c_ll_tu-c_ll_vl-c_ll_ya-c_lp_do-c_lp_sm)
+for POP in ${POPS[@]}
+do
+echo $POP
+rm "all_c_samples_$POP"_n"$NUMBER_IND".gVCFlist
+IFS='-' read -r -a POPS1 <<< "$POP" # this creates an array stripping by "-"
+for POP1 in "${POPS1[@]}"
+do
+echo "$POP --> $POP1"
+ls /home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs/*${POP1}_*_recal_round-1*g.vcf* | grep -v "tbi" | grep -v "idx" >> "$POP".gVCFlist
+done
+NUMBER_IND=$(printf "%03d" `wc -l "$POP".gVCFlist | cut -f1 -d " "`);
+mv "$POP".gVCFlist "all_c_samples_$POP"_n"$NUMBER_IND".gVCFlist
+done
+
+#Code to define the populations to be used, and then print all gVCFs in a list. This version returns a list with only those (original, 28x) samples that were subsampled:
+POPS=(c_lp_do-c_lp_sm)
+for POP in ${POPS[@]}
+do
+echo $POP
+rm "all_c_lp_samples_28x_$POP"_n"$NUMBER_IND".gVCFlist
+IFS='-' read -r -a POPS1 <<< "$POP" # this creates an array stripping by "-"
+for POP1 in "${POPS1[@]}"
+do
+echo "$POP --> $POP1"
+ls /home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs/*${POP1}_*_recal_round-1_subsampled.g.vcf* | grep -v "tbi" | grep -v "idx" | sed 's/_subsampled//g' >> "$POP".gVCFlist
+done
+NUMBER_IND=$(printf "%03d" `wc -l "$POP".gVCFlist | cut -f1 -d " "`);
+mv "$POP".gVCFlist "all_c_lp_samples_28x_$POP"_n"$NUMBER_IND".gVCFlist
+done
+
+#Next, use the following line to exclude from the all samples list the list with only 28x samples in order to obtain a list with only 5x samples (including the subsampled versions of 28x samples)
+grep -v -f all_c_lp_samples_28x*.gVCFlist all_c_samples_c*.gVCFlist > all_c_samples_5x_c_ll_ba-c_ll_cr-c_ll_ka-c_ll_ki-c_ll_la-c_ll_no-c_ll_og-c_ll_po-c_ll_to-c_ll_tu-c_ll_vl-c_ll_ya-c_lp_do-c_lp_sm_n103.gVCFlist
+
+#Next, run the VCF calling using the "original" samples:
+POPS=(c_ll_ba-c_ll_cr-c_ll_ka-c_ll_ki-c_ll_la-c_ll_no-c_ll_og-c_ll_po-c_ll_to-c_ll_tu-c_ll_vl-c_ll_ya-c_lp_do-c_lp_sm)
+INPUT_gVCFs=all_c_samples_5x_*.list #insert here one of the lists generated above ()
+
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms8g -Xmx16g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T GenotypeGVCFs -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa -V $INPUT_gVCFs -o all_c_original_coverage_recal_round-1.vcf
+
+
 
 ```
 
