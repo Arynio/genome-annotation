@@ -5,8 +5,7 @@ date: "17 de abril de 2017"
 output: html_document
 ---
 
-#Prepare reference genome
-Step 1. Prepare two files with data from the reference genome: a dictionary with contig names and sizes, and a fasta index file. This step should only be performed once (per reference genome).
+#Step 1: Prepare reference genome. Prepare two files with data from the reference genome: a dictionary with contig names and sizes, and a fasta index file. This step should only be performed once (per reference genome).
 
 ```{r Prepare reference genome, eval=FALSE, engine='bash'}
 
@@ -19,8 +18,7 @@ java -jar /home/tmp/Software/Picard/picard-tools-1.66/CreateSequenceDictionary.j
 samtools faidx lp23.fa
 ```
 
-#Produce gVCF files
-Step 2. Perform a calling per sample to produce a gVCF file with variant information for every position in the genome (variant or not).
+#Step 2a: Produce gVCF files. Perform a calling per sample to produce a gVCF file with variant information for every position in the genome (variant or not).
 
 ```{r Produce gVCF files, eval=FALSE, engine='bash'}
 
@@ -40,17 +38,55 @@ java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g -X
 done
 done
 
+#This was only used to test one sample (lp_do_0443):
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx64g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T HaplotypeCaller -R $REF -I c_lp_do_0443_recal_round-1.bam --emitRefConfidence GVCF -o /home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs/c_lp_do_0443_BIS_recal_round-1.g.vcf
+
 ```
 
-#Combine gVCF into VCF
-Step 3. Run joint genotyping of all desired gVCF files to produce a multisample VCF file. First, I generate a VCF file using all lp gVCF files. It doesn't work on compressed files, so I have to unzip all .g.vcf.gz files using the gunzip command, and then repeat.
+#Step 2b: Perform sanity checks. Perform various sanity checks on all gVCFs.
+
+```{r Perform sanity checks, eval=FALSE, engine='bash'}
+
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs
+shopt -s extglob #the extglob shell option gives you more powerful pattern matching in the command line.
+SAMPLELIST=($(ls c_!(*BIS*).g.vcf | cut -d "." -f1 | sort | uniq))
+
+rm toy_c_gVCF_raw.stats
+echo "sample_name,total_SNPs,homoz_ref,heteroz,homoz_alt,unaccounted" > toy_c_gVCF_raw.stats 
+for sample in "${SAMPLELIST[@]}"
+do
+echo "${sample}"
+#done
+NAME="${sample}"
+TOTAL_SNPS="$(grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs/"${sample}"*.g.vcf | wc -l)"
+echo $TOTAL_SNPS
+TOTAL_00="$(grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs/"${sample}"*.g.vcf | grep '0/0:' | wc -l)"
+echo $TOTAL_00
+TOTAL_01="$(grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs/"${sample}"*.g.vcf | grep '0/1:' | wc -l)"
+echo $TOTAL_01
+TOTAL_11="$(grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs/"${sample}"*.g.vcf | grep '1/1:' | wc -l)"
+echo $TOTAL_11
+UNACCOUNTED="$(($TOTAL_SNPS - $TOTAL_00 - $TOTAL_01 - $TOTAL_11))"
+echo $UNACCOUNTED
+echo "$NAME,$TOTAL_SNPS,$TOTAL_00,$TOTAL_01,$TOTAL_11,$UNACCOUNTED" >> toy_c_gVCF_raw.stats
+done
+
+shopt -u extglob #disable extglob
+
+```
+
+#Step 3: Combine gVCF into VCF. Run joint genotyping of all desired gVCF files to produce a multisample VCF file.
 
 ```{r Combine gVCF into VCF, eval=FALSE, engine='bash'}
+
+#First, I generate a VCF file using all lp gVCF files. It doesn't work on compressed files, so I have to unzip all .g.vcf.gz files using the gunzip command, and then repeat. #Later on, when trying to work both with lp and ll gVCFs, server B is running very slow and the generation of .idx files (necessary for the VCF calling) is not working fine or whatever. We decide that it's best to work with compressed files so I compress three random lp gVCFs, but then I encounter the same problem that I got before (when using just the lp files): 'Unable to create iterator for rod named variant'.
+
 
 #Option A: when all gVCFs are named the same (same name structure) and in the same folder:
 cd /home/dkleinman/datos/c_lp_bamfiles
 
-java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g -Xmx128g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T GenotypeGVCFs -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa $(for var in *.g.vcf; do echo -V ${var}" ";done) -o lp_all_pop_recal_round-1.vcf
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g -Xmx128g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T GenotypeGVCFs -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa $(for var in *.g.vcf.gz; do echo -V ${var}" ";done) -o lp_all_pop_recal_round-1.vcf
 
 
 #Option B: Maria's code to better define the populations and stuff.
@@ -129,14 +165,16 @@ grep -v -f all_c_lp_samples_28x*.gVCFlist all_c_samples_c*.gVCFlist > all_c_samp
 POPS=(c_ll_ba-c_ll_cr-c_ll_ka-c_ll_ki-c_ll_la-c_ll_no-c_ll_og-c_ll_po-c_ll_to-c_ll_tu-c_ll_vl-c_ll_ya-c_lp_do-c_lp_sm)
 INPUT_gVCFs=all_c_samples_5x_*.list #insert here one of the lists generated above ()
 
-java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms8g -Xmx16g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T GenotypeGVCFs -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa -V $INPUT_gVCFs -o all_c_original_coverage_recal_round-1.vcf
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T GenotypeGVCFs -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa -V $INPUT_gVCFs -o all_c_samples_5x_recal_round-1.vcf
 
 
+INPUT_gVCFs=all_c_original_coverage_*.list #insert here one of the lists generated above ()
+
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T GenotypeGVCFs -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa -V $INPUT_gVCFs -o all_c_original_coverage_recal_round-1.vcf
 
 ```
 
-#Extract SNPs
-Step 4a. Subset the VCF file in order to keep only SNP variants.
+#Step 4a: Extract SNPs. Subset the VCF file in order to keep only SNP variants.
 
 ```{r Extract SNPs, eval=FALSE, engine='bash'}
 
@@ -144,8 +182,7 @@ java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g -X
 
 ```
 
-#Extract INDELs
-Step 4b. Subset the VCF file in order to keep only INDELs.
+#Step 4b: Extract INDELs. Subset the VCF file in order to keep only INDELs.
 
 ```{r Extract INDELs, eval=FALSE, engine='bash'}
 
@@ -153,8 +190,7 @@ java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g -X
 
 ```
 
-#Tag SNPs
-Step 5a. Tag SNPs which don't reach certain quality thresholds (QD: QualbyDepth; FS: FisherStrand; MQ: root mean square of Mapping Quality; MQRankSum: Mann-Whitney Rank Sum Test for Mappin Qualities; ReadPosRankSum: Mann-Whitney Rank Sum Test for distance from end of the read).
+#Step 5a: Tag SNPs. Tag SNPs which don't reach certain quality thresholds (QD: QualbyDepth; FS: FisherStrand; MQ: root mean square of Mapping Quality; MQRankSum: Mann-Whitney Rank Sum Test for Mappin Qualities; ReadPosRankSum: Mann-Whitney Rank Sum Test for distance from end of the read).
 
 ```{r Tag SNPs, eval=FALSE, engine='bash'}
 
@@ -162,8 +198,7 @@ java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g -X
 
 ```
 
-#Filter SNPs
-Step 5b. Remove all SNPs tagged in the previous step.
+#Step 5b: Filter SNPs. Remove all SNPs tagged in the previous step.
 
 ```{r Filter SNPs, eval=FALSE, engine='bash'}
 
@@ -171,5 +206,4 @@ java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g  -
 
 ```
 
-#Polarize SNPs
-Step 6. Later on, use VCFtools in order to polarize according to the ancestral genome of preference.
+#Step 6: Polarize SNPs. Later on, use VCFtools in order to polarize according to the ancestral genome of preference.
