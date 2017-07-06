@@ -22,7 +22,7 @@ samtools faidx lp23.fa
 
 ```{r Produce gVCF files, eval=FALSE, engine='bash'}
 
-cd /home/dkleinman/datos/c_lp_bamfiles
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
 
 REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa
 POP=("*_lp")
@@ -34,7 +34,7 @@ INPUT_BAMS_FOR_CALLING=($(cat ${pop/*_lp/lp}_recal_round-1.bam.list))
 for id in ${INPUT_BAMS_FOR_CALLING[@]}
 do
 echo "${id}"
-java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g -Xmx64g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T HaplotypeCaller -R $REF -I ${id} --emitRefConfidence GVCF -o ${id/.bam/.g.vcf.gz}
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T HaplotypeCaller -R $REF -I ${id} --emitRefConfidence GVCF -o ${id/.bam/.g.vcf.gz}
 done
 done
 
@@ -76,6 +76,15 @@ shopt -u extglob #disable extglob
 
 ```
 
+
+
+```{r}
+
+
+
+```
+
+
 #Step 3: Combine gVCF into VCF. Run joint genotyping of all desired gVCF files to produce a multisample VCF file.
 
 ```{r Combine gVCF into VCF, eval=FALSE, engine='bash'}
@@ -88,6 +97,9 @@ cd /home/dkleinman/datos/c_lp_bamfiles
 
 java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g -Xmx128g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T GenotypeGVCFs -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa $(for var in *.g.vcf.gz; do echo -V ${var}" ";done) -o lp_all_pop_recal_round-1.vcf
 
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs
+
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T GenotypeGVCFs -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa -V c_lp_do_0443_BIS_recal_round-1.g.vcf -V c_lp_sm_0325_recal_round-1.g.vcf -o toy_lp_VCF_3.vcf
 
 #Option B: Maria's code to better define the populations and stuff.
 
