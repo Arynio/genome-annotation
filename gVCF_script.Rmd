@@ -22,7 +22,7 @@ samtools faidx lp23.fa
 
 ```{r Produce gVCF files, eval=FALSE, engine='bash'}
 
-cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #this works for the 5x samples
 
 REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa
 POP=("*_lp")
@@ -31,6 +31,22 @@ do
 echo "${pop}"
 ls ${pop}_*_recal_round-1.bam  > ${pop/*_lp/lp}_recal_round-1.bam.list;
 INPUT_BAMS_FOR_CALLING=($(cat ${pop/*_lp/lp}_recal_round-1.bam.list)) 
+for id in ${INPUT_BAMS_FOR_CALLING[@]}
+do
+echo "${id}"
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T HaplotypeCaller -R $REF -I ${id} --emitRefConfidence GVCF -o ${id/.bam/.g.vcf.gz}
+done
+done
+
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/genome_project_samples_25x #this works for the 25x samples
+
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa
+POP=("*_lp")
+for pop in ${POP[@]}
+do
+echo "${pop}"
+ls ${pop}_*_recal_round-1_25x.bam  > ${pop/*_lp/lp}_recal_round-1_25x.bam.list;
+INPUT_BAMS_FOR_CALLING=($(cat ${pop/*_lp/lp}_recal_round-1_25x.bam.list)) 
 for id in ${INPUT_BAMS_FOR_CALLING[@]}
 do
 echo "${id}"
@@ -76,10 +92,26 @@ shopt -u extglob #disable extglob
 
 ```
 
+#Step 2b: Analyse the sanity checks file. Perform per population analyses on the sanity checks file.
 
+```{r Analyse the sanity checks file}
+library("readr")
+library("dplyr")
+library("ggplot2")
 
-```{r}
+sanity_checks <- read_csv("/Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/toy_c_gVCF_raw.stats")
+sanity_checks
+pop_summary_sc <- sanity_checks %>% 
+  mutate(species=substr(sanity_checks$sample_name,3,4),population=substr(sanity_checks$sample_name,6,7)) %>%
+  group_by(species,population) %>%
+  summarise(mean_total_SNPs=mean(total_SNPs),mean_homoz_ref=mean(homoz_ref),mean_heteroz=mean(heteroz),mean_homoz_alt=mean(homoz_alt),mean_unaccounted=mean(unaccounted))
+pop_summary_sc
 
+plot_total_SNPs <- ggplot(pop_summary_sc, aes(population,mean_total_SNPs)) + geom_col() + facet_grid(. ~ species)
+plot_total_SNPs
+
+plot_heteroz <- ggplot(pop_summary_sc, aes(population,mean_heteroz)) + geom_col() + facet_grid(. ~ species)
+plot_heteroz
 
 
 ```
