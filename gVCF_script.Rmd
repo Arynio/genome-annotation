@@ -21,7 +21,7 @@ samtools faidx lp23.fa
 #Step 2a: Produce gVCF files. Perform a calling per sample to produce a gVCF file with variant information for every position in the genome (variant or not).
 
 ```{r Produce gVCF files, eval=FALSE, engine='bash'}
-
+#5x genomes
 cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #this works for the 5x samples
 
 REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa
@@ -60,6 +60,29 @@ java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -X
 
 ```
 
+##2.a. Immunocapture
+```{bash}
+
+#Immunocapture
+cd /home/emarmesat/grupolince/immunocapture/alignments_merged_cap_wg_ontarget
+
+POP=h_lp_al
+screen -S gvcfs_samples_$POP
+POP=h_lp_al
+script gvcfs_samples_$POP.log
+POP=h_lp_al
+
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa
+
+for id in $POP*filtered.bam
+do
+echo "${id}"
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T HaplotypeCaller -R $REF -I ${id} --emitRefConfidence GVCF -o ${id/.bam/.g.vcf.gz}
+done
+
+
+```
+
 #Step 2b: Perform sanity checks. Perform various sanity checks on all gVCFs.
 
 ```{r Perform sanity checks, eval=FALSE, engine='bash'}
@@ -92,7 +115,7 @@ shopt -u extglob #disable extglob
 
 ```
 
-#Step 2b: Analyse the sanity checks file. Perform per population analyses on the sanity checks file.
+#Step 2c: Analyse the sanity checks file. Perform per population analyses on the sanity checks file.
 
 ```{r Analyse the sanity checks file}
 library("readr")
