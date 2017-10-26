@@ -22,6 +22,7 @@ samtools faidx lp23.fa
 
 ```{r Produce gVCF files, eval=FALSE, engine='bash'}
 
+#For 5x samples:
 cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #this works for the 5x samples
 
 REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa
@@ -38,6 +39,7 @@ java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar /opt/
 done
 done
 
+#For 25x samples:
 cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/genome_project_samples_25x #this works for the 25x samples
 
 REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa
@@ -64,9 +66,9 @@ java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -X
 
 ```{r Perform sanity checks, eval=FALSE, engine='bash'}
 
-cd /home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
 shopt -s extglob #the extglob shell option gives you more powerful pattern matching in the command line.
-SAMPLELIST=($(ls c_!(*BIS*).g.vcf | cut -d "." -f1 | sort | uniq))
+SAMPLELIST=($(ls c_*.g.vcf.gz | cut -d "." -f1 | sort | uniq))
 
 rm toy_c_gVCF_raw.stats
 echo "sample_name,total_SNPs,homoz_ref,heteroz,homoz_alt,unaccounted" > toy_c_gVCF_raw.stats 
@@ -75,13 +77,13 @@ do
 echo "${sample}"
 #done
 NAME="${sample}"
-TOTAL_SNPS="$(grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs/"${sample}"*.g.vcf | wc -l)"
+TOTAL_SNPS="$(zgrep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${sample}".g.vcf.gz | wc -l)"
 echo $TOTAL_SNPS
-TOTAL_00="$(grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs/"${sample}"*.g.vcf | grep '0/0:' | wc -l)"
+TOTAL_00="$(zgrep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${sample}".g.vcf.gz | zgrep '0/0:' | wc -l)"
 echo $TOTAL_00
-TOTAL_01="$(grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs/"${sample}"*.g.vcf | grep '0/1:' | wc -l)"
+TOTAL_01="$(zgrep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${sample}".g.vcf.gz | zgrep '0/1:' | wc -l)"
 echo $TOTAL_01
-TOTAL_11="$(grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs/"${sample}"*.g.vcf | grep '1/1:' | wc -l)"
+TOTAL_11="$(zgrep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${sample}".g.vcf.gz | zgrep '1/1:' | wc -l)"
 echo $TOTAL_11
 UNACCOUNTED="$(($TOTAL_SNPS - $TOTAL_00 - $TOTAL_01 - $TOTAL_11))"
 echo $UNACCOUNTED
@@ -90,9 +92,12 @@ done
 
 shopt -u extglob #disable extglob
 
+#Save locally the .stats file
+scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/toy_c_gVCF_raw.stats /Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/
+
 ```
 
-#Step 2b: Analyse the sanity checks file. Perform per population analyses on the sanity checks file.
+#Step 2c: Analyse the sanity checks file. Perform per population analyses on the sanity checks file.
 
 ```{r Analyse the sanity checks file}
 library("readr")
@@ -101,23 +106,29 @@ library("ggplot2")
 
 sanity_checks <- read_csv("/Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/toy_c_gVCF_raw.stats")
 sanity_checks
+rowSums(sanity_checks[,-c(1,2)])==sanity_checks[,2] #check if the sum of AA, AB and BB SNPs equal the total SNP count (for each individual)
 pop_summary_sc <- sanity_checks %>% 
   mutate(species=substr(sanity_checks$sample_name,3,4),population=substr(sanity_checks$sample_name,6,7)) %>%
   group_by(species,population) %>%
-  summarise(mean_total_SNPs=mean(total_SNPs),mean_homoz_ref=mean(homoz_ref),mean_heteroz=mean(heteroz),mean_homoz_alt=mean(homoz_alt),mean_unaccounted=mean(unaccounted))
+  summarise(N=n(),mean_total_SNPs=mean(total_SNPs),mean_homoz_ref=mean(homoz_ref),mean_heteroz=mean(heteroz),mean_homoz_alt=mean(homoz_alt),mean_unaccounted=mean(unaccounted))
 pop_summary_sc
 
-plot_total_SNPs <- ggplot(pop_summary_sc, aes(population,mean_total_SNPs)) + geom_col() + facet_grid(. ~ species)
-plot_total_SNPs
+plot_pop_total_SNPs <- ggplot(pop_summary_sc, aes(population,mean_total_SNPs)) + geom_col() + facet_grid(. ~ species,scales="free_x",space="free_x")
+plot_pop_total_SNPs
 
-plot_heteroz <- ggplot(pop_summary_sc, aes(population,mean_heteroz)) + geom_col() + facet_grid(. ~ species)
-plot_heteroz
+plot_pop_heteroz <- ggplot(pop_summary_sc, aes(population,mean_heteroz)) + geom_col() + facet_grid(. ~ species,scales="free_x",space="free_x")
+plot_pop_heteroz
 
+plot_indiv_total_SNPs <- ggplot(sanity_checks, aes(x=substr(sample_name,0,12),y=total_SNPs,fill=substr(sample_name,0,7))) + geom_col() + theme(axis.text.x=element_text(angle=90,hjust=0,size=6,colour="black")) 
+plot_indiv_total_SNPs
+
+plot_indiv_heteroz <- ggplot(sanity_checks, aes(x=substr(sample_name,0,12),y=heteroz,fill=substr(sample_name,0,7))) + geom_col() + theme(axis.text.x=element_text(angle=90,hjust=0,size=6,colour="black")) 
+plot_indiv_heteroz
 
 ```
 
 
-#Step 3: Combine gVCF into VCF. Run joint genotyping of all desired gVCF files to produce a multisample VCF file.
+#Step 3a: Combine gVCF into VCF. Run joint genotyping of all desired gVCF files to produce a multisample VCF file.
 
 ```{r Combine gVCF into VCF, eval=FALSE, engine='bash'}
 
@@ -216,7 +227,41 @@ INPUT_gVCFs=all_c_original_coverage_*.list #insert here one of the lists generat
 
 java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T GenotypeGVCFs -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa -V $INPUT_gVCFs -o all_c_original_coverage_recal_round-1.vcf
 
+
 ```
+
+
+#Step 3b: Split VCF into per population VCFs.
+
+```{r Combine gVCF into VCF, eval=FALSE, engine='bash'}
+
+#Rename those samples in the global VCF that don't have the proper name (the 4 samples that were sequenced at Macrogen and the DON sample from before 1990)
+#!/bin/bash
+#cat << "EOF" > list_to_remove.txt #Unmark this line when running it (I marked it in R because it doesn't understand it and messes the colours of subsequent lines)
+LL112_rgsm c_ll_vl_0112
+LL146_rgsm c_ll_ya_0146
+LL212_rgsm c_ll_cr_0212
+LL90_rgsm c_ll_ki_0090
+h_lp_do_0007 c_lp_do_0007
+EOF
+
+/opt/bcftools/bcftools reheader -s list_to_remove.txt -o all_c_ll_lp_renamed.vcf all_c_ll_lp.vcf #copy the VCF and rename the wrong named samples in the new VCF
+
+
+#Split the VCF in order to get one for each population
+#The first time that I did this I encountered an error for 5 populations because 5 samples were not names as they should. That's why I renamed samples in the VCF and then I ran this code again:
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
+declare POP=$(ls c_*.g.vcf.gz | cut -c1-7 | uniq)
+for i in ${POP[@]}
+  do
+  echo "${i}"
+  ls ${i}*g.vcf.gz | sed 's/_recal_round-1.g.vcf.gz//g' > list_to_remove.txt
+  /opt/bcftools/bcftools view -c1 -Oz -S list_to_remove.txt --min-ac=1 --no-update -o "${i}".vcf.perpop all_c_ll_lp_renamed.vcf
+  rm list_to_remove.txt
+  done
+
+```
+
 
 #Step 4a: Extract SNPs. Subset the VCF file in order to keep only SNP variants.
 
