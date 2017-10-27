@@ -22,12 +22,10 @@ samtools faidx lp23.fa
 #Step 2a: Produce gVCF files. Perform a calling per sample to produce a gVCF file with variant information for every position in the genome (variant or not).
 
 ```{r Produce gVCF files, eval=FALSE, engine='bash'}
-<<<<<<< HEAD
+
 
 #For 5x samples:
-=======
-#5x genomes
->>>>>>> a0c58c22dfb406bf8435c4ca7c82e5e8eea00be0
+
 cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #this works for the 5x samples
 
 REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa
