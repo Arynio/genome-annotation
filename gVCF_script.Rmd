@@ -16,6 +16,7 @@ java -jar /home/tmp/Software/Picard/picard-tools-1.66/CreateSequenceDictionary.j
  O= lp23.dict
 
 samtools faidx lp23.fa
+
 ```
 
 #Step 2a: Produce gVCF files. Perform a calling per sample to produce a gVCF file with variant information for every position in the genome (variant or not).
