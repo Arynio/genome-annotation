@@ -282,7 +282,7 @@ for i in ${POP[@]}
   do
   echo "${i}"
   ls ${i}*g.vcf.gz | sed 's/_recal_round-1.g.vcf.gz//g' > list_to_remove.txt
-  /opt/bcftools/bcftools view -c1 -Oz -S list_to_remove.txt --min-ac=1 --no-update -O v -o "${i}"perpop.vcf all_c_ll_lp_renamed.vcf
+  /opt/bcftools/bcftools view -c1 -Oz -S list_to_remove.txt --min-ac=1 --no-update -O v -o "${i}"_perpop.vcf all_c_ll_lp_renamed.vcf
   rm list_to_remove.txt
   done
 
@@ -293,7 +293,9 @@ for i in ${POP[@]}
 
 ```{r Extract SNPs, eval=FALSE, engine='bash'}
 
-java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g -Xmx128g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T SelectVariants -selectType SNP -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa -V lp_all_pop_recal_round-1.vcf -o lp_all_pop_recal_round-1_SNPs.vcf
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/
+
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T SelectVariants -selectType SNP -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa -V /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/all_c_ll_lp_renamed.vcf -o all_c_ll_lp_renamed_SNPs.vcf
 
 ```
 
@@ -301,7 +303,9 @@ java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g -X
 
 ```{r Extract INDELs, eval=FALSE, engine='bash'}
 
-java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g -Xmx64g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T SelectVariants -selectType INDEL -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa -V lp_all_pop_recal_round-1.vcf -o lp_all_pop_recal_round-1_indels.vcf
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/
+
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T SelectVariants -selectType INDEL -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa -V /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/all_c_ll_lp_renamed.vcf -o all_c_ll_lp_renamed_INDELs.vcf
 
 ```
 
