@@ -282,7 +282,7 @@ for i in ${POP[@]}
   do
   echo "${i}"
   ls ${i}*g.vcf.gz | sed 's/_recal_round-1.g.vcf.gz//g' > list_to_remove.txt
-  /opt/bcftools/bcftools view -c1 -Oz -S list_to_remove.txt --min-ac=1 --no-update -O v -o "${i}"_perpop.vcf all_c_ll_lp_renamed.vcf
+  /opt/bcftools/bcftools view -c1 -Oz -S list_to_remove.txt --min-ac=1 --no-update -O v -o "${i}"_perpop.vcf all_c_ll_lp_renamed_SNPs.vcf
   rm list_to_remove.txt
   done
 
