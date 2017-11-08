@@ -1,0 +1,52 @@
+---
+title: "TreeMix_script"
+author: "Dani"
+date: "8/11/2017"
+output: html_document
+---
+
+
+#1: Build TreeMix input. Combine per population allele counts for all SNPs in a single gzipped file matching the required format for TreeMix inputs.
+
+```{r Remove monomorphic SNPs, eval=FALSE, engine='bash'}
+
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
+shopt -s extglob #the extglob shell option gives you more powerful pattern matching in the command line.
+POPLIST=($(ls c_*_perpop.vcf | cut -d "_" -f1,2,3 | sort | uniq))
+
+rm toy_treemix_input.txt
+echo "pop_name,sample_number,total_SNPs" > toy_treemix_input.txt 
+#echo "pop_name,total_SNPs,homoz_ref,heteroz,homoz_alt,unaccounted,unaccounted_cat" > c_VCF_raw.stats 
+for pop in "${POPLIST[@]}"
+do
+echo "${pop}"
+#done
+NAME="${pop}"
+SAMPLE_NUMBER="$(/opt/bcftools/bcftools query -l "${pop}"_perpop.vcf | wc -l)"
+echo $SAMPLE_NUMBER
+TOTAL_SNPS="$(grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${pop}"_perpop.vcf | wc -l)"
+echo $TOTAL_SNPS
+FORMAT="$(grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/c_lp_sm_perpop.vcf | cut -d$'\t' -f1,2,8 | cut -d$';' -f1,3 --output-delimiter=' ' | awk '{print $1"_"$2"     "$3" "$4}' | head)"
+echo $FORMAT
+
+
+
+#TOTAL_00="$(grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${pop}"_perpop.vcf | grep '0/0:' | wc -l)"
+#echo $TOTAL_00
+#TOTAL_01="$(grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${pop}"_perpop.vcf | grep '0/1:' | wc -l)"
+#echo $TOTAL_01
+#TOTAL_11="$(grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${pop}"_perpop.vcf | grep '1/1:' | wc -l)"
+#echo $TOTAL_11
+#UNACCOUNTED="$(($TOTAL_SNPS - $TOTAL_00 - $TOTAL_01 - $TOTAL_11))"
+#echo $UNACCOUNTED
+#UNACCOUNTED_CAT="$(grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${pop}"_perpop.vcf | cut -d$'\t' -f10 | cut -d ":" -f1 | sort | uniq | paste -s -d ",")"
+#echo $UNACCOUNTED_CAT
+
+echo "$NAME,$SAMPLE_NUMBER,$TOTAL_SNPS" >> c_VCF_raw.stats
+#echo "$NAME,$TOTAL_SNPS,$TOTAL_00,$TOTAL_01,$TOTAL_11,$UNACCOUNTED,$UNACCOUNTED_CAT" >> c_VCF_raw.stats
+done
+
+shopt -u extglob #disable extglob
+
+
+```
