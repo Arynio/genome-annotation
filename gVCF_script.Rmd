@@ -310,7 +310,7 @@ java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g  -
 
 #5a: Split VCF into per population VCFs.
 
-```{r Split VCF into per population VCFs., eval=FALSE, engine='bash'}
+```{r Split VCF into per population VCFs, eval=FALSE, engine='bash'}
 
 #Split the VCF in order to get one for each population
 #The first time that I did this I encountered an error for 5 populations because 5 samples were not names as they should. That's why I renamed samples in the VCF and then I ran this code again:
@@ -320,7 +320,7 @@ for i in ${POP[@]}
   do
   echo "${i}"
   ls ${i}*g.vcf.gz | sed 's/_recal_round-1.g.vcf.gz//g' > list_to_remove.txt
-  /opt/bcftools/bcftools view -c1 -Oz -S list_to_remove.txt --min-ac=1 --no-update -O v -o "${i}"_perpop.vcf all_c_ll_lp_renamed_SNPs.vcf
+  /opt/bcftools/bcftools view -c1 -S list_to_remove.txt --min-ac=1 --no-update -Ov -o "${i}"_perpop.vcf all_c_ll_lp_renamed_SNPs.vcf
   rm list_to_remove.txt
   done
 
@@ -335,26 +335,30 @@ shopt -s extglob #the extglob shell option gives you more powerful pattern match
 POPLIST=($(ls c_*_perpop.vcf | cut -d "_" -f1,2,3 | sort | uniq))
 
 rm c_VCF_raw.stats
-echo "sample_name,total_SNPs,homoz_ref,heteroz,homoz_alt,unaccounted,unaccounted_cat" > c_VCF_raw.stats 
+echo "pop_name,sample_number,total_SNPs" > c_VCF_raw.stats 
+#echo "pop_name,total_SNPs,homoz_ref,heteroz,homoz_alt,unaccounted,unaccounted_cat" > c_VCF_raw.stats 
 for pop in "${POPLIST[@]}"
 do
 echo "${pop}"
 #done
 NAME="${pop}"
+SAMPLE_NUMBER="$(/opt/bcftools/bcftools query -l "${pop}"_perpop.vcf | wc -l)"
+echo $SAMPLE_NUMBER
 TOTAL_SNPS="$(grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${pop}"_perpop.vcf | wc -l)"
 echo $TOTAL_SNPS
-TOTAL_00="$(grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${pop}"_perpop.vcf | grep '0/0:' | wc -l)"
-echo $TOTAL_00
-TOTAL_01="$(grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${pop}"_perpop.vcf | grep '0/1:' | wc -l)"
-echo $TOTAL_01
-TOTAL_11="$(grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${pop}"_perpop.vcf | grep '1/1:' | wc -l)"
-echo $TOTAL_11
-UNACCOUNTED="$(($TOTAL_SNPS - $TOTAL_00 - $TOTAL_01 - $TOTAL_11))"
-echo $UNACCOUNTED
-UNACCOUNTED_CAT="$(grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${pop}"_perpop.vcf | cut -d$'\t' -f10 | cut -d ":" -f1 | sort | uniq | paste -s -d ",")"
-echo $UNACCOUNTED_CAT
+#TOTAL_00="$(grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${pop}"_perpop.vcf | grep '0/0:' | wc -l)"
+#echo $TOTAL_00
+#TOTAL_01="$(grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${pop}"_perpop.vcf | grep '0/1:' | wc -l)"
+#echo $TOTAL_01
+#TOTAL_11="$(grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${pop}"_perpop.vcf | grep '1/1:' | wc -l)"
+#echo $TOTAL_11
+#UNACCOUNTED="$(($TOTAL_SNPS - $TOTAL_00 - $TOTAL_01 - $TOTAL_11))"
+#echo $UNACCOUNTED
+#UNACCOUNTED_CAT="$(grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${pop}"_perpop.vcf | cut -d$'\t' -f10 | cut -d ":" -f1 | sort | uniq | paste -s -d ",")"
+#echo $UNACCOUNTED_CAT
 
-echo "$NAME,$TOTAL_SNPS,$TOTAL_00,$TOTAL_01,$TOTAL_11,$UNACCOUNTED,$UNACCOUNTED_CAT" >> c_VCF_raw.stats
+echo "$NAME,$SAMPLE_NUMBER,$TOTAL_SNPS" >> c_VCF_raw.stats
+#echo "$NAME,$TOTAL_SNPS,$TOTAL_00,$TOTAL_01,$TOTAL_11,$UNACCOUNTED,$UNACCOUNTED_CAT" >> c_VCF_raw.stats
 done
 
 shopt -u extglob #disable extglob
@@ -364,9 +368,44 @@ scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/BAM
 
 ```
 grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/c_ll_ya_perpop.vcf | grep '4/4:' | wc -l
-grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/c_ll_ya_perpop.vcf | cut -d$'\t' -f 10- | cut -d ":" -f1 | sort | uniq | paste -s -d ","
+grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/c_ll_ya_perpop.vcf | cut -d$'\t' -f 10- | sort | uniq | paste -s -d ","
 
 # ^ keep all things before ":" (all columns) and then count the number of 1/1 (substitutions when all individuals are 1/1?).
-# ^ keep only that + the total number of SNPs. The rest doesn't make sense in a population VCF.
 
-#6: Polarize SNPs. Later on, use VCFtools in order to polarize according to the ancestral genome of preference.
+
+#5c: Analyse the sanity checks file. Perform per population analyses on the sanity checks file.
+
+```{r Analyse the sanity checks file}
+library("readr")
+library("dplyr")
+library("ggplot2")
+
+sanity_checks <- read_csv("/Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/c_VCF_raw.stats")
+sanity_checks
+sanity_checks <- sanity_checks %>% 
+  mutate(species=substr(sanity_checks$pop_name,3,4)) %>%
+  select(1,4,2,3)
+sanity_checks
+
+plot_SNPs_samples_corr <- ggplot(sanity_checks, aes(sample_number,total_SNPs)) + geom_point(aes(colour=species)) + scale_colour_manual(values=c("blue","red"))
+plot_SNPs_samples_corr
+
+```
+
+#6: Remove monomorphic SNPs. Remove substitutions or monomorphic SNPs within each population/species (as desired).
+
+```{r Remove monomorphic SNPs, eval=FALSE, engine='bash'}
+
+#Remove monomorphic sites (e.g. substitutions between both species)
+
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
+/opt/bcftools-1.6/bcftools view --min-af 0.01:minor --max-af 0.99:major --no-update -O v -o c_ll_ya_perpop_no_mono_toy.vcf c_ll_ya_perpop.vcf
+grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/c_ll_ya_perpop.vcf | wc -l
+
+#It doesn't work because of previous --no-update!
+
+#First, subset VCF at the species level, UPDATING the INFO fields (make sure that REF allele isn't reassigned). Then remove/count substitutions as well as INDELS, etc. Tag SNPs. And in the end, split into populations!
+
+```
+
+#7: Polarize SNPs. Later on, use VCFtools in order to polarize according to the ancestral genome of preference.
