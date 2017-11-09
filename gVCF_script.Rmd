@@ -26,42 +26,55 @@ samtools faidx lp23.fa
 
 #For 5x samples:
 
-cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #this works for the 5x samples
-
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #this works for the 5x samples (25x samples are stored in another folder and are named differently)
 REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa
 POP=("*_lp")
 for pop in ${POP[@]}
-do
-echo "${pop}"
-ls ${pop}_*_recal_round-1.bam  > ${pop/*_lp/lp}_recal_round-1.bam.list;
-INPUT_BAMS_FOR_CALLING=($(cat ${pop/*_lp/lp}_recal_round-1.bam.list)) 
-for id in ${INPUT_BAMS_FOR_CALLING[@]}
-do
-echo "${id}"
-java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T HaplotypeCaller -R $REF -I ${id} --emitRefConfidence GVCF -o ${id/.bam/.g.vcf.gz}
-done
-done
+  do
+  echo "${pop}"
+  ls ${pop}_*_recal_round-1.bam  > ${pop/*_lp/lp}_recal_round-1.bam.list;
+  INPUT_BAMS_FOR_CALLING=($(cat ${pop/*_lp/lp}_recal_round-1.bam.list)) 
+  for id in ${INPUT_BAMS_FOR_CALLING[@]}
+    do
+    echo "${id}"
+    java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar /opt/GATK-3.7/GenomeAnalysisTK.jar \
+    -T HaplotypeCaller \
+    -R $REF \
+    -I ${id} \
+    --emitRefConfidence GVCF \
+    -o ${id/.bam/.g.vcf.gz}
+    done
+  done
 
 #For 25x samples:
 cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/genome_project_samples_25x #this works for the 25x samples
-
 REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa
 POP=("*_lp")
 for pop in ${POP[@]}
-do
-echo "${pop}"
-ls ${pop}_*_recal_round-1_25x.bam  > ${pop/*_lp/lp}_recal_round-1_25x.bam.list;
-INPUT_BAMS_FOR_CALLING=($(cat ${pop/*_lp/lp}_recal_round-1_25x.bam.list)) 
-for id in ${INPUT_BAMS_FOR_CALLING[@]}
-do
-echo "${id}"
-java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T HaplotypeCaller -R $REF -I ${id} --emitRefConfidence GVCF -o ${id/.bam/.g.vcf.gz}
-done
-done
+  do
+  echo "${pop}"
+  ls ${pop}_*_recal_round-1_25x.bam  > ${pop/*_lp/lp}_recal_round-1_25x.bam.list;
+  INPUT_BAMS_FOR_CALLING=($(cat ${pop/*_lp/lp}_recal_round-1_25x.bam.list)) 
+  for id in ${INPUT_BAMS_FOR_CALLING[@]}
+    do
+    echo "${id}"
+    java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar /opt/GATK-3.7/GenomeAnalysisTK.jar \
+    -T HaplotypeCaller \
+    -R $REF \
+    -I ${id} \
+    --emitRefConfidence GVCF \
+    -o ${id/.bam/.g.vcf.gz}
+    done
+  done
 
 #This was only used to test one sample (lp_do_0443):
 REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa
-java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx64g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T HaplotypeCaller -R $REF -I c_lp_do_0443_recal_round-1.bam --emitRefConfidence GVCF -o /home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs/c_lp_do_0443_BIS_recal_round-1.g.vcf
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx64g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar \
+-T HaplotypeCaller \
+-R $REF \
+-I c_lp_do_0443_recal_round-1.bam \
+--emitRefConfidence GVCF \
+-o /home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs/c_lp_do_0443_BIS_recal_round-1.g.vcf
 
 ```
 
@@ -94,27 +107,25 @@ done
 cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
 shopt -s extglob #the extglob shell option gives you more powerful pattern matching in the command line.
 SAMPLELIST=($(ls c_*.g.vcf.gz | cut -d "." -f1 | sort | uniq))
-
 rm toy_c_gVCF_raw.stats
 echo "sample_name,total_SNPs,homoz_ref,heteroz,homoz_alt,unaccounted" > toy_c_gVCF_raw.stats 
 for sample in "${SAMPLELIST[@]}"
-do
-echo "${sample}"
-#done
-NAME="${sample}"
-TOTAL_SNPS="$(zgrep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${sample}".g.vcf.gz | wc -l)"
-echo $TOTAL_SNPS
-TOTAL_00="$(zgrep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${sample}".g.vcf.gz | zgrep '0/0:' | wc -l)"
-echo $TOTAL_00
-TOTAL_01="$(zgrep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${sample}".g.vcf.gz | zgrep '0/1:' | wc -l)"
-echo $TOTAL_01
-TOTAL_11="$(zgrep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${sample}".g.vcf.gz | zgrep '1/1:' | wc -l)"
-echo $TOTAL_11
-UNACCOUNTED="$(($TOTAL_SNPS - $TOTAL_00 - $TOTAL_01 - $TOTAL_11))"
-echo $UNACCOUNTED
-echo "$NAME,$TOTAL_SNPS,$TOTAL_00,$TOTAL_01,$TOTAL_11,$UNACCOUNTED" >> toy_c_gVCF_raw.stats
-done
-
+  do
+  echo "${sample}"
+  #done
+  NAME="${sample}"
+  TOTAL_SNPS="$(zgrep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${sample}".g.vcf.gz | wc -l)"
+  echo $TOTAL_SNPS
+  TOTAL_00="$(zgrep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${sample}".g.vcf.gz | zgrep '0/0:' | wc -l)"
+  echo $TOTAL_00
+  TOTAL_01="$(zgrep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${sample}".g.vcf.gz | zgrep '0/1:' | wc -l)"
+  echo $TOTAL_01
+  TOTAL_11="$(zgrep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${sample}".g.vcf.gz | zgrep '1/1:' | wc -l)"
+  echo $TOTAL_11
+  UNACCOUNTED="$(($TOTAL_SNPS - $TOTAL_00 - $TOTAL_01 - $TOTAL_11))"
+  echo $UNACCOUNTED
+  echo "$NAME,$TOTAL_SNPS,$TOTAL_00,$TOTAL_01,$TOTAL_11,$UNACCOUNTED" >> toy_c_gVCF_raw.stats
+  done
 shopt -u extglob #disable extglob
 
 #Save locally the .stats file
@@ -160,12 +171,13 @@ plot_indiv_heteroz
 #Later on, when trying to work both with lp and ll gVCFs, server B is running very slow and the generation of .idx files (necessary for the VCF calling) is not working fine or whatever. We decide that it's best to work with compressed files so I compress three random lp gVCFs, but then I encounter the same problem that I got before (when using just the lp files): 'Unable to create iterator for rod named variant'.
 #Eventually, Karolina and I realize that all the compressing and decompressing of the gVCFs has messed the files. We decide to start all over again, targeting the compressed format (g.vcf.gz). She makes the ll gVCFs and I take care of the lp ones.
 
-
-#Option A: when all gVCFs are named the same (same name structure) and in the same folder (this is the code that I used in the end to redo gVCFs for the 5x lp samples):
+#Option A: when all gVCFs are named the same (same name structure) and in the same folder (this is the code that I used in the end to redo gVCFs ONLY for the 5x lp samples):
 cd /home/dkleinman/datos/c_lp_bamfiles
-
-java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g -Xmx128g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T GenotypeGVCFs -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa $(for var in *.g.vcf.gz; do echo -V ${var}" ";done) -o lp_all_pop_recal_round-1.vcf
-
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g -Xmx128g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar \
+-T GenotypeGVCFs \
+-R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa \
+$(for var in *.g.vcf.gz; do echo -V ${var}" ";done) \
+-o lp_all_pop_recal_round-1.vcf
 
 #Option B: Maria's code to better define the populations and to obtain gVCFs when BAMs with different name structure are considered.
 
@@ -191,65 +203,69 @@ java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g -X
 #Code to define the populations to be used, and then print all gVCFs in a list. This version returns a list of the "original" samples (all samples except for the subsampled version of the 28x ones):
 POPS=(c_ll_ba-c_ll_cr-c_ll_ka-c_ll_ki-c_ll_la-c_ll_no-c_ll_og-c_ll_po-c_ll_to-c_ll_tu-c_ll_vl-c_ll_ya-c_lp_do-c_lp_sm)
 for POP in ${POPS[@]}
-do
-echo $POP
-rm "all_c_original_coverage_$POP"_n"$NUMBER_IND".gVCFlist
-IFS='-' read -r -a POPS1 <<< "$POP" # this creates an array stripping by "-"
-for POP1 in "${POPS1[@]}"
-do
-echo "$POP --> $POP1"
-ls /home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs/*${POP1}_*_recal_round-1.g.vcf* | grep -v "tbi" | grep -v "idx" >> "$POP".gVCFlist
-done
-NUMBER_IND=$(printf "%03d" `wc -l "$POP".gVCFlist | cut -f1 -d " "`);
-mv "$POP".gVCFlist "all_c_original_coverage_$POP"_n"$NUMBER_IND".gVCFlist
-done
+  do
+  echo $POP
+  rm "all_c_original_coverage_$POP"_n"$NUMBER_IND".gVCFlist
+  IFS='-' read -r -a POPS1 <<< "$POP" # this creates an array stripping by "-"
+  for POP1 in "${POPS1[@]}"
+    do
+    echo "$POP --> $POP1"
+    ls /home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs/*${POP1}_*_recal_round-1.g.vcf* | grep -v "tbi" | grep -v "idx" >> "$POP".gVCFlist
+    done
+  NUMBER_IND=$(printf "%03d" `wc -l "$POP".gVCFlist | cut -f1 -d " "`);
+  mv "$POP".gVCFlist "all_c_original_coverage_$POP"_n"$NUMBER_IND".gVCFlist
+  done
 
 #Code to define the populations to be used, and then print all gVCFs in a list. This version returns a list of all samples, including both the subsampled (5x) version of those with 28x, and the 28x themselves:
 POPS=(c_ll_ba-c_ll_cr-c_ll_ka-c_ll_ki-c_ll_la-c_ll_no-c_ll_og-c_ll_po-c_ll_to-c_ll_tu-c_ll_vl-c_ll_ya-c_lp_do-c_lp_sm)
 for POP in ${POPS[@]}
-do
-echo $POP
-rm "all_c_samples_$POP"_n"$NUMBER_IND".gVCFlist
-IFS='-' read -r -a POPS1 <<< "$POP" # this creates an array stripping by "-"
-for POP1 in "${POPS1[@]}"
-do
-echo "$POP --> $POP1"
-ls /home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs/*${POP1}_*_recal_round-1*g.vcf* | grep -v "tbi" | grep -v "idx" >> "$POP".gVCFlist
-done
-NUMBER_IND=$(printf "%03d" `wc -l "$POP".gVCFlist | cut -f1 -d " "`);
-mv "$POP".gVCFlist "all_c_samples_$POP"_n"$NUMBER_IND".gVCFlist
-done
+  do
+  echo $POP
+  rm "all_c_samples_$POP"_n"$NUMBER_IND".gVCFlist
+  IFS='-' read -r -a POPS1 <<< "$POP" # this creates an array stripping by "-"
+  for POP1 in "${POPS1[@]}"
+    do
+    echo "$POP --> $POP1"
+    ls /home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs/*${POP1}_*_recal_round-1*g.vcf* | grep -v "tbi" | grep -v "idx" >> "$POP".gVCFlist
+    done
+  NUMBER_IND=$(printf "%03d" `wc -l "$POP".gVCFlist | cut -f1 -d " "`);
+  mv "$POP".gVCFlist "all_c_samples_$POP"_n"$NUMBER_IND".gVCFlist
+  done
 
 #Code to define the populations to be used, and then print all gVCFs in a list. This version returns a list with only those (original, 28x) samples that were subsampled:
 POPS=(c_lp_do-c_lp_sm)
 for POP in ${POPS[@]}
-do
-echo $POP
-rm "all_c_lp_samples_28x_$POP"_n"$NUMBER_IND".gVCFlist
-IFS='-' read -r -a POPS1 <<< "$POP" # this creates an array stripping by "-"
-for POP1 in "${POPS1[@]}"
-do
-echo "$POP --> $POP1"
-ls /home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs/*${POP1}_*_recal_round-1_subsampled.g.vcf* | grep -v "tbi" | grep -v "idx" | sed 's/_subsampled//g' >> "$POP".gVCFlist
-done
-NUMBER_IND=$(printf "%03d" `wc -l "$POP".gVCFlist | cut -f1 -d " "`);
-mv "$POP".gVCFlist "all_c_lp_samples_28x_$POP"_n"$NUMBER_IND".gVCFlist
-done
+  do
+  echo $POP
+  rm "all_c_lp_samples_28x_$POP"_n"$NUMBER_IND".gVCFlist
+  IFS='-' read -r -a POPS1 <<< "$POP" # this creates an array stripping by "-"
+    for POP1 in "${POPS1[@]}"
+    do
+    echo "$POP --> $POP1"
+    ls /home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs/*${POP1}_*_recal_round-1_subsampled.g.vcf* | grep -v "tbi" | grep -v "idx" | sed 's/_subsampled//g' >> "$POP".gVCFlist
+    done
+  NUMBER_IND=$(printf "%03d" `wc -l "$POP".gVCFlist | cut -f1 -d " "`);
+  mv "$POP".gVCFlist "all_c_lp_samples_28x_$POP"_n"$NUMBER_IND".gVCFlist
+  done
 
 #Next, use the following line to exclude from the all samples list the list with only 28x samples in order to obtain a list with only 5x samples (including the subsampled versions of 28x samples)
 grep -v -f all_c_lp_samples_28x*.gVCFlist all_c_samples_c*.gVCFlist > all_c_samples_5x_c_ll_ba-c_ll_cr-c_ll_ka-c_ll_ki-c_ll_la-c_ll_no-c_ll_og-c_ll_po-c_ll_to-c_ll_tu-c_ll_vl-c_ll_ya-c_lp_do-c_lp_sm_n103.gVCFlist
 
-#Next, run the VCF calling using the "original" samples:
+#Next, run the VCF calling using the "original" samples (28x when possible, and 5x elsewhere):
 POPS=(c_ll_ba-c_ll_cr-c_ll_ka-c_ll_ki-c_ll_la-c_ll_no-c_ll_og-c_ll_po-c_ll_to-c_ll_tu-c_ll_vl-c_ll_ya-c_lp_do-c_lp_sm)
 INPUT_gVCFs=all_c_samples_5x_*.list #insert here one of the lists generated above ()
-
-java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T GenotypeGVCFs -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa -V $INPUT_gVCFs -o all_c_samples_5x_recal_round-1.vcf
-
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar /opt/GATK-3.7/GenomeAnalysisTK.jar \
+-T GenotypeGVCFs \
+-R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa \
+-V $INPUT_gVCFs \
+-o all_c_samples_5x_recal_round-1.vcf
 
 INPUT_gVCFs=all_c_original_coverage_*.list #insert here one of the lists generated above ()
-
-java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T GenotypeGVCFs -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa -V $INPUT_gVCFs -o all_c_original_coverage_recal_round-1.vcf
-
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar /opt/GATK-3.7/GenomeAnalysisTK.jar \
+-T GenotypeGVCFs \
+-R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa \
+-V $INPUT_gVCFs \
+-o all_c_original_coverage_recal_round-1.vcf
 
 ```
 
@@ -257,7 +273,7 @@ java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar /opt/
 
 ```{r Fix sample names in the VCF, eval=FALSE, engine='bash'}
 
-#First, it's important to rename those samples in the global VCF that don't have the proper name (in our case it's 5 samples: the 4 that were sequenced at Macrogen and the DON sample from before 1990):
+#First, it's important to rename those samples in the global VCF that don't have the proper name (in our case it's 5 samples: the 4 that were sequenced at Macrogen and the DON sample from before 1990). The first time that I tried to split the VCF, I ran into some errors due to these names.
 
 #!/bin/bash
 #cat << "EOF" > list_to_remove.txt #Unmark this line when running it (I marked it in R because it doesn't understand it and messes the colours of subsequent lines)
@@ -272,31 +288,86 @@ EOF
 
 ```
 
-#3a: Extract SNPs. Subset the VCF file in order to keep only SNP variants.
+#2c: Split the VCF into per species VCFs. Generate a VCF for the Iberian lynx and another one for the Eurasian lynx.
+
+```{r Split the VCF into per population VCFs, eval=FALSE, engine='bash'}
+
+#Split the VCF in order to get one for each species. It will be necessary to get rid of substitutions. During this step, all fixed positions within each species (including substitutions) will also be removed (with minor allele count = 1).
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
+declare SPECIES=$(ls c_*.g.vcf.gz | cut -c1-4 | uniq)
+for i in ${SPECIES[@]}
+  do
+  echo "${i}"
+  ls ${i}*g.vcf.gz | sed 's/_recal_round-1.g.vcf.gz//g' > list_to_remove.txt
+  /opt/bcftools-1.6/bcftools view -S list_to_remove.txt --min-ac 1:minor -Ov -o "${i}"_species.vcf all_c_ll_lp_renamed.vcf
+  done
+rm list_to_remove.txt
+  
+!!!!!!!! IMPORTANT TO CHECK WHETHER THE REFERENCE ALLELE IS STILL THE SAME BETWEEN BOTH VCFs !!!!!!!!!
+
+```
+
+#3a: Extract SNPs. Subset the VCF files in order to keep only SNP variants.
 
 ```{r Extract SNPs, eval=FALSE, engine='bash'}
 
+#During this step, all multiallelic SNPs as well as all INDELs will be dropped from the respective VCFs.
 cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/
-
-java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T SelectVariants -selectType SNP -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa -V /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/all_c_ll_lp_renamed.vcf -o all_c_ll_lp_renamed_SNPs.vcf
+declare SPECIES=$(ls c*_species.vcf | cut -c1-4 | uniq)
+for i in ${SPECIES[@]}
+  do
+  echo "${i}"
+  java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar \
+  -T SelectVariants \
+  -selectType SNP \
+  -restrictAllelesTo BIALLELIC \
+  -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa \
+  -V /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${i}"_species.vcf \
+  -o "${i}"_species_SNPs.vcf
+  done
 
 ```
 
-#3b: Extract INDELs. Subset the VCF file in order to keep only INDELs.
+#3b: Extract INDELs. Subset the VCF files in order to keep only INDELs.
 
 ```{r Extract INDELs, eval=FALSE, engine='bash'}
 
+#This section should only be used if INDELs are needed.
 cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/
-
-java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T SelectVariants -selectType INDEL -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa -V /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/all_c_ll_lp_renamed.vcf -o all_c_ll_lp_renamed_INDELs.vcf
+declare SPECIES=$(ls c*_species.vcf | cut -c1-4 | uniq)
+for i in ${SPECIES[@]}
+  do
+  echo "${i}"
+  java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar \
+  -T SelectVariants \
+  -selectType INDEL \
+  -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa \
+  -V /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${i}"_species.vcf \
+  -o "${i}"_species_INDELs.vcf
+  done
 
 ```
 
-#4a: Tag SNPs. Tag SNPs which don't reach certain quality thresholds (QD: QualbyDepth; FS: FisherStrand; MQ: root mean square of Mapping Quality; MQRankSum: Mann-Whitney Rank Sum Test for Mappin Qualities; ReadPosRankSum: Mann-Whitney Rank Sum Test for distance from end of the read).
+#4a: Tag SNPs. Tag SNPs which don't reach certain quality thresholds.
 
 ```{r Tag SNPs, eval=FALSE, engine='bash'}
 
-java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g -Xmx128g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T VariantFiltration --filterName "snpsfilter" --filterExpression "QD<2.0||MQ<40.0||FS>60.0||MQRankSum<-12.5||ReadPosRankSum<-8.0" -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa -V lp_all_pop_recal_round-1_SNPs.vcf -o lp_all_pop_recal_round-1_SNPs_tagged.vcf
+#SNPs that don't meet certain quality criteria should be tagged (and eventually removed). QD: QualbyDepth; FS: FisherStrand; MQ: root mean square of Mapping Quality; MQRankSum: Mann-Whitney Rank Sum Test for Mappin Qualities; ReadPosRankSum: Mann-Whitney Rank Sum Test for distance from end of the read.
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/
+declare SPECIES=$(ls c*_species_SNPs.vcf | cut -c1-4 | uniq)
+for i in ${SPECIES[@]}
+  do
+  echo "${i}"
+  java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar \
+  -T VariantFiltration \
+  --filterName "snpsfilter" \
+  --filterExpression "QD<2.0||MQ<40.0||FS>60.0||MQRankSum<-12.5||ReadPosRankSum<-8.0" \
+  -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa \
+  -V "${i}"_species_SNPs.vcf \
+  -o "${i}"_species_SNPs_tagged.vcf
+  done
+
+!!!!!!!!!! FILTERING CRITERIA MUST BE REVISED !!!!!!!!!!
 
 ```
 
@@ -304,26 +375,44 @@ java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g -X
 
 ```{r Filter SNPs, eval=FALSE, engine='bash'}
 
-java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g  -Xmx64g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T SelectVariants -select 'vc.isNotFiltered()' -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa -V lp_all_pop_recal_round-1_SNPs_tagged.vcf -o lp_all_pop_recal_round-1_SNPs_tagged_filtered.vcf
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/
+declare SPECIES=$(ls c*_species_SNPs.vcf | cut -c1-4 | uniq)
+for i in ${SPECIES[@]}
+  do
+  echo "${i}"
+  java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar \
+  -T SelectVariants \
+  -select 'vc.isNotFiltered()' \
+  -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa \
+  -V "${i}"_species_SNPs_tagged.vcf \
+  -o "${i}"_species_SNPs_tagged_filtered.vcf
+  done
 
 ```
 
-#5a: Split VCF into per population VCFs.
+#5a: Split the species VCFs into per population VCFs. Generate a VCF for each population.
 
-```{r Split VCF into per population VCFs, eval=FALSE, engine='bash'}
+```{r Split the species VCFs into per population VCFs, eval=FALSE, engine='bash'}
 
-#Split the VCF in order to get one for each population
-#The first time that I did this I encountered an error for 5 populations because 5 samples were not names as they should. That's why I renamed samples in the VCF and then I ran this code again:
+#Split both species VCFs in order to get a sub-VCF for each population.
+
+!!!!!!!!!! REVISAR CODIGO. COMPROBAR QUE FUNCIONA ANTES DE USAR !!!!!!!!!!
+
 cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
-declare POP=$(ls c_*.g.vcf.gz | cut -c1-7 | uniq)
-for i in ${POP[@]}
+declare SPECIES=$(ls c_*.g.vcf.gz | cut -c1-4 | uniq)
+for i in ${SPECIES[@]}
   do
   echo "${i}"
-  ls ${i}*g.vcf.gz | sed 's/_recal_round-1.g.vcf.gz//g' > list_to_remove.txt
-  /opt/bcftools/bcftools view -c1 -S list_to_remove.txt --min-ac=1 --no-update -Ov -o "${i}"_perpop.vcf all_c_ll_lp_renamed_SNPs.vcf
-  rm list_to_remove.txt
+  declare POP=$(ls "${i}"*.g.vcf.gz | cut -c1-7 | uniq)
+  for j in ${POP[@]}
+    do
+    echo "${j}"
+    ls ${j}*g.vcf.gz | sed 's/_recal_round-1.g.vcf.gz//g' > list_to_remove.txt
+    /opt/bcftools/bcftools view -c1 -S list_to_remove.txt -Ov -o "${j}"_perpop.vcf "${i}"_species_SNPs_tagged_filtered.vcf
+    done
   done
-
+rm list_to_remove.txt
+  
 ```
 
 #5b: Perform sanity checks on VCFs. Perform various sanity checks on all VCFs.
@@ -333,45 +422,38 @@ for i in ${POP[@]}
 cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
 shopt -s extglob #the extglob shell option gives you more powerful pattern matching in the command line.
 POPLIST=($(ls c_*_perpop.vcf | cut -d "_" -f1,2,3 | sort | uniq))
-
 rm c_VCF_raw.stats
 echo "pop_name,sample_number,total_SNPs" > c_VCF_raw.stats 
 #echo "pop_name,total_SNPs,homoz_ref,heteroz,homoz_alt,unaccounted,unaccounted_cat" > c_VCF_raw.stats 
 for pop in "${POPLIST[@]}"
-do
-echo "${pop}"
-#done
-NAME="${pop}"
-SAMPLE_NUMBER="$(/opt/bcftools/bcftools query -l "${pop}"_perpop.vcf | wc -l)"
-echo $SAMPLE_NUMBER
-TOTAL_SNPS="$(grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${pop}"_perpop.vcf | wc -l)"
-echo $TOTAL_SNPS
-#TOTAL_00="$(grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${pop}"_perpop.vcf | grep '0/0:' | wc -l)"
-#echo $TOTAL_00
-#TOTAL_01="$(grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${pop}"_perpop.vcf | grep '0/1:' | wc -l)"
-#echo $TOTAL_01
-#TOTAL_11="$(grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${pop}"_perpop.vcf | grep '1/1:' | wc -l)"
-#echo $TOTAL_11
-#UNACCOUNTED="$(($TOTAL_SNPS - $TOTAL_00 - $TOTAL_01 - $TOTAL_11))"
-#echo $UNACCOUNTED
-#UNACCOUNTED_CAT="$(grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${pop}"_perpop.vcf | cut -d$'\t' -f10 | cut -d ":" -f1 | sort | uniq | paste -s -d ",")"
-#echo $UNACCOUNTED_CAT
-
-echo "$NAME,$SAMPLE_NUMBER,$TOTAL_SNPS" >> c_VCF_raw.stats
-#echo "$NAME,$TOTAL_SNPS,$TOTAL_00,$TOTAL_01,$TOTAL_11,$UNACCOUNTED,$UNACCOUNTED_CAT" >> c_VCF_raw.stats
-done
-
+  do
+  echo "${pop}"
+  #done
+  NAME="${pop}"
+  SAMPLE_NUMBER="$(/opt/bcftools/bcftools query -l "${pop}"_perpop.vcf | wc -l)"
+  echo $SAMPLE_NUMBER
+  TOTAL_SNPS="$(grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${pop}"_perpop.vcf | wc -l)"
+  echo $TOTAL_SNPS
+  #TOTAL_00="$(grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${pop}"_perpop.vcf | grep '0/0:' | wc -l)"
+  #echo $TOTAL_00
+  #TOTAL_01="$(grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${pop}"_perpop.vcf | grep '0/1:' | wc -l)"
+  #echo $TOTAL_01
+  #TOTAL_11="$(grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${pop}"_perpop.vcf | grep '1/1:' | wc -l)"
+  #echo $TOTAL_11
+  #UNACCOUNTED="$(($TOTAL_SNPS - $TOTAL_00 - $TOTAL_01 - $TOTAL_11))"
+  #echo $UNACCOUNTED
+  #UNACCOUNTED_CAT="$(grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${pop}"_perpop.vcf | cut -d$'\t' -f10 | cut -d ":" -f1 | sort | uniq | paste -s -d ",")"
+  #echo $UNACCOUNTED_CAT
+  
+  echo "$NAME,$SAMPLE_NUMBER,$TOTAL_SNPS" >> c_VCF_raw.stats
+  #echo "$NAME,$TOTAL_SNPS,$TOTAL_00,$TOTAL_01,$TOTAL_11,$UNACCOUNTED,$UNACCOUNTED_CAT" >> c_VCF_raw.stats
+  done
 shopt -u extglob #disable extglob
 
 #Save locally the .stats file
 scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/c_VCF_raw.stats /Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/
 
 ```
-grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/c_ll_ya_perpop.vcf | grep '4/4:' | wc -l
-grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/c_ll_ya_perpop.vcf | cut -d$'\t' -f 10- | sort | uniq | paste -s -d ","
-
-# ^ keep all things before ":" (all columns) and then count the number of 1/1 (substitutions when all individuals are 1/1?).
-
 
 #5c: Analyse the sanity checks file. Perform per population analyses on the sanity checks file.
 
@@ -392,20 +474,4 @@ plot_SNPs_samples_corr
 
 ```
 
-#6: Remove monomorphic SNPs. Remove substitutions or monomorphic SNPs within each population/species (as desired).
-
-```{r Remove monomorphic SNPs, eval=FALSE, engine='bash'}
-
-#Remove monomorphic sites (e.g. substitutions between both species)
-
-cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
-/opt/bcftools-1.6/bcftools view --min-af 0.01:minor --max-af 0.99:major --no-update -O v -o c_ll_ya_perpop_no_mono_toy.vcf c_ll_ya_perpop.vcf
-grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/c_ll_ya_perpop.vcf | wc -l
-
-#It doesn't work because of previous --no-update!
-
-#First, subset VCF at the species level, UPDATING the INFO fields (make sure that REF allele isn't reassigned). Then remove/count substitutions as well as INDELS, etc. Tag SNPs. And in the end, split into populations!
-
-```
-
-#7: Polarize SNPs. Later on, use VCFtools in order to polarize according to the ancestral genome of preference.
+#6: Polarize SNPs. Later on, use VCFtools in order to polarize according to the ancestral genome of preference.
