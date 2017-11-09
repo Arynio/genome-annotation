@@ -15,37 +15,23 @@ shopt -s extglob #the extglob shell option gives you more powerful pattern match
 POPLIST=($(ls c_*_perpop.vcf | cut -d "_" -f1,2,3 | sort | uniq))
 
 rm toy_treemix_input.txt
-echo "pop_name,sample_number,total_SNPs" > toy_treemix_input.txt 
+touch toy_treemix_input.txt
 #echo "pop_name,total_SNPs,homoz_ref,heteroz,homoz_alt,unaccounted,unaccounted_cat" > c_VCF_raw.stats 
 for pop in "${POPLIST[@]}"
 do
 echo "${pop}"
 #done
 NAME="${pop}"
-SAMPLE_NUMBER="$(/opt/bcftools/bcftools query -l "${pop}"_perpop.vcf | wc -l)"
+SAMPLE_NUMBER="$(/opt/bcftools-1.6/bcftools query -l "${pop}"_perpop.vcf | wc -l)"
 echo $SAMPLE_NUMBER
 TOTAL_SNPS="$(grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${pop}"_perpop.vcf | wc -l)"
 echo $TOTAL_SNPS
-ROW_ONE= (concatenate all pop names separated by a whitespace)
-echo $ROW_ONE
-FORMAT="$(grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/c_lp_sm_perpop.vcf | cut -d$'\t' -f1,2,8 | cut -d$';' -f1,3 --output-delimiter=' ' | cut -d$'=' -f1,2,3 --output-delimiter=' ' | awk '{print $1"_"$2","$6-$4","$4}' | head)"
-echo $FORMAT
+grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/c_lp_sm_perpop.vcf | cut -d$'\t' -f1,2,8 | cut -d$';' -f1,3 --output-delimiter=' ' | cut -d$'=' -f1,2,3 --output-delimiter=' ' | awk '{print $1"_"$2","$6-$4","$4}' > temp_SNP_counts.txt
 
-Next append column wise all $FORMAT files, joining by the SNP name.
+#Next append column wise all $FORMAT files, joining by the SNP name.
 
-#TOTAL_00="$(grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${pop}"_perpop.vcf | grep '0/0:' | wc -l)"
-#echo $TOTAL_00
-#TOTAL_01="$(grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${pop}"_perpop.vcf | grep '0/1:' | wc -l)"
-#echo $TOTAL_01
-#TOTAL_11="$(grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${pop}"_perpop.vcf | grep '1/1:' | wc -l)"
-#echo $TOTAL_11
-#UNACCOUNTED="$(($TOTAL_SNPS - $TOTAL_00 - $TOTAL_01 - $TOTAL_11))"
-#echo $UNACCOUNTED
-#UNACCOUNTED_CAT="$(grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${pop}"_perpop.vcf | cut -d$'\t' -f10 | cut -d ":" -f1 | sort | uniq | paste -s -d ",")"
-#echo $UNACCOUNTED_CAT
-
-echo "$NAME,$SAMPLE_NUMBER,$TOTAL_SNPS" >> c_VCF_raw.stats
-#echo "$NAME,$TOTAL_SNPS,$TOTAL_00,$TOTAL_01,$TOTAL_11,$UNACCOUNTED,$UNACCOUNTED_CAT" >> c_VCF_raw.stats
+#sed -i "1 s/$/ $NAME/" toy_treemix_input.txt
+paste -d',' toy_treemix_input.txt temp_SNP_counts.txt
 done
 
 shopt -u extglob #disable extglob
