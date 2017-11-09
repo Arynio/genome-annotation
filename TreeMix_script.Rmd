@@ -26,10 +26,12 @@ SAMPLE_NUMBER="$(/opt/bcftools/bcftools query -l "${pop}"_perpop.vcf | wc -l)"
 echo $SAMPLE_NUMBER
 TOTAL_SNPS="$(grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${pop}"_perpop.vcf | wc -l)"
 echo $TOTAL_SNPS
-FORMAT="$(grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/c_lp_sm_perpop.vcf | cut -d$'\t' -f1,2,8 | cut -d$';' -f1,3 --output-delimiter=' ' | awk '{print $1"_"$2"     "$3" "$4}' | head)"
+ROW_ONE= (concatenate all pop names separated by a whitespace)
+echo $ROW_ONE
+FORMAT="$(grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/c_lp_sm_perpop.vcf | cut -d$'\t' -f1,2,8 | cut -d$';' -f1,3 --output-delimiter=' ' | cut -d$'=' -f1,2,3 --output-delimiter=' ' | awk '{print $1"_"$2","$6-$4","$4}' | head)"
 echo $FORMAT
 
-
+Next append column wise all $FORMAT files, joining by the SNP name.
 
 #TOTAL_00="$(grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${pop}"_perpop.vcf | grep '0/0:' | wc -l)"
 #echo $TOTAL_00
