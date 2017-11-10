@@ -5,35 +5,47 @@ date: "8/11/2017"
 output: html_document
 ---
 
+#0: Define paths.
+
+```{r Define paths, eval=FALSE, engine='bash'}
+
+V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/obsolete #BAM path
+O_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/TreeMix #TreeMix analyses output path
+T_PATH=??? #TreeMix software path
+
+```
+
 
 #1: Build TreeMix input. Combine per population allele counts for all SNPs in a single gzipped file matching the required format for TreeMix inputs.
 
 ```{r Remove monomorphic SNPs, eval=FALSE, engine='bash'}
 
-cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
+cd $V_PATH
 shopt -s extglob #the extglob shell option gives you more powerful pattern matching in the command line.
 POPLIST=($(ls c_*_perpop.vcf | cut -d "_" -f1,2,3 | sort | uniq))
-
+cd $O_PATH
 rm toy_treemix_input.txt
 touch toy_treemix_input.txt
 #echo "pop_name,total_SNPs,homoz_ref,heteroz,homoz_alt,unaccounted,unaccounted_cat" > c_VCF_raw.stats 
 for pop in "${POPLIST[@]}"
-do
-echo "${pop}"
-#done
-NAME="${pop}"
-SAMPLE_NUMBER="$(/opt/bcftools-1.6/bcftools query -l "${pop}"_perpop.vcf | wc -l)"
-echo $SAMPLE_NUMBER
-TOTAL_SNPS="$(grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/"${pop}"_perpop.vcf | wc -l)"
-echo $TOTAL_SNPS
-grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/c_lp_sm_perpop.vcf | cut -d$'\t' -f1,2,8 | cut -d$';' -f1,3 --output-delimiter=' ' | cut -d$'=' -f1,2,3 --output-delimiter=' ' | awk '{print $1"_"$2","$6-$4","$4}' > temp_SNP_counts.txt
+  do
+  echo "${pop}"
+  #done
+  NAME="${pop}"
+  SAMPLE_NUMBER="$(/opt/bcftools-1.6/bcftools query -l "$V_PATH/${pop}"_perpop.vcf | wc -l)"
+  echo $SAMPLE_NUMBER
+  TOTAL_SNPS="$(grep -v '#' "$V_PATH/${pop}"_perpop.vcf | wc -l)"
+  echo $TOTAL_SNPS
+  #done
+  grep -v '#' "$V_PATH/${pop}"_perpop.vcf | cut -d$'\t' -f1,2,8 | cut -d$';' -f1,3 --output-delimiter=' ' | cut -d$'=' -f1,2,3 --output-delimiter=' ' | awk '{print $1"_"$2","$6-$4","$4}' > temp_SNP_counts.txt
 
 #Next append column wise all $FORMAT files, joining by the SNP name.
 
-#sed -i "1 s/$/ $NAME/" toy_treemix_input.txt
-paste -d',' toy_treemix_input.txt temp_SNP_counts.txt
-done
-
+  #sed -i "1 s/$/ $NAME/" toy_treemix_input.txt
+  paste -d' ' toy_treemix_input.txt temp_SNP_counts.txt > toy_treemix_input.borrar.txt
+  mv toy_treemix_input.borrar.txt toy_treemix_input.txt
+  done
+rm toy_treemix_input.borrar.txt
 shopt -u extglob #disable extglob
 
 
