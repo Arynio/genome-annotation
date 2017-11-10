@@ -5,16 +5,28 @@ date: "17 de abril de 2017"
 output: html_document
 ---
 
-#0: Prepare reference genome. Prepare two files with data from the reference genome: a dictionary with contig names and sizes, and a fasta index file. This step should only be performed once (per reference genome).
+#0a: Define paths.
+
+```{r Define paths, eval=FALSE, engine='bash'}
+
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAMs path
+G_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+```
+
+#0b: Prepare reference genome. Prepare two files with data from the reference genome: a dictionary with contig names and sizes, and a fasta index file. This step should only be performed once (per reference genome).
 
 ```{r Prepare reference genome, eval=FALSE, engine='bash'}
 
+#Karolina's code to prepare the reference genome. This should only be performed once per reference genome.
 cd /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/
-
 java -jar /home/tmp/Software/Picard/picard-tools-1.66/CreateSequenceDictionary.jar \
- R= lp23.fa \
- O= lp23.dict
-
+ R=lp23.fa \
+ O=lp23.dict
 samtools faidx lp23.fa
 
 ```
@@ -23,58 +35,54 @@ samtools faidx lp23.fa
 
 ```{r Produce gVCF files, eval=FALSE, engine='bash'}
 
-
 #For 5x samples:
 
-cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #this works for the 5x samples (25x samples are stored in another folder and are named differently)
-REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa
+cd $B_PATH #this works for the 5x samples (25x samples are stored in another folder and are named differently)
 POP=("*_lp")
 for pop in ${POP[@]}
   do
   echo "${pop}"
-  ls ${pop}_*_recal_round-1.bam  > ${pop/*_lp/lp}_recal_round-1.bam.list;
+  ls ${pop}_*_recal_round-1.bam > ${pop/*_lp/lp}_recal_round-1.bam.list;
   INPUT_BAMS_FOR_CALLING=($(cat ${pop/*_lp/lp}_recal_round-1.bam.list)) 
   for id in ${INPUT_BAMS_FOR_CALLING[@]}
     do
     echo "${id}"
-    java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar /opt/GATK-3.7/GenomeAnalysisTK.jar \
+    java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
     -T HaplotypeCaller \
     -R $REF \
     -I ${id} \
     --emitRefConfidence GVCF \
-    -o ${id/.bam/.g.vcf.gz}
+    -o $G_PATH/${id/.bam/.g.vcf.gz}
     done
   done
 
 #For 25x samples:
-cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/genome_project_samples_25x #this works for the 25x samples
-REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa
+cd $B_PATH/genome_project_samples_25x #this works for the 25x samples
 POP=("*_lp")
 for pop in ${POP[@]}
   do
   echo "${pop}"
-  ls ${pop}_*_recal_round-1_25x.bam  > ${pop/*_lp/lp}_recal_round-1_25x.bam.list;
+  ls ${pop}_*_recal_round-1_25x.bam > ${pop/*_lp/lp}_recal_round-1_25x.bam.list;
   INPUT_BAMS_FOR_CALLING=($(cat ${pop/*_lp/lp}_recal_round-1_25x.bam.list)) 
   for id in ${INPUT_BAMS_FOR_CALLING[@]}
     do
     echo "${id}"
-    java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar /opt/GATK-3.7/GenomeAnalysisTK.jar \
+    java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
     -T HaplotypeCaller \
     -R $REF \
     -I ${id} \
     --emitRefConfidence GVCF \
-    -o ${id/.bam/.g.vcf.gz}
+    -o $G_PATH/genome_project_samples_25x/${id/.bam/.g.vcf.gz}
     done
   done
 
 #This was only used to test one sample (lp_do_0443):
-REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa
-java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx64g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar \
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx64g -jar $GATK \
 -T HaplotypeCaller \
 -R $REF \
 -I c_lp_do_0443_recal_round-1.bam \
 --emitRefConfidence GVCF \
--o /home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs/c_lp_do_0443_BIS_recal_round-1.g.vcf
+-o $G_PATH/c_lp_do_0443_BIS_recal_round-1.g.vcf
 
 ```
 
@@ -104,11 +112,11 @@ done
 
 ```{r Perform sanity checks on gVCFs, eval=FALSE, engine='bash'}
 
-cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
+cd $G_PATH
 shopt -s extglob #the extglob shell option gives you more powerful pattern matching in the command line.
 SAMPLELIST=($(ls c_*.g.vcf.gz | cut -d "." -f1 | sort | uniq))
 rm toy_c_gVCF_raw.stats
-echo "sample_name,total_SNPs,homoz_ref,heteroz,homoz_alt,unaccounted" > toy_c_gVCF_raw.stats 
+echo "sample_name,total_SNPs,homoz_ref,heteroz,homoz_alt,unaccounted" > c_gVCF_raw.stats 
 for sample in "${SAMPLELIST[@]}"
   do
   echo "${sample}"
@@ -124,12 +132,12 @@ for sample in "${SAMPLELIST[@]}"
   echo $TOTAL_11
   UNACCOUNTED="$(($TOTAL_SNPS - $TOTAL_00 - $TOTAL_01 - $TOTAL_11))"
   echo $UNACCOUNTED
-  echo "$NAME,$TOTAL_SNPS,$TOTAL_00,$TOTAL_01,$TOTAL_11,$UNACCOUNTED" >> toy_c_gVCF_raw.stats
+  echo "$NAME,$TOTAL_SNPS,$TOTAL_00,$TOTAL_01,$TOTAL_11,$UNACCOUNTED" >> c_gVCF_raw.stats
   done
 shopt -u extglob #disable extglob
 
 #Save locally the .stats file
-scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/toy_c_gVCF_raw.stats /Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/
+scp dkleinman@genomics-b.ebd.csic.es:$B_PATH/c_gVCF_raw.stats /Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/
 
 ```
 
@@ -140,7 +148,7 @@ library("readr")
 library("dplyr")
 library("ggplot2")
 
-sanity_checks <- read_csv("/Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/toy_c_gVCF_raw.stats")
+sanity_checks <- read_csv("/Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/c_gVCF_raw.stats")
 sanity_checks
 rowSums(sanity_checks[,-c(1,2)])==sanity_checks[,2] #check if the sum of AA, AB and BB SNPs equal the total SNP count (for each individual)
 pop_summary_sc <- sanity_checks %>% 
@@ -169,15 +177,15 @@ plot_indiv_heteroz
 
 #First, I generate a VCF file using all lp gVCF files. It doesn't work on compressed files, so I have to unzip all .g.vcf.gz files using the gunzip command, and then repeat. 
 #Later on, when trying to work both with lp and ll gVCFs, server B is running very slow and the generation of .idx files (necessary for the VCF calling) is not working fine or whatever. We decide that it's best to work with compressed files so I compress three random lp gVCFs, but then I encounter the same problem that I got before (when using just the lp files): 'Unable to create iterator for rod named variant'.
-#Eventually, Karolina and I realize that all the compressing and decompressing of the gVCFs has messed the files. We decide to start all over again, targeting the compressed format (g.vcf.gz). She makes the ll gVCFs and I take care of the lp ones.
+#Eventually, Karolina and I realize that all the compressing and decompressing of the gVCFs has messed the files. We decide to start all over again, targeting the compressed format (g.vcf.gz). She makes the ll gVCFs and I take care of the lp ones, and she creates the single VCF combining all gVCFs.
 
 #Option A: when all gVCFs are named the same (same name structure) and in the same folder (this is the code that I used in the end to redo gVCFs ONLY for the 5x lp samples):
-cd /home/dkleinman/datos/c_lp_bamfiles
-java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g -Xmx128g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar \
+cd $G_PATH
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g -Xmx128g -jar $GATK \
 -T GenotypeGVCFs \
--R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa \
+-R $REF \
 $(for var in *.g.vcf.gz; do echo -V ${var}" ";done) \
--o lp_all_pop_recal_round-1.vcf
+-o $V_PATH/all_c_ll_lp.vcf
 
 #Option B: Maria's code to better define the populations and to obtain gVCFs when BAMs with different name structure are considered.
 
@@ -275,6 +283,7 @@ java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar /opt/
 
 #First, it's important to rename those samples in the global VCF that don't have the proper name (in our case it's 5 samples: the 4 that were sequenced at Macrogen and the DON sample from before 1990). The first time that I tried to split the VCF, I ran into some errors due to these names.
 
+cd $V_PATH
 #!/bin/bash
 #cat << "EOF" > list_to_remove.txt #Unmark this line when running it (I marked it in R because it doesn't understand it and messes the colours of subsequent lines)
 LL112_rgsm c_ll_vl_0112
@@ -284,7 +293,9 @@ LL90_rgsm c_ll_ki_0090
 h_lp_do_0007 c_lp_do_0007
 EOF
 
-/opt/bcftools/bcftools reheader -s list_to_remove.txt -o all_c_ll_lp_renamed.vcf all_c_ll_lp.vcf #copy the VCF and rename the wrong named samples in the new VCF
+$BCF reheader -s list_to_remove.txt -o all_c_ll_lp_renamed.vcf all_c_ll_lp.vcf #copy the VCF and rename the wrong named samples in the new VCF
+
+#Next I checked whether both files were identical (except for the sample names, obviously) with diff, and they were, so I deleted all_c_ll_lp.vcf
 
 ```
 
@@ -394,7 +405,7 @@ for i in ${SPECIES[@]}
 
 ```{r Split the species VCFs into per population VCFs, eval=FALSE, engine='bash'}
 
-#Split both species VCFs in order to get a sub-VCF for each population.
+#Split both species VCFs in order to get a sub-VCF for each population. All these sub-VCFs must include all positions so that they are comparable (i.e. positions that become monomorphic whitin a population mustn't be dropped).
 
 !!!!!!!!!! REVISAR CODIGO. COMPROBAR QUE FUNCIONA ANTES DE USAR !!!!!!!!!!
 
