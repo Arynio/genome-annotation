@@ -9,7 +9,7 @@ output: html_document
 
 ```{r Define paths, eval=FALSE, engine='bash'}
 
-V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/obsolete #BAM path
+V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
 O_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/TreeMix #TreeMix analyses output path
 T_PATH=??? #TreeMix software path
 
@@ -22,7 +22,7 @@ T_PATH=??? #TreeMix software path
 
 cd $V_PATH
 shopt -s extglob #the extglob shell option gives you more powerful pattern matching in the command line.
-POPLIST=($(ls c_*_perpop.vcf | cut -d "_" -f1,2,3 | sort | uniq))
+POPLIST=($(ls c_lp*_perpop.vcf | cut -d "_" -f1,2,3 | sort | uniq))
 cd $O_PATH
 rm toy_treemix_input.txt
 touch toy_treemix_input.txt
@@ -37,16 +37,17 @@ for pop in "${POPLIST[@]}"
   TOTAL_SNPS="$(grep -v '#' "$V_PATH/${pop}"_perpop.vcf | wc -l)"
   echo $TOTAL_SNPS
   #done
-  grep -v '#' "$V_PATH/${pop}"_perpop.vcf | cut -d$'\t' -f1,2,8 | cut -d$';' -f1,3 --output-delimiter=' ' | cut -d$'=' -f1,2,3 --output-delimiter=' ' | awk '{print $1"_"$2","$6-$4","$4}' > temp_SNP_counts.txt
-
-#Next append column wise all $FORMAT files, joining by the SNP name.
-
-  #sed -i "1 s/$/ $NAME/" toy_treemix_input.txt
-  paste -d' ' toy_treemix_input.txt temp_SNP_counts.txt > toy_treemix_input.borrar.txt
+  grep -v '#' "$V_PATH/${pop}"_perpop.vcf | cut -d$'\t' -f1,2,8 | cut -d$';' -f1,3 --output-delimiter=' ' | cut -d$'=' -f1,2,3 --output-delimiter=' ' | awk '{print $1"_"$2" "$6-$4","$4}' > temp_SNP_counts.txt
+  LANG=en_EN join -j 1 -o 0,1.2,2.2 <(LANG=en_EN sort -k1 toy_treemix_input.txt) <(LANG=en_EN sort -k1 temp_SNP_counts.txt) > toy_treemix_input.borrar.txt
   mv toy_treemix_input.borrar.txt toy_treemix_input.txt
   done
 rm toy_treemix_input.borrar.txt
 shopt -u extglob #disable extglob
 
+!!!!!!!!! CREATE HEADER WITH POP NAMES !!!!!!!!!!
+
+  #sed -i "1 s/$/ $NAME/" toy_treemix_input.txt
+  #paste -d' ' toy_treemix_input.txt temp_SNP_counts.txt > toy_treemix_input.borrar.txt
+  #mv toy_treemix_input.borrar.txt toy_treemix_input.txt
 
 ```
