@@ -35,9 +35,6 @@ samtools faidx lp23.fa
 
 ```{r Produce gVCF files, eval=FALSE, engine='bash'}
 
-
-!!!!!!! REPEAT THE ll_ba and the Spanish lp gVCFs once the filtered BAMs are ready !!!!!!!!
-
 #For 5x samples:
 
 cd $B_PATH #this works for the 5x samples (25x samples are stored in another folder and are named differently)
@@ -80,12 +77,22 @@ for pop in ${POP[@]}
   done
 
 #This was only used to test one sample (lp_do_0443):
-java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx64g -jar $GATK \
+cd $B_PATH
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
 -T HaplotypeCaller \
 -R $REF \
 -I c_lp_do_0443_recal_round-1.bam \
 --emitRefConfidence GVCF \
 -o $G_PATH/c_lp_do_0443_BIS_recal_round-1.g.vcf
+
+#This was only used to produce the gVCF file for the Euskadi historical Lynx lynx sample:
+cd $B_PATH
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+    -T HaplotypeCaller \
+    -R $REF \
+    -I h_ll_pv_0223_sorted_indelrealigner_marked_sorted.bam \
+    --emitRefConfidence GVCF \
+    -o $G_PATH/h_ll_pv_0223_sorted_indelrealigner_marked_sorted.g.vcf.gz
 
 ```
 
@@ -381,11 +388,12 @@ for i in ${SPECIES[@]}
 
 ```{r Tag SNPs, eval=FALSE, engine='bash'}
 
-#SNPs that don't meet certain quality criteria should be tagged (and eventually removed).     #QD: QualByDepth (variant confidence divided by the unfiltered depth of non-reference samples). Default < 2.0.
+#SNPs that don't meet certain quality criteria should be tagged (and eventually removed).     
+  #QD: QualByDepth (variant confidence divided by the unfiltered depth of non-reference samples). Default < 2.0.
   #FS: FisherStrand (phred-scaled p-value using Fisher's Exact Test to detect strand bias in the reads). Default > 60.0.
   #MQ: RMSMappingQuality (root mean square of Mapping Quality of reads across all samples). Default < 40.0.
-  #MQRankSum: MappingQualityRankSumTest (u-based z-approximation from Mann-Whitney Rank Sum Test for Mappin Qualities, i.e. reads with reference alleles vs. those with the alternate allele. Will only be applied to heterozygous calls). Default < -12.5.
-  #ReadPosRankSum: ReadPosRankSumTest (u-based z-approximation from Mann-Whitney Rank Sum Test for distance from end of the read for reads with the alternate allele. Will only be applied to heterozygous calls). Default < -8.0.
+  #MQRankSum: MappingQualityRankSumTest (u-based z-approximation from Mann-Whitney Rank Sum Test for Mappin Qualities, i.e. reads with reference alleles vs. those with the alternate allele. Will only be applied to heterozygous calls). Default < -12.5. In theory, this would alleviate contamination problems.
+  #ReadPosRankSum: ReadPosRankSumTest (u-based z-approximation from Mann-Whitney Rank Sum Test for distance from end of the read for reads with the alternate allele. Will only be applied to heterozygous calls). Default < -8.0. In theory, this would alleviate damage problems.
   #SOR: StrandOddsRatio (evaluates whether there's strand bias in the data). Default > 3.0.
 cd $V_PATH
 declare SPECIES=$(ls c*_species_SNPs.vcf | cut -c1-4 | uniq)
@@ -401,8 +409,6 @@ for i in ${SPECIES[@]}
   -o "${i}"_species_SNPs_tagged.vcf
   done
 
-!!!!!!!!!! FILTERING CRITERIA MUST BE REVISED !!!!!!!!!!
-
 ```
 
 #4b: Filter SNPs. Remove all SNPs tagged in the previous step.
@@ -410,7 +416,7 @@ for i in ${SPECIES[@]}
 ```{r Filter SNPs, eval=FALSE, engine='bash'}
 
 cd $V_PATH
-declare SPECIES=$(ls c*_species_SNPs.vcf | cut -c1-4 | uniq)
+declare SPECIES=$(ls c*_species_SNPs_tagged.vcf | cut -c1-4 | uniq)
 for i in ${SPECIES[@]}
   do
   echo "${i}"
@@ -421,6 +427,69 @@ for i in ${SPECIES[@]}
   -V "${i}"_species_SNPs_tagged.vcf \
   -o "${i}"_species_SNPs_tagged_filtered.vcf
   done
+  
+
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAMs path
+G_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+
+  #MQRankSum: MappingQualityRankSumTest (u-based z-approximation from Mann-Whitney Rank Sum Test for Mappin Qualities, i.e. reads with reference alleles vs. those with the alternate allele. Will only be applied to heterozygous calls). Default < -12.5. In theory, this would alleviate contamination problems.
+  #ReadPosRankSum: ReadPosRankSumTest (u-based z-approximation from Mann-Whitney Rank Sum Test for distance from end of the read for reads with the alternate allele. Will only be applied to heterozygous calls). Default < -8.0. In theory, this would alleviate damage problems.
+  
+#Tests with different filters
+cd $V_PATH
+
+grep -v '#' c_ll_species_SNPs.vcf | wc -l #10488154
+
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T SelectVariants \
+-select "MQRankSum<-12.5 || ReadPosRankSum<-8.0" \
+-R $REF \
+-V c_ll_species_SNPs.vcf \
+-o c_ll_species_SNPs_MQRS12,5_RPRS8,0.vcf
+
+grep -v '#' c_ll_species_SNPs_MQRS12,5_RPRS8,0.vcf | wc -l #232
+  
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T SelectVariants \
+-select "MQRankSum<-8.0 || ReadPosRankSum<-8.0" \
+-R $REF \
+-V c_ll_species_SNPs.vcf \
+-o c_ll_species_SNPs_MQRS8,0_RPRS8,0.vcf
+
+grep -v '#' c_ll_species_SNPs_MQRS8,0_RPRS8,0.vcf | wc -l #738
+
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T SelectVariants \
+-select "MQRankSum<-12.5 || ReadPosRankSum<-5.0" \
+-R $REF \
+-V c_ll_species_SNPs.vcf \
+-o c_ll_species_SNPs_MQRS12,5_RPRS5,0.vcf
+
+grep -v '#' c_ll_species_SNPs_MQRS12,5_RPRS5,0.vcf | wc -l #258
+
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T SelectVariants \
+-select "MQRankSum<-8.0 || ReadPosRankSum<-5.0" \
+-R $REF \
+-V c_ll_species_SNPs.vcf \
+-o c_ll_species_SNPs_MQRS8,0_RPRS5,0.vcf
+
+grep -v '#' c_ll_species_SNPs_MQRS8,0_RPRS5,0.vcf | wc -l #756
+
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T SelectVariants \
+-select "MQRankSum<-2.5 || ReadPosRankSum<-2.5" \
+-R $REF \
+-V c_ll_species_SNPs.vcf \
+-o c_ll_species_SNPs_MQRS2,5_RPRS2,5.vcf
+
+grep -v '#' c_ll_species_SNPs_MQRS2,5_RPRS2,5.vcf | wc -l #113081
+
 
 ```
 
@@ -430,8 +499,30 @@ for i in ${SPECIES[@]}
 
 #Split both species VCFs in order to get a sub-VCF for each population. All these sub-VCFs must include all positions so that they are comparable (i.e. positions that become monomorphic whitin a population mustn't be dropped).
 
-!!!!!!!!!! REVISAR CODIGO. COMPROBAR QUE FUNCIONA ANTES DE USAR !!!!!!!!!!
+#Version that keeps all sites in all subVCFs.
+cd $G_PATH
+declare SPECIES=$(ls c_*.g.vcf.gz | cut -c1-4 | uniq)
+for i in ${SPECIES[@]}
+  do
+  echo "${i}"
+  declare POP=$(ls "${i}"*.g.vcf.gz | cut -c1-7 | uniq)
+  for j in ${POP[@]}
+    do
+    echo "${j}"
+    ls ${j}*g.vcf.gz | sed 's/_recal_round-1.g.vcf.gz//g' > list_to_remove.txt
+    cat list_to_remove.txt
+    java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+    -T SelectVariants \
+    -R $REF \
+    -V $V_PATH/"${i}"_species_SNPs_tagged_filtered.vcf \
+    -o $V_PATH/"${j}"_perpop.vcf \
+    --sample_file list_to_remove.txt \
+    --preserveAlleles
+    done
+  done
+rm list_to_remove.txt
 
+#Version that drops monomorphic positions within each species.
 cd $G_PATH
 declare SPECIES=$(ls c_*.g.vcf.gz | cut -c1-4 | uniq)
 for i in ${SPECIES[@]}
@@ -446,7 +537,7 @@ for i in ${SPECIES[@]}
     done
   done
 rm list_to_remove.txt
-  
+
 ```
 
 #5b: Perform sanity checks on VCFs. Perform various sanity checks on all VCFs.
