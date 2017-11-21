@@ -45,13 +45,21 @@ for pop in "${POPLIST[@]}"
   mv intermediate_file.borrar.txt SNP_names_treemix_input.txt
   done
 rm temp_SNP_counts.txt
-sed -i -e '1i'"$POPNAMES"'\' SNP_names_treemix_input.txt
-cut -d$' ' -f 2- SNP_names_treemix_input.txt | gzip > treemix_input.txt.gz
+sed -i -e '1i'"$POPNAMES"'\' 
+#adds the headers
+grep -v ' 0,0 ' SNP_names_treemix_input.txt | grep -v ' 0,0$' | cut -d$' ' -f 2- | gzip > treemix_input.txt.gz #removes rows with any missing data, and also the SNP names
 shopt -u extglob #disable extglob
+
 
   #sed -i "1 s/$/ $NAME/" toy_treemix_input.txt
   #paste -d' ' toy_treemix_input.txt temp_SNP_counts.txt > toy_treemix_input.borrar.txt
   #mv toy_treemix_input.borrar.txt toy_treemix_input.txt
+
+
+#Get a version of the TreeMix input without Balkans:
+cut -d$' ' -f2 --complement SNP_names_treemix_input.txt > SNP_names_treemix_input_wout_ba.txt #removes the Balkans column
+grep -v ' 0,0 ' SNP_names_treemix_input_wout_ba.txt | grep -v ' 0,0$' | cut -d$' ' -f 2- | gzip > treemix_input_wout_ba.txt.gz #removes rows with any missing data, and also the SNP names
+
 
 ```
 
@@ -62,5 +70,35 @@ shopt -u extglob #disable extglob
 #Basic command to build a ML tree
 cd $O_PATH
 $T_PATH/treemix -i treemix_input.txt.gz -o toy_out_stem
+
+#Basic command to build a ML tree without Balkans
+cd $O_PATH
+$T_PATH/treemix -i treemix_input_wout_ba.txt.gz -o toy_wout_ba_out_stem
+
+
+scp dkleinman@genomics-b.ebd.csic.es:/opt/treemix-1.12/src/plotting_funcs.R /Users/Dani/ownCloud/backup/annotation/TreeMix
+scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/TreeMix/toy_out_stem* /Users/Dani/ownCloud/backup/annotation/TreeMix
+scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/TreeMix/toy_wout_ba_out_stem* /Users/Dani/ownCloud/backup/annotation/TreeMix
+
+```
+
+#3: Plot TreeMix.
+
+```{r Plot TreeMix}
+
+local_repo <- file.path("/Users/Dani/ownCloud/backup/annotation/TreeMix/")
+
+source("/Users/Dani/ownCloud/backup/annotation/TreeMix/plotting_funcs.R")
+pdf(paste0(local_repo,"ll_toy_basic_tree.pdf"),width=20,height=10)
+toy_out_stem <- plot_tree("/Users/Dani/ownCloud/backup/annotation/TreeMix/toy_out_stem")
+toy_out_stem
+dev.off()
+
+png("CrabMigrationAllSNPSmig3.png",width=2400,height=2000,res = 300)
+plot_tree("crabmigout3")
+dev.off()
+
+toy_wout_ba_out_stem <- plot_tree("/Users/Dani/ownCloud/backup/annotation/TreeMix/toy_wout_ba_out_stem")
+toy_wout_ba_out_stem
 
 ```
