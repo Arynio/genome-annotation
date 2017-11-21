@@ -204,11 +204,11 @@ ggsave("gVCFs_SNPs_per_sample.pdf", width=30, height=10, units="cm", device="pdf
 
 #Option A: when all gVCFs are named the same (same name structure) and in the same folder (this is the code that I used in the end to redo gVCFs ONLY for the 5x lp samples):
 cd $G_PATH
-java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms64g -Xmx128g -jar $GATK \
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
 -T GenotypeGVCFs \
 -R $REF \
 $(for var in *.g.vcf.gz; do echo -V ${var}" ";done) \
--o $V_PATH/all_c_ll_lp.vcf
+-o $V_PATH/c_ll_lp_plus_h_ll.vcf
 
 #Option B: Maria's code to better define the populations and to obtain gVCFs when BAMs with different name structure are considered.
 
@@ -373,6 +373,8 @@ for i in ${SPECIES[@]}
 #Check whether there's any position with the reference allele fixed (AC=0) or with the alternative allele fixed (AC=AN)
 grep -v '#' c_lp_species_SNPs.vcf | cut -d$'\t' -f8 | cut -d$';' -f1,3 --output-delimiter=' ' | cut -d$'=' -f2,3 --output-delimiter=' ' | cut -d$' ' -f1,3 | awk -F , '{if($1 == $2 || $1 == 0) print 0; else print 1; }' | sort | uniq #this should only return the value "1" when all positions are variable (i.e. when all positions have at least one reference or one alternative allele), whereas both "1" and "0" would be returned when there's any position with a fixed allele.
 
+grep -v '#' c_ll_species_SNPs.vcf | wc -l #10488154
+
 ```
 
 #3b: Extract INDELs. Subset the VCF files in order to keep only INDELs.
@@ -438,14 +440,36 @@ for i in ${SPECIES[@]}
   -V "${i}"_species_SNPs_tagged.vcf \
   -o "${i}"_species_SNPs_tagged_filtered.vcf
   done
+
+grep -v '#' c_ll_species_SNPs_tagged_filtered.vcf | wc -l #8608569
   
 #Now subset the previous VCF in order to keep only those SNPs above strict RankSum thresholds.
 java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
 -T SelectVariants \
--select "MQRankSum>-0.5 || ReadPosRankSum>-0.5" \
+-select "MQRankSum>-0.5 && ReadPosRankSum>-0.5" \
 -R $REF \
 -V c_ll_species_SNPs_tagged_filtered.vcf \
 -o c_ll_species_strict_filter.vcf
+
+grep -v '#' c_ll_species_strict_filter.vcf | wc -l #6304158
+
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T SelectVariants \
+-select "MQRankSum>-0.1 && ReadPosRankSum>-0.1" \
+-R $REF \
+-V c_ll_species_SNPs_tagged_filtered.vcf \
+-o c_ll_species_super_strict_filter.vcf
+
+grep -v '#' c_ll_species_super_strict_filter.vcf | wc -l #4866975
+
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T SelectVariants \
+-select "MQRankSum>0.0 && ReadPosRankSum>0.0" \
+-R $REF \
+-V c_ll_species_SNPs_tagged_filtered.vcf \
+-o c_ll_species_ultra_strict_filter.vcf
+
+grep -v '#' c_ll_species_ultra_strict_filter.vcf | wc -l #198699
 
 ```
 
@@ -512,6 +536,33 @@ java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -X
 
 grep -v '#' c_ll_species_SNPs_MQRS0,5_RPRS0,5.vcf | wc -l #2867801
 
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T SelectVariants \
+-select "MQRankSum<-0.1" \
+-R $REF \
+-V c_ll_species_SNPs.vcf \
+-o c_ll_species_SNPs_MQRS0,1.vcf
+
+grep -v '#' c_ll_species_SNPs_MQRS0,1.vcf | wc -l #1745652
+
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T SelectVariants \
+-select "ReadPosRankSum<-0.1" \
+-R $REF \
+-V c_ll_species_SNPs.vcf \
+-o c_ll_species_SNPs_RPRS0,1.vcf
+
+grep -v '#' c_ll_species_SNPs_RPRS0,1.vcf | wc -l #3388326
+
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T SelectVariants \
+-select "MQRankSum<-0.1 || ReadPosRankSum<-0.1" \
+-R $REF \
+-V c_ll_species_SNPs.vcf \
+-o c_ll_species_SNPs_MQRS0,1_RPRS0,1.vcf
+
+grep -v '#' c_ll_species_SNPs_MQRS0,1_RPRS0,1.vcf | wc -l #4460116
+
 ```
 
 #5a: Split the species VCFs into per population VCFs. Generate a VCF for each population.
@@ -575,26 +626,17 @@ declare POP=$(ls c_ll*.g.vcf.gz | cut -c1-7 | uniq)
 for j in ${POP[@]}
   do
   echo "${j}"
-  ls ${j}*g.vcf.gz | sed 's/_recal_round-1.g.vcf.gz//g' > list_to_remove.txt
-  cat list_to_remove.txt
+  ls ${j}*g.vcf.gz | sed 's/_recal_round-1.g.vcf.gz//g' > strict_list_to_remove.txt
+  cat strict_list_to_remove.txt
   java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
   -T SelectVariants \
   -R $REF \
-  -V $V_PATH/c_ll_species_SNPs_strict_filter.vcf \
+  -V $V_PATH/c_ll_species_strict_filter.vcf \
   -o $V_PATH/"${j}"_perpop_strict_filter.vcf \
-  --sample_file list_to_remove.txt \
+  --sample_file strict_list_to_remove.txt \
   --preserveAlleles
   done
-rm list_to_remove.txt
-
-#And with this subsequent step, fixed positions within each population will be dropped and only the variables will remain.
-cd $V_PATH
-declare POP=$(ls *perpop_strict_filter.vcf | cut -c1-7 | uniq)
-for i in ${POP[@]}
-  do
-  echo "${i}"
-  $BCF view --min-ac 1:minor -Ov -o $V_PATH/trimmed_VCFs/"${i}"_perpop_strict_filter.trimmed.vcf $V_PATH/"${i}"_perpop_strict_filter.vcf
-  done
+rm strict_list_to_remove.txt
 
 
 #Get subVCFs from the VCF that had no filters.
@@ -615,14 +657,24 @@ for j in ${POP[@]}
   done
 rm pop_list_to_remove.txt
 
-#And with this subsequent step, fixed positions within each population will be dropped and only the variables will remain.
-cd $V_PATH
-declare POP=$(ls *perpop_no_filter.vcf | cut -c1-7 | uniq)
-for i in ${POP[@]}
+
+#Get subVCFs from the VCF with additional RankSum super strict filters.
+cd $G_PATH
+declare POP=$(ls c_ll*.g.vcf.gz | cut -c1-7 | uniq)
+for j in ${POP[@]}
   do
-  echo "${i}"
-  $BCF view --min-ac 1:minor -Ov -o $V_PATH/trimmed_VCFs/"${i}"_perpop_no_filter.trimmed.vcf $V_PATH/"${i}"_perpop_no_filter.vcf
+  echo "${j}"
+  ls ${j}*g.vcf.gz | sed 's/_recal_round-1.g.vcf.gz//g' > super_list_to_remove.txt
+  cat super_list_to_remove.txt
+  java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+  -T SelectVariants \
+  -R $REF \
+  -V $V_PATH/c_ll_species_super_strict_filter.vcf \
+  -o $V_PATH/"${j}"_perpop_super_strict_filter.vcf \
+  --sample_file super_list_to_remove.txt \
+  --preserveAlleles
   done
+rm super_list_to_remove.txt
 
 ```
 
@@ -670,22 +722,42 @@ scp dkleinman@genomics-b.ebd.csic.es:$V_PATH/c_VCF_trimmed.stats /Users/Dani/own
 #Finally, generate stats file for each population using BCFtools:
 cd $V_PATH
 shopt -s extglob #the extglob shell option gives you more powerful pattern matching in the command line.
-POPLIST=($(ls c_*_perpop_no_filter.vcf | cut -d "_" -f1,2,3 | sort | uniq))
-rm c_VCF_no_filter_individual.bcf.stats
+POPLIST=($(ls c_*_perpop_strict_filter.vcf | cut -d "_" -f1,2,3 | sort | uniq))
+rm c_VCF_strict_filter_individual.bcf.stats
 for pop in "${POPLIST[@]}"
   do
   echo "${pop}"
   ls $G_PATH/${pop}*g.vcf.gz | sed 's/_recal_round-1.g.vcf.gz//g' | cut -d'/' -f7 > individuals_list_to_remove.txt
   cat individuals_list_to_remove.txt
-  $BCF stats -v -S individuals_list_to_remove.txt ${pop}_perpop_no_filter.vcf > ${pop}_perpop_no_filter.bcf.stats
-  grep 'PSC' ${pop}_perpop_no_filter.bcf.stats | grep -v '#' >> c_VCF_no_filter_individual.bcf.stats
+  $BCF stats -v -S individuals_list_to_remove.txt ${pop}_perpop_strict_filter.vcf > ${pop}_perpop_strict_filter.bcf.stats
+  grep 'PSC' ${pop}_perpop_strict_filter.bcf.stats | grep -v '#' >> c_VCF_strict_filter_individual.bcf.stats
   done
 rm individuals_list_to_remove.txt
-HEADER=$(grep '# PSC' ${pop}_perpop_no_filter.bcf.stats | tail -1)
-sed -i -e '1i'"$HEADER"'\' c_VCF_no_filter_individual.bcf.stats
+HEADER=$(grep '# PSC' ${pop}_perpop_strict_filter.bcf.stats | tail -1)
+sed -i -e '1i'"$HEADER"'\' c_VCF_strict_filter_individual.bcf.stats
 
 #Save locally the .stats file
-scp dkleinman@genomics-b.ebd.csic.es:$V_PATH/c_VCF_no_filter_individual.bcf.stats /Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/
+scp dkleinman@genomics-b.ebd.csic.es:$V_PATH/c_VCF_strict_filter_individual.bcf.stats /Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/
+
+
+cd $V_PATH
+shopt -s extglob #the extglob shell option gives you more powerful pattern matching in the command line.
+POPLIST=($(ls c_*_perpop_super_strict_filter.vcf | cut -d "_" -f1,2,3 | sort | uniq))
+rm c_VCF_super_strict_filter_individual.bcf.stats
+for pop in "${POPLIST[@]}"
+  do
+  echo "${pop}"
+  ls $G_PATH/${pop}*g.vcf.gz | sed 's/_recal_round-1.g.vcf.gz//g' | cut -d'/' -f7 > super_individuals_list_to_remove.txt
+  cat super_individuals_list_to_remove.txt
+  $BCF stats -v -S super_individuals_list_to_remove.txt ${pop}_perpop_super_strict_filter.vcf > ${pop}_perpop_super_strict_filter.bcf.stats
+  grep 'PSC' ${pop}_perpop_super_strict_filter.bcf.stats | grep -v '#' >> c_VCF_super_strict_filter_individual.bcf.stats
+  done
+rm super_individuals_list_to_remove.txt
+HEADER=$(grep '# PSC' ${pop}_perpop_super_strict_filter.bcf.stats | tail -1)
+sed -i -e '1i'"$HEADER"'\' c_VCF_super_strict_filter_individual.bcf.stats
+
+#Save locally the .stats file
+scp dkleinman@genomics-b.ebd.csic.es:$V_PATH/c_VCF_super_strict_filter_individual.bcf.stats /Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/
 
 ```
 
@@ -721,10 +793,13 @@ no_filter_db$`# PSC` <- gsub("PSC", "no", no_filter_db$`# PSC`)
 strict_filter_db <- read_tsv("/Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/c_VCF_strict_filter_individual.bcf.stats")[,c(1,3:6)]
 strict_filter_db
 strict_filter_db$`# PSC` <- gsub("PSC", "strict", strict_filter_db$`# PSC`)
+super_filter_db <- read_tsv("/Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/c_VCF_super_strict_filter_individual.bcf.stats")[,c(1,3:6)]
+super_filter_db
+super_filter_db$`# PSC` <- gsub("PSC", "super", super_filter_db$`# PSC`)
 
-common_db <- rbind(std_filter_db,no_filter_db,strict_filter_db)
+common_db <- rbind(std_filter_db,no_filter_db,strict_filter_db,super_filter_db)
 common_db <- common_db %>% 
-  mutate(population=substr(common_db$sample,6,7))
+  mutate(population=substr(common_db$`[3]sample`,6,7))
 colnames(common_db) <- c("filter","sample","n00","n11","n01","population")
 common_db
 common_db$filter <- as.factor(common_db$filter)
@@ -735,31 +810,41 @@ common_db_ggplot <- ggplot(data=common_db, aes(x=filter,y=n01,colour=(sample))) 
   geom_point()
 common_db_ggplot
 
+common_db_ggplot_std <- ggplot(data=filter(common_db,filter=="std"), aes(x=sample,y=n01)) + 
+  geom_col(aes(fill=population))
+common_db_ggplot_std
+
 common_db_ggplot_strict <- ggplot(data=filter(common_db,filter=="strict"), aes(x=sample,y=n01)) + 
   geom_col(aes(fill=population))
 common_db_ggplot_strict
+
+common_db_ggplot_super <- ggplot(data=filter(common_db,filter=="super"), aes(x=sample,y=n01)) + 
+  geom_col(aes(fill=population))
+common_db_ggplot_super
 
 #Represent the loss of SNPs per sample between the different filterings
 colnames(std_filter_db) <- c("filter","sample","n00_std","n11_std","n01_std")
 colnames(no_filter_db) <- c("filter","sample","n00_no","n11_no","n01_no")
 colnames(strict_filter_db) <- c("filter","sample","n00_strict","n11_strict","n01_strict")
+colnames(super_filter_db) <- c("filter","sample","n00_super","n11_super","n01_super")
 
-joined_db <- full_join(full_join(no_filter_db[,-c(1)],std_filter_db[,-c(1)],"sample"),strict_filter_db[,-c(1)],"sample")
+joined_db <- full_join(full_join(full_join(no_filter_db[,-c(1)],std_filter_db[,-c(1)],"sample"),strict_filter_db[,-c(1)],"sample"),super_filter_db[,-c(1)],"sample")
 joined_db
 joined_db <- joined_db %>% 
-  mutate(n01_no_minus_std=n01_no-n01_std,n01_std_minus_strict=n01_std-n01_strict,population=substr(joined_db$sample,6,7))
+  mutate(n01_no_minus_std=n01_no-n01_std,n01_std_minus_strict=n01_std-n01_strict,n01_strict_minus_super=n01_strict-n01_super,population=substr(joined_db$sample,6,7))
 joined_db
 
-tidy_joined_db <- joined_db[,c(1,4,7,10:13)] %>%
-  mutate(perc_loss_1=round(100*n01_no_minus_std/n01_no,1),perc_loss_2=round(100*n01_std_minus_strict/n01_std,1)) %>%
-  gather(filter,N,-sample,-n01_no,-n01_std,-n01_strict,-population,-perc_loss_1,-perc_loss_2)
+tidy_joined_db <- joined_db[,c(1,4,7,10,13:17)] %>%
+  mutate(perc_loss_1=round(100*n01_no_minus_std/n01_no,1),perc_loss_2=round(100*n01_std_minus_strict/n01_std,1),perc_loss_3=round(100*n01_strict_minus_super/n01_strict,1)) %>%
+  gather(filter,N,-sample,-n01_no,-n01_std,-n01_strict,-n01_super,-population,-perc_loss_1,-perc_loss_2,-perc_loss_3)
 tidy_joined_db
 
 joined_db_ggplot <- ggplot(data=tidy_joined_db, aes(x=sample,y=N)) + 
-  geom_col(aes(fill=filter)) +
-  geom_text(aes(label=ifelse(filter=="n01_no_minus_std",perc_loss_1,NA)),size=2,position="identity") +
-  geom_text(aes(label=ifelse(filter=="n01_std_minus_strict",perc_loss_2,NA)),size=2,position="identity",vjust=1.5) +
-  scale_fill_hue(labels=c("no_filter - standard_filter","standard_filter - strict_filter")) +
+  geom_bar(stat="identity", aes(fill=filter,group=filter)) +
+  geom_text(aes(label=ifelse(filter=="n01_no_minus_std",perc_loss_1,NA)),size=2,y=((tidy_joined_db$n01_no-tidy_joined_db$n01_std)/2+(tidy_joined_db$n01_std-tidy_joined_db$n01_strict)+(tidy_joined_db$n01_strict-tidy_joined_db$n01_super))) +
+  geom_text(aes(label=ifelse(filter=="n01_std_minus_strict",perc_loss_2,NA)),size=2,y=((tidy_joined_db$n01_std-tidy_joined_db$n01_strict)/2+(tidy_joined_db$n01_strict-tidy_joined_db$n01_super))) +
+  geom_text(aes(label=ifelse(filter=="n01_strict_minus_super",perc_loss_3,NA)),size=2,y=((tidy_joined_db$n01_strict-tidy_joined_db$n01_super)/2)) +
+  scale_fill_hue(labels=c("no_filter - standard_filter","standard_filter - strict_filter","strict_filter - super_filter")) +
   ggtitle("Filtered out 0/1 positions per sample (in VCF)") +
   theme_bw() +
   theme(plot.title=element_text(hjust=0.5),
@@ -767,15 +852,20 @@ joined_db_ggplot <- ggplot(data=tidy_joined_db, aes(x=sample,y=N)) +
         legend.key.size=unit(0.4,"cm")
   )
 joined_db_ggplot
-ggsave("VCFs_filtered_out_SNPs_per_sample.pdf", width=40, height=10, units="cm", device="pdf", path=local_repo)
+ggsave("VCFs_filtered_out_SNPs_per_sample_2.pdf", width=40, height=10, units="cm", device="pdf", path=local_repo)
 
-tidy_joined_db2 <- joined_db[,c(1,13,11,12,10)] %>%
+tidy_joined_db2 <- joined_db[,c(1,17,14,15,16,13)] %>% 
   gather(filter,N,-sample,-population)
 tidy_joined_db2
 
+qual_col_pals = brewer.pal.info[brewer.pal.info$category == 'qual',]
+twelve_col_pals = brewer.pal.info[brewer.pal.info$maxcolors == '12',]
+col_vector = c("#000000",unlist(mapply(brewer.pal, twelve_col_pals$maxcolors, rownames(twelve_col_pals)))[c(2:13)])
+
 joined_db_ggplot2 <- ggplot(data=tidy_joined_db2, aes(x=sample,y=N)) + 
   geom_col(aes(fill=population,alpha=filter)) +
-  scale_alpha_manual(values=c(0.5,0.75,1), labels=c("no_filter","standard_filter","strict_filter")) +
+  scale_alpha_manual(values=c(0.4,0.6,0.8,1), labels=c("no_filter","standard_filter","strict_filter","super_filter")) +
+  scale_fill_manual(values=col_vector) +
   ggtitle("0/1 positions per sample (in VCF) with different filtering") +
   theme_bw() +
   theme(plot.title=element_text(hjust=0.5),
@@ -783,7 +873,7 @@ joined_db_ggplot2 <- ggplot(data=tidy_joined_db2, aes(x=sample,y=N)) +
         legend.key.size=unit(0.4,"cm")
   )
 joined_db_ggplot2
-ggsave("VCFs_SNPs_per_sample.pdf", width=30, height=10, units="cm", device="pdf", path=local_repo)
+ggsave("VCFs_SNPs_per_sample_2.pdf", width=30, height=10, units="cm", device="pdf", path=local_repo)
 
 
 ```
