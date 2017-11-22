@@ -735,11 +735,12 @@ for pop in "${POPLIST[@]}"
 rm individuals_list_to_remove.txt
 HEADER=$(grep '# PSC' ${pop}_perpop_strict_filter.bcf.stats | tail -1)
 sed -i -e '1i'"$HEADER"'\' c_VCF_strict_filter_individual.bcf.stats
+shopt -u extglob #disable extglob
 
 #Save locally the .stats file
 scp dkleinman@genomics-b.ebd.csic.es:$V_PATH/c_VCF_strict_filter_individual.bcf.stats /Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/
 
-
+#Same for the super_filtered ones:
 cd $V_PATH
 shopt -s extglob #the extglob shell option gives you more powerful pattern matching in the command line.
 POPLIST=($(ls c_*_perpop_super_strict_filter.vcf | cut -d "_" -f1,2,3 | sort | uniq))
@@ -755,13 +756,85 @@ for pop in "${POPLIST[@]}"
 rm super_individuals_list_to_remove.txt
 HEADER=$(grep '# PSC' ${pop}_perpop_super_strict_filter.bcf.stats | tail -1)
 sed -i -e '1i'"$HEADER"'\' c_VCF_super_strict_filter_individual.bcf.stats
+shopt -u extglob #disable extglob
 
 #Save locally the .stats file
 scp dkleinman@genomics-b.ebd.csic.es:$V_PATH/c_VCF_super_strict_filter_individual.bcf.stats /Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/
 
+mkdir $V_PATH/private_alleles
+#Calculate the number of private alleles carried by each sample before and after filtering:
+cd $G_PATH
+declare POP=$(ls c_ll*.g.vcf.gz | cut -c1-7 | uniq)
+for j in ${POP[@]}
+  do
+  echo "${j}"
+  ls ${j}*g.vcf.gz | sed 's/_recal_round-1.g.vcf.gz//g' > private_alleles_list_to_remove.txt
+  $BCF view -x -S private_alleles_list_to_remove.txt -Ov -o $V_PATH/private_alleles/"${j}"_perpop_private_alleles.vcf $V_PATH/c_ll_species_SNPs_tagged_filtered.vcf
+  done
+rm private_alleles_list_to_remove.txt
+
+cd $G_PATH
+declare POP=$(ls c_ll*.g.vcf.gz | cut -c1-7 | uniq)
+for j in ${POP[@]}
+  do
+  echo "${j}"
+  ls ${j}*g.vcf.gz | sed 's/_recal_round-1.g.vcf.gz//g' > private_alleles_strict_list_to_remove.txt
+  $BCF view -x -S private_alleles_strict_list_to_remove.txt -Ov -o $V_PATH/private_alleles/"${j}"_perpop_strict_filter_private_alleles.vcf $V_PATH/c_ll_species_strict_filter.vcf
+  done
+rm private_alleles_strict_list_to_remove.txt
+
+cd $G_PATH
+declare POP=$(ls c_ll*.g.vcf.gz | cut -c1-7 | uniq)
+for j in ${POP[@]}
+  do
+  echo "${j}"
+  ls ${j}*g.vcf.gz | sed 's/_recal_round-1.g.vcf.gz//g' > private_alleles_super_strict_list_to_remove.txt
+  $BCF view -x -S private_alleles_super_strict_list_to_remove.txt -Ov -o $V_PATH/private_alleles/"${j}"_perpop_super_strict_filter_private_alleles.vcf $V_PATH/c_ll_species_super_strict_filter.vcf
+  done
+rm private_alleles_super_strict_list_to_remove.txt
+
+
+#Finally, generate stats file for the private alleles using BCFtools:
+cd $V_PATH/private_alleles
+shopt -s extglob #the extglob shell option gives you more powerful pattern matching in the command line.
+POPLIST=($(ls c_*_perpop_private_alleles.vcf | cut -d "_" -f1,2,3 | sort | uniq))
+rm c_VCF_individual_private_alleles.stats
+for pop in "${POPLIST[@]}"
+  do
+  echo "${pop}"
+  PRIVATE_A=$(grep -v '#' ${pop}_perpop_private_alleles.vcf | wc -l)
+  echo "${pop}, $PRIVATE_A, std" >> c_VCF_individual_private_alleles.stats
+  done
+shopt -u extglob #disable extglob
+
+cd $V_PATH/private_alleles
+shopt -s extglob #the extglob shell option gives you more powerful pattern matching in the command line.
+POPLIST=($(ls c_*_perpop_strict_filter_private_alleles.vcf | cut -d "_" -f1,2,3 | sort | uniq))
+rm c_VCF_strict_filter_individual_private_alleles.stats
+for pop in "${POPLIST[@]}"
+  do
+  echo "${pop}"
+  PRIVATE_A=$(grep -v '#' ${pop}_perpop_strict_filter_private_alleles.vcf | wc -l)
+  echo "${pop}, $PRIVATE_A, strict" >> c_VCF_strict_filter_individual_private_alleles.stats
+  done
+shopt -u extglob #disable extglob
+
+cd $V_PATH/private_alleles
+shopt -s extglob #the extglob shell option gives you more powerful pattern matching in the command line.
+POPLIST=($(ls c_*_perpop_super_strict_filter_private_alleles.vcf | cut -d "_" -f1,2,3 | sort | uniq))
+rm c_VCF_super_strict_filter_individual_private_alleles.stats
+for pop in "${POPLIST[@]}"
+  do
+  echo "${pop}"
+  PRIVATE_A=$(grep -v '#' ${pop}_perpop_super_strict_filter_private_alleles.vcf | wc -l)
+  echo "${pop}, $PRIVATE_A, super" >> c_VCF_super_strict_filter_individual_private_alleles.stats
+  done
+shopt -u extglob #disable extglob
+
+
 ```
 
-#5c: Analyse the sanity checks file. Perform per population analyses on the sanity checks file.
+#5c: Analyse the sanity checks files. Perform per population analyses on the sanity checks files.
 
 ```{r Analyse the sanity checks file}
 library("readr")
@@ -863,7 +936,7 @@ twelve_col_pals = brewer.pal.info[brewer.pal.info$maxcolors == '12',]
 col_vector = c("#000000",unlist(mapply(brewer.pal, twelve_col_pals$maxcolors, rownames(twelve_col_pals)))[c(2:13)])
 
 joined_db_ggplot2 <- ggplot(data=tidy_joined_db2, aes(x=sample,y=N)) + 
-  geom_col(aes(fill=population,alpha=filter)) +
+  geom_col(aes(fill=population,alpha=filter),colour="black") +
   scale_alpha_manual(values=c(0.4,0.6,0.8,1), labels=c("no_filter","standard_filter","strict_filter","super_filter")) +
   scale_fill_manual(values=col_vector) +
   ggtitle("0/1 positions per sample (in VCF) with different filtering") +
@@ -875,6 +948,23 @@ joined_db_ggplot2 <- ggplot(data=tidy_joined_db2, aes(x=sample,y=N)) +
 joined_db_ggplot2
 ggsave("VCFs_SNPs_per_sample_2.pdf", width=30, height=10, units="cm", device="pdf", path=local_repo)
 
+
+#Analyse the private alleles files:
+std_private <- read_csv("/Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/c_VCF_individual_private_alleles.stats",col_names=c("pop","private_SNPs","filter"))
+std_private
+strict_private <- read_csv("/Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/c_VCF_strict_filter_individual_private_alleles.stats",col_names=c("pop","private_SNPs","filter"))
+strict_private
+super_private <- read_csv("/Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/c_VCF_super_strict_filter_individual_private_alleles.stats",col_names=c("pop","private_SNPs","filter"))
+super_private
+
+all_private <- rbind(std_private,strict_private,super_private)
+all_private <- all_private %>%
+  mutate(pop=substr(all_private$pop,6,7))
+all_private
+
+all_private_ggplot <- ggplot(data=all_private, aes(x=pop,y=private_SNPs,colour=filter)) + 
+  geom_point()
+all_private_ggplot
 
 ```
 
