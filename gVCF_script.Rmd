@@ -769,27 +769,21 @@ for i in ${SPECIES[@]}
   declare POP=$(ls "${i}"*.g.vcf.gz | cut -c1-7 | uniq)
   for j in ${POP[@]}
 
-
-
-cd $V_PATH
-declare POPLIST=($(printf "c_ll_ba\nc_ll_ya"))
-for pop in "${POPLIST[@]}"
-  do
-  echo "${pop}"
-  declare FILTER=($(printf "_perpop.vcf\n_perpop_strict_filter.vcf\n_perpop_super_strict_filter.vcf"))
-  for filter in "${FILTER[@]}"
-    do
-    echo "${pop}${filter}"
-    $BCF query -f "%CHROM\t%POS\t%INFO/AF\t%QUAL\t%INFO/MQRankSum\t%INFO/ReadPosRankSum\n" -o ${pop}${filter/.vcf/.info} ${pop}${filter}
-    HEADER=$(printf "CHROM\tPOS\tAF\tQUAL\tMQRankSum\tReadPosRankSum")
-    sed -i -e '1i'"$HEADER"'\' ${pop}${filter/.vcf/.info}
-    done
-  done
-
-
-
-
-
+#Get the MQRankSum and ReadPosRankSum per SNP for ba and ya to see if their distributions are different. Later on when I get the same results for both populations, I realize that those parameters are common to all reads (unique values for the whole database). So this is useless.
+#cd $V_PATH
+#declare POPLIST=($(printf "c_ll_ba\nc_ll_ya"))
+#for pop in "${POPLIST[@]}"
+#  do
+#  echo "${pop}"
+#  declare FILTER=($(printf "_perpop.vcf\n_perpop_strict_filter.vcf\n_perpop_super_strict_filter.vcf"))
+#  for filter in "${FILTER[@]}"
+#    do
+#    echo "${pop}${filter}"
+#    $BCF query -f "%CHROM\t%POS\t%INFO/AF\t%QUAL\t%INFO/MQRankSum\t%INFO/ReadPosRankSum\n" -o ${pop}${filter/.vcf/.info} ${pop}${filter}
+#    HEADER=$(printf "CHROM\tPOS\tAF\tQUAL\tMQRankSum\tReadPosRankSum")
+#    sed -i -e '1i'"$HEADER"'\' ${pop}${filter/.vcf/.info}
+#    done
+#  done
 
 #Calculate the number of private alleles carried by each sample before and after filtering:
 mkdir $V_PATH/private_alleles
@@ -822,7 +816,6 @@ for j in ${POP[@]}
   $BCF view -x -S private_alleles_super_strict_list_to_remove.txt -Ov -o $V_PATH/private_alleles/"${j}"_perpop_super_strict_filter_private_alleles.vcf $V_PATH/c_ll_species_super_strict_filter.vcf
   done
 rm private_alleles_super_strict_list_to_remove.txt
-
 
 #Finally, generate stats file for the private alleles using BCFtools:
 cd $V_PATH/private_alleles
@@ -1019,87 +1012,86 @@ all_private_ggplot_2
 ggsave("private_SNPs_per_sample_2.pdf", width=20, height=10, units="cm", device="pdf", path=local_repo)
 
 
-#Analyse the .info distribution files:
-ba_std <- read_tsv(paste0(local_repo,"c_ll_ba_perpop.info"))
-ba_std
-ba_std$MQRankSum <- as.double(ba_std$MQRankSum)
-ba_std$ReadPosRankSum <- as.double(ba_std$ReadPosRankSum)
-ba_std$filter <- c("std")
-
-ba_strict <- read_tsv(paste0(local_repo,"c_ll_ba_perpop_strict_filter.info"))
-ba_strict
-ba_strict$MQRankSum <- as.double(ba_strict$MQRankSum)
-ba_strict$ReadPosRankSum <- as.double(ba_strict$ReadPosRankSum)
-ba_strict$filter <- c("strict")
-
-ba_super <- read_tsv(paste0(local_repo,"c_ll_ba_perpop_super_strict_filter.info"))
-ba_super
-ba_super$MQRankSum <- as.double(ba_super$MQRankSum)
-ba_super$ReadPosRankSum <- as.double(ba_super$ReadPosRankSum)
-ba_super$filter <- c("super")
-
-ba_all <- rbind(ba_std,ba_strict,ba_super)
-ba_all
-
-ba_MQ_ggplot <- ggplot(data=ba_all, aes(x=MQRankSum,fill=filter)) + 
-  geom_density(alpha=0.3) +
-  ggtitle("ba_std_MQRankSum_distribution") +
-  scale_x_continuous(limits = c(-2, 0.25)) +
-  theme_bw() +
-  theme(plot.title=element_text(hjust=0.5)
-  )
-ba_MQ_ggplot
-
-ba_RP_ggplot <- ggplot(data=ba_all, aes(x=ReadPosRankSum,fill=filter)) + 
-  geom_density(alpha=0.3) +
-  ggtitle("ba_std_RPRankSum_distribution") +
-  #scale_x_continuous(limits = c(-2, 0.25)) +
-  theme_bw() +
-  theme(plot.title=element_text(hjust=0.5)
-  )
-ba_RP_ggplot
-ggsave("c_ll_ba_RP_distribution.pdf", width=30, height=10, units="cm", device="pdf", path=local_repo)
-
-
-ya_std <- read_tsv(paste0(local_repo,"c_ll_ya_perpop.info"))
-ya_std
-ya_std$MQRankSum <- as.double(ya_std$MQRankSum)
-ya_std$ReadPosRankSum <- as.double(ya_std$ReadPosRankSum)
-ya_std$filter <- c("std")
-
-ya_strict <- read_tsv(paste0(local_repo,"c_ll_ya_perpop_strict_filter.info"))
-ya_strict
-ya_strict$MQRankSum <- as.double(ya_strict$MQRankSum)
-ya_strict$ReadPosRankSum <- as.double(ya_strict$ReadPosRankSum)
-ya_strict$filter <- c("strict")
-
-ya_super <- read_tsv(paste0(local_repo,"c_ll_ya_perpop_super_strict_filter.info"))
-ya_super
-ya_super$MQRankSum <- as.double(ya_super$MQRankSum)
-ya_super$ReadPosRankSum <- as.double(ya_super$ReadPosRankSum)
-ya_super$filter <- c("super")
-
-ya_all <- rbind(ya_std,ya_strict,ya_super)
-ya_all
-
-ya_MQ_ggplot <- ggplot(data=ya_all, aes(x=MQRankSum,fill=filter)) + 
-  geom_density(alpha=0.3) +
-  ggtitle("ya_std_MQRankSum_distribution") +
-  scale_x_continuous(limits = c(-0.1, 0.1)) +
-  theme_bw() +
-  theme(plot.title=element_text(hjust=0.5)
-  )
-ya_MQ_ggplot
-
-ya_RP_ggplot <- ggplot(data=ya_all, aes(x=ReadPosRankSum,fill=filter)) + 
-  geom_density(alpha=0.3) +
-  ggtitle("ya_std_RPRankSum_distribution") +
-  #scale_x_continuous(limits = c(-2, 0.25)) +
-  theme_bw() +
-  theme(plot.title=element_text(hjust=0.5)
-  )
-ya_RP_ggplot
-ggsave("c_ll_ya_RP_distribution.pdf", width=30, height=10, units="cm", device="pdf", path=local_repo)
+# Analyse the .info distribution files. Later on when I get the same results for both populations, I realize that those parameters are common to all reads (unique values for the whole database). So this is useless.
+# ba_std <- read_tsv(paste0(local_repo,"c_ll_ba_perpop.info"))
+# ba_std
+# ba_std$MQRankSum <- as.double(ba_std$MQRankSum)
+# ba_std$ReadPosRankSum <- as.double(ba_std$ReadPosRankSum)
+# ba_std$filter <- c("std")
+# 
+# ba_strict <- read_tsv(paste0(local_repo,"c_ll_ba_perpop_strict_filter.info"))
+# ba_strict
+# ba_strict$MQRankSum <- as.double(ba_strict$MQRankSum)
+# ba_strict$ReadPosRankSum <- as.double(ba_strict$ReadPosRankSum)
+# ba_strict$filter <- c("strict")
+# 
+# ba_super <- read_tsv(paste0(local_repo,"c_ll_ba_perpop_super_strict_filter.info"))
+# ba_super
+# ba_super$MQRankSum <- as.double(ba_super$MQRankSum)
+# ba_super$ReadPosRankSum <- as.double(ba_super$ReadPosRankSum)
+# ba_super$filter <- c("super")
+# 
+# ba_all <- rbind(ba_std,ba_strict,ba_super)
+# ba_all
+# 
+# ba_MQ_ggplot <- ggplot(data=ba_all, aes(x=MQRankSum,fill=filter)) + 
+#   geom_density(alpha=0.3) +
+#   ggtitle("ba_std_MQRankSum_distribution") +
+#   scale_x_continuous(limits = c(-2, 0.25)) +
+#   theme_bw() +
+#   theme(plot.title=element_text(hjust=0.5)
+#   )
+# ba_MQ_ggplot
+# 
+# ba_RP_ggplot <- ggplot(data=ba_all, aes(x=ReadPosRankSum,fill=filter)) + 
+#   geom_density(alpha=0.3) +
+#   ggtitle("ba_std_RPRankSum_distribution") +
+#   #scale_x_continuous(limits = c(-2, 0.25)) +
+#   theme_bw() +
+#   theme(plot.title=element_text(hjust=0.5)
+#   )
+# ba_RP_ggplot
+# ggsave("c_ll_ba_RP_distribution.pdf", width=30, height=10, units="cm", device="pdf", path=local_repo)
+# 
+# ya_std <- read_tsv(paste0(local_repo,"c_ll_ya_perpop.info"))
+# ya_std
+# ya_std$MQRankSum <- as.double(ya_std$MQRankSum)
+# ya_std$ReadPosRankSum <- as.double(ya_std$ReadPosRankSum)
+# ya_std$filter <- c("std")
+# 
+# ya_strict <- read_tsv(paste0(local_repo,"c_ll_ya_perpop_strict_filter.info"))
+# ya_strict
+# ya_strict$MQRankSum <- as.double(ya_strict$MQRankSum)
+# ya_strict$ReadPosRankSum <- as.double(ya_strict$ReadPosRankSum)
+# ya_strict$filter <- c("strict")
+# 
+# ya_super <- read_tsv(paste0(local_repo,"c_ll_ya_perpop_super_strict_filter.info"))
+# ya_super
+# ya_super$MQRankSum <- as.double(ya_super$MQRankSum)
+# ya_super$ReadPosRankSum <- as.double(ya_super$ReadPosRankSum)
+# ya_super$filter <- c("super")
+# 
+# ya_all <- rbind(ya_std,ya_strict,ya_super)
+# ya_all
+# 
+# ya_MQ_ggplot <- ggplot(data=ya_all, aes(x=MQRankSum,fill=filter)) + 
+#   geom_density(alpha=0.3) +
+#   ggtitle("ya_std_MQRankSum_distribution") +
+#   scale_x_continuous(limits = c(-0.1, 0.1)) +
+#   theme_bw() +
+#   theme(plot.title=element_text(hjust=0.5)
+#   )
+# ya_MQ_ggplot
+# 
+# ya_RP_ggplot <- ggplot(data=ya_all, aes(x=ReadPosRankSum,fill=filter)) + 
+#   geom_density(alpha=0.3) +
+#   ggtitle("ya_std_RPRankSum_distribution") +
+#   #scale_x_continuous(limits = c(-2, 0.25)) +
+#   theme_bw() +
+#   theme(plot.title=element_text(hjust=0.5)
+#   )
+# ya_RP_ggplot
+# ggsave("c_ll_ya_RP_distribution.pdf", width=30, height=10, units="cm", device="pdf", path=local_repo)
 
 ```
 
