@@ -5,13 +5,27 @@ date: "8/11/2017"
 output: html_document
 ---
 
-#0: Define paths.
+#0a: Define paths.
 
 ```{r Define paths, eval=FALSE, engine='bash'}
 
 V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
 O_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/TreeMix #TreeMix analyses output path
 T_PATH=/opt/treemix-1.12/src #TreeMix software path
+
+```
+
+#0b: Produce a gVCF and allelic counts data for the outgroup (the lynx rufus sample).
+
+```{r Define paths, eval=FALSE, engine='bash'}
+
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar \
+    -T HaplotypeCaller \
+    -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa \
+    -I c_lr_zz_0001_recal_round-1.bam \
+    --emitRefConfidence GVCF \
+    -o /home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs/c_lr_zz_0001_recal_round.g.vcf.gz
 
 ```
 
@@ -59,6 +73,22 @@ shopt -u extglob #disable extglob
 #Get a version of the TreeMix input without Balkans:
 cut -d$' ' -f2 --complement SNP_names_treemix_input.txt > SNP_names_treemix_input_wout_ba.txt #removes the Balkans column
 grep -v ' 0,0 ' SNP_names_treemix_input_wout_ba.txt | grep -v ' 0,0$' | cut -d$' ' -f 2- | gzip > treemix_input_wout_ba.txt.gz #removes rows with any missing data, and also the SNP names
+
+
+#Get a version that includes Lynx rufus (first test it with pardinus) as the outgroup:
+cd $O_PATH
+SNP_LIST="$(ls "$V_PATH"/c_ll*_perpop.vcf | head -1)"
+grep -v '#' $SNP_LIST | cut -d$'\t' -f1,2,8 | cut -d$';' -f1,3 --output-delimiter=' ' | awk '{printf ("%1s\t%s\n",$1,$2)}' > SNP_names_only.txt
+/opt/bcftools-1.6/bcftools filter -R SNP_names_only.txt -Ov -o $O_PATH/c_lp_do_0007_subset_positions.vcf /home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs/c_lp_do_0007_recal_round-1.g.vcf.gz
+
+cd $O_PATH
+grep -v '#' $O_PATH/c_lp_do_0007_subset_positions.vcf | cut -d$'\t' -f1,2,8 | cut -d$';' -f1,3 --output-delimiter=' ' | cut -d$'=' -f1,2,3 --output-delimiter=' ' | awk '{print $1"_"$2" "$6-$4","$4}' > c_lp_do_0007_SNP_counts.txt
+
+awk '($5==",") {print}' dummy_file <c_lp_do_0007_subset_positions.vcf
+
+HAY DIRECTAMENTE ALLELE COUNTS DENTRO DE c_lp_do_0007_subset_positions.vcf O INCLUSO EL GVCF!
+
+Coger directamente esos!!! E intersectar con el input de TreeMix.
 
 
 ```
