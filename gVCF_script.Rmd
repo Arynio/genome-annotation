@@ -202,13 +202,17 @@ ggsave("gVCFs_SNPs_per_sample.pdf", width=30, height=10, units="cm", device="pdf
 #Later on, when trying to work both with lp and ll gVCFs, server B is running very slow and the generation of .idx files (necessary for the VCF calling) is not working fine or whatever. We decide that it's best to work with compressed files so I compress three random lp gVCFs, but then I encounter the same problem that I got before (when using just the lp files): 'Unable to create iterator for rod named variant'.
 #Eventually, Karolina and I realize that all the compressing and decompressing of the gVCFs has messed the files. We decide to start all over again, targeting the compressed format (g.vcf.gz). She makes the ll gVCFs and I take care of the lp ones, and she creates the single VCF combining all gVCFs.
 
-#Option A: when all gVCFs are named the same (same name structure) and in the same folder (this is the code that I used in the end to redo gVCFs ONLY for the 5x lp samples):
+#Option A: when all gVCFs are named the same (same name structure) and in the same folder (this is the code that I used in the end to redo the VCF ONLY for the 5x lp samples):
 cd $G_PATH
 java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
 -T GenotypeGVCFs \
 -R $REF \
 $(for var in *.g.vcf.gz; do echo -V ${var}" ";done) \
 -o $V_PATH/c_ll_lp_plus_h_ll.vcf
+
+#Compare the number of SNPs of the new VCF versus the old one (which had three samples less):
+grep -v '#' c_ll_lp_plus_h_ll.vcf | wc -l #23999314
+grep -v '#' all_c_ll_lp_renamed.vcf | wc -l #20248404
 
 #Option B: Maria's code to better define the populations and to obtain gVCFs when BAMs with different name structure are considered.
 
@@ -312,8 +316,9 @@ java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK
 #First, it's important to rename those samples in the global VCF that don't have the proper name (in our case it's 5 samples: the 4 that were sequenced at Macrogen and the DON sample from before 1990). The first time that I tried to split the VCF, I ran into some errors due to these names.
 
 cd $V_PATH
+$BCF query -l c_ll_lp_plus_h_ll.vcf #check sample names
 #!/bin/bash
-#cat << "EOF" > list_to_remove.txt #Unmark this line when running it (I marked it in R because it doesn't understand it and messes the colours of subsequent lines)
+#cat << "EOF" > list_to_remove.txt #Unmark this line when running it (I marked it in R because it doesn't understand it and messes the colours of subsequent lines). It should include all incorrect names.
 LL112_rgsm c_ll_vl_0112
 LL146_rgsm c_ll_ya_0146
 LL212_rgsm c_ll_cr_0212
@@ -321,7 +326,7 @@ LL90_rgsm c_ll_ki_0090
 h_lp_do_0007 c_lp_do_0007
 EOF
 
-$BCF reheader -s list_to_remove.txt -o all_c_ll_lp_renamed.vcf all_c_ll_lp.vcf #copy the VCF and rename the wrong named samples in the new VCF
+$BCF reheader -s list_to_remove.txt -o c_ll_lp_plus_h_ll_renamed.vcf c_ll_lp_plus_h_ll.vcf #copy the VCF and rename the wrong named samples in the new VCF
 
 #Next I checked whether both files were identical (except for the sample names, obviously) with diff, and they were, so I deleted all_c_ll_lp.vcf
 
@@ -333,12 +338,12 @@ $BCF reheader -s list_to_remove.txt -o all_c_ll_lp_renamed.vcf all_c_ll_lp.vcf #
 
 #Split the VCF in order to get one for each species. It will be necessary to get rid of substitutions. During this step, all fixed positions within each species (including substitutions) will also be removed (with minor allele count = 1).
 cd $G_PATH
-declare SPECIES=$(ls c_*.g.vcf.gz | cut -c1-4 | uniq)
+declare SPECIES=$(ls {*lp,*ll}_*.g.vcf.gz | cut -c3-4 | sort | uniq)
 for i in ${SPECIES[@]}
   do
   echo "${i}"
-  ls ${i}*g.vcf.gz | sed 's/_recal_round-1.g.vcf.gz//g' > list_to_remove.txt
-  $BCF view -S list_to_remove.txt --min-ac 1:minor -Ov -o $V_PATH/"${i}"_species.vcf $V_PATH/all_c_ll_lp_renamed.vcf
+  ls *${i}*g.vcf.gz | cut -c1-12 > list_to_remove.txt
+  $BCF view -S list_to_remove.txt --min-ac 1:minor -Ov -o $V_PATH/"${i}"_species.vcf $V_PATH/c_ll_lp_plus_h_ll_renamed.vcf
   done
 rm list_to_remove.txt
 
