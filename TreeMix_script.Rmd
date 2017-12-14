@@ -84,11 +84,20 @@ grep -v '#' $SNP_LIST | cut -d$'\t' -f1,2,8 | cut -d$';' -f1,3 --output-delimite
 cd $O_PATH
 grep -v '#' $O_PATH/c_lp_do_0007_subset_positions.vcf | cut -d$'\t' -f1,2,8 | cut -d$';' -f1,3 --output-delimiter=' ' | cut -d$'=' -f1,2,3 --output-delimiter=' ' | awk '{print $1"_"$2" "$6-$4","$4}' > c_lp_do_0007_SNP_counts.txt
 
-awk '($5==",") {print}' dummy_file <c_lp_do_0007_subset_positions.vcf
+grep -v '#' c_lp_do_0007_subset_positions.vcf | cut -d$' ' -f1,2,10 | cut -d$':' -f1 | awk '{print $1"_"$2" "$3}' | NUEVA VARIABLE que para 0,0 sea 2,0; para 0,1 sea 1,1; para 1,1 sea 0,2 > new_test.txt
 
-HAY DIRECTAMENTE ALLELE COUNTS DENTRO DE c_lp_do_0007_subset_positions.vcf O INCLUSO EL GVCF!
+
 
 Coger directamente esos!!! E intersectar con el input de TreeMix.
+
+
+#Build a VCF for the rufus sample
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar /opt/GATK-3.7/GenomeAnalysisTK.jar \
+-T GenotypeGVCFs \
+-R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa \
+$(for var in c_lr_zz_0001_recal_round.g.vcf.gz; do echo -V ${var}" ";done) \
+-o /home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/c_lr.vcf
 
 
 ```
