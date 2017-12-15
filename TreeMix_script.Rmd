@@ -1,7 +1,7 @@
 ---
 title: "TreeMix_script"
 author: "Dani"
-date: "8/11/2017"
+date: "8 de noviembre de 2017"
 output: html_document
 ---
 
@@ -15,30 +15,50 @@ T_PATH=/opt/treemix-1.12/src #TreeMix software path
 
 ```
 
-#0b: Produce a gVCF and allelic counts data for the outgroup (the lynx rufus sample).
+#0b: Produce a gVCF and VCF data for the outgroup (the lynx rufus sample).
 
-```{r Define paths, eval=FALSE, engine='bash'}
+```{r Produce a gVCF and VCF data for the outgroup (the lynx rufus sample), eval=FALSE, engine='bash'}
 
+#Build a gVCF for the rufus sample:
 cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
 java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar \
-    -T HaplotypeCaller \
-    -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa \
-    -I c_lr_zz_0001_recal_round-1.bam \
-    --emitRefConfidence GVCF \
-    -o /home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs/c_lr_zz_0001_recal_round.g.vcf.gz
+-T HaplotypeCaller \
+-R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa \
+-I c_lr_zz_0001_recal_round-1.bam \
+--emitRefConfidence GVCF \
+-o /home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs/c_lr_zz_0001_recal_round.g.vcf.gz
+    
+#Build a VCF for the rufus sample:
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar /opt/GATK-3.7/GenomeAnalysisTK.jar \
+-T GenotypeGVCFs \
+-R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa \
+$(for var in c_lr_zz_0001_recal_round.g.vcf.gz; do echo -V ${var}" ";done) \
+-o /home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/c_lr.vcf
+
+#Drop all multiallelic SNPs as well as all INDELs from the rufus VCFs:
+cd $V_PATH
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar \
+-T SelectVariants \
+-selectType SNP \
+-restrictAllelesTo BIALLELIC \
+-R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa \
+-V c_lr.vcf \
+-o c_lr_SNPs.vcf
 
 ```
 
 #1: Build TreeMix input. Combine per population allele counts for all SNPs in a single gzipped file matching the required format for TreeMix inputs.
 
-```{r Remove monomorphic SNPs, eval=FALSE, engine='bash'}
+```{r Build TreeMix input, eval=FALSE, engine='bash'}
 
+#First create the allelic counts file for Eurasian lynx (without the root):
 cd $V_PATH
 shopt -s extglob #the extglob shell option gives you more powerful pattern matching in the command line.
-POPLIST=($(ls c_ll*_perpop.vcf | cut -d "_" -f1,2,3 | sort | uniq))
+POPLIST=($(ls ll*[^pv]_perpop_standard_filter.vcf | cut -d "_" -f1,2 | sort | uniq)) #selects all populations except for País Vasco
 cd $O_PATH
 rm SNP_names_treemix_input.txt
-SNP_LIST="$(ls "$V_PATH"/c_ll*_perpop.vcf | head -1)" #any population will be useful to retrieve the SNP list because I didn't trim the subVCFs so all populations have all the SNPs (from their species)
+SNP_LIST="$(ls "$V_PATH"/ll*_perpop_standard_filter.vcf | head -1)" #any population will be useful to retrieve the SNP list because I didn't trim the subVCFs so all populations have all the SNPs (from their species)
 grep -v '#' $SNP_LIST | cut -d$'\t' -f1,2,8 | cut -d$';' -f1,3 --output-delimiter=' ' | awk '{print $1"_"$2}' > SNP_names_treemix_input.txt
 unset POPNAMES #removes the variable so that it starts all over again inside the loop
 POPNAMES="SNP"
@@ -49,56 +69,37 @@ for pop in "${POPLIST[@]}"
   NAME="${pop}"
   POPNAMES=$POPNAMES" "$NAME
   echo $POPNAMES
-  SAMPLE_NUMBER="$(/opt/bcftools-1.6/bcftools query -l "$V_PATH/${pop}"_perpop.vcf | wc -l)"
+  SAMPLE_NUMBER="$(/opt/bcftools-1.6/bcftools query -l "$V_PATH/${pop}"_perpop_standard_filter.vcf | wc -l)"
   echo $SAMPLE_NUMBER
-  TOTAL_SNPS="$(grep -v '#' "$V_PATH/${pop}"_perpop.vcf | wc -l)"
+  TOTAL_SNPS="$(grep -v '#' "$V_PATH/${pop}"_perpop_standard_filter.vcf | wc -l)"
   echo $TOTAL_SNPS
   #done
-  grep -v '#' "$V_PATH/${pop}"_perpop.vcf | cut -d$'\t' -f1,2,8 | cut -d$';' -f1,3 --output-delimiter=' ' | cut -d$'=' -f1,2,3 --output-delimiter=' ' | awk '{print $1"_"$2" "$6-$4","$4}' > temp_SNP_counts.txt
+  grep -v '#' "$V_PATH/${pop}"_perpop_standard_filter.vcf | cut -d$'\t' -f1,2,8 | cut -d$';' -f1,3 --output-delimiter=' ' | cut -d$'=' -f1,2,3 --output-delimiter=' ' | awk '{print $1"_"$2" "$6-$4","$4}' > temp_SNP_counts.txt
   LANG=en_EN join -j 1 <(LANG=en_EN sort -k1 SNP_names_treemix_input.txt) <(LANG=en_EN sort -k1 temp_SNP_counts.txt) > intermediate_file.borrar.txt
   mv intermediate_file.borrar.txt SNP_names_treemix_input.txt
   done
 rm temp_SNP_counts.txt
-sed -i -e '1i'"$POPNAMES"'\' 
+sed -i -e '1i'"$POPNAMES"'\' SNP_names_treemix_input.txt
 #adds the headers
 grep -v ' 0,0 ' SNP_names_treemix_input.txt | grep -v ' 0,0$' | cut -d$' ' -f 2- | gzip > treemix_input.txt.gz #removes rows with any missing data, and also the SNP names
 shopt -u extglob #disable extglob
-
-
-  #sed -i "1 s/$/ $NAME/" toy_treemix_input.txt
-  #paste -d' ' toy_treemix_input.txt temp_SNP_counts.txt > toy_treemix_input.borrar.txt
-  #mv toy_treemix_input.borrar.txt toy_treemix_input.txt
-
 
 #Get a version of the TreeMix input without Balkans:
 cut -d$' ' -f2 --complement SNP_names_treemix_input.txt > SNP_names_treemix_input_wout_ba.txt #removes the Balkans column
 grep -v ' 0,0 ' SNP_names_treemix_input_wout_ba.txt | grep -v ' 0,0$' | cut -d$' ' -f 2- | gzip > treemix_input_wout_ba.txt.gz #removes rows with any missing data, and also the SNP names
 
-
-#Get a version that includes Lynx rufus (first test it with pardinus) as the outgroup:
+#Get a version of the TreeMix input that includes Lynx rufus as the outgroup:
 cd $O_PATH
-SNP_LIST="$(ls "$V_PATH"/c_ll*_perpop.vcf | head -1)"
-grep -v '#' $SNP_LIST | cut -d$'\t' -f1,2,8 | cut -d$';' -f1,3 --output-delimiter=' ' | awk '{printf ("%1s\t%s\n",$1,$2)}' > SNP_names_only.txt
-/opt/bcftools-1.6/bcftools filter -R SNP_names_only.txt -Ov -o $O_PATH/c_lp_do_0007_subset_positions.vcf /home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs/c_lp_do_0007_recal_round-1.g.vcf.gz
+grep -v '#' $V_PATH/c_lr_SNPs.vcf | cut -d$'\t' -f1,2,8 | cut -d$';' -f1,3 --output-delimiter=' ' | cut -d$'=' -f1,2,3 --output-delimiter=' ' | awk '{print $1"_"$2" "$6-$4","$4}' > c_lr_SNP_counts.txt #gets the allele counts for all variable positions within the rufus individual
+sed -i -e '1i'"SNP lr_zz"'\' c_lr_SNP_counts.txt #adds column names
+LANG=en_EN join -a1 -e 2,0 -o auto -j 1 <(LANG=en_EN sort -k1 SNP_names_treemix_input.txt) <(LANG=en_EN sort -k1 c_lr_SNP_counts.txt) > intermediate_file.borrar.txt #joins the eurasian lynx allelic counts with the rufus allelic counts, assigning "2,0" for all missing positions
+rm c_lr_SNP_counts.txt
+mv intermediate_file.borrar.txt SNP_names_treemix_input_rooted.txt
+grep -v ' 0,0 ' SNP_names_treemix_input_rooted.txt | grep -v ' 0,0$' | cut -d$' ' -f 2- | gzip > treemix_input_rooted.txt.gz #removes rows with any missing data, and also the SNP names
 
-cd $O_PATH
-grep -v '#' $O_PATH/c_lp_do_0007_subset_positions.vcf | cut -d$'\t' -f1,2,8 | cut -d$';' -f1,3 --output-delimiter=' ' | cut -d$'=' -f1,2,3 --output-delimiter=' ' | awk '{print $1"_"$2" "$6-$4","$4}' > c_lp_do_0007_SNP_counts.txt
-
-grep -v '#' c_lp_do_0007_subset_positions.vcf | cut -d$' ' -f1,2,10 | cut -d$':' -f1 | awk '{print $1"_"$2" "$3}' | NUEVA VARIABLE que para 0,0 sea 2,0; para 0,1 sea 1,1; para 1,1 sea 0,2 > new_test.txt
-
-
-
-Coger directamente esos!!! E intersectar con el input de TreeMix.
-
-
-#Build a VCF for the rufus sample
-cd /home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs
-java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar /opt/GATK-3.7/GenomeAnalysisTK.jar \
--T GenotypeGVCFs \
--R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa \
-$(for var in c_lr_zz_0001_recal_round.g.vcf.gz; do echo -V ${var}" ";done) \
--o /home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/c_lr.vcf
-
+#Get a version of the rufus-rooted TreeMix input without Balkans:
+cut -d$' ' -f2 --complement SNP_names_treemix_input_rooted.txt > SNP_names_treemix_input_rooted_wout_ba.txt #removes the Balkans column
+grep -v ' 0,0 ' SNP_names_treemix_input_rooted_wout_ba.txt | grep -v ' 0,0$' | cut -d$' ' -f 2- | gzip > treemix_input_rooted_wout_ba.txt.gz #removes rows with any missing data, and also the SNP names
 
 ```
 
@@ -106,18 +107,31 @@ $(for var in c_lr_zz_0001_recal_round.g.vcf.gz; do echo -V ${var}" ";done) \
 
 ```{r Run TreeMix, eval=FALSE, engine='bash'}
 
+V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+O_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/TreeMix #TreeMix analyses output path
+T_PATH=/opt/treemix-1.12/src #TreeMix software path
+
 #Basic command to build a ML tree
 cd $O_PATH
-$T_PATH/treemix -i treemix_input.txt.gz -o toy_out_stem
+$T_PATH/treemix -i treemix_input.txt.gz -o eurasian_lynx_out_stem
 
 #Basic command to build a ML tree without Balkans
 cd $O_PATH
-$T_PATH/treemix -i treemix_input_wout_ba.txt.gz -o toy_wout_ba_out_stem
+$T_PATH/treemix -i treemix_input_wout_ba.txt.gz -o eurasian_lynx_wout_ba_out_stem
 
+#Basic command to build a rooted ML tree
+cd $O_PATH
+$T_PATH/treemix -i treemix_input_rooted.txt.gz -root lr_zz -o eurasian_lynx_rooted_out_stem
 
-scp dkleinman@genomics-b.ebd.csic.es:/opt/treemix-1.12/src/plotting_funcs.R /Users/Dani/ownCloud/backup/annotation/TreeMix
-scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/TreeMix/toy_out_stem* /Users/Dani/ownCloud/backup/annotation/TreeMix
-scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/TreeMix/toy_wout_ba_out_stem* /Users/Dani/ownCloud/backup/annotation/TreeMix
+#Basic command to build a rooted ML tree without Balkans
+cd $O_PATH
+$T_PATH/treemix -i treemix_input_rooted_wout_ba.txt.gz -root lr_zz -o eurasian_lynx_rooted_wout_ba_out_stem
+
+#scp dkleinman@genomics-b.ebd.csic.es:/opt/treemix-1.12/src/plotting_funcs.R /Users/Dani/ownCloud/backup/annotation/TreeMix
+scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/TreeMix/eurasian_lynx_out_stem* /Users/Dani/ownCloud/backup/annotation/TreeMix
+scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/TreeMix/eurasian_lynx_wout_ba_out_stem* /Users/Dani/ownCloud/backup/annotation/TreeMix
+scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/TreeMix/eurasian_lynx_rooted_out_stem* /Users/Dani/ownCloud/backup/annotation/TreeMix
+scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/TreeMix/eurasian_lynx_rooted_wout_ba_out_stem* /Users/Dani/ownCloud/backup/annotation/TreeMix
 
 ```
 
@@ -139,5 +153,33 @@ dev.off()
 
 toy_wout_ba_out_stem <- plot_tree("/Users/Dani/ownCloud/backup/annotation/TreeMix/toy_wout_ba_out_stem")
 toy_wout_ba_out_stem
+
+#All Eurasian lynx populations
+source("/Users/Dani/ownCloud/backup/annotation/TreeMix/plotting_funcs.R")
+pdf(paste0(local_repo,"eurasian_lynx_out_stem.pdf"),width=20,height=10)
+eurasian_lynx_out_stem <- plot_tree("/Users/Dani/ownCloud/backup/annotation/TreeMix/eurasian_lynx_out_stem")
+eurasian_lynx_out_stem
+dev.off()
+
+#All Eurasian lynx populations except for Balkans
+source("/Users/Dani/ownCloud/backup/annotation/TreeMix/plotting_funcs.R")
+pdf(paste0(local_repo,"eurasian_lynx_wout_ba_out_stem.pdf"),width=20,height=10)
+eurasian_lynx_wout_ba_out_stem <- plot_tree("/Users/Dani/ownCloud/backup/annotation/TreeMix/eurasian_lynx_wout_ba_out_stem")
+eurasian_lynx_wout_ba_out_stem
+dev.off()
+
+#All Eurasian lynx populations, rooted with Lynx rufus
+source("/Users/Dani/ownCloud/backup/annotation/TreeMix/plotting_funcs.R")
+pdf(paste0(local_repo,"eurasian_lynx_rooted_out_stem.pdf"),width=20,height=10)
+eurasian_lynx_rooted_out_stem <- plot_tree("/Users/Dani/ownCloud/backup/annotation/TreeMix/eurasian_lynx_rooted_out_stem")
+eurasian_lynx_rooted_out_stem
+dev.off()
+
+#All Eurasian lynx populations except for Balkans, rooted with Lynx rufus
+source("/Users/Dani/ownCloud/backup/annotation/TreeMix/plotting_funcs.R")
+pdf(paste0(local_repo,"eurasian_lynx_rooted_wout_ba_out_stem.pdf"),width=20,height=10)
+eurasian_lynx_rooted_wout_ba_out_stem <- plot_tree("/Users/Dani/ownCloud/backup/annotation/TreeMix/eurasian_lynx_rooted_wout_ba_out_stem")
+eurasian_lynx_rooted_wout_ba_out_stem
+dev.off()
 
 ```
