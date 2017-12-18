@@ -1,0 +1,61 @@
+---
+title: "filtered_BAMs_analysis"
+author: "Dani"
+date: "15 de diciembre de 2017"
+output: html_document
+---
+
+#0a: Define paths.
+
+```{r Define paths, eval=FALSE, engine='bash'}
+
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_intergenic/BAM_intergenic_capture/BAM_intergenic_capture_filtered #BAMs path
+G_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs/gVCFs_intergenic_capture_filtered #gVCFs path
+V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+```
+
+#0b: Prepare reference genome. Prepare two files with data from the reference genome: a dictionary with contig names and sizes, and a fasta index file. This step should only be performed once (per reference genome).
+
+```{r Prepare reference genome, eval=FALSE, engine='bash'}
+
+#Karolina's code to prepare the reference genome. This should only be performed once per reference genome.
+cd /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/
+java -jar /home/tmp/Software/Picard/picard-tools-1.66/CreateSequenceDictionary.jar \
+ R=lp23.fa \
+ O=lp23.dict
+samtools faidx lp23.fa
+
+```
+
+#1a: Produce gVCF files. Perform a calling per sample to produce a gVCF file with variant information for every position in the genome (variant or not).
+
+```{r Produce gVCF files, eval=FALSE, engine='bash'}
+
+#For 5x samples:
+
+cd $B_PATH
+declare POP=$(ls *ll*.bam | cut -c3-7 | sort | uniq)
+for pop in ${POP[@]}
+  do
+  echo "${pop}"
+  ls *${pop}_*.bam > *${pop}_*.bam.list;
+  INPUT_BAMS_FOR_CALLING=($(cat *${pop}_*.bam.list)) 
+  for id in ${INPUT_BAMS_FOR_CALLING[@]}
+    do
+    echo "${id}"
+    java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
+    -T HaplotypeCaller \
+    -R $REF \
+    -I ${id} \
+    --emitRefConfidence GVCF \
+    -o $G_PATH/${id/.bam/.g.vcf.gz}
+    done
+  done
+
+```
+
+#1b: Perform sanity checks on gVCFs. Perform various sanity checks on all gVCFs.
