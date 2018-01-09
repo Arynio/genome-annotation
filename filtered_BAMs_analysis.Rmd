@@ -11,7 +11,7 @@ output: html_document
 
 B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_intergenic/BAM_intergenic_capture/BAM_intergenic_capture_filtered #BAMs path
 G_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs/gVCFs_intergenic_capture_filtered #gVCFs path
-V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/VCFs_intergenic_capture_filtered #VCFs path
 REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
 GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
 BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
@@ -59,3 +59,161 @@ for pop in ${POP[@]}
 ```
 
 #1b: Perform sanity checks on gVCFs. Perform various sanity checks on all gVCFs.
+
+```{r Perform sanity checks on gVCFs, eval=FALSE, engine='bash'}
+
+cd $G_PATH
+shopt -s extglob #the extglob shell option gives you more powerful pattern matching in the command line.
+SAMPLELIST=($(ls *.g.vcf.gz | cut -d "." -f1 | sort | uniq))
+rm gVCF_intergenic_capture_filtered.stats
+echo "sample_name,total_SNPs,homoz_ref,heteroz,homoz_alt,unaccounted" > gVCF_intergenic_capture_filtered.stats 
+for sample in "${SAMPLELIST[@]}"
+  do
+  echo "${sample}"
+  #done
+  NAME="$(echo ${sample} | cut -d "_" -f1,2,3,4)"
+  TOTAL_SNPS="$(zgrep -v '#' "$G_PATH/${sample}".g.vcf.gz | wc -l)"
+  echo $TOTAL_SNPS
+  TOTAL_00="$(zgrep -v '#' "$G_PATH/${sample}".g.vcf.gz | zgrep '0/0:' | wc -l)"
+  echo $TOTAL_00
+  TOTAL_01="$(zgrep -v '#' "$G_PATH/${sample}".g.vcf.gz | zgrep '0/1:' | wc -l)"
+  echo $TOTAL_01
+  TOTAL_11="$(zgrep -v '#' "$G_PATH/${sample}".g.vcf.gz | zgrep '1/1:' | wc -l)"
+  echo $TOTAL_11
+  UNACCOUNTED="$(($TOTAL_SNPS - $TOTAL_00 - $TOTAL_01 - $TOTAL_11))"
+  echo $UNACCOUNTED
+  echo "$NAME,$TOTAL_SNPS,$TOTAL_00,$TOTAL_01,$TOTAL_11,$UNACCOUNTED" >> gVCF_intergenic_capture_filtered.stats
+  done
+shopt -u extglob #disable extglob
+
+#Save locally the .stats file
+scp dkleinman@genomics-b.ebd.csic.es:$G_PATH/gVCF_intergenic_capture_filtered.stats /Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/intergenic_capture_filtered/
+
+```
+
+#1c: Analyse the sanity checks file. Perform per individual analyses on the sanity checks file.
+
+```{r Analyse the sanity checks file}
+library("readr")
+library("dplyr")
+library("ggplot2")
+
+local_repo <- file.path("/Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/intergenic_capture_filtered")
+
+sanity_checks <- read_csv("/Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/intergenic_capture_filtered/gVCF_intergenic_capture_filtered.stats")
+sanity_checks
+rowSums(sanity_checks[,-c(1,2)])==sanity_checks[,2] #check if the sum of AA, AB and BB SNPs equal the total SNP count (for each individual)
+pop_summary_sc <- sanity_checks %>% 
+  mutate(species=substr(sanity_checks$sample_name,3,4),population=substr(sanity_checks$sample_name,6,7)) %>%
+  group_by(species,population) %>%
+  summarise(N=n(),mean_total_SNPs=mean(total_SNPs),mean_homoz_ref=mean(homoz_ref),mean_heteroz=mean(heteroz),mean_homoz_alt=mean(homoz_alt),mean_unaccounted=mean(unaccounted))
+pop_summary_sc
+
+plot_pop_total_SNPs <- ggplot(pop_summary_sc, aes(population,mean_total_SNPs)) + geom_col()
+plot_pop_total_SNPs
+
+plot_pop_heteroz <- ggplot(pop_summary_sc, aes(population,mean_heteroz)) + geom_col() + facet_grid(. ~ species,scales="free_x",space="free_x")
+plot_pop_heteroz
+
+plot_indiv_total_SNPs <- ggplot(sanity_checks, aes(x=substr(sample_name,0,12),y=total_SNPs,fill=substr(sample_name,0,7))) + geom_col() + theme(axis.text.x=element_text(angle=90,hjust=0,size=6,colour="black")) 
+plot_indiv_total_SNPs
+
+plot_indiv_heteroz <- ggplot(sanity_checks, aes(x=substr(sample_name,3,12),y=heteroz,fill=substr(sample_name,6,7))) + 
+  geom_col() +
+  ggtitle("0/1 positions per sample (in gVCF)") +
+  theme_bw() +
+  labs(x="sample",y="N",fill="population") +
+  theme(plot.title=element_text(hjust=0.5),
+        axis.text.x=element_text(angle=90, hjust=0, size=6,colour="black"),
+        legend.key.size=unit(0.4,"cm")
+  )
+plot_indiv_heteroz
+ggsave("gVCFs_SNPs_per_sample.pdf", width=30, height=10, units="cm", device="pdf", path=local_repo)
+
+```
+
+#2a: Combine gVCF into VCF. Run joint genotyping of all desired gVCF files to produce a multisample VCF file.
+
+```{r Combine gVCF into VCF, eval=FALSE, engine='bash'}
+
+#First, I generate a VCF file using all lp gVCF files. It doesn't work on compressed files, so I have to unzip all .g.vcf.gz files using the gunzip command, and then repeat. 
+#Later on, when trying to work both with lp and ll gVCFs, server B is running very slow and the generation of .idx files (necessary for the VCF calling) is not working fine or whatever. We decide that it's best to work with compressed files so I compress three random lp gVCFs, but then I encounter the same problem that I got before (when using just the lp files): 'Unable to create iterator for rod named variant'.
+#Eventually, Karolina and I realize that all the compressing and decompressing of the gVCFs has messed the files. We decide to start all over again, targeting the compressed format (g.vcf.gz). She makes the ll gVCFs and I take care of the lp ones, and she creates the single VCF combining all gVCFs.
+
+#Option A: when all gVCFs are named the same (same name structure) and in the same folder (this is the code that I used in the end to redo the VCF ONLY for the 5x lp samples):
+cd $G_PATH
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
+-T GenotypeGVCFs \
+-R $REF \
+$(for var in *.g.vcf.gz; do echo -V ${var}" ";done) \
+-o $V_PATH/c_ll_plus_h_ll_icf.vcf
+
+```
+
+#2b: Fix sample names in the VCF.
+
+```{r Fix sample names in the VCF, eval=FALSE, engine='bash'}
+
+#First, it's important to rename those samples in the global VCF that don't have the proper name (in our case it's 5 samples: the 4 that were sequenced at Macrogen and the DON sample from before 1990). The first time that I tried to split the VCF, I ran into some errors due to these names.
+
+cd $V_PATH
+$BCF query -l c_ll_plus_h_ll_icf.vcf #check sample names
+#!/bin/bash
+#cat << "EOF" > list_to_remove.txt #Unmark this line when running it (I marked it in R because it doesn't understand it and messes the colours of subsequent lines). It should include all incorrect names.
+LL112_rgsm c_ll_vl_0112
+LL146_rgsm c_ll_ya_0146
+LL212_rgsm c_ll_cr_0212
+LL90_rgsm c_ll_ki_0090
+EOF
+
+$BCF reheader -s list_to_remove.txt -o c_ll_plus_h_ll_icf_renamed.vcf c_ll_plus_h_ll_icf.vcf #copy the VCF and rename the wrong named samples in the new VCF
+
+grep -v '#' c_ll_plus_h_ll_icf_renamed.vcf | wc -l #
+
+```
+
+#3a: Extract SNPs. Subset the VCF files in order to keep only SNP variants.
+
+```{r Extract SNPs, eval=FALSE, engine='bash'}
+
+#During this step, all multiallelic SNPs as well as all INDELs will be dropped from the respective VCFs.
+cd $V_PATH
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T SelectVariants \
+-selectType SNP \
+-restrictAllelesTo BIALLELIC \
+-R $REF \
+-V c_ll_plus_h_ll_icf_renamed.vcf \
+-o c_ll_plus_h_ll_icf_SNPs.vcf
+
+#Check whether there's any position with the reference allele fixed (AC=0) or with the alternative allele fixed (AC=AN)
+grep -v '#' c_ll_plus_h_ll_icf_SNPs.vcf | cut -d$'\t' -f8 | cut -d$';' -f1,3 --output-delimiter=' ' | cut -d$'=' -f2,3 --output-delimiter=' ' | cut -d$' ' -f1,3 | awk -F , '{if($1 == $2 || $1 == 0) print 0; else print 1; }' | sort | uniq #this should only return the value "1" when all positions are variable (i.e. when all positions have at least one reference or one alternative allele), whereas both "1" and "0" would be returned when there's any position with a fixed allele.
+
+grep -v '#' c_ll_plus_h_ll_icf_SNPs.vcf | wc -l #
+
+```
+
+#4a: Tag SNPs. Tag SNPs which don't reach certain quality thresholds.
+
+```{r Tag SNPs, eval=FALSE, engine='bash'}
+
+#SNPs that don't meet certain quality criteria should be tagged (and eventually removed).     
+  #QD: QualByDepth (variant confidence divided by the unfiltered depth of non-reference samples). Default < 2.0.
+  #FS: FisherStrand (phred-scaled p-value using Fisher's Exact Test to detect strand bias in the reads). Default > 60.0.
+  #MQ: RMSMappingQuality (root mean square of Mapping Quality of reads across all samples). Default < 40.0.
+  #MQRankSum: MappingQualityRankSumTest (u-based z-approximation from Mann-Whitney Rank Sum Test for Mappin Qualities, i.e. reads with reference alleles vs. those with the alternate allele. Will only be applied to heterozygous calls). Default < -12.5. In theory, this would alleviate contamination problems.
+  #ReadPosRankSum: ReadPosRankSumTest (u-based z-approximation from Mann-Whitney Rank Sum Test for distance from end of the read for reads with the alternate allele. Will only be applied to heterozygous calls). Default < -8.0. In theory, this would alleviate damage problems.
+  #SOR: StrandOddsRatio (evaluates whether there's strand bias in the data). Default > 3.0.
+cd $V_PATH
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T VariantFiltration \
+--filterName "snpsfilter" \
+--filterExpression "QD<2.0 || FS>60.0 || MQ<40.0 || MQRankSum<-12.5 || ReadPosRankSum<-8.0 || SOR>3.0" \
+-R $REF \
+-V c_ll_plus_h_ll_icf_SNPs.vcf \
+-o c_ll_plus_h_ll_icf_SNPs_tagged.vcf
+
+```
+
+
+
