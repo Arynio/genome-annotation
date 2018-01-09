@@ -59,7 +59,7 @@ POPLIST=($(ls ll*[^pv]_perpop_standard_filter.vcf | cut -d "_" -f1,2 | sort | un
 cd $O_PATH
 rm SNP_names_treemix_input.txt
 SNP_LIST="$(ls "$V_PATH"/ll*_perpop_standard_filter.vcf | head -1)" #any population will be useful to retrieve the SNP list because I didn't trim the subVCFs so all populations have all the SNPs (from their species)
-grep -v '#' $SNP_LIST | cut -d$'\t' -f1,2,8 | cut -d$';' -f1,3 --output-delimiter=' ' | awk '{print $1"_"$2}' > SNP_names_treemix_input.txt
+grep -v '#' $SNP_LIST | cut -d$'\t' -f1,2,8 | cut -d$';' -f1,3 --output-delimiter=' ' | LANG=en_EN sort -k1,1 -k2,2n | awk '{print $1"_"$2}' > SNP_names_treemix_input.txt
 unset POPNAMES #removes the variable so that it starts all over again inside the loop
 POPNAMES="SNP"
 #echo "pop_name,total_SNPs,homoz_ref,heteroz,homoz_alt,unaccounted,unaccounted_cat" > c_VCF_raw.stats 
@@ -74,13 +74,17 @@ for pop in "${POPLIST[@]}"
   TOTAL_SNPS="$(grep -v '#' "$V_PATH/${pop}"_perpop_standard_filter.vcf | wc -l)"
   echo $TOTAL_SNPS
   #done
-  grep -v '#' "$V_PATH/${pop}"_perpop_standard_filter.vcf | cut -d$'\t' -f1,2,8 | cut -d$';' -f1,3 --output-delimiter=' ' | cut -d$'=' -f1,2,3 --output-delimiter=' ' | awk '{print $1"_"$2" "$6-$4","$4}' > temp_SNP_counts.txt
-  LANG=en_EN join -j 1 <(LANG=en_EN sort -k1 SNP_names_treemix_input.txt) <(LANG=en_EN sort -k1 temp_SNP_counts.txt) > intermediate_file.borrar.txt
+  grep -v '#' "$V_PATH/${pop}"_perpop_standard_filter.vcf | cut -d$'\t' -f1,2,8 | cut -d$';' -f1,3 --output-delimiter=' ' | cut -d$'=' -f1,2,3 --output-delimiter=' ' | awk '{print $1" "$2" "$6-$4","$4}' | LANG=en_EN sort -k1,1 -k2,2n | awk '{print $1"_"$2" "$3}' > temp_SNP_counts.txt
+  #LANG=en_EN join -j 1 <(LANG=en_EN sort -k1,1 -k2,2n SNP_names_treemix_input.txt | awk '{print $1"_"$2}') <(LANG=en_EN sort -k1,1 -k2,2n temp_SNP_counts.txt | awk '{print $1"_"$2" "$3}') > intermediate_file.borrar.txt
+  LANG=en_EN join -j 1 SNP_names_treemix_input.txt temp_SNP_counts.txt > intermediate_file.borrar.txt
   mv intermediate_file.borrar.txt SNP_names_treemix_input.txt
   done
 rm temp_SNP_counts.txt
-sed -i -e '1i'"$POPNAMES"'\' SNP_names_treemix_input.txt
-#adds the headers
+LONGNAMES=$(echo $POPNAMES | sed -e "s/ll_ba/Balkans/g; s/ll_cr/Carpathians/g; s/ll_ka/Khentii/g; s/ll_ki/Kirov/g; s/ll_la/Latvia/g; s/ll_no/Norway/g; s/ll_og/Ömnögovi/g; s/ll_po/Bialowieza/g; s/ll_to/Töv/g; s/ll_tu/Tuva/g; s/ll_ur/Urals/g; s/ll_vl/Vladivostok/g; s/ll_ya/Yakutia/g; s/lp_sm/Sierra Morena/g; s/lp_do/Doñana/g; s/lr_zz/Rufus/g") #swaps the short names with the full names
+echo $LONGNAMES
+sed -i -e '1i'"$LONGNAMES"'\' SNP_names_treemix_input.txt #adds the headers
+#sed -i "1s/.*/$LONGNAMES/" SNP_names_treemix_input.txt #substitutes old headers
+
 grep -v ' 0,0 ' SNP_names_treemix_input.txt | grep -v ' 0,0$' | cut -d$' ' -f 2- | gzip > treemix_input.txt.gz #removes rows with any missing data, and also the SNP names
 shopt -u extglob #disable extglob
 
@@ -90,11 +94,13 @@ grep -v ' 0,0 ' SNP_names_treemix_input_wout_ba.txt | grep -v ' 0,0$' | cut -d$'
 
 #Get a version of the TreeMix input that includes Lynx rufus as the outgroup:
 cd $O_PATH
-grep -v '#' $V_PATH/c_lr_SNPs.vcf | cut -d$'\t' -f1,2,8 | cut -d$';' -f1,3 --output-delimiter=' ' | cut -d$'=' -f1,2,3 --output-delimiter=' ' | awk '{print $1"_"$2" "$6-$4","$4}' > c_lr_SNP_counts.txt #gets the allele counts for all variable positions within the rufus individual
-sed -i -e '1i'"SNP lr_zz"'\' c_lr_SNP_counts.txt #adds column names
-LANG=en_EN join -a1 -e 2,0 -o auto -j 1 <(LANG=en_EN sort -k1 SNP_names_treemix_input.txt) <(LANG=en_EN sort -k1 c_lr_SNP_counts.txt) > intermediate_file.borrar.txt #joins the eurasian lynx allelic counts with the rufus allelic counts, assigning "2,0" for all missing positions
+#LANG=en_EN sort -k1,1 -k2,2n SNP_names_treemix_input.txt
+grep -v '#' $V_PATH/c_lr_SNPs.vcf | cut -d$'\t' -f1,2,8 | cut -d$';' -f1,3 --output-delimiter=' ' | cut -d$'=' -f1,2,3 --output-delimiter=' ' | LANG=en_EN sort -k1,1 -k2,2n | awk '{print $1"_"$2" "$6-$4","$4}' > c_lr_SNP_counts.txt #gets the allele counts for all variable positions within the rufus individual
+sed -i -e '1i'"SNP Rufus"'\' c_lr_SNP_counts.txt #adds column names
+LANG=en_EN join -a1 -e 2,0 -o auto -j 1 <(LANG=en_EN sort -k1 SNP_names_treemix_input.txt | tail -n +2) <(LANG=en_EN sort -k1 c_lr_SNP_counts.txt) | cut -d$'_' -f1,2 --output-delimiter=' ' | LANG=en_EN sort -k1,1 -k2,2n | awk '{print $1"_"$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "$10" "$11" "$12" "$13" "$14" "$15" "$16}' > intermediate_file.borrar.txt #joins the eurasian lynx allelic counts with the rufus allelic counts, assigning "2,0" for all missing positions
 rm c_lr_SNP_counts.txt
 mv intermediate_file.borrar.txt SNP_names_treemix_input_rooted.txt
+sed -i -e '1i'"$LONGNAMES Rufus"'\' SNP_names_treemix_input_rooted.txt
 grep -v ' 0,0 ' SNP_names_treemix_input_rooted.txt | grep -v ' 0,0$' | cut -d$' ' -f 2- | gzip > treemix_input_rooted.txt.gz #removes rows with any missing data, and also the SNP names
 
 #Get a version of the rufus-rooted TreeMix input without Balkans:
@@ -119,9 +125,14 @@ $T_PATH/treemix -i treemix_input.txt.gz -o eurasian_lynx_out_stem
 cd $O_PATH
 $T_PATH/treemix -i treemix_input_wout_ba.txt.gz -o eurasian_lynx_wout_ba_out_stem
 
-#Basic command to build a rooted ML tree
+#Basic command to build a rooted ML tree, followed by a loop that runs TreeMix with different number of migration events
 cd $O_PATH
-$T_PATH/treemix -i treemix_input_rooted.txt.gz -root lr_zz -o eurasian_lynx_rooted_out_stem
+$T_PATH/treemix -i treemix_input_rooted.txt.gz -root Rufus -k 100 -o eurasian_lynx_rooted_out_stem
+END=6
+for i in $(seq 1 $END)
+  do echo "migration events number = " $i
+  $T_PATH/treemix -i treemix_input_rooted.txt.gz -root Rufus -k 100 -m ${i} -o eurasian_lynx_rooted_out_stem_"${i}"_migration
+  done
 
 #Basic command to build a rooted ML tree without Balkans
 cd $O_PATH
@@ -130,7 +141,8 @@ $T_PATH/treemix -i treemix_input_rooted_wout_ba.txt.gz -root lr_zz -o eurasian_l
 #scp dkleinman@genomics-b.ebd.csic.es:/opt/treemix-1.12/src/plotting_funcs.R /Users/Dani/ownCloud/backup/annotation/TreeMix
 scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/TreeMix/eurasian_lynx_out_stem* /Users/Dani/ownCloud/backup/annotation/TreeMix
 scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/TreeMix/eurasian_lynx_wout_ba_out_stem* /Users/Dani/ownCloud/backup/annotation/TreeMix
-scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/TreeMix/eurasian_lynx_rooted_out_stem* /Users/Dani/ownCloud/backup/annotation/TreeMix
+scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/TreeMix/eurasian_lynx_rooted_out_stem.* /Users/Dani/ownCloud/backup/annotation/TreeMix
+scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/TreeMix/eurasian_lynx_rooted_out_stem*migration* /Users/Dani/ownCloud/backup/annotation/TreeMix/migration
 scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/TreeMix/eurasian_lynx_rooted_wout_ba_out_stem* /Users/Dani/ownCloud/backup/annotation/TreeMix
 
 ```
@@ -140,15 +152,14 @@ scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/Tre
 ```{r Plot TreeMix}
 
 local_repo <- file.path("/Users/Dani/ownCloud/backup/annotation/TreeMix/")
+mig_repo <- file.path("/Users/Dani/ownCloud/backup/annotation/TreeMix/migration/")
+poporder <- c("Balkans","Carpathians","Norway","Bialowieza","Latvia","Kirov","Urals","Tuva","Ömnögovi","Töv","Khentii","Yakutia","Vladivostok","Rufus")
+poporder <- read.tsv(paste0(mig_repo, "poporder.txt"),header=T)
 
 source("/Users/Dani/ownCloud/backup/annotation/TreeMix/plotting_funcs.R")
 pdf(paste0(local_repo,"ll_toy_basic_tree.pdf"),width=20,height=10)
 toy_out_stem <- plot_tree("/Users/Dani/ownCloud/backup/annotation/TreeMix/toy_out_stem")
 toy_out_stem
-dev.off()
-
-png("CrabMigrationAllSNPSmig3.png",width=2400,height=2000,res = 300)
-plot_tree("crabmigout3")
 dev.off()
 
 toy_wout_ba_out_stem <- plot_tree("/Users/Dani/ownCloud/backup/annotation/TreeMix/toy_wout_ba_out_stem")
@@ -160,6 +171,7 @@ pdf(paste0(local_repo,"eurasian_lynx_out_stem.pdf"),width=20,height=10)
 eurasian_lynx_out_stem <- plot_tree("/Users/Dani/ownCloud/backup/annotation/TreeMix/eurasian_lynx_out_stem")
 eurasian_lynx_out_stem
 dev.off()
+plot_resid(eurasian_lynx_out_stem, poporder)
 
 #All Eurasian lynx populations except for Balkans
 source("/Users/Dani/ownCloud/backup/annotation/TreeMix/plotting_funcs.R")
@@ -170,10 +182,28 @@ dev.off()
 
 #All Eurasian lynx populations, rooted with Lynx rufus
 source("/Users/Dani/ownCloud/backup/annotation/TreeMix/plotting_funcs.R")
-pdf(paste0(local_repo,"eurasian_lynx_rooted_out_stem.pdf"),width=20,height=10)
+pdf(paste0(local_repo,"eurasian_lynx_rooted_out_stem_tree.pdf"),width=20,height=10)
 eurasian_lynx_rooted_out_stem <- plot_tree("/Users/Dani/ownCloud/backup/annotation/TreeMix/eurasian_lynx_rooted_out_stem")
 eurasian_lynx_rooted_out_stem
 dev.off()
+source("/Users/Dani/ownCloud/backup/annotation/TreeMix/plotting_funcs.R")
+pdf(paste0(local_repo,"eurasian_lynx_rooted_out_stem_residuals.pdf"),width=20,height=10)
+eurasian_lynx_rooted_out_stem <- plot_resid("/Users/Dani/ownCloud/backup/annotation/TreeMix/eurasian_lynx_rooted_out_stem",paste0(mig_repo,"pop_order"))
+eurasian_lynx_rooted_out_stem
+dev.off()
+
+for (i in 1:6) {
+  source("/Users/Dani/ownCloud/backup/annotation/TreeMix/plotting_funcs.R")
+  pdf(paste0(mig_repo,"eurasian_lynx_rooted_out_stem_",i,"_migration_tree.pdf"),width=20,height=10)
+  eurasian_lynx_rooted_migration <- plot_tree(paste0(mig_repo,"eurasian_lynx_rooted_out_stem_",i,"_migration"))
+  eurasian_lynx_rooted_migration
+  dev.off()
+  source("/Users/Dani/ownCloud/backup/annotation/TreeMix/plotting_funcs.R")
+  pdf(paste0(mig_repo,"eurasian_lynx_rooted_out_stem_",i,"_migration_residuals.pdf"),width=20,height=10)
+  eurasian_lynx_rooted_migration <- plot_resid(paste0(mig_repo,"eurasian_lynx_rooted_out_stem_",i,"_migration"),paste0(mig_repo,"pop_order"))
+  eurasian_lynx_rooted_migration
+  dev.off()
+}
 
 #All Eurasian lynx populations except for Balkans, rooted with Lynx rufus
 source("/Users/Dani/ownCloud/backup/annotation/TreeMix/plotting_funcs.R")
@@ -181,5 +211,7 @@ pdf(paste0(local_repo,"eurasian_lynx_rooted_wout_ba_out_stem.pdf"),width=20,heig
 eurasian_lynx_rooted_wout_ba_out_stem <- plot_tree("/Users/Dani/ownCloud/backup/annotation/TreeMix/eurasian_lynx_rooted_wout_ba_out_stem")
 eurasian_lynx_rooted_wout_ba_out_stem
 dev.off()
+
+
 
 ```
