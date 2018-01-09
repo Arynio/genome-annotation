@@ -125,7 +125,7 @@ done
 cd $G_PATH
 shopt -s extglob #the extglob shell option gives you more powerful pattern matching in the command line.
 SAMPLELIST=($(ls c_*.g.vcf.gz | cut -d "." -f1 | sort | uniq))
-rm toy_c_gVCF_raw.stats
+rm c_gVCF_raw.stats
 echo "sample_name,total_SNPs,homoz_ref,heteroz,homoz_alt,unaccounted" > c_gVCF_raw.stats 
 for sample in "${SAMPLELIST[@]}"
   do
@@ -195,8 +195,6 @@ ggsave("gVCFs_SNPs_per_sample.pdf", width=30, height=10, units="cm", device="pdf
 #2a: Combine gVCF into VCF. Run joint genotyping of all desired gVCF files to produce a multisample VCF file.
 
 ```{r Combine gVCF into VCF, eval=FALSE, engine='bash'}
-
-!!!!!!!!!! REPEAT THE VCF ONCE ALL gVCFs ARE READY !!!!!!!!!!!
 
 #First, I generate a VCF file using all lp gVCF files. It doesn't work on compressed files, so I have to unzip all .g.vcf.gz files using the gunzip command, and then repeat. 
 #Later on, when trying to work both with lp and ll gVCFs, server B is running very slow and the generation of .idx files (necessary for the VCF calling) is not working fine or whatever. We decide that it's best to work with compressed files so I compress three random lp gVCFs, but then I encounter the same problem that I got before (when using just the lp files): 'Unable to create iterator for rod named variant'.
@@ -1045,6 +1043,44 @@ joined_db_ggplot2 <- ggplot(data=tidy_joined_db2, aes(x=substr(sample,3,length(s
   )
 joined_db_ggplot2
 ggsave("full_VCFs_SNPs_per_sample.pdf", width=30, height=10, units="cm", device="pdf", path=local_repo)
+
+
+#Analyse the change in transitions/transversions:
+std_filter_tt <- read_tsv("/Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/standard_filter_individual.bcf.stats")[,c(1,3,7:8)]
+std_filter_tt <- std_filter_tt[grep("_ll_", std_filter_tt$`[3]sample`),]
+std_filter_tt$`# PSC` <- gsub("PSC", "std", std_filter_tt$`# PSC`)
+std_filter_tt
+no_filter_tt <- read_tsv("/Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/no_filter_individual.bcf.stats")[,c(1,3,7:8)]
+no_filter_tt$`# PSC` <- gsub("PSC", "no", no_filter_tt$`# PSC`)
+no_filter_tt
+strict_filter_tt <- read_tsv("/Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/strict_filter_individual.bcf.stats")[,c(1,3,7:8)]
+strict_filter_tt$`# PSC` <- gsub("PSC", "strict", strict_filter_tt$`# PSC`)
+strict_filter_tt
+super_filter_tt <- read_tsv("/Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/super_strict_filter_individual.bcf.stats")[,c(1,3,7:8)]
+super_filter_tt$`# PSC` <- gsub("PSC", "super", super_filter_tt$`# PSC`)
+super_filter_tt
+
+common_tt <- rbind(std_filter_tt,no_filter_tt,strict_filter_tt,super_filter_tt)
+common_tt <- common_tt %>% 
+  mutate(ts_tv=(common_tt$`[7]nTransitions`/common_tt$`[8]nTransversions`),population=substr(common_tt$`[3]sample`,6,7))
+colnames(common_tt) <- c("filter","sample","ts","tv","ts/tv","population")
+common_tt
+common_tt$filter <- as.factor(common_tt$filter)
+common_tt$sample <- as.factor(common_tt$sample)
+common_tt$population <- as.factor(common_tt$population)
+
+common_tt_ggplot <- ggplot(data=common_tt, aes(x=substr(sample,3,length(sample)),y=ts/tv,colour=filter)) + 
+  geom_point() +
+  ggtitle("Rate of ts/tv per sample with different filterings") +
+  ylab("ts/tv") +
+  xlab("sample") +
+  theme_bw() +
+  theme(plot.title=element_text(hjust=0.5),
+        axis.text.x=element_text(angle=90, hjust=0, size=6,colour="black"),
+        legend.key.size=unit(0.4,"cm")
+  )
+common_tt_ggplot
+ggsave("full_VCF_ts_tv_per_sample.pdf", width=20, height=10, units="cm", device="pdf", path=local_repo)
 
 
 #Analyse the private alleles files:
