@@ -107,6 +107,12 @@ grep -v ' 0,0 ' SNP_names_treemix_input_rooted.txt | grep -v ' 0,0$' | cut -d$' 
 cut -d$' ' -f2 --complement SNP_names_treemix_input_rooted.txt > SNP_names_treemix_input_rooted_wout_ba.txt #removes the Balkans column
 grep -v ' 0,0 ' SNP_names_treemix_input_rooted_wout_ba.txt | grep -v ' 0,0$' | cut -d$' ' -f 2- | gzip > treemix_input_rooted_wout_ba.txt.gz #removes rows with any missing data, and also the SNP names
 
+#Get a version of the rufus-rooted TreeMix input with Khentii, Töv & Ömnögovi
+cut -d$' ' -f1,4,8,10  SNP_names_treemix_input_rooted.txt | cut -d$',' -f1,2,3,4 --output-delimiter=' ' | cut -d$' ' -f1,2,3,4,5,6,7 | awk '{print $1" "$2+$4+$6","$3+$5+$7}' > SNP_names_threepop_input_ka_om_to.txt #sums allele counts for the three Mongolian populations
+sed -i '1s/.*/SNP Mongolia/' SNP_names_threepop_input_ka_om_to.txt #adds correct column names
+awk -v f2=SNP_names_treemix_input_rooted.txt '{ c = $2; getline < f2; print $0, c; }' SNP_names_threepop_input_ka_om_to.txt > SNP_names_treemix_input_rooted_w_mo.txt #copies the Mongolia column to a new TreeMix input that includes all prior populations plus Mongolia
+
+
 ```
 
 #2: Run TreeMix. Run TreeMix under different scenarios.
@@ -151,15 +157,6 @@ scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/Tre
 scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/TreeMix/eurasian_lynx_rooted_wout_ba_out_stem.* /Users/Dani/ownCloud/backup/annotation/TreeMix/rooted/wout_ba
 scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/TreeMix/eurasian_lynx_rooted_wout_ba_out_stem*migration* /Users/Dani/ownCloud/backup/annotation/TreeMix/rooted/wout_ba/migration
 
-
-#Run threepop test to evaluate admixture between populations (without Balkans)
-cd $O_PATH
-$T_PATH/threepop -i treemix_input_rooted_wout_ba.txt.gz -k 100
-
-
-#Get a version of the rufus-rooted TreeMix input without Balkans:
-cut -d$' ' -f2 --complement SNP_names_treemix_input_rooted.txt > SNP_names_treemix_input_rooted_wout_ba.txt #removes the Balkans column
-grep -v ' 0,0 ' SNP_names_treemix_input_rooted_wout_ba.txt | grep -v ' 0,0$' | cut -d$' ' -f 2- | gzip > treemix_input_rooted_wout_ba.txt.gz #removes rows with any missing data, and also the SNP names
 
 ```
 
@@ -267,18 +264,20 @@ O_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/TreeMix #TreeMix analyses output 
 T_PATH=/opt/treemix-1.12/src #TreeMix software path
 
 
-#Run threepop test to evaluate admixture between populations (without Balkans)
+#Run threepop test to evaluate admixture between populations (without Balkans). I eventually abort it because it will take MONTHS.
 cd $O_PATH
 $T_PATH/threepop -i treemix_input_rooted_wout_ba.txt.gz -k 100
 
 
-#Get a ThreePop input with only Kirov, Tuva & Yakutia:
-cut -d$' ' -f1,5,11,14  SNP_names_treemix_input_rooted.txt > SNP_names_threepop_input_ki_tu_ya.txt #keeps only columns for the three desired populations
-grep -v ' 0,0 ' SNP_names_threepop_input_ki_tu_ya.txt | grep -v ' 0,0$' | cut -d$' ' -f 2- | gzip > SNP_names_threepop_input_ki_tu_ya.txt.gz #removes rows with any missing data, and also the SNP names
+#####ThreePop with Khentii in the East:
 
-#Run threepop test to evaluate admixture between Kirov, Tuva and Yakutia:
+#Get a ThreePop input with only Urals, Tuva & Khentii:
+cut -d$' ' -f1,4,11,12  SNP_names_treemix_input_rooted.txt > SNP_names_threepop_input_ka_tu_ur.txt #keeps only columns for the three desired populations
+grep -v ' 0,0 ' SNP_names_threepop_input_ka_tu_ur.txt | grep -v ' 0,0$' | cut -d$' ' -f 2- | gzip > SNP_names_threepop_input_ka_tu_ur.txt.gz #removes rows with any missing data, and also the SNP names
+
+#Run threepop test to evaluate admixture between Urals, Tuva and Khentii:
 cd $O_PATH
-$T_PATH/threepop -i SNP_names_threepop_input_ki_tu_ya.txt.gz -k 100
+$T_PATH/threepop -i SNP_names_threepop_input_ka_tu_ur.txt.gz -k 100
 
 
 #Get a ThreePop input with only Kirov, Tuva & Khentii:
@@ -290,14 +289,16 @@ cd $O_PATH
 $T_PATH/threepop -i SNP_names_threepop_input_ka_ki_tu.txt.gz -k 100
 
 
-#Get a ThreePop input with only Urals, Tuva & Khentii:
-cut -d$' ' -f1,4,11,12  SNP_names_treemix_input_rooted.txt > SNP_names_threepop_input_ka_tu_ur.txt #keeps only columns for the three desired populations
-grep -v ' 0,0 ' SNP_names_threepop_input_ka_tu_ur.txt | grep -v ' 0,0$' | cut -d$' ' -f 2- | gzip > SNP_names_threepop_input_ka_tu_ur.txt.gz #removes rows with any missing data, and also the SNP names
+#Get a ThreePop input with only Carpathians, Tuva & Khentii:
+cut -d$' ' -f1,3,4,11  SNP_names_treemix_input_rooted.txt > SNP_names_threepop_input_ca_ka_tu.txt #keeps only columns for the three desired populations
+grep -v ' 0,0 ' SNP_names_threepop_input_ca_ka_tu.txt | grep -v ' 0,0$' | cut -d$' ' -f 2- | gzip > SNP_names_threepop_input_ca_ka_tu.txt.gz #removes rows with any missing data, and also the SNP names
 
-#Run threepop test to evaluate admixture between Urals, Tuva and Khentii:
+#Run threepop test to evaluate admixture between Carpathians, Tuva and Khentii:
 cd $O_PATH
-$T_PATH/threepop -i SNP_names_threepop_input_ka_tu_ur.txt.gz -k 100
+$T_PATH/threepop -i SNP_names_threepop_input_ca_ka_tu.txt.gz -k 100
 
+
+#####ThreePop with Yakutia in the East:
 
 #Get a ThreePop input with only Urals, Tuva & Yakutia:
 cut -d$' ' -f1,11,12,14  SNP_names_treemix_input_rooted.txt > SNP_names_threepop_input_tu_ur_ya.txt #keeps only columns for the three desired populations
@@ -308,6 +309,26 @@ cd $O_PATH
 $T_PATH/threepop -i SNP_names_threepop_input_tu_ur_ya.txt.gz -k 100
 
 
+#Get a ThreePop input with only Kirov, Tuva & Yakutia:
+cut -d$' ' -f1,5,11,14  SNP_names_treemix_input_rooted.txt > SNP_names_threepop_input_ki_tu_ya.txt #keeps only columns for the three desired populations
+grep -v ' 0,0 ' SNP_names_threepop_input_ki_tu_ya.txt | grep -v ' 0,0$' | cut -d$' ' -f 2- | gzip > SNP_names_threepop_input_ki_tu_ya.txt.gz #removes rows with any missing data, and also the SNP names
+
+#Run threepop test to evaluate admixture between Kirov, Tuva and Yakutia:
+cd $O_PATH
+$T_PATH/threepop -i SNP_names_threepop_input_ki_tu_ya.txt.gz -k 100
+
+
+#Get a ThreePop input with only Carpathians, Tuva & Yakutia:
+cut -d$' ' -f1,3,11,14  SNP_names_treemix_input_rooted.txt > SNP_names_threepop_input_ca_tu_ya.txt #keeps only columns for the three desired populations
+grep -v ' 0,0 ' SNP_names_threepop_input_ca_tu_ya.txt | grep -v ' 0,0$' | cut -d$' ' -f 2- | gzip > SNP_names_threepop_input_ca_tu_ya.txt.gz #removes rows with any missing data, and also the SNP names
+
+#Run threepop test to evaluate admixture between Carpathians, Tuva and Yakutia:
+cd $O_PATH
+$T_PATH/threepop -i SNP_names_threepop_input_ca_tu_ya.txt.gz -k 100
+
+
+#####ThreePop with Vladivostok in the East:
+
 #Get a ThreePop input with only Urals, Tuva & Vladivostok:
 cut -d$' ' -f1,11,12,13  SNP_names_treemix_input_rooted.txt > SNP_names_threepop_input_tu_ur_vl.txt #keeps only columns for the three desired populations
 grep -v ' 0,0 ' SNP_names_threepop_input_tu_ur_vl.txt | grep -v ' 0,0$' | cut -d$' ' -f 2- | gzip > SNP_names_threepop_input_tu_ur_vl.txt.gz #removes rows with any missing data, and also the SNP names
@@ -315,5 +336,58 @@ grep -v ' 0,0 ' SNP_names_threepop_input_tu_ur_vl.txt | grep -v ' 0,0$' | cut -d
 #Run threepop test to evaluate admixture between Urals, Tuva and Vladivostok:
 cd $O_PATH
 $T_PATH/threepop -i SNP_names_threepop_input_tu_ur_vl.txt.gz -k 100
+
+
+#Get a ThreePop input with only Kirov, Tuva & Vladivostok:
+cut -d$' ' -f1,5,11,13  SNP_names_treemix_input_rooted.txt > SNP_names_threepop_input_ki_tu_vl.txt #keeps only columns for the three desired populations
+grep -v ' 0,0 ' SNP_names_threepop_input_ki_tu_vl.txt | grep -v ' 0,0$' | cut -d$' ' -f 2- | gzip > SNP_names_threepop_input_ki_tu_vl.txt.gz #removes rows with any missing data, and also the SNP names
+
+#Run threepop test to evaluate admixture between Kirov, Tuva and Vladivostok:
+cd $O_PATH
+$T_PATH/threepop -i SNP_names_threepop_input_ki_tu_vl.txt.gz -k 100
+
+
+#Get a ThreePop input with only Carpathians, Tuva & Vladivostok:
+cut -d$' ' -f1,3,11,13  SNP_names_treemix_input_rooted.txt > SNP_names_threepop_input_ca_tu_vl.txt #keeps only columns for the three desired populations
+grep -v ' 0,0 ' SNP_names_threepop_input_ca_tu_vl.txt | grep -v ' 0,0$' | cut -d$' ' -f 2- | gzip > SNP_names_threepop_input_ca_tu_vl.txt.gz #removes rows with any missing data, and also the SNP names
+
+#Run threepop test to evaluate admixture between Carpathians, Tuva and Vladivostok:
+cd $O_PATH
+$T_PATH/threepop -i SNP_names_threepop_input_ca_tu_vl.txt.gz -k 100
+
+
+#####ThreePop with Mongolia (grouped) in the East:
+
+#Get a ThreePop input with only Urals, Tuva & Mongolia:
+cut -d$' ' -f1,11,12,16  SNP_names_treemix_input_rooted_w_mo.txt > SNP_names_threepop_input_tu_ur_mo.txt #keeps only columns for the three desired populations
+grep -v ' 0,0 ' SNP_names_threepop_input_tu_ur_mo.txt | grep -v ' 0,0$' | cut -d$' ' -f 2- | gzip > SNP_names_threepop_input_tu_ur_mo.txt.gz #removes rows with any missing data, and also the SNP names
+
+#Run threepop test to evaluate admixture between Urals, Tuva and Mongolia:
+cd $O_PATH
+$T_PATH/threepop -i SNP_names_threepop_input_tu_ur_mo.txt.gz -k 100
+
+
+#Get a ThreePop input with only Kirov, Tuva & Mongolia:
+cut -d$' ' -f1,5,11,16  SNP_names_treemix_input_rooted_w_mo.txt > SNP_names_threepop_input_ki_tu_mo.txt #keeps only columns for the three desired populations
+grep -v ' 0,0 ' SNP_names_threepop_input_ki_tu_mo.txt | grep -v ' 0,0$' | cut -d$' ' -f 2- | gzip > SNP_names_threepop_input_ki_tu_mo.txt.gz #removes rows with any missing data, and also the SNP names
+
+#Run threepop test to evaluate admixture between Kirov, Tuva and Mongolia:
+cd $O_PATH
+$T_PATH/threepop -i SNP_names_threepop_input_ki_tu_mo.txt.gz -k 100
+
+
+#Get a ThreePop input with only Carpathians, Tuva & Mongolia:
+cut -d$' ' -f1,3,11,16  SNP_names_treemix_input_rooted_w_mo.txt > SNP_names_threepop_input_ca_tu_mo.txt #keeps only columns for the three desired populations
+grep -v ' 0,0 ' SNP_names_threepop_input_ca_tu_mo.txt | grep -v ' 0,0$' | cut -d$' ' -f 2- | gzip > SNP_names_threepop_input_ca_tu_mo.txt.gz #removes rows with any missing data, and also the SNP names
+
+#Run threepop test to evaluate admixture between Carpathians, Tuva and Mongolia:
+cd $O_PATH
+$T_PATH/threepop -i SNP_names_threepop_input_ca_tu_mo.txt.gz -k 100
+
+
+V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+O_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/TreeMix #TreeMix analyses output path
+T_PATH=/opt/treemix-1.12/src #TreeMix software path
+
 
 ```
