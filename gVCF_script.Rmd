@@ -93,6 +93,16 @@ java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -X
     -I h_ll_pv_0223_sorted_indelrealigner_marked_sorted.bam \
     --emitRefConfidence GVCF \
     -o $G_PATH/h_ll_pv_0223_sorted_indelrealigner_marked_sorted.g.vcf.gz
+    
+#This was only used to produce the gVCF file for the Lynx canadensis sample:
+cd $B_PATH
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+    -T HaplotypeCaller \
+    -R $REF \
+    -I c_lc_zz_0001_recal_round-1.bam \
+    --emitRefConfidence GVCF \
+    -o $G_PATH/c_lc_zz_0001_recal_round-1.g.vcf.gz
+    
 
 ```
 
