@@ -1,0 +1,1283 @@
+---
+title: "c_lp_ll_VCF"
+author: "Dani"
+date: "20 de febrero de 2018"
+output: html_document
+---
+
+
+#0a: Define paths.
+
+```{r Define paths, eval=FALSE, engine='bash'}
+
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAMs path
+G_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+```
+
+#0b: Prepare reference genome. Prepare two files with data from the reference genome: a dictionary with contig names and sizes, and a fasta index file. This step should only be performed once (per reference genome).
+
+```{r Prepare reference genome, eval=FALSE, engine='bash'}
+
+#Karolina's code to prepare the reference genome. This should only be performed once per reference genome.
+cd /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/
+java -jar /home/tmp/Software/Picard/picard-tools-1.66/CreateSequenceDictionary.jar \
+ R=lp23.fa \
+ O=lp23.dict
+samtools faidx lp23.fa
+
+```
+
+#1a: Produce gVCF files. Perform a calling per sample to produce a gVCF file with variant information for every position in the genome (variant or not).
+
+```{r Produce gVCF files, eval=FALSE, engine='bash'}
+
+#For 5x samples:
+
+cd $B_PATH #this works for the 5x samples (25x samples are stored in another folder and are named differently)
+POP=("*_lp")
+for pop in ${POP[@]}
+  do
+  echo "${pop}"
+  ls ${pop}_*_recal_round-1.bam > ${pop/*_lp/lp}_recal_round-1.bam.list;
+  INPUT_BAMS_FOR_CALLING=($(cat ${pop/*_lp/lp}_recal_round-1.bam.list)) 
+  for id in ${INPUT_BAMS_FOR_CALLING[@]}
+    do
+    echo "${id}"
+    java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
+    -T HaplotypeCaller \
+    -R $REF \
+    -I ${id} \
+    --emitRefConfidence GVCF \
+    -o $G_PATH/${id/.bam/.g.vcf.gz}
+    done
+  done
+
+#For 25x samples:
+cd $B_PATH/genome_project_samples_25x #this works for the 25x samples
+POP=("*_lp")
+for pop in ${POP[@]}
+  do
+  echo "${pop}"
+  ls ${pop}_*_recal_round-1_25x.bam > ${pop/*_lp/lp}_recal_round-1_25x.bam.list;
+  INPUT_BAMS_FOR_CALLING=($(cat ${pop/*_lp/lp}_recal_round-1_25x.bam.list)) 
+  for id in ${INPUT_BAMS_FOR_CALLING[@]}
+    do
+    echo "${id}"
+    java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
+    -T HaplotypeCaller \
+    -R $REF \
+    -I ${id} \
+    --emitRefConfidence GVCF \
+    -o $G_PATH/genome_project_samples_25x/${id/.bam/.g.vcf.gz}
+    done
+  done
+
+#This was only used to test one sample (lp_do_0443):
+cd $B_PATH
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T HaplotypeCaller \
+-R $REF \
+-I c_lp_do_0443_recal_round-1.bam \
+--emitRefConfidence GVCF \
+-o $G_PATH/c_lp_do_0443_BIS_recal_round-1.g.vcf
+
+#This was only used to produce the gVCF file for the Euskadi historical Lynx lynx sample:
+cd $B_PATH
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+    -T HaplotypeCaller \
+    -R $REF \
+    -I h_ll_pv_0223_sorted_indelrealigner_marked_sorted.bam \
+    --emitRefConfidence GVCF \
+    -o $G_PATH/h_ll_pv_0223_sorted_indelrealigner_marked_sorted.g.vcf.gz
+    
+#This was only used to produce the gVCF file for the Lynx canadensis sample:
+cd $B_PATH
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+    -T HaplotypeCaller \
+    -R $REF \
+    -I c_lc_zz_0001_recal_round-1.bam \
+    --emitRefConfidence GVCF \
+    -o $G_PATH/c_lc_zz_0001_recal_round-1.g.vcf.gz
+    
+
+```
+
+##1a_bis: Immunocapture
+```{bash}
+
+#Immunocapture
+cd /home/emarmesat/grupolince/immunocapture/alignments_merged_cap_wg_ontarget
+
+POP=h_lp_al
+screen -S gvcfs_samples_$POP
+POP=h_lp_al
+script gvcfs_samples_$POP.log
+POP=h_lp_al
+
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa
+
+for id in $POP*filtered.bam
+do
+echo "${id}"
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T HaplotypeCaller -R $REF -I ${id} --emitRefConfidence GVCF -o ${id/.bam/.g.vcf.gz}
+done
+
+```
+
+#1b: Perform sanity checks on gVCFs. Perform various sanity checks on all gVCFs.
+
+```{r Perform sanity checks on gVCFs, eval=FALSE, engine='bash'}
+
+cd $G_PATH
+shopt -s extglob #the extglob shell option gives you more powerful pattern matching in the command line.
+SAMPLELIST=($(ls c_*.g.vcf.gz | cut -d "." -f1 | sort | uniq))
+rm c_gVCF_raw.stats
+echo "sample_name,total_SNPs,homoz_ref,heteroz,homoz_alt,unaccounted" > c_gVCF_raw.stats 
+for sample in "${SAMPLELIST[@]}"
+  do
+  echo "${sample}"
+  #done
+  NAME="${sample}"
+  TOTAL_SNPS="$(zgrep -v '#' "$G_PATH/${sample}".g.vcf.gz | wc -l)"
+  echo $TOTAL_SNPS
+  TOTAL_00="$(zgrep -v '#' "$G_PATH/${sample}".g.vcf.gz | zgrep '0/0:' | wc -l)"
+  echo $TOTAL_00
+  TOTAL_01="$(zgrep -v '#' "$G_PATH/${sample}".g.vcf.gz | zgrep '0/1:' | wc -l)"
+  echo $TOTAL_01
+  TOTAL_11="$(zgrep -v '#' "$G_PATH/${sample}".g.vcf.gz | zgrep '1/1:' | wc -l)"
+  echo $TOTAL_11
+  UNACCOUNTED="$(($TOTAL_SNPS - $TOTAL_00 - $TOTAL_01 - $TOTAL_11))"
+  echo $UNACCOUNTED
+  echo "$NAME,$TOTAL_SNPS,$TOTAL_00,$TOTAL_01,$TOTAL_11,$UNACCOUNTED" >> c_gVCF_raw.stats
+  done
+shopt -u extglob #disable extglob
+
+#Save locally the .stats file
+scp dkleinman@genomics-b.ebd.csic.es:$G_PATH/c_gVCF_raw.stats /Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/
+
+```
+
+#1c: Analyse the sanity checks file. Perform per individual analyses on the sanity checks file.
+
+```{r Analyse the sanity checks file}
+library("readr")
+library("dplyr")
+library("ggplot2")
+
+local_repo <- file.path("/Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/")
+
+sanity_checks <- read_csv("/Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/c_gVCF_raw.stats")
+sanity_checks
+rowSums(sanity_checks[,-c(1,2)])==sanity_checks[,2] #check if the sum of AA, AB and BB SNPs equal the total SNP count (for each individual)
+pop_summary_sc <- sanity_checks %>% 
+  mutate(species=substr(sanity_checks$sample_name,3,4),population=substr(sanity_checks$sample_name,6,7)) %>%
+  group_by(species,population) %>%
+  summarise(N=n(),mean_total_SNPs=mean(total_SNPs),mean_homoz_ref=mean(homoz_ref),mean_heteroz=mean(heteroz),mean_homoz_alt=mean(homoz_alt),mean_unaccounted=mean(unaccounted))
+pop_summary_sc
+
+plot_pop_total_SNPs <- ggplot(pop_summary_sc, aes(population,mean_total_SNPs)) + geom_col() + facet_grid(. ~ species,scales="free_x",space="free_x")
+plot_pop_total_SNPs
+
+plot_pop_heteroz <- ggplot(pop_summary_sc, aes(population,mean_heteroz)) + geom_col() + facet_grid(. ~ species,scales="free_x",space="free_x")
+plot_pop_heteroz
+
+plot_indiv_total_SNPs <- ggplot(sanity_checks, aes(x=substr(sample_name,0,12),y=total_SNPs,fill=substr(sample_name,0,7))) + geom_col() + theme(axis.text.x=element_text(angle=90,hjust=0,size=6,colour="black")) 
+plot_indiv_total_SNPs
+
+plot_indiv_heteroz <- ggplot(sanity_checks[grep("c_ll",sanity_checks$sample_name),], aes(x=substr(sample_name,0,12),y=heteroz,fill=substr(sample_name,6,7))) + 
+  geom_col() +
+  ggtitle("0/1 positions per sample (in gVCF)") +
+  theme_bw() +
+  labs(x="sample",y="N",fill="population") +
+  theme(plot.title=element_text(hjust=0.5),
+        axis.text.x=element_text(angle=90, hjust=0, size=6,colour="black"),
+        legend.key.size=unit(0.4,"cm")
+  )
+plot_indiv_heteroz
+ggsave("gVCFs_SNPs_per_sample.pdf", width=30, height=10, units="cm", device="pdf", path=local_repo)
+
+```
+
+#2a: Combine gVCF into VCF. Run joint genotyping of all desired gVCF files to produce a multisample VCF file.
+
+```{r Combine gVCF into VCF, eval=FALSE, engine='bash'}
+
+#First, I generate a VCF file using all lp gVCF files. It doesn't work on compressed files, so I have to unzip all .g.vcf.gz files using the gunzip command, and then repeat. 
+#Later on, when trying to work both with lp and ll gVCFs, server B is running very slow and the generation of .idx files (necessary for the VCF calling) is not working fine or whatever. We decide that it's best to work with compressed files so I compress three random lp gVCFs, but then I encounter the same problem that I got before (when using just the lp files): 'Unable to create iterator for rod named variant'.
+#Eventually, Karolina and I realize that all the compressing and decompressing of the gVCFs has messed the files. We decide to start all over again, targeting the compressed format (g.vcf.gz). She makes the ll gVCFs and I take care of the lp ones, and she creates the single VCF combining all gVCFs.
+
+#Option A: when all gVCFs are named the same (same name structure) and in the same folder (this is the code that I used in the end to redo the VCF ONLY for the 5x lp samples):
+cd $G_PATH
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
+-T GenotypeGVCFs \
+-R $REF \
+$(for var in *.g.vcf.gz; do echo -V ${var}" ";done) \
+-o $V_PATH/c_ll_lp_plus_h_ll.vcf
+
+#Compare the number of SNPs of the new VCF versus the old one (which had three samples less):
+grep -v '#' c_ll_lp_plus_h_ll.vcf | wc -l #23999314
+grep -v '#' all_c_ll_lp_renamed.vcf | wc -l #20248404
+
+#Option B: Maria's code to better define the populations and to obtain gVCFs when BAMs with different name structure are considered.
+
+#List of populations
+#c_lc_zz
+#c_ll_ba
+#c_ll_cr
+#c_ll_ka
+#c_ll_ki
+#c_ll_la
+#c_ll_no
+#c_ll_og
+#c_ll_po
+#c_ll_to
+#c_ll_tu
+#c_ll_vl
+#c_ll_ya
+#c_lp_do
+#c_lp_sm
+#c_lr_zz
+#h_ll_ba
+
+#Code to define the populations to be used, and then print all gVCFs in a list. This version returns a list of the "original" samples (all samples except for the subsampled version of the 28x ones):
+cd $G_PATH
+POPS=(c_ll_ba-c_ll_cr-c_ll_ka-c_ll_ki-c_ll_la-c_ll_no-c_ll_og-c_ll_po-c_ll_to-c_ll_tu-c_ll_vl-c_ll_ya-c_lp_do-c_lp_sm)
+for POP in ${POPS[@]}
+  do
+  echo $POP
+  rm "all_c_original_coverage_$POP"_n"$NUMBER_IND".gVCFlist
+  IFS='-' read -r -a POPS1 <<< "$POP" # this creates an array stripping by "-"
+  for POP1 in "${POPS1[@]}"
+    do
+    echo "$POP --> $POP1"
+    ls *${POP1}_*_recal_round-1.g.vcf* | grep -v "tbi" | grep -v "idx" >> "$POP".gVCFlist
+    done
+  NUMBER_IND=$(printf "%03d" `wc -l "$POP".gVCFlist | cut -f1 -d " "`);
+  mv "$POP".gVCFlist "all_c_original_coverage_$POP"_n"$NUMBER_IND".gVCFlist
+  done
+
+#Code to define the populations to be used, and then print all gVCFs in a list. This version returns a list of all samples, including both the subsampled (5x) version of those with 28x, and the 28x themselves:
+cd $G_PATH
+POPS=(c_ll_ba-c_ll_cr-c_ll_ka-c_ll_ki-c_ll_la-c_ll_no-c_ll_og-c_ll_po-c_ll_to-c_ll_tu-c_ll_vl-c_ll_ya-c_lp_do-c_lp_sm)
+for POP in ${POPS[@]}
+  do
+  echo $POP
+  rm "all_c_samples_$POP"_n"$NUMBER_IND".gVCFlist
+  IFS='-' read -r -a POPS1 <<< "$POP" # this creates an array stripping by "-"
+  for POP1 in "${POPS1[@]}"
+    do
+    echo "$POP --> $POP1"
+    ls *${POP1}_*_recal_round-1*g.vcf* | grep -v "tbi" | grep -v "idx" >> "$POP".gVCFlist
+    done
+  NUMBER_IND=$(printf "%03d" `wc -l "$POP".gVCFlist | cut -f1 -d " "`);
+  mv "$POP".gVCFlist "all_c_samples_$POP"_n"$NUMBER_IND".gVCFlist
+  done
+
+#Code to define the populations to be used, and then print all gVCFs in a list. This version returns a list with only those (original, 28x) samples that were subsampled:
+cd $G_PATH
+POPS=(c_lp_do-c_lp_sm)
+for POP in ${POPS[@]}
+  do
+  echo $POP
+  rm "all_c_lp_samples_28x_$POP"_n"$NUMBER_IND".gVCFlist
+  IFS='-' read -r -a POPS1 <<< "$POP" # this creates an array stripping by "-"
+    for POP1 in "${POPS1[@]}"
+    do
+    echo "$POP --> $POP1"
+    ls *${POP1}_*_recal_round-1_subsampled.g.vcf* | grep -v "tbi" | grep -v "idx" | sed 's/_subsampled//g' >> "$POP".gVCFlist
+    done
+  NUMBER_IND=$(printf "%03d" `wc -l "$POP".gVCFlist | cut -f1 -d " "`);
+  mv "$POP".gVCFlist "all_c_lp_samples_28x_$POP"_n"$NUMBER_IND".gVCFlist
+  done
+
+#Next, use the following line to exclude from the all samples list the list with only 28x samples in order to obtain a list with only 5x samples (including the subsampled versions of 28x samples)
+cd $G_PATH
+grep -v -f all_c_lp_samples_28x*.gVCFlist all_c_samples_c*.gVCFlist > all_c_samples_5x_c_ll_ba-c_ll_cr-c_ll_ka-c_ll_ki-c_ll_la-c_ll_no-c_ll_og-c_ll_po-c_ll_to-c_ll_tu-c_ll_vl-c_ll_ya-c_lp_do-c_lp_sm_n103.gVCFlist
+
+#Next, run the VCF calling using the "original" samples (28x when possible, and 5x elsewhere):
+cd $G_PATH
+POPS=(c_ll_ba-c_ll_cr-c_ll_ka-c_ll_ki-c_ll_la-c_ll_no-c_ll_og-c_ll_po-c_ll_to-c_ll_tu-c_ll_vl-c_ll_ya-c_lp_do-c_lp_sm)
+INPUT_gVCFs=all_c_samples_5x_*.list #insert here one of the lists generated above ()
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
+-T GenotypeGVCFs \
+-R $REF \
+-V $INPUT_gVCFs \
+-o all_c_samples_5x_recal_round-1.vcf
+
+INPUT_gVCFs=all_c_original_coverage_*.list #insert here one of the lists generated above ()
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
+-T GenotypeGVCFs \
+-R $REF \
+-V $INPUT_gVCFs \
+-o all_c_original_coverage_recal_round-1.vcf
+
+```
+
+#2b: Fix sample names in the VCF.
+
+```{r Fix sample names in the VCF, eval=FALSE, engine='bash'}
+
+#First, it's important to rename those samples in the global VCF that don't have the proper name (in our case it's 5 samples: the 4 that were sequenced at Macrogen and the DON sample from before 1990). The first time that I tried to split the VCF, I ran into some errors due to these names.
+
+cd $V_PATH
+$BCF query -l c_ll_lp_plus_h_ll.vcf #check sample names
+#!/bin/bash
+#cat << "EOF" > list_to_remove.txt #Unmark this line when running it (I marked it in R because it doesn't understand it and messes the colours of subsequent lines). It should include all incorrect names.
+LL112_rgsm c_ll_vl_0112
+LL146_rgsm c_ll_ya_0146
+LL212_rgsm c_ll_cr_0212
+LL90_rgsm c_ll_ki_0090
+h_lp_do_0007 c_lp_do_0007
+EOF
+
+$BCF reheader -s list_to_remove.txt -o c_ll_lp_plus_h_ll_renamed.vcf c_ll_lp_plus_h_ll.vcf #copy the VCF and rename the wrong named samples in the new VCF
+
+#Next I checked whether both files were identical (except for the sample names, obviously) with diff, and they were, so I deleted all_c_ll_lp.vcf
+
+```
+
+#2c: Split the VCF into per species VCFs. Generate a VCF for the Iberian lynx and another one for the Eurasian lynx, and check whether the reference allele has changed.
+
+```{r Split the VCF into per population VCFs, eval=FALSE, engine='bash'}
+
+#Split the VCF in order to get one for each species. It will be necessary to get rid of substitutions. During this step, all fixed positions within each species (including substitutions) will also be removed (with minor allele count = 1).
+cd $G_PATH
+declare SPECIES=$(ls {*lp,*ll}_*.g.vcf.gz | cut -c3-4 | sort | uniq)
+for i in ${SPECIES[@]}
+  do
+  echo "${i}"
+  ls *${i}*g.vcf.gz | cut -c1-12 > list_to_remove.txt
+  $BCF view -S list_to_remove.txt --min-ac 1:minor -Ov -o $V_PATH/"${i}"_species.vcf $V_PATH/c_ll_lp_plus_h_ll_renamed.vcf
+  done
+rm list_to_remove.txt
+
+grep -v '#' ll_species.vcf | wc -l #18244146
+grep -v '#' lp_species.vcf | wc -l #4310101
+
+#Check whether the reference allele has changed between VCFs. To this end, let's compare all SNPs common to both species' variants list.
+grep -v '#' $V_PATH/lp_species.vcf | cut -d$'\t' -f1,2,4,5 | awk '{print $1"_"$2" "$3" "$4}' | sort -k 1,1 > $V_PATH/lp_variants.txt #creates variants list for lp.
+grep -v '#' $V_PATH/ll_species.vcf | cut -d$'\t' -f1,2,4,5 | awk '{print $1"_"$2" "$3" "$4}' | sort -k 1,1 > $V_PATH/ll_variants.txt #creates variants list for ll.
+join -1 1 -2 1 -e0 -o'0,1.2,1.3,2.2,2.3' $V_PATH/ll_variants.txt $V_PATH/lp_variants.txt > lp_ll_joined_variants.txt #joins both lists and outputs only the common SNPs.
+awk '{if($2 == $4) print 1; else print 0; }' lp_ll_joined_variants.txt | sort | uniq #this should only return the value "1" when all SNPs share the same reference allele, or both "0" and "1" if some SNPs have different reference alleles between species. In this case it only returns "1", so everything is fine.
+cat lp_ll_joined_variants.txt | awk '{if($2 == $4) print $0" 1"; else print $0" 0"; }' lp_ll_joined_variants.txt | awk '$6 == 0' #in case there's any row where the reference allele has changed, return those rows. In this case, none are returned.
+
+```
+
+#3a: Extract SNPs. Subset the VCF files in order to keep only SNP variants.
+
+```{r Extract SNPs, eval=FALSE, engine='bash'}
+
+#During this step, all multiallelic SNPs as well as all INDELs will be dropped from the respective VCFs.
+cd $V_PATH
+declare SPECIES=$(ls *species.vcf | cut -c1-2 | sort | uniq)
+for i in ${SPECIES[@]}
+  do
+  echo "${i}"
+  java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+  -T SelectVariants \
+  -selectType SNP \
+  -restrictAllelesTo BIALLELIC \
+  -R $REF \
+  -V "${i}"_species.vcf \
+  -o "${i}"_species_SNPs.vcf
+  done
+
+#Check whether there's any position with the reference allele fixed (AC=0) or with the alternative allele fixed (AC=AN)
+grep -v '#' lp_species_SNPs.vcf | cut -d$'\t' -f8 | cut -d$';' -f1,3 --output-delimiter=' ' | cut -d$'=' -f2,3 --output-delimiter=' ' | cut -d$' ' -f1,3 | awk -F , '{if($1 == $2 || $1 == 0) print 0; else print 1; }' | sort | uniq #this should only return the value "1" when all positions are variable (i.e. when all positions have at least one reference or one alternative allele), whereas both "1" and "0" would be returned when there's any position with a fixed allele.
+
+grep -v '#' ll_species_SNPs.vcf | wc -l #14035279
+grep -v '#' lp_species_SNPs.vcf | wc -l #3364193
+
+```
+
+#3b: Extract INDELs. Subset the VCF files in order to keep only INDELs.
+
+```{r Extract INDELs, eval=FALSE, engine='bash'}
+
+#This section should only be used if INDELs are needed.
+cd $V_PATH
+declare SPECIES=$(ls c*_species.vcf | cut -c1-4 | uniq)
+for i in ${SPECIES[@]}
+  do
+  echo "${i}"
+  java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+  -T SelectVariants \
+  -selectType INDEL \
+  -R $REF \
+  -V "${i}"_species.vcf \
+  -o "${i}"_species_INDELs.vcf
+  done
+
+```
+
+#4a: Tag SNPs. Tag SNPs which don't reach certain quality thresholds.
+
+```{r Tag SNPs, eval=FALSE, engine='bash'}
+
+#SNPs that don't meet certain quality criteria should be tagged (and eventually removed).     
+  #QD: QualByDepth (variant confidence divided by the unfiltered depth of non-reference samples). Default < 2.0.
+  #FS: FisherStrand (phred-scaled p-value using Fisher's Exact Test to detect strand bias in the reads). Default > 60.0.
+  #MQ: RMSMappingQuality (root mean square of Mapping Quality of reads across all samples). Default < 40.0.
+  #MQRankSum: MappingQualityRankSumTest (u-based z-approximation from Mann-Whitney Rank Sum Test for Mappin Qualities, i.e. reads with reference alleles vs. those with the alternate allele. Will only be applied to heterozygous calls). Default < -12.5. In theory, this would alleviate contamination problems.
+  #ReadPosRankSum: ReadPosRankSumTest (u-based z-approximation from Mann-Whitney Rank Sum Test for distance from end of the read for reads with the alternate allele. Will only be applied to heterozygous calls). Default < -8.0. In theory, this would alleviate damage problems.
+  #SOR: StrandOddsRatio (evaluates whether there's strand bias in the data). Default > 3.0.
+cd $V_PATH
+declare SPECIES=$(ls *_species_SNPs.vcf | cut -c1-2 | uniq)
+for i in ${SPECIES[@]}
+  do
+  echo "${i}"
+  java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+  -T VariantFiltration \
+  --filterName "snpsfilter" \
+  --filterExpression "QD<2.0 || FS>60.0 || MQ<40.0 || MQRankSum<-12.5 || ReadPosRankSum<-8.0 || SOR>3.0" \
+  -R $REF \
+  -V "${i}"_species_SNPs.vcf \
+  -o "${i}"_species_SNPs_tagged.vcf
+  done
+
+```
+
+#4b: Filter SNPs. Remove all SNPs tagged in the previous step.
+
+```{r Filter SNPs, eval=FALSE, engine='bash'}
+
+cd $V_PATH
+declare SPECIES=$(ls *_species_SNPs_tagged.vcf | cut -c1-2 | uniq)
+for i in ${SPECIES[@]}
+  do
+  echo "${i}"
+  java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+  -T SelectVariants \
+  -select 'vc.isNotFiltered()' \
+  -R $REF \
+  -V "${i}"_species_SNPs_tagged.vcf \
+  -o "${i}"_species_SNPs_tagged_filtered.vcf
+  done
+
+grep -v '#' c_ll_species_SNPs_tagged_filtered.vcf | wc -l #8608569 this was for the old VCF (without 3 old samples)
+grep -v '#' ll_species_SNPs_tagged_filtered.vcf | wc -l #11412781
+grep -v '#' lp_species_SNPs_tagged_filtered.vcf | wc -l #2707297
+  
+#Now subset the previous VCF in order to keep only those SNPs above strict RankSum thresholds.
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T SelectVariants \
+-select "MQRankSum>-0.5 && ReadPosRankSum>-0.5" \
+-R $REF \
+-V ll_species_SNPs_tagged_filtered.vcf \
+-o ll_species_strict_filter.vcf
+
+grep -v '#' c_ll_species_strict_filter.vcf | wc -l #6304158 this was for the old VCF (without 3 old samples)
+grep -v '#' ll_species_strict_filter.vcf | wc -l #7727248
+
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T SelectVariants \
+-select "MQRankSum>-0.1 && ReadPosRankSum>-0.1" \
+-R $REF \
+-V ll_species_SNPs_tagged_filtered.vcf \
+-o ll_species_super_strict_filter.vcf
+
+grep -v '#' c_ll_species_super_strict_filter.vcf | wc -l #4866975 this was for the old VCF (without 3 old samples)
+grep -v '#' ll_species_super_strict_filter.vcf | wc -l #6154505
+
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T SelectVariants \
+-select "MQRankSum>0.0 && ReadPosRankSum>0.0" \
+-R $REF \
+-V c_ll_species_SNPs_tagged_filtered.vcf \
+-o c_ll_species_ultra_strict_filter.vcf
+
+grep -v '#' c_ll_species_ultra_strict_filter.vcf | wc -l #198699
+
+```
+
+#4c: Compare SNP filters.
+
+```{r Filter SNPs, eval=FALSE, engine='bash'}
+
+#Tests with different filters
+cd $V_PATH
+
+grep -v '#' c_ll_species_SNPs.vcf | wc -l #10488154
+
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T SelectVariants \
+-select "MQRankSum<-12.5 || ReadPosRankSum<-8.0" \
+-R $REF \
+-V c_ll_species_SNPs.vcf \
+-o c_ll_species_SNPs_MQRS12,5_RPRS8,0.vcf
+
+grep -v '#' c_ll_species_SNPs_MQRS12,5_RPRS8,0.vcf | wc -l #232
+  
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T SelectVariants \
+-select "MQRankSum<-8.0 || ReadPosRankSum<-8.0" \
+-R $REF \
+-V c_ll_species_SNPs.vcf \
+-o c_ll_species_SNPs_MQRS8,0_RPRS8,0.vcf
+
+grep -v '#' c_ll_species_SNPs_MQRS8,0_RPRS8,0.vcf | wc -l #738
+
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T SelectVariants \
+-select "MQRankSum<-12.5 || ReadPosRankSum<-5.0" \
+-R $REF \
+-V c_ll_species_SNPs.vcf \
+-o c_ll_species_SNPs_MQRS12,5_RPRS5,0.vcf
+
+grep -v '#' c_ll_species_SNPs_MQRS12,5_RPRS5,0.vcf | wc -l #258
+
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T SelectVariants \
+-select "MQRankSum<-8.0 || ReadPosRankSum<-5.0" \
+-R $REF \
+-V c_ll_species_SNPs.vcf \
+-o c_ll_species_SNPs_MQRS8,0_RPRS5,0.vcf
+
+grep -v '#' c_ll_species_SNPs_MQRS8,0_RPRS5,0.vcf | wc -l #756
+
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T SelectVariants \
+-select "MQRankSum<-2.5 || ReadPosRankSum<-2.5" \
+-R $REF \
+-V c_ll_species_SNPs.vcf \
+-o c_ll_species_SNPs_MQRS2,5_RPRS2,5.vcf
+
+grep -v '#' c_ll_species_SNPs_MQRS2,5_RPRS2,5.vcf | wc -l #113081
+
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T SelectVariants \
+-select "MQRankSum<-0.5 || ReadPosRankSum<-0.5" \
+-R $REF \
+-V c_ll_species_SNPs.vcf \
+-o c_ll_species_SNPs_MQRS0,5_RPRS0,5.vcf
+
+grep -v '#' c_ll_species_SNPs_MQRS0,5_RPRS0,5.vcf | wc -l #2867801
+
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T SelectVariants \
+-select "MQRankSum<-0.1" \
+-R $REF \
+-V c_ll_species_SNPs.vcf \
+-o c_ll_species_SNPs_MQRS0,1.vcf
+
+grep -v '#' c_ll_species_SNPs_MQRS0,1.vcf | wc -l #1745652
+
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T SelectVariants \
+-select "ReadPosRankSum<-0.1" \
+-R $REF \
+-V c_ll_species_SNPs.vcf \
+-o c_ll_species_SNPs_RPRS0,1.vcf
+
+grep -v '#' c_ll_species_SNPs_RPRS0,1.vcf | wc -l #3388326
+
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T SelectVariants \
+-select "MQRankSum<-0.1 || ReadPosRankSum<-0.1" \
+-R $REF \
+-V c_ll_species_SNPs.vcf \
+-o c_ll_species_SNPs_MQRS0,1_RPRS0,1.vcf
+
+grep -v '#' c_ll_species_SNPs_MQRS0,1_RPRS0,1.vcf | wc -l #4460116
+
+```
+
+#5a: Split the species VCFs into per population VCFs. Generate a VCF for each population.
+
+```{r Split the species VCFs into per population VCFs, eval=FALSE, engine='bash'}
+
+#Split both species VCFs in order to get a sub-VCF for each population. All these sub-VCFs must include all positions so that they are comparable (i.e. positions that become monomorphic whitin a population mustn't be dropped). Then, a trimmed-down VCF with only variable positions within each position can be generated (e.g. to test thresholds).
+
+#Version that keeps all sites in all subVCFs.
+cd $G_PATH
+declare SPECIES=$(ls {*lp,*ll}_*.g.vcf.gz | cut -c3-4 | sort | uniq)
+for i in ${SPECIES[@]}
+  do
+  echo "${i}"
+  declare POP=$(ls *"${i}"*.g.vcf.gz | cut -c3-7 | sort | uniq)
+  for j in ${POP[@]}
+    do
+    echo "${j}"
+    ls *${j}*g.vcf.gz | cut -c1-12 > list_to_remove.txt
+    cat list_to_remove.txt
+    java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+    -T SelectVariants \
+    -R $REF \
+    -V $V_PATH/"${i}"_species_SNPs_tagged_filtered.vcf \
+    -o $V_PATH/"${j}"_perpop_standard_filter.vcf \
+    --sample_file list_to_remove.txt \
+    --preserveAlleles
+    done
+  done
+rm list_to_remove.txt
+
+#And with this subsequent step, fixed positions within each population will be dropped and only the variables will remain.
+cd $V_PATH
+declare POP=$(ls *perpop.vcf | cut -c1-7 | uniq)
+for i in ${POP[@]}
+  do
+  echo "${i}"
+  $BCF view --min-ac 1:minor -Ov -o $V_PATH/trimmed_VCFs/"${i}"_perpop.trimmed.vcf $V_PATH/"${i}"_perpop.vcf
+  done
+
+#Version that directly drops monomorphic positions within each species.
+cd $G_PATH
+declare SPECIES=$(ls c_*.g.vcf.gz | cut -c1-4 | uniq)
+for i in ${SPECIES[@]}
+  do
+  echo "${i}"
+  declare POP=$(ls "${i}"*.g.vcf.gz | cut -c1-7 | uniq)
+  for j in ${POP[@]}
+    do
+    echo "${j}"
+    ls ${j}*g.vcf.gz | cut -c1-12 > list_to_remove.txt
+    $BCF view -c1 -S list_to_remove.txt -Ov -o $V_PATH/"${j}"_perpop.vcf $V_PATH/"${i}"_species_SNPs_tagged_filtered.vcf
+    done
+  done
+rm list_to_remove.txt
+
+
+#Get subVCFs from the VCF with additional RankSum strict filters.
+cd $G_PATH
+declare POP=$(ls *ll*.g.vcf.gz | cut -c3-7 | sort | uniq)
+for j in ${POP[@]}
+  do
+  echo "${j}"
+  ls *${j}*g.vcf.gz | cut -c1-12 > strict_list_to_remove.txt
+  cat strict_list_to_remove.txt
+  java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+  -T SelectVariants \
+  -R $REF \
+  -V $V_PATH/ll_species_strict_filter.vcf \
+  -o $V_PATH/"${j}"_perpop_strict_filter.vcf \
+  --sample_file strict_list_to_remove.txt \
+  --preserveAlleles
+  done
+rm strict_list_to_remove.txt
+
+
+#Get subVCFs from the VCF that had no filters.
+cd $G_PATH
+declare POP=$(ls *ll*.g.vcf.gz | cut -c3-7 | uniq)
+for j in ${POP[@]}
+  do
+  echo "${j}"
+  ls *${j}*g.vcf.gz | cut -c1-12 > pop_list_to_remove.txt
+  cat pop_list_to_remove.txt
+  java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+  -T SelectVariants \
+  -R $REF \
+  -V $V_PATH/ll_species_SNPs.vcf \
+  -o $V_PATH/"${j}"_perpop_no_filter.vcf \
+  --sample_file pop_list_to_remove.txt \
+  --preserveAlleles
+  done
+rm pop_list_to_remove.txt
+
+
+#Get subVCFs from the VCF with additional RankSum super strict filters.
+cd $G_PATH
+declare POP=$(ls *ll*.g.vcf.gz | cut -c3-7 | uniq)
+for j in ${POP[@]}
+  do
+  echo "${j}"
+  ls *${j}*g.vcf.gz | cut -c1-12 > super_list_to_remove.txt
+  cat super_list_to_remove.txt
+  java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+  -T SelectVariants \
+  -R $REF \
+  -V $V_PATH/ll_species_super_strict_filter.vcf \
+  -o $V_PATH/"${j}"_perpop_super_strict_filter.vcf \
+  --sample_file super_list_to_remove.txt \
+  --preserveAlleles
+  done
+rm super_list_to_remove.txt
+
+
+cd $G_PATH
+declare POP=$(ls h_ll_pv*.g.vcf.gz | cut -c3-7 | sort | uniq)
+  for j in ${POP[@]}
+    do
+    echo "${j}"
+    ls *${j}*g.vcf.gz | cut -c1-12 > list_to_remove.txt
+    cat list_to_remove.txt
+    java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+    -T SelectVariants \
+    -R $REF \
+    -V $V_PATH/ll_species_super_strict_filter.vcf \
+    -o $V_PATH/"${j}"_perpop_super_strict_filter.vcf \
+    --sample_file list_to_remove.txt \
+    --preserveAlleles
+    done
+rm list_to_remove.txt
+
+
+
+```
+
+#5b: Perform sanity checks on VCFs. Perform various sanity checks on all VCFs.
+
+```{r Perform sanity checks on gVCFs, eval=FALSE, engine='bash'}
+
+#First, check that all perpop VCFs have the same number of SNPs, as they are supposed to.
+cd $V_PATH/
+shopt -s extglob #the extglob shell option gives you more powerful pattern matching in the command line.
+POPLIST=($(ls ll*_perpop_super_strict_filter.vcf | cut -d "_" -f1,2 | sort | uniq))
+for pop in "${POPLIST[@]}"
+  do
+  echo "${pop}"
+  SAMPLE_NUMBER="$($BCF query -l "${pop}"_perpop_strict_filter.vcf | wc -l)"
+  echo $SAMPLE_NUMBER
+  TOTAL_SNPS="$(grep -v '#' "$V_PATH/${pop}"_perpop_strict_filter.vcf | wc -l)"
+  echo $TOTAL_SNPS
+  done
+shopt -u extglob #disable extglob
+
+#Next, create a stats file with the actual number of SNPs per population (based on the trimmed perpop VCFs)
+cd $V_PATH/trimmed_VCFs
+shopt -s extglob #the extglob shell option gives you more powerful pattern matching in the command line.
+POPLIST=($(ls c_*_perpop.trimmed.vcf | cut -d "_" -f1,2,3 | sort | uniq))
+rm c_VCF_trimmed.stats
+echo "pop_name,sample_number,total_SNPs" > c_VCF_trimmed.stats
+for pop in "${POPLIST[@]}"
+  do
+  echo "${pop}"
+  #done
+  NAME="${pop}"
+  SAMPLE_NUMBER="$($BCF query -l "${pop}"_perpop.trimmed.vcf | wc -l)"
+  echo $SAMPLE_NUMBER
+  TOTAL_SNPS="$(grep -v '#' "${pop}"_perpop.trimmed.vcf | wc -l)"
+  echo $TOTAL_SNPS
+  echo "$NAME,$SAMPLE_NUMBER,$TOTAL_SNPS" >> c_VCF_trimmed.stats
+  done
+shopt -u extglob #disable extglob
+
+#Save locally the .stats file
+scp dkleinman@genomics-b.ebd.csic.es:$V_PATH/c_VCF_trimmed.stats /Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/
+
+
+#Next, generate stats file for each population using BCFtools:
+#For the standard_filtered ones:
+cd $V_PATH
+shopt -s extglob #the extglob shell option gives you more powerful pattern matching in the command line.
+POPLIST=($(ls *_perpop_standard_filter.vcf | cut -d "_" -f1,2 | sort | uniq))
+rm standard_filter_individual.bcf.stats
+for pop in "${POPLIST[@]}"
+  do
+  echo "${pop}"
+  ls $G_PATH/*${pop}*g.vcf.gz | cut -d'/' -f7 | cut -c1-12  > standard_individuals_list_to_remove.txt
+  cat standard_individuals_list_to_remove.txt
+  $BCF stats -v -S standard_individuals_list_to_remove.txt ${pop}_perpop_standard_filter.vcf > ${pop}_perpop_standard_filter.bcf.stats
+  grep 'PSC' ${pop}_perpop_standard_filter.bcf.stats | grep -v '#' >> standard_filter_individual.bcf.stats
+  done
+rm standard_individuals_list_to_remove.txt
+HEADER=$(grep '# PSC' ${pop}_perpop_standard_filter.bcf.stats | tail -1)
+sed -i -e '1i'"$HEADER"'\' standard_filter_individual.bcf.stats
+shopt -u extglob #disable extglob
+
+#Save locally the .stats file
+scp dkleinman@genomics-b.ebd.csic.es:$V_PATH/standard_filter_individual.bcf.stats /Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/
+
+#Same for the no_filtered ones:
+cd $V_PATH
+shopt -s extglob #the extglob shell option gives you more powerful pattern matching in the command line.
+POPLIST=($(ls *_perpop_no_filter.vcf | cut -d "_" -f1,2 | sort | uniq))
+rm no_filter_individual.bcf.stats
+for pop in "${POPLIST[@]}"
+  do
+  echo "${pop}"
+  ls $G_PATH/*${pop}*g.vcf.gz | cut -d'/' -f7 | cut -c1-12  > no_individuals_list_to_remove.txt
+  cat no_individuals_list_to_remove.txt
+  $BCF stats -v -S no_individuals_list_to_remove.txt ${pop}_perpop_no_filter.vcf > ${pop}_perpop_no_filter.bcf.stats
+  grep 'PSC' ${pop}_perpop_no_filter.bcf.stats | grep -v '#' >> no_filter_individual.bcf.stats
+  done
+rm no_individuals_list_to_remove.txt
+HEADER=$(grep '# PSC' ${pop}_perpop_no_filter.bcf.stats | tail -1)
+sed -i -e '1i'"$HEADER"'\' no_filter_individual.bcf.stats
+shopt -u extglob #disable extglob
+
+#Save locally the .stats file
+scp dkleinman@genomics-b.ebd.csic.es:$V_PATH/no_filter_individual.bcf.stats /Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/
+
+#Same for the strict_filtered ones:
+cd $V_PATH
+shopt -s extglob #the extglob shell option gives you more powerful pattern matching in the command line.
+POPLIST=($(ls *_perpop_strict_filter.vcf | cut -d "_" -f1,2 | sort | uniq))
+rm strict_filter_individual.bcf.stats
+for pop in "${POPLIST[@]}"
+  do
+  echo "${pop}"
+  ls $G_PATH/*${pop}*g.vcf.gz | cut -d'/' -f7 | cut -c1-12 > strict_individuals_list_to_remove.txt
+  cat strict_individuals_list_to_remove.txt
+  $BCF stats -v -S strict_individuals_list_to_remove.txt ${pop}_perpop_strict_filter.vcf > ${pop}_perpop_strict_filter.bcf.stats
+  grep 'PSC' ${pop}_perpop_strict_filter.bcf.stats | grep -v '#' >> strict_filter_individual.bcf.stats
+  done
+rm strict_individuals_list_to_remove.txt
+HEADER=$(grep '# PSC' ${pop}_perpop_strict_filter.bcf.stats | tail -1)
+sed -i -e '1i'"$HEADER"'\' strict_filter_individual.bcf.stats
+shopt -u extglob #disable extglob
+
+#Save locally the .stats file
+scp dkleinman@genomics-b.ebd.csic.es:$V_PATH/strict_filter_individual.bcf.stats /Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/
+
+#Same for the super_filtered ones:
+cd $V_PATH
+shopt -s extglob #the extglob shell option gives you more powerful pattern matching in the command line.
+POPLIST=($(ls *_perpop_super_strict_filter.vcf | cut -d "_" -f1,2 | sort | uniq))
+rm super_strict_filter_individual.bcf.stats
+for pop in "${POPLIST[@]}"
+  do
+  echo "${pop}"
+  ls $G_PATH/*${pop}*g.vcf.gz | cut -d'/' -f7 | cut -c1-12 > super_super_strict_individuals_list_to_remove.txt
+  cat super_super_strict_individuals_list_to_remove.txt
+  $BCF stats -v -S super_super_strict_individuals_list_to_remove.txt ${pop}_perpop_super_strict_filter.vcf > ${pop}_perpop_super_strict_filter.bcf.stats
+  grep 'PSC' ${pop}_perpop_super_strict_filter.bcf.stats | grep -v '#' >> super_strict_filter_individual.bcf.stats
+  done
+rm super_super_strict_individuals_list_to_remove.txt
+HEADER=$(grep '# PSC' ${pop}_perpop_super_strict_filter.bcf.stats | tail -1)
+sed -i -e '1i'"$HEADER"'\' super_strict_filter_individual.bcf.stats
+shopt -u extglob #disable extglob
+
+#Save locally the .stats file
+scp dkleinman@genomics-b.ebd.csic.es:$V_PATH/super_strict_filter_individual.bcf.stats /Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/
+
+#Get the MQRankSum and ReadPosRankSum per SNP for ba and ya to see if their distributions are different. Later on when I get the same results for both populations, I realize that those parameters are common to all reads (unique values for the whole database). So this is useless.
+#cd $V_PATH
+#declare POPLIST=($(printf "c_ll_ba\nc_ll_ya"))
+#for pop in "${POPLIST[@]}"
+#  do
+#  echo "${pop}"
+#  declare FILTER=($(printf "_perpop.vcf\n_perpop_strict_filter.vcf\n_perpop_super_strict_filter.vcf"))
+#  for filter in "${FILTER[@]}"
+#    do
+#    echo "${pop}${filter}"
+#    $BCF query -f "%CHROM\t%POS\t%INFO/AF\t%QUAL\t%INFO/MQRankSum\t%INFO/ReadPosRankSum\n" -o ${pop}${filter/.vcf/.info} ${pop}${filter}
+#    HEADER=$(printf "CHROM\tPOS\tAF\tQUAL\tMQRankSum\tReadPosRankSum")
+#    sed -i -e '1i'"$HEADER"'\' ${pop}${filter/.vcf/.info}
+#    done
+#  done
+
+#Calculate the number of private alleles carried by each sample before and after filtering:
+#mkdir $V_PATH/private_alleles
+cd $G_PATH
+declare POP=$(ls *ll*.g.vcf.gz | cut -c3-7 | sort | uniq)
+for j in ${POP[@]}
+  do
+  echo "${j}"
+  ls *${j}*g.vcf.gz | cut -c1-12 > private_alleles_list_to_remove.txt
+  $BCF view -x -S private_alleles_list_to_remove.txt -Ov -o $V_PATH/private_alleles/"${j}"_perpop_standard_filter_private_alleles.vcf $V_PATH/ll_species_SNPs_tagged_filtered.vcf
+  done
+rm private_alleles_list_to_remove.txt
+
+cd $G_PATH
+declare POP=$(ls *ll*.g.vcf.gz | cut -c3-7 | sort | uniq)
+for j in ${POP[@]}
+  do
+  echo "${j}"
+  ls *${j}*g.vcf.gz | cut -c1-12 > private_alleles_strict_list_to_remove.txt
+  $BCF view -x -S private_alleles_strict_list_to_remove.txt -Ov -o $V_PATH/private_alleles/"${j}"_perpop_strict_filter_private_alleles.vcf $V_PATH/ll_species_strict_filter.vcf
+  done
+rm private_alleles_strict_list_to_remove.txt
+
+cd $G_PATH
+declare POP=$(ls *ll*.g.vcf.gz | cut -c3-7 | sort | uniq)
+for j in ${POP[@]}
+  do
+  echo "${j}"
+  ls *${j}*g.vcf.gz | cut -c1-12 > private_alleles_super_strict_list_to_remove.txt
+  $BCF view -x -S private_alleles_super_strict_list_to_remove.txt -Ov -o $V_PATH/private_alleles/"${j}"_perpop_super_strict_filter_private_alleles.vcf $V_PATH/ll_species_super_strict_filter.vcf
+  done
+rm private_alleles_super_strict_list_to_remove.txt
+
+#Finally, generate stats file for the private alleles using BCFtools:
+cd $V_PATH/private_alleles
+shopt -s extglob #the extglob shell option gives you more powerful pattern matching in the command line.
+POPLIST=($(ls ll*perpop_standard_filter_private_alleles.vcf | cut -d "_" -f1,2 | sort | uniq))
+rm standard_filter_individual_private_alleles.stats
+for pop in "${POPLIST[@]}"
+  do
+  echo "${pop}"
+  PRIVATE_A=$(grep -v '#' ${pop}_perpop_standard_filter_private_alleles.vcf | wc -l)
+  echo "${pop}, $PRIVATE_A, std" >> standard_filter_individual_private_alleles.stats
+  done
+shopt -u extglob #disable extglob
+
+scp dkleinman@genomics-b.ebd.csic.es:$V_PATH/private_alleles/standard_filter_individual_private_alleles.stats /Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/
+
+cd $V_PATH/private_alleles
+shopt -s extglob #the extglob shell option gives you more powerful pattern matching in the command line.
+POPLIST=($(ls ll*perpop_strict_filter_private_alleles.vcf | cut -d "_" -f1,2 | sort | uniq))
+rm strict_filter_individual_private_alleles.stats
+for pop in "${POPLIST[@]}"
+  do
+  echo "${pop}"
+  PRIVATE_A=$(grep -v '#' ${pop}_perpop_strict_filter_private_alleles.vcf | wc -l)
+  echo "${pop}, $PRIVATE_A, strict" >> strict_filter_individual_private_alleles.stats
+  done
+shopt -u extglob #disable extglob
+
+scp dkleinman@genomics-b.ebd.csic.es:$V_PATH/private_alleles/strict_filter_individual_private_alleles.stats /Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/
+
+cd $V_PATH/private_alleles
+shopt -s extglob #the extglob shell option gives you more powerful pattern matching in the command line.
+POPLIST=($(ls ll*perpop_super_strict_filter_private_alleles.vcf | cut -d "_" -f1,2 | sort | uniq))
+rm super_strict_filter_individual_private_alleles.stats
+for pop in "${POPLIST[@]}"
+  do
+  echo "${pop}"
+  PRIVATE_A=$(grep -v '#' ${pop}_perpop_super_strict_filter_private_alleles.vcf | wc -l)
+  echo "${pop}, $PRIVATE_A, super" >> super_strict_filter_individual_private_alleles.stats
+  done
+shopt -u extglob #disable extglob
+
+scp dkleinman@genomics-b.ebd.csic.es:$V_PATH/private_alleles/super_strict_filter_individual_private_alleles.stats /Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/
+
+```
+
+#5c: Analyse the sanity checks files. Perform per population analyses on the sanity checks files.
+
+```{r Analyse the sanity checks file}
+library("readr")
+library("dplyr")
+library("ggplot2")
+library("tidyr")
+library("RColorBrewer")
+
+local_repo <- file.path("/Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/")
+
+#Analyse my basic .stats file
+sanity_checks <- read_csv("/Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/c_VCF_raw.stats")
+sanity_checks
+sanity_checks <- sanity_checks %>% 
+  mutate(species=substr(sanity_checks$pop_name,3,4)) %>%
+  select(1,4,2,3)
+sanity_checks
+
+plot_SNPs_samples_corr <- ggplot(sanity_checks, aes(sample_number,total_SNPs)) + geom_point(aes(colour=species)) + scale_colour_manual(values=c("blue","red"))
+plot_SNPs_samples_corr
+
+#Analyse the BCFtools .stats files:
+std_filter_db <- read_tsv("/Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/standard_filter_individual.bcf.stats")[,c(1,3:6)]
+std_filter_db <- std_filter_db[grep("_ll_", std_filter_db$`[3]sample`),]
+std_filter_db$`# PSC` <- gsub("PSC", "std", std_filter_db$`# PSC`)
+std_filter_db
+no_filter_db <- read_tsv("/Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/no_filter_individual.bcf.stats")[,c(1,3:6)]
+no_filter_db$`# PSC` <- gsub("PSC", "no", no_filter_db$`# PSC`)
+no_filter_db
+strict_filter_db <- read_tsv("/Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/strict_filter_individual.bcf.stats")[,c(1,3:6)]
+strict_filter_db$`# PSC` <- gsub("PSC", "strict", strict_filter_db$`# PSC`)
+strict_filter_db
+super_filter_db <- read_tsv("/Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/super_strict_filter_individual.bcf.stats")[,c(1,3:6)]
+super_filter_db$`# PSC` <- gsub("PSC", "super", super_filter_db$`# PSC`)
+super_filter_db
+
+common_db <- rbind(std_filter_db,no_filter_db,strict_filter_db,super_filter_db)
+common_db <- common_db %>% 
+  mutate(population=substr(common_db$`[3]sample`,6,7))
+colnames(common_db) <- c("filter","sample","n00","n11","n01","population")
+common_db
+common_db$filter <- as.factor(common_db$filter)
+common_db$sample <- as.factor(common_db$sample)
+common_db$population <- as.factor(common_db$population)
+
+common_db_ggplot <- ggplot(data=common_db, aes(x=filter,y=n01,colour=(sample))) + 
+  geom_point()
+common_db_ggplot
+
+common_db_ggplot_std <- ggplot(data=filter(common_db,filter=="std"), aes(x=substr(sample,3,length(sample)),y=n01)) + 
+  geom_col(aes(fill=population))
+common_db_ggplot_std
+
+common_db_ggplot_strict <- ggplot(data=filter(common_db,filter=="strict"), aes(x=substr(sample,3,length(sample)),y=n01)) + 
+  geom_col(aes(fill=population))
+common_db_ggplot_strict
+
+common_db_ggplot_super <- ggplot(data=filter(common_db,filter=="super"), aes(x=substr(sample,3,length(sample)),y=n01)) + 
+  geom_col(aes(fill=population))
+common_db_ggplot_super
+
+#Represent the loss of SNPs per sample between the different filterings
+colnames(std_filter_db) <- c("filter","sample","n00_std","n11_std","n01_std")
+colnames(no_filter_db) <- c("filter","sample","n00_no","n11_no","n01_no")
+colnames(strict_filter_db) <- c("filter","sample","n00_strict","n11_strict","n01_strict")
+colnames(super_filter_db) <- c("filter","sample","n00_super","n11_super","n01_super")
+
+joined_db <- full_join(full_join(full_join(no_filter_db[,-c(1)],std_filter_db[,-c(1)],"sample"),strict_filter_db[,-c(1)],"sample"),super_filter_db[,-c(1)],"sample")
+joined_db
+joined_db <- joined_db %>% 
+  mutate(n01_no_minus_std=n01_no-n01_std,n01_std_minus_strict=n01_std-n01_strict,n01_strict_minus_super=n01_strict-n01_super,population=substr(joined_db$sample,6,7))
+joined_db
+
+tidy_joined_db <- joined_db[,c(1,4,7,10,13:17)] %>%
+  mutate(perc_loss_1=round(100*n01_no_minus_std/n01_no,1),perc_loss_2=round(100*n01_std_minus_strict/n01_std,1),perc_loss_3=round(100*n01_strict_minus_super/n01_strict,1)) %>%
+  gather(filter,N,-sample,-n01_no,-n01_std,-n01_strict,-n01_super,-population,-perc_loss_1,-perc_loss_2,-perc_loss_3)
+tidy_joined_db
+
+joined_db_ggplot <- ggplot(data=tidy_joined_db, aes(x=substr(sample,3,length(sample)),y=N)) + 
+  geom_bar(stat="identity", aes(fill=filter,group=filter)) +
+  geom_text(aes(label=ifelse(filter=="n01_no_minus_std",perc_loss_1,NA)),size=2,y=((tidy_joined_db$n01_no-tidy_joined_db$n01_std)/2+(tidy_joined_db$n01_std-tidy_joined_db$n01_strict)+(tidy_joined_db$n01_strict-tidy_joined_db$n01_super))) +
+  geom_text(aes(label=ifelse(filter=="n01_std_minus_strict",perc_loss_2,NA)),size=2,y=((tidy_joined_db$n01_std-tidy_joined_db$n01_strict)/2+(tidy_joined_db$n01_strict-tidy_joined_db$n01_super))) +
+  geom_text(aes(label=ifelse(filter=="n01_strict_minus_super",perc_loss_3,NA)),size=2,y=((tidy_joined_db$n01_strict-tidy_joined_db$n01_super)/2)) +
+  scale_fill_hue(labels=c("no_filter - standard_filter","standard_filter - strict_filter","strict_filter - super_filter")) +
+  ggtitle("Filtered out 0/1 positions per sample (in VCF)") +
+  xlab("sample") +
+  theme_bw() +
+  theme(plot.title=element_text(hjust=0.5),
+        axis.text.x=element_text(angle=90, hjust=0,size=6,colour="black"),
+        legend.key.size=unit(0.4,"cm")
+  )
+joined_db_ggplot
+ggsave("full_VCFs_filtered_out_SNPs_per_sample.pdf", width=40, height=10, units="cm", device="pdf", path=local_repo)
+
+tidy_joined_db2 <- joined_db[,c(1,17,14,15,16,13)] %>% 
+  gather(filter,N,-sample,-population)
+tidy_joined_db2
+
+qual_col_pals = brewer.pal.info[brewer.pal.info$category == 'qual',]
+twelve_col_pals = brewer.pal.info[brewer.pal.info$maxcolors == '12',]
+col_vector = c("#000000","#666666",unlist(mapply(brewer.pal, twelve_col_pals$maxcolors, rownames(twelve_col_pals)))[c(1:12)])
+
+joined_db_ggplot2 <- ggplot(data=tidy_joined_db2, aes(x=substr(sample,3,length(sample)),y=N)) + 
+  geom_col(aes(fill=population,alpha=filter),colour="black") +
+  scale_alpha_manual(values=c(0.4,0.6,0.8,1), labels=c("no_filter","standard_filter","strict_filter","super_filter")) +
+  scale_fill_manual(values=col_vector) +
+  ggtitle("0/1 positions per sample (in VCF) with different filterings") +
+  theme_bw() +
+  theme(plot.title=element_text(hjust=0.5),
+        axis.text.x=element_text(angle=90, hjust=0, size=6,colour="black"),
+        legend.key.size=unit(0.4,"cm")
+  )
+joined_db_ggplot2
+ggsave("full_VCFs_SNPs_per_sample.pdf", width=30, height=10, units="cm", device="pdf", path=local_repo)
+
+
+#Analyse the change in transitions/transversions:
+std_filter_tt <- read_tsv("/Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/standard_filter_individual.bcf.stats")[,c(1,3,7:8)]
+std_filter_tt <- std_filter_tt[grep("_ll_", std_filter_tt$`[3]sample`),]
+std_filter_tt$`# PSC` <- gsub("PSC", "std", std_filter_tt$`# PSC`)
+std_filter_tt
+no_filter_tt <- read_tsv("/Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/no_filter_individual.bcf.stats")[,c(1,3,7:8)]
+no_filter_tt$`# PSC` <- gsub("PSC", "no", no_filter_tt$`# PSC`)
+no_filter_tt
+strict_filter_tt <- read_tsv("/Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/strict_filter_individual.bcf.stats")[,c(1,3,7:8)]
+strict_filter_tt$`# PSC` <- gsub("PSC", "strict", strict_filter_tt$`# PSC`)
+strict_filter_tt
+super_filter_tt <- read_tsv("/Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/super_strict_filter_individual.bcf.stats")[,c(1,3,7:8)]
+super_filter_tt$`# PSC` <- gsub("PSC", "super", super_filter_tt$`# PSC`)
+super_filter_tt
+
+common_tt <- rbind(std_filter_tt,no_filter_tt,strict_filter_tt,super_filter_tt)
+common_tt <- common_tt %>% 
+  mutate(ts_tv=(common_tt$`[7]nTransitions`/common_tt$`[8]nTransversions`),population=substr(common_tt$`[3]sample`,6,7))
+colnames(common_tt) <- c("filter","sample","ts","tv","ts/tv","population")
+common_tt
+common_tt$filter <- as.factor(common_tt$filter)
+common_tt$sample <- as.factor(common_tt$sample)
+common_tt$population <- as.factor(common_tt$population)
+
+common_tt_ggplot <- ggplot(data=common_tt, aes(x=substr(sample,3,length(sample)),y=ts/tv,colour=filter)) + 
+  geom_point() +
+  ggtitle("Rate of ts/tv per sample with different filterings") +
+  ylab("ts/tv") +
+  xlab("sample") +
+  theme_bw() +
+  theme(plot.title=element_text(hjust=0.5),
+        axis.text.x=element_text(angle=90, hjust=0, size=6,colour="black"),
+        legend.key.size=unit(0.4,"cm")
+  )
+common_tt_ggplot
+ggsave("full_VCF_ts_tv_per_sample.pdf", width=20, height=10, units="cm", device="pdf", path=local_repo)
+
+
+#Analyse the private alleles files:
+std_private <- read_csv("/Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/standard_filter_individual_private_alleles.stats",col_names=c("pop","private_SNPs","filter"))
+std_private <- std_private %>%
+  mutate(ratio=NA)
+std_private
+strict_private <- read_csv("/Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/strict_filter_individual_private_alleles.stats",col_names=c("pop","private_SNPs","filter"))
+strict_private <- strict_private %>%
+  mutate(ratio=(std_private$private_SNPs-private_SNPs)/std_private$private_SNPs)
+strict_private
+super_private <- read_csv("/Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/super_strict_filter_individual_private_alleles.stats",col_names=c("pop","private_SNPs","filter"))
+super_private <- super_private %>%
+  mutate(ratio=(strict_private$private_SNPs-private_SNPs)/strict_private$private_SNPs)
+super_private
+
+all_private <- rbind(std_private,strict_private,super_private)
+#all_private <- all_private %>%
+#  mutate(pop=substr(all_private$pop,6,7))
+all_private
+
+all_private_ggplot <- ggplot(data=all_private, aes(x=pop,y=private_SNPs,colour=filter)) + 
+  geom_point() +
+  ggtitle("Number of private SNPs per population with different filterings") +
+  ylab("N") +
+  theme_bw() +
+  theme(plot.title=element_text(hjust=0.5)
+       )
+all_private_ggplot
+ggsave("full_VCF_private_SNPs_per_sample.pdf", width=20, height=10, units="cm", device="pdf", path=local_repo)
+
+all_private_wout_ba_ggplot <- ggplot(data=filter(all_private,pop!="ll_ba"), aes(x=pop,y=private_SNPs,colour=filter)) + 
+  geom_point() +
+  ggtitle("Number of private SNPs per population with different filterings") +
+  ylab("N") +
+  theme_bw() +
+  theme(plot.title=element_text(hjust=0.5)
+       )
+all_private_wout_ba_ggplot
+ggsave("full_VCF_private_SNPs_per_sample_without_ba.pdf", width=20, height=10, units="cm", device="pdf", path=local_repo)
+
+all_private_ggplot_2 <- ggplot(data=all_private[complete.cases(all_private),], aes(x=pop,y=ratio*100,colour=filter)) + 
+  geom_point() +
+  scale_colour_hue(labels=c("standard_filter - strict_filter","strict_filter - super_filter")) +
+  ggtitle("Loss of private SNPs per population with different filterings") +
+  ylab("% of filtered out private SNPs") +
+  theme_bw() +
+  theme(plot.title=element_text(hjust=0.5)
+       )
+all_private_ggplot_2
+ggsave("full_VCF_private_SNPs_per_sample_2.pdf", width=20, height=10, units="cm", device="pdf", path=local_repo)
+
+
+# Analyse the .info distribution files. Later on when I get the same results for both populations, I realize that those parameters are common to all reads (unique values for the whole database). So this is useless.
+# ba_std <- read_tsv(paste0(local_repo,"c_ll_ba_perpop.info"))
+# ba_std
+# ba_std$MQRankSum <- as.double(ba_std$MQRankSum)
+# ba_std$ReadPosRankSum <- as.double(ba_std$ReadPosRankSum)
+# ba_std$filter <- c("std")
+# 
+# ba_strict <- read_tsv(paste0(local_repo,"c_ll_ba_perpop_strict_filter.info"))
+# ba_strict
+# ba_strict$MQRankSum <- as.double(ba_strict$MQRankSum)
+# ba_strict$ReadPosRankSum <- as.double(ba_strict$ReadPosRankSum)
+# ba_strict$filter <- c("strict")
+# 
+# ba_super <- read_tsv(paste0(local_repo,"c_ll_ba_perpop_super_strict_filter.info"))
+# ba_super
+# ba_super$MQRankSum <- as.double(ba_super$MQRankSum)
+# ba_super$ReadPosRankSum <- as.double(ba_super$ReadPosRankSum)
+# ba_super$filter <- c("super")
+# 
+# ba_all <- rbind(ba_std,ba_strict,ba_super)
+# ba_all
+# 
+# ba_MQ_ggplot <- ggplot(data=ba_all, aes(x=MQRankSum,fill=filter)) + 
+#   geom_density(alpha=0.3) +
+#   ggtitle("ba_std_MQRankSum_distribution") +
+#   scale_x_continuous(limits = c(-2, 0.25)) +
+#   theme_bw() +
+#   theme(plot.title=element_text(hjust=0.5)
+#   )
+# ba_MQ_ggplot
+# 
+# ba_RP_ggplot <- ggplot(data=ba_all, aes(x=ReadPosRankSum,fill=filter)) + 
+#   geom_density(alpha=0.3) +
+#   ggtitle("ba_std_RPRankSum_distribution") +
+#   #scale_x_continuous(limits = c(-2, 0.25)) +
+#   theme_bw() +
+#   theme(plot.title=element_text(hjust=0.5)
+#   )
+# ba_RP_ggplot
+# ggsave("c_ll_ba_RP_distribution.pdf", width=30, height=10, units="cm", device="pdf", path=local_repo)
+# 
+# ya_std <- read_tsv(paste0(local_repo,"c_ll_ya_perpop.info"))
+# ya_std
+# ya_std$MQRankSum <- as.double(ya_std$MQRankSum)
+# ya_std$ReadPosRankSum <- as.double(ya_std$ReadPosRankSum)
+# ya_std$filter <- c("std")
+# 
+# ya_strict <- read_tsv(paste0(local_repo,"c_ll_ya_perpop_strict_filter.info"))
+# ya_strict
+# ya_strict$MQRankSum <- as.double(ya_strict$MQRankSum)
+# ya_strict$ReadPosRankSum <- as.double(ya_strict$ReadPosRankSum)
+# ya_strict$filter <- c("strict")
+# 
+# ya_super <- read_tsv(paste0(local_repo,"c_ll_ya_perpop_super_strict_filter.info"))
+# ya_super
+# ya_super$MQRankSum <- as.double(ya_super$MQRankSum)
+# ya_super$ReadPosRankSum <- as.double(ya_super$ReadPosRankSum)
+# ya_super$filter <- c("super")
+# 
+# ya_all <- rbind(ya_std,ya_strict,ya_super)
+# ya_all
+# 
+# ya_MQ_ggplot <- ggplot(data=ya_all, aes(x=MQRankSum,fill=filter)) + 
+#   geom_density(alpha=0.3) +
+#   ggtitle("ya_std_MQRankSum_distribution") +
+#   scale_x_continuous(limits = c(-0.1, 0.1)) +
+#   theme_bw() +
+#   theme(plot.title=element_text(hjust=0.5)
+#   )
+# ya_MQ_ggplot
+# 
+# ya_RP_ggplot <- ggplot(data=ya_all, aes(x=ReadPosRankSum,fill=filter)) + 
+#   geom_density(alpha=0.3) +
+#   ggtitle("ya_std_RPRankSum_distribution") +
+#   #scale_x_continuous(limits = c(-2, 0.25)) +
+#   theme_bw() +
+#   theme(plot.title=element_text(hjust=0.5)
+#   )
+# ya_RP_ggplot
+# ggsave("c_ll_ya_RP_distribution.pdf", width=30, height=10, units="cm", device="pdf", path=local_repo)
+
+
+#Compare the number of SNPs between the old VCF and the new VCF. Very few SNPs are retained per sample in the new VCF, so we can keep it even if we discard Balkans.
+std_filter_db
+no_filter_db
+strict_filter_db
+super_filter_db
+
+common_db
+
+std_filter_old <- read_tsv("/Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/c_VCF_individual.bcf.stats")[,c(1,3:6)]
+std_filter_old <- std_filter_old[grep("_ll_", std_filter_old$`[3]sample`),]
+std_filter_old$`# PSC` <- gsub("PSC", "std", std_filter_old$`# PSC`)
+std_filter_old
+no_filter_old <- read_tsv("/Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/c_VCF_no_filter_individual.bcf.stats")[,c(1,3:6)]
+no_filter_old$`# PSC` <- gsub("PSC", "no", no_filter_old$`# PSC`)
+no_filter_old
+strict_filter_old <- read_tsv("/Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/c_VCF_strict_filter_individual.bcf.stats")[,c(1,3:6)]
+strict_filter_old$`# PSC` <- gsub("PSC", "strict", strict_filter_old$`# PSC`)
+strict_filter_old
+super_filter_old <- read_tsv("/Users/Dani/ownCloud/backup/annotation/gVCFs_analysis/c_VCF_super_strict_filter_individual.bcf.stats")[,c(1,3:6)]
+super_filter_old$`# PSC` <- gsub("PSC", "super", super_filter_old$`# PSC`)
+super_filter_old
+
+common_old <- rbind(std_filter_old,no_filter_old,strict_filter_old,super_filter_old)
+common_old <- common_old %>% 
+  mutate(population=substr(common_old$`[3]sample`,6,7))
+colnames(common_old) <- c("filter","sample","n00","n11","n01","population")
+common_old
+common_old$filter <- as.factor(common_old$filter)
+common_old$sample <- as.factor(common_old$sample)
+common_old$population <- as.factor(common_old$population)
+
+common_db_short <- common_db[,c(1,2,5,6)]
+common_db_short
+
+common_old_short <- common_old[,c(1,2,5)]
+common_old_short
+
+compare_VCFs <- full_join(common_db_short,common_old_short,by=c("sample"="sample","filter"="filter")) %>% select(1,2,4,3,5) %>% mutate(diff=n01.x-n01.y)
+compare_VCFs
+
+compare_vcfs_ggplot <- ggplot(data=compare_VCFs[complete.cases(compare_VCFs),], aes(x=sample,y=diff,colour=filter)) + 
+  geom_point() +
+  geom_hline(yintercept=0) +
+  ggtitle("Difference in 0/1 positions per sample between the new and the old VCF") +
+  ylab("N") +
+  theme_bw() +
+  theme(plot.title=element_text(hjust=0.5),
+        axis.text.x=element_text(angle=90,size=6,colour="black")
+       )
+compare_vcfs_ggplot
+
+```
+
+#6: Polarize SNPs. Later on, use VCFtools in order to polarize according to the ancestral genome of preference.
