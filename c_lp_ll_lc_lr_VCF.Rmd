@@ -36,28 +36,8 @@ samtools faidx lp23.fa
 
 ```{r Produce gVCF files, eval=FALSE, engine='bash'}
 
-#For 5x samples:
+#We'll be using one 25x sample from each species. The gVCF for lp_sm_298 was already created months ago as part of the following loop (in the c_lp_ll_VCF script):
 
-cd $B_PATH #this works for the 5x samples (25x samples are stored in another folder and are named differently)
-POP=("*_lp")
-for pop in ${POP[@]}
-  do
-  echo "${pop}"
-  ls ${pop}_*_recal_round-1.bam > ${pop/*_lp/lp}_recal_round-1.bam.list;
-  INPUT_BAMS_FOR_CALLING=($(cat ${pop/*_lp/lp}_recal_round-1.bam.list)) 
-  for id in ${INPUT_BAMS_FOR_CALLING[@]}
-    do
-    echo "${id}"
-    java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
-    -T HaplotypeCaller \
-    -R $REF \
-    -I ${id} \
-    --emitRefConfidence GVCF \
-    -o $G_PATH/${id/.bam/.g.vcf.gz}
-    done
-  done
-
-#For 25x samples:
 cd $B_PATH/genome_project_samples_25x #this works for the 25x samples
 POP=("*_lp")
 for pop in ${POP[@]}
@@ -77,55 +57,35 @@ for pop in ${POP[@]}
     done
   done
 
-#This was only used to test one sample (lp_do_0443):
-cd $B_PATH
-java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
--T HaplotypeCaller \
--R $REF \
--I c_lp_do_0443_recal_round-1.bam \
---emitRefConfidence GVCF \
--o $G_PATH/c_lp_do_0443_BIS_recal_round-1.g.vcf
 
-#This was only used to produce the gVCF file for the Euskadi historical Lynx lynx sample:
-cd $B_PATH
+#The remaining three gVCFs were produced as follows:
+    
+#This was only used to produce the gVCF file for the original (not subsampled) Macrogen Kirov sample:
+cd $B_PATH/MACROGEN_samples_25x
 java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
     -T HaplotypeCaller \
     -R $REF \
-    -I h_ll_pv_0223_sorted_indelrealigner_marked_sorted.bam \
+    -I c_ll_ki_0090_recal_round-1_25x.bam \
     --emitRefConfidence GVCF \
-    -o $G_PATH/h_ll_pv_0223_sorted_indelrealigner_marked_sorted.g.vcf.gz
-    
-#This was only used to produce the gVCF file for the Lynx canadensis sample:
-cd $B_PATH
+    -o $G_PATH/c_ll_ki_0090_recal_round-1_25x.g.vcf.gz
+
+#This was only used to produce the gVCF file for the original (not subsampled) Macrogen Lynx canadensis sample:
+cd $B_PATH/MACROGEN_samples_25x
 java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
     -T HaplotypeCaller \
     -R $REF \
-    -I c_lc_zz_0001_recal_round-1.bam \
+    -I c_lc_zz_0001_recal_round-1_25x.bam \
     --emitRefConfidence GVCF \
-    -o $G_PATH/c_lc_zz_0001_recal_round-1.g.vcf.gz
+    -o $G_PATH/c_lc_zz_0001_recal_round-1_25x.g.vcf.gz
     
-
-```
-
-##1a_bis: Immunocapture
-```{bash}
-
-#Immunocapture
-cd /home/emarmesat/grupolince/immunocapture/alignments_merged_cap_wg_ontarget
-
-POP=h_lp_al
-screen -S gvcfs_samples_$POP
-POP=h_lp_al
-script gvcfs_samples_$POP.log
-POP=h_lp_al
-
-REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa
-
-for id in $POP*filtered.bam
-do
-echo "${id}"
-java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar /opt/GATK-3.7/GenomeAnalysisTK.jar -T HaplotypeCaller -R $REF -I ${id} --emitRefConfidence GVCF -o ${id/.bam/.g.vcf.gz}
-done
+#This was only used to produce the gVCF file for the original (not subsampled) Macrogen Lynx rufus sample:
+cd $B_PATH/MACROGEN_samples_25x
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+    -T HaplotypeCaller \
+    -R $REF \
+    -I c_lr_zz_0001_recal_round-1_25x.bam \
+    --emitRefConfidence GVCF \
+    -o $G_PATH/c_lr_zz_0001_recal_round-1_25x.g.vcf.gz
 
 ```
 
@@ -207,114 +167,30 @@ ggsave("gVCFs_SNPs_per_sample.pdf", width=30, height=10, units="cm", device="pdf
 
 ```{r Combine gVCF into VCF, eval=FALSE, engine='bash'}
 
-#First, I generate a VCF file using all lp gVCF files. It doesn't work on compressed files, so I have to unzip all .g.vcf.gz files using the gunzip command, and then repeat. 
-#Later on, when trying to work both with lp and ll gVCFs, server B is running very slow and the generation of .idx files (necessary for the VCF calling) is not working fine or whatever. We decide that it's best to work with compressed files so I compress three random lp gVCFs, but then I encounter the same problem that I got before (when using just the lp files): 'Unable to create iterator for rod named variant'.
-#Eventually, Karolina and I realize that all the compressing and decompressing of the gVCFs has messed the files. We decide to start all over again, targeting the compressed format (g.vcf.gz). She makes the ll gVCFs and I take care of the lp ones, and she creates the single VCF combining all gVCFs.
+#Create an array with the path to all desired files:
+GVCF_LIST=($G_PATH/genome_project_samples_25x/c_lp_sm_0298_recal_round-1_25x.g.vcf.gz $G_PATH/macrogen_samples_25x/c_ll_ki_0090_recal_round-1_25x.g.vcf.gz $G_PATH/macrogen_samples_25x/c_lc_zz_0001_recal_round-1_25x.g.vcf.gz $G_PATH/macrogen_samples_25x/c_lr_zz_0001_recal_round-1_25x.g.vcf.gz)
 
-#Option A: when all gVCFs are named the same (same name structure) and in the same folder (this is the code that I used in the end to redo the VCF ONLY for the 5x lp samples):
+#Combine gVCF files into a VCF that conserves all sites, including non-variable sites (this will be important later on to compare callable sites and uncovered sites with total sites):
 cd $G_PATH
 java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
 -T GenotypeGVCFs \
 -R $REF \
-$(for var in *.g.vcf.gz; do echo -V ${var}" ";done) \
--o $V_PATH/c_ll_lp_plus_h_ll.vcf
+$(for var in ${GVCF_LIST[@]}; do echo -V ${var}" ";done) \
+--includeNonVariantSites \
+-o $V_PATH/c_lp_ll_lc_lr_all_sites.vcf
 
-#Compare the number of SNPs of the new VCF versus the old one (which had three samples less):
-grep -v '#' c_ll_lp_plus_h_ll.vcf | wc -l #23999314
-grep -v '#' all_c_ll_lp_renamed.vcf | wc -l #20248404
-
-#Option B: Maria's code to better define the populations and to obtain gVCFs when BAMs with different name structure are considered.
-
-#List of populations
-#c_lc_zz
-#c_ll_ba
-#c_ll_cr
-#c_ll_ka
-#c_ll_ki
-#c_ll_la
-#c_ll_no
-#c_ll_og
-#c_ll_po
-#c_ll_to
-#c_ll_tu
-#c_ll_vl
-#c_ll_ya
-#c_lp_do
-#c_lp_sm
-#c_lr_zz
-#h_ll_ba
-
-#Code to define the populations to be used, and then print all gVCFs in a list. This version returns a list of the "original" samples (all samples except for the subsampled version of the 28x ones):
+#Combine gVCF files into a VCF with all variant sites:
 cd $G_PATH
-POPS=(c_ll_ba-c_ll_cr-c_ll_ka-c_ll_ki-c_ll_la-c_ll_no-c_ll_og-c_ll_po-c_ll_to-c_ll_tu-c_ll_vl-c_ll_ya-c_lp_do-c_lp_sm)
-for POP in ${POPS[@]}
-  do
-  echo $POP
-  rm "all_c_original_coverage_$POP"_n"$NUMBER_IND".gVCFlist
-  IFS='-' read -r -a POPS1 <<< "$POP" # this creates an array stripping by "-"
-  for POP1 in "${POPS1[@]}"
-    do
-    echo "$POP --> $POP1"
-    ls *${POP1}_*_recal_round-1.g.vcf* | grep -v "tbi" | grep -v "idx" >> "$POP".gVCFlist
-    done
-  NUMBER_IND=$(printf "%03d" `wc -l "$POP".gVCFlist | cut -f1 -d " "`);
-  mv "$POP".gVCFlist "all_c_original_coverage_$POP"_n"$NUMBER_IND".gVCFlist
-  done
-
-#Code to define the populations to be used, and then print all gVCFs in a list. This version returns a list of all samples, including both the subsampled (5x) version of those with 28x, and the 28x themselves:
-cd $G_PATH
-POPS=(c_ll_ba-c_ll_cr-c_ll_ka-c_ll_ki-c_ll_la-c_ll_no-c_ll_og-c_ll_po-c_ll_to-c_ll_tu-c_ll_vl-c_ll_ya-c_lp_do-c_lp_sm)
-for POP in ${POPS[@]}
-  do
-  echo $POP
-  rm "all_c_samples_$POP"_n"$NUMBER_IND".gVCFlist
-  IFS='-' read -r -a POPS1 <<< "$POP" # this creates an array stripping by "-"
-  for POP1 in "${POPS1[@]}"
-    do
-    echo "$POP --> $POP1"
-    ls *${POP1}_*_recal_round-1*g.vcf* | grep -v "tbi" | grep -v "idx" >> "$POP".gVCFlist
-    done
-  NUMBER_IND=$(printf "%03d" `wc -l "$POP".gVCFlist | cut -f1 -d " "`);
-  mv "$POP".gVCFlist "all_c_samples_$POP"_n"$NUMBER_IND".gVCFlist
-  done
-
-#Code to define the populations to be used, and then print all gVCFs in a list. This version returns a list with only those (original, 28x) samples that were subsampled:
-cd $G_PATH
-POPS=(c_lp_do-c_lp_sm)
-for POP in ${POPS[@]}
-  do
-  echo $POP
-  rm "all_c_lp_samples_28x_$POP"_n"$NUMBER_IND".gVCFlist
-  IFS='-' read -r -a POPS1 <<< "$POP" # this creates an array stripping by "-"
-    for POP1 in "${POPS1[@]}"
-    do
-    echo "$POP --> $POP1"
-    ls *${POP1}_*_recal_round-1_subsampled.g.vcf* | grep -v "tbi" | grep -v "idx" | sed 's/_subsampled//g' >> "$POP".gVCFlist
-    done
-  NUMBER_IND=$(printf "%03d" `wc -l "$POP".gVCFlist | cut -f1 -d " "`);
-  mv "$POP".gVCFlist "all_c_lp_samples_28x_$POP"_n"$NUMBER_IND".gVCFlist
-  done
-
-#Next, use the following line to exclude from the all samples list the list with only 28x samples in order to obtain a list with only 5x samples (including the subsampled versions of 28x samples)
-cd $G_PATH
-grep -v -f all_c_lp_samples_28x*.gVCFlist all_c_samples_c*.gVCFlist > all_c_samples_5x_c_ll_ba-c_ll_cr-c_ll_ka-c_ll_ki-c_ll_la-c_ll_no-c_ll_og-c_ll_po-c_ll_to-c_ll_tu-c_ll_vl-c_ll_ya-c_lp_do-c_lp_sm_n103.gVCFlist
-
-#Next, run the VCF calling using the "original" samples (28x when possible, and 5x elsewhere):
-cd $G_PATH
-POPS=(c_ll_ba-c_ll_cr-c_ll_ka-c_ll_ki-c_ll_la-c_ll_no-c_ll_og-c_ll_po-c_ll_to-c_ll_tu-c_ll_vl-c_ll_ya-c_lp_do-c_lp_sm)
-INPUT_gVCFs=all_c_samples_5x_*.list #insert here one of the lists generated above ()
 java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
 -T GenotypeGVCFs \
 -R $REF \
--V $INPUT_gVCFs \
--o all_c_samples_5x_recal_round-1.vcf
+$(for var in ${GVCF_LIST[@]}; do echo -V ${var}" ";done) \
+-o $V_PATH/c_lp_ll_lc_lr_variant_sites.vcf
 
-INPUT_gVCFs=all_c_original_coverage_*.list #insert here one of the lists generated above ()
-java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
--T GenotypeGVCFs \
--R $REF \
--V $INPUT_gVCFs \
--o all_c_original_coverage_recal_round-1.vcf
+#Get the number of SNPs of the VCFs:
+grep -v '#' c_lp_ll_lc_lr_all_sites.vcf | wc -l #
+grep -v '#' c_lp_ll_lc_lr_variant_sites.vcf | wc -l #
+
 
 ```
 
