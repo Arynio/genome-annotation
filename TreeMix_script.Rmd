@@ -19,32 +19,34 @@ T_PATH=/opt/treemix-1.12/src #TreeMix software path
 
 ```{r Produce a gVCF and VCF data for the outgroup (the lynx rufus sample), eval=FALSE, engine='bash'}
 
-#Build a gVCF for the rufus sample:
-cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
+#I first did all these with the subsampled rufus BAM, but eventually I substituted them with the original one.
+
+#This was only used to produce the gVCF file for the original (not subsampled) Macrogen Lynx rufus sample, and was actually performed as part of the c_lp_ll_lc_lr_VCF script:
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/MACROGEN_samples_25x
 java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar \
--T HaplotypeCaller \
--R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa \
--I c_lr_zz_0001_recal_round-1.bam \
---emitRefConfidence GVCF \
--o /home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs/c_lr_zz_0001_recal_round.g.vcf.gz
+    -T HaplotypeCaller \
+    -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa \
+    -I c_lr_zz_0001_recal_round-1_25x.bam \
+    --emitRefConfidence GVCF \
+    -o /home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs/c_lr_zz_0001_recal_round-1_25x.g.vcf.gz
     
-#Build a VCF for the rufus sample:
-cd /home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs
+#Next, build a VCF for the rufus sample:
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs/macrogen_samples_25x
 java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar /opt/GATK-3.7/GenomeAnalysisTK.jar \
--T GenotypeGVCFs \
--R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa \
-$(for var in c_lr_zz_0001_recal_round.g.vcf.gz; do echo -V ${var}" ";done) \
--o /home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/c_lr.vcf
+    -T GenotypeGVCFs \
+    -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa \
+    -V c_lr_zz_0001_recal_round-1_25x.g.vcf.gz \
+    -o /home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/c_lr.vcf
 
 #Drop all multiallelic SNPs as well as all INDELs from the rufus VCFs:
 cd $V_PATH
 java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar \
--T SelectVariants \
--selectType SNP \
--restrictAllelesTo BIALLELIC \
--R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa \
--V c_lr.vcf \
--o c_lr_SNPs.vcf
+    -T SelectVariants \
+    -selectType SNP \
+    -restrictAllelesTo BIALLELIC \
+    -R /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa \
+    -V c_lr.vcf \
+    -o c_lr_SNPs.vcf
 
 ```
 
@@ -69,6 +71,7 @@ for pop in "${POPLIST[@]}"
   NAME="${pop}"
   POPNAMES=$POPNAMES" "$NAME
   echo $POPNAMES
+  #done
   SAMPLE_NUMBER="$(/opt/bcftools-1.6/bcftools query -l "$V_PATH/${pop}"_perpop_standard_filter.vcf | wc -l)"
   echo $SAMPLE_NUMBER
   TOTAL_SNPS="$(grep -v '#' "$V_PATH/${pop}"_perpop_standard_filter.vcf | wc -l)"
@@ -95,13 +98,17 @@ grep -v ' 0,0 ' SNP_names_treemix_input_wout_ba.txt | grep -v ' 0,0$' | cut -d$'
 #Get a version of the TreeMix input that includes Lynx rufus as the outgroup:
 cd $O_PATH
 #LANG=en_EN sort -k1,1 -k2,2n SNP_names_treemix_input.txt
-grep -v '#' $V_PATH/c_lr_SNPs.vcf | cut -d$'\t' -f1,2,8 | cut -d$';' -f1,3 --output-delimiter=' ' | cut -d$'=' -f1,2,3 --output-delimiter=' ' | LANG=en_EN sort -k1,1 -k2,2n | awk '{print $1"_"$2" "$6-$4","$4}' > c_lr_SNP_counts.txt #gets the allele counts for all variable positions within the rufus individual
+grep -v '#' $V_PATH/c_lr_zz_0001_recal_round-1_25x_SNPs.vcf | cut -d$'\t' -f1,2,8 | cut -d$';' -f1,3 --output-delimiter=' ' | cut -d$'=' -f1,2,3 --output-delimiter=' ' | LANG=en_EN sort -k1,1 -k2,2n | awk '{print $1"_"$2" "$6-$4","$4}' > c_lr_SNP_counts.txt #gets the allele counts for all variable positions within the rufus individual
 sed -i -e '1i'"SNP Rufus"'\' c_lr_SNP_counts.txt #adds column names
-LANG=en_EN join -a1 -e 2,0 -o auto -j 1 <(LANG=en_EN sort -k1 SNP_names_treemix_input.txt | tail -n +2) <(LANG=en_EN sort -k1 c_lr_SNP_counts.txt) | cut -d$'_' -f1,2 --output-delimiter=' ' | LANG=en_EN sort -k1,1 -k2,2n | awk '{print $1"_"$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "$10" "$11" "$12" "$13" "$14" "$15" "$16}' > intermediate_file.borrar.txt #joins the eurasian lynx allelic counts with the rufus allelic counts, assigning "2,0" for all missing positions
-rm c_lr_SNP_counts.txt
-mv intermediate_file.borrar.txt SNP_names_treemix_input_rooted.txt
-sed -i -e '1i'"$LONGNAMES Rufus"'\' SNP_names_treemix_input_rooted.txt
+LANG=en_EN join -a1 -e 2,0 -o auto -j 1 <(LANG=en_EN sort -k1 SNP_names_treemix_input.txt | tail -n +2) <(LANG=en_EN sort -k1 c_lr_SNP_counts.txt | tail -n +2) | cut -d$'_' -f1,2 --output-delimiter=' ' | LANG=en_EN sort -k1,1 -k2,2n | awk '{print $1"_"$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "$10" "$11" "$12" "$13" "$14" "$15" "$16}' > intermediate_file.borrar.txt #joins the eurasian lynx allelic counts with the rufus allelic counts, assigning "2,0" for all missing positions from Rufus
+LANG=en_EN join -a2 -e 'NA' -o auto -j 1 <(LANG=en_EN sort -k1 SNP_names_treemix_input.txt | tail -n +2) <(LANG=en_EN sort -k1 c_lr_SNP_counts.txt | tail -n +2) | cut -d$'_' -f1,2 --output-delimiter=' ' | LANG=en_EN sort -k1,1 -k2,2n | awk '{print $1"_"$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "$10" "$11" "$12" "$13" "$14" "$15" "$16}' > intermediate_file_2.borrar.txt #joins the eurasian lynx allelic counts with the rufus allelic counts, assigning "NA" for all missing positions from Eurasian
+LANG=en_EN join -a1 -a2 -j 1 <(LANG=en_EN sort -k1 intermediate_file.borrar.txt) <(LANG=en_EN sort -k1 intermediate_file_2.borrar.txt) | cut -d$'_' -f1,2 --output-delimiter=' ' | LANG=en_EN sort -k1,1 -k2,2n | awk '{print $1"_"$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "$10" "$11" "$12" "$13" "$14" "$15" "$16}' > intermediate_file_joined.borrar.txt #joins both previous allelic count files in a single one with all variable positions
+cp intermediate_file_joined.borrar.txt intermediate_file_joined_2.borrar.txt #duplicates the joined intermediate file
+sed -i 's/NA NA NA NA NA NA NA NA NA NA NA NA NA/6,0 12,0 8,0 26,0 12,0 16,0 4,0 16,0 4,0 12,0 12,0 16,0 16,0/g' intermediate_file_joined_2.borrar.txt #replaces all rows with NA in the Eurasian fields with max allelic counts for the reference allele
+mv intermediate_file_joined_2.borrar.txt SNP_names_treemix_input_rooted.txt #final name
+sed -i -e '1i'"$LONGNAMES Rufus"'\' SNP_names_treemix_input_rooted.txt #adds headers with population names
 grep -v ' 0,0 ' SNP_names_treemix_input_rooted.txt | grep -v ' 0,0$' | cut -d$' ' -f 2- | gzip > treemix_input_rooted.txt.gz #removes rows with any missing data, and also the SNP names
+rm *.borrar.txt #removes all intermediate files
 
 #Get a version of the rufus-rooted TreeMix input without Balkans:
 cut -d$' ' -f2 --complement SNP_names_treemix_input_rooted.txt > SNP_names_treemix_input_rooted_wout_ba.txt #removes the Balkans column
