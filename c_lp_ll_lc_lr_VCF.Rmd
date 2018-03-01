@@ -188,9 +188,8 @@ $(for var in ${GVCF_LIST[@]}; do echo -V ${var}" ";done) \
 -o $V_PATH/c_lp_ll_lc_lr_variant_sites.vcf
 
 #Get the number of SNPs of the VCFs:
-grep -v '#' c_lp_ll_lc_lr_all_sites.vcf | wc -l #1170283050 (con más de 24h de computación pendientes)
+grep -v '#' c_lp_ll_lc_lr_all_sites.vcf | wc -l #2412763898
 grep -v '#' c_lp_ll_lc_lr_variant_sites.vcf | wc -l #30079077
-
 
 ```
 
@@ -233,9 +232,9 @@ $BCF query -l c_lp_ll_lc_lr_all_sites_renamed.vcf #checks if samples have been r
 
 ```
 
-#3: Split the VCF into per species VCFs. Generate a VCF for the Iberian lynx and another one for the Eurasian lynx, and check whether the reference allele has changed.
+#3: Split the VCF into per species VCFs. Generate a VCF for each individual.
 
-```{r Split the VCF into per population VCFs, eval=FALSE, engine='bash'}
+```{r Split the VCF into per species VCFs, eval=FALSE, engine='bash'}
 
 #Split the VCF in order to get one for each species. Contrary to our objective with the lp & ll VCF, here it's important to keep all substitutions.
 
@@ -244,10 +243,9 @@ GVCF_LIST=($G_PATH/genome_project_samples_25x/c_lp_sm_0298_recal_round-1_25x.g.v
 for i in ${GVCF_LIST[@]}
   do
   echo "${i}"
-  INPUT=$(echo "${i}" | cut -d$'.' -f1)
+  INPUT=$(echo "${i}" | cut -d$"/" -f8 | cut -d$"_" -f1,2,3,4)
   echo $INPUT
-  !!!!!CHECK HOW THE FILES ARE NAMED WITHIN THE VCF
-  $BCF view -s ${i} -Ov -o $V_PATH/$INPUT.vcf $V_PATH/c_lp_ll_lc_lr_all_sites.vcf
+  $BCF view -s $INPUT -Ov -o $V_PATH/"$INPUT"_recal_round-1_25x.vcf $V_PATH/c_lp_ll_lc_lr_all_sites_renamed.vcf
   done
 
 grep -v '#' c_lp_sm_0298_recal_round-1_25x.vcf | wc -l #
@@ -259,7 +257,7 @@ grep -v '#' c_lr_zz_0001_recal_round-1_25x.vcf | wc -l #
 cd $G_PATH
 GVCF_LIST=($G_PATH/genome_project_samples_25x/c_lp_sm_0298_recal_round-1_25x.g.vcf.gz $G_PATH/macrogen_samples_25x/c_ll_ki_0090_recal_round-1_25x.g.vcf.gz $G_PATH/macrogen_samples_25x/c_lc_zz_0001_recal_round-1_25x.g.vcf.gz $G_PATH/macrogen_samples_25x/c_lr_zz_0001_recal_round-1_25x.g.vcf.gz)
 !!!!!CHECK HOW THE FILES ARE NAMED WITHIN THE VCF
-$BCF view -s c_ll_ki_0090_recal_round-1_25x.g.vcf.gz c_lr_zz_0001_recal_round-1_25x.g.vcf.gz -Ov -o $V_PATH/c_ll_ki_0090_plus_c_lr_zz_0001_recal_round-1_25x.vcf $V_PATH/c_lp_ll_lc_lr_all_sites.vcf
+$BCF view -s c_ll_ki_0090_recal_round-1_25x.g.vcf.gz c_lr_zz_0001_recal_round-1_25x.g.vcf.gz -Ov -o $V_PATH/c_ll_ki_0090_plus_c_lr_zz_0001_recal_round-1_25x.vcf $V_PATH/c_lp_ll_lc_lr_all_sites_renamed.vcf
 
 #Check whether the reference allele has changed between VCFs. To this end, let's compare all SNPs common to both species' variants list.
 grep -v '#' $V_PATH/c_lp_sm_0298_recal_round-1_25x.vcf | cut -d$'\t' -f1,2,4,5 | awk '{print $1"_"$2" "$3" "$4}' | sort -k 1,1 > $V_PATH/c_lp_sm_0298_recal_round-1_25x_variants.txt #creates variants list for lp.
