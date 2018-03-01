@@ -342,7 +342,7 @@ $BCF reheader -s list_to_remove.txt -o c_ll_lp_plus_h_ll_renamed.vcf c_ll_lp_plu
 
 #2c: Split the VCF into per species VCFs. Generate a VCF for the Iberian lynx and another one for the Eurasian lynx, and check whether the reference allele has changed.
 
-```{r Split the VCF into per population VCFs, eval=FALSE, engine='bash'}
+```{r Split the VCF into per species VCFs, eval=FALSE, engine='bash'}
 
 #Split the VCF in order to get one for each species. It will be necessary to get rid of substitutions. During this step, all fixed positions within each species (including substitutions) will also be removed (with minor allele count = 1).
 cd $G_PATH
