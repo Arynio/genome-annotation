@@ -12,6 +12,8 @@ output: html_document
 V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
 O_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/TreeMix #TreeMix analyses output path
 T_PATH=/opt/treemix-1.12/src #TreeMix software path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
 BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
 
 ```
@@ -74,7 +76,7 @@ grep -v '#' c_lr_SNPs_tagged_filtered.vcf | wc -l #16685199
 
 #1a: Build whole-genome TreeMix input. Combine per population allele counts for all SNPs in a single gzipped file matching the required format for TreeMix inputs.
 
-```{r Build TreeMix input, eval=FALSE, engine='bash'}
+```{r Build whole-genome TreeMix input, eval=FALSE, engine='bash'}
 
 #First create the allelic counts file for Eurasian lynx (without the root):
 cd $V_PATH
@@ -145,30 +147,45 @@ grep -v ' 0,0 ' SNP_names_treemix_input_rooted_wout_ba_w_mo.txt | grep -v ' 0,0$
 
 #1b: Build intergenic TreeMix input. Combine per population allele counts for intergenic SNPs in a single gzipped file matching the required format for TreeMix inputs.
 
-```{r Build TreeMix input, eval=FALSE, engine='bash'}
+```{r Build intergenic TreeMix input, eval=FALSE, engine='bash'}
 
-$BCF view -R /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.intergenic.PLUS1000.bed -Ov -o $V_PATH/intergenic_plus_1000/c_lr_SNPs_tagged_filtered_intergenic.vcf $V_PATH/c_lr_SNPs_tagged_filtered.vcf
+#Generate VCF with only intergenic positions for Lynx rufus:
+cd $V_PATH
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+  -T SelectVariants \
+  -R $REF \
+  -V c_lr_SNPs_tagged_filtered.vcf \
+  -o $V_PATH/intergenic_plus_1000/c_lr_SNPs_tagged_filtered_intergenic.vcf \
+  -L /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.intergenic.PLUS1000.bed
+  
+grep -v '#' c_lr_SNPs_tagged_filtered_intergenic.vcf | wc -l #10492014
+
+#Generate VCF with only intergenic positions for all Eurasian lynx populations:
+cd $V_PATH
+shopt -s extglob #the extglob shell option gives you more powerful pattern matching in the command line.
+POP_VCFs=($(ls ll*[^pv]_perpop_standard_filter.vcf)) #selects all populational VCFs except for País Vasco
+for pop in "${POP_VCFs[@]}"
+  do
+  echo "${pop}"
+  java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+    -T SelectVariants \
+    -R $REF \
+    -V "${pop}" \
+    -o $V_PATH/intergenic_plus_1000/${pop/.vcf/_intergenic.vcf} \
+    -L /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.intergenic.PLUS1000.bed
+  done
+shopt -u extglob #disable extglob
 
 
-$BCF view -R <(cat <(echo "CHROM CHROMST CHROMEND" /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.intergenic.PLUS1000.bed)) -Ov -o $V_PATH/intergenic_plus_1000/c_lr_SNPs_intergenic.vcf $V_PATH/ll_ba_perpop_standard_filter.vcf
+!!! CHECK THAT ALL LL POPS HAVE THE SAME SNPS (INTERGENIC)
 
-
-/opt/vcftools_0.1.13/cpp/vcftools --vcf $V_PATH/c_lr_SNPs_tagged_filtered.vcf --bed <(cat <(echo "CHROM CHROMST CHROMEND") /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.intergenic.PLUS1000.bed) --out $V_PATH/c_lr_SNPs_tagged_filtered_intergenic.vcf
-
-
-
+#Create the allelic counts file for Eurasian lynx (without the root):
 cd $V_PATH
 shopt -s extglob #the extglob shell option gives you more powerful pattern matching in the command line.
 POPLIST=($(ls ll*[^pv]_perpop_standard_filter.vcf | cut -d "_" -f1,2 | sort | uniq)) #selects all populations except for País Vasco
-
-for pop in "${POPLIST[@]}"
-  do
-  $BCF view -R /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.intergenic.PLUS1000.bed -Ov -o $V_PATH/intergenic_plus_1000/${pop}_perpop_standard_filter_intergenic.vcf $V_PATH/${pop}_perpop_standard_filter.vcf
-  done
-
-cd $O_PATH
+cd $O_PATH/intergenic_plus_1000
 rm SNP_names_treemix_input_intergenic.txt
-SNP_LIST="$(ls "$V_PATH"/ll*_perpop_standard_filter.vcf | head -1)" #any population will be useful to retrieve the SNP list because I didn't trim the subVCFs so all populations have all the SNPs (from their species)
+SNP_LIST="$(ls "$V_PATH"/ll*_perpop_standard_filter_intergenic.vcf | head -1)" #any population will be useful to retrieve the SNP list because I didn't trim the subVCFs so all populations have all the SNPs (from their species)
 grep -v '#' $SNP_LIST | cut -d$'\t' -f1,2,8 | cut -d$';' -f1,3 --output-delimiter=' ' | LANG=en_EN sort -k1,1 -k2,2n | awk '{print $1"_"$2}' > SNP_names_treemix_input_intergenic.txt
 unset POPNAMES #removes the variable so that it starts all over again inside the loop
 POPNAMES="SNP"
@@ -179,16 +196,49 @@ for pop in "${POPLIST[@]}"
   NAME="${pop}"
   POPNAMES=$POPNAMES" "$NAME
   echo $POPNAMES
-  SAMPLE_NUMBER="$(/opt/bcftools-1.6/bcftools query -l "$V_PATH/${pop}"_perpop_standard_filter.vcf | wc -l)"
+  SAMPLE_NUMBER="$(/opt/bcftools-1.6/bcftools query -l "$V_PATH/${pop}"_perpop_standard_filter_intergenic.vcf | wc -l)"
   echo $SAMPLE_NUMBER
-  TOTAL_SNPS="$(grep -v '#' "$V_PATH/${pop}"_perpop_standard_filter.vcf | wc -l)"
+  TOTAL_SNPS="$(grep -v '#' "$V_PATH/${pop}"_perpop_standard_filter_intergenic.vcf | wc -l)"
   echo $TOTAL_SNPS
   #done
-  grep -v '#' "$V_PATH/${pop}"_perpop_standard_filter.vcf | cut -d$'\t' -f1,2,8 | cut -d$';' -f1,3 --output-delimiter=' ' | cut -d$'=' -f1,2,3 --output-delimiter=' ' | awk '{print $1" "$2" "$6-$4","$4}' | LANG=en_EN sort -k1,1 -k2,2n | awk '{print $1"_"$2" "$3}' > temp_SNP_counts.txt
+  grep -v '#' "$V_PATH/${pop}"_perpop_standard_filter_intergenic.vcf | cut -d$'\t' -f1,2,8 | cut -d$';' -f1,3 --output-delimiter=' ' | cut -d$'=' -f1,2,3 --output-delimiter=' ' | awk '{print $1" "$2" "$6-$4","$4}' | LANG=en_EN sort -k1,1 -k2,2n | awk '{print $1"_"$2" "$3}' > temp_SNP_counts.txt
   #LANG=en_EN join -j 1 <(LANG=en_EN sort -k1,1 -k2,2n SNP_names_treemix_input.txt | awk '{print $1"_"$2}') <(LANG=en_EN sort -k1,1 -k2,2n temp_SNP_counts.txt | awk '{print $1"_"$2" "$3}') > intermediate_file.borrar.txt
-  LANG=en_EN join -j 1 SNP_names_treemix_input.txt temp_SNP_counts.txt > intermediate_file.borrar.txt
-  mv intermediate_file.borrar.txt SNP_names_treemix_input.txt
+  LANG=en_EN join -j 1 SNP_names_treemix_input_intergenic.txt temp_SNP_counts.txt > intermediate_file.borrar.txt
+  mv intermediate_file.borrar.txt SNP_names_treemix_input_intergenic.txt
   done
+rm temp_SNP_counts.txt
+LONGNAMES=$(echo $POPNAMES | sed -e "s/ll_ba/Balkans/g; s/ll_cr/Carpathians/g; s/ll_ka/Khentii/g; s/ll_ki/Kirov/g; s/ll_la/Latvia/g; s/ll_no/Norway/g; s/ll_og/Ömnögovi/g; s/ll_po/Bialowieza/g; s/ll_to/Töv/g; s/ll_tu/Tuva/g; s/ll_ur/Urals/g; s/ll_vl/Vladivostok/g; s/ll_ya/Yakutia/g; s/lp_sm/Sierra Morena/g; s/lp_do/Doñana/g; s/lr_zz/Rufus/g") #swaps the short names with the full names
+echo $LONGNAMES
+sed -i -e '1i'"$LONGNAMES"'\' SNP_names_treemix_input_intergenic.txt #adds the headers
+#sed -i "1s/.*/$LONGNAMES/" SNP_names_treemix_input.txt #substitutes old headers
+
+grep -v ' 0,0 ' SNP_names_treemix_input_intergenic.txt | grep -v ' 0,0$' | cut -d$' ' -f 2- | gzip > treemix_input_intergenic.txt.gz #removes rows with any missing data, and also the SNP names
+shopt -u extglob #disable extglob
+
+#Get a version of the TreeMix input that includes Lynx rufus as the outgroup:
+cd $O_PATH
+#LANG=en_EN sort -k1,1 -k2,2n SNP_names_treemix_input.txt
+grep -v '#' $V_PATH/c_lr_SNPs_tagged_filtered_intergenic.vcf | cut -d$'\t' -f1,2,8 | cut -d$';' -f1,3 --output-delimiter=' ' | cut -d$'=' -f1,2,3 --output-delimiter=' ' | LANG=en_EN sort -k1,1 -k2,2n | awk '{print $1"_"$2" "$6-$4","$4}' > c_lr_SNP_counts_intergenic.txt #gets the allele counts for all variable positions within the rufus individual
+sed -i -e '1i'"SNP Rufus"'\' c_lr_SNP_counts_intergenic.txt #adds column names
+LANG=en_EN join -a1 -e 2,0 -o auto -j 1 <(LANG=en_EN sort -k1 SNP_names_treemix_input_intergenic.txt | tail -n +2) <(LANG=en_EN sort -k1 c_lr_SNP_counts_intergenic.txt | tail -n +2) | cut -d$'_' -f1,2 --output-delimiter=' ' | LANG=en_EN sort -k1,1 -k2,2n | awk '{print $1"_"$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "$10" "$11" "$12" "$13" "$14" "$15" "$16}' > intermediate_file.borrar.txt #joins the eurasian lynx allelic counts with the rufus allelic counts, assigning "2,0" for all missing positions from Rufus
+LANG=en_EN join -a2 -e 'NA' -o auto -j 1 <(LANG=en_EN sort -k1 SNP_names_treemix_input_intergenic.txt | tail -n +2) <(LANG=en_EN sort -k1 c_lr_SNP_counts_intergenic.txt | tail -n +2) | cut -d$'_' -f1,2 --output-delimiter=' ' | LANG=en_EN sort -k1,1 -k2,2n | awk '{print $1"_"$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "$10" "$11" "$12" "$13" "$14" "$15" "$16}' > intermediate_file_2.borrar.txt #joins the eurasian lynx allelic counts with the rufus allelic counts, assigning "NA" for all missing positions from Eurasian
+LANG=en_EN join -a1 -a2 -j 1 <(LANG=en_EN sort -k1 intermediate_file.borrar.txt) <(LANG=en_EN sort -k1 intermediate_file_2.borrar.txt) | cut -d$'_' -f1,2 --output-delimiter=' ' | LANG=en_EN sort -k1,1 -k2,2n | awk '{print $1"_"$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "$10" "$11" "$12" "$13" "$14" "$15" "$16}' > intermediate_file_joined.borrar.txt #joins both previous allelic count files in a single one with all variable positions
+cp intermediate_file_joined.borrar.txt intermediate_file_joined_2.borrar.txt #duplicates the joined intermediate file
+sed -i 's/NA NA NA NA NA NA NA NA NA NA NA NA NA/6,0 12,0 8,0 26,0 12,0 16,0 4,0 16,0 4,0 12,0 12,0 16,0 16,0/g' intermediate_file_joined_2.borrar.txt #replaces all rows with NA in the Eurasian fields with max allelic counts for the reference allele
+mv intermediate_file_joined_2.borrar.txt SNP_names_treemix_input_intergenic_rooted.txt #final name
+sed -i -e '1i'"$LONGNAMES Rufus"'\' SNP_names_treemix_input_intergenic_rooted.txt #adds headers with population names
+grep -v ' 0,0 ' SNP_names_treemix_input_intergenic_rooted.txt | grep -v ' 0,0$' | cut -d$' ' -f 2- | gzip > treemix_input_intergenic_rooted.txt.gz #removes rows with any missing data, and also the SNP names
+rm *.borrar.txt #removes all intermediate files
+
+#Get a version of the rufus-rooted TreeMix input without Balkans:
+cut -d$' ' -f2 --complement SNP_names_treemix_input_intergenic_rooted.txt > SNP_names_treemix_input_intergenic_rooted_wout_ba.txt #removes the Balkans column
+grep -v ' 0,0 ' SNP_names_treemix_input_intergenic_rooted_wout_ba.txt | grep -v ' 0,0$' | cut -d$' ' -f 2- | gzip > treemix_input_intergenic_rooted_wout_ba.txt.gz #removes rows with any missing data, and also the SNP names
+
+#Get a version of the rufus-rooted TreeMix input without Balkans and with Khentii, Töv & Ömnögovi grouped together as Mongolia:
+cut -d$' ' -f1,4,8,10  SNP_names_treemix_input_intergenic_rooted.txt | cut -d$',' -f1,2,3,4 --output-delimiter=' ' | cut -d$' ' -f1,2,3,4,5,6,7 | awk '{print $1" "$2+$4+$6","$3+$5+$7}' > SNP_names_threepop_input_intergenic_ka_om_to.txt #sums allele counts for the three Mongolian populations
+sed -i '1s/.*/SNP Mongolia/' SNP_names_threepop_input_intergenic_ka_om_to.txt #adds correct column names
+awk -v f2=SNP_names_treemix_input_intergenic_rooted.txt '{ c = $2; getline < f2; print $0, c; }' SNP_names_threepop_input_intergenic_ka_om_to.txt | cut -d$' ' -f2,4,8,10 --complement > SNP_names_treemix_input_intergenic_rooted_wout_ba_w_mo.txt #copies the Mongolia column to a new TreeMix input where Balkans and the three Mongolian populations have been removed
+grep -v ' 0,0 ' SNP_names_treemix_input_intergenic_rooted_wout_ba_w_mo.txt | grep -v ' 0,0$' | cut -d$' ' -f 2- | gzip > treemix_input_intergenic_rooted_wout_ba_w_mo.txt.gz #removes rows with any missing data, and also the SNP names
 
 ```
 
