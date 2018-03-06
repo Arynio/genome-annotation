@@ -67,7 +67,7 @@ java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -X
     -R $REF \
     -I c_ll_ki_0090_recal_round-1_25x.bam \
     --emitRefConfidence GVCF \
-    -o $G_PATH/c_ll_ki_0090_recal_round-1_25x.g.vcf.gz
+    -o $G_PATH/macrogen_samples_25x/c_ll_ki_0090_recal_round-1_25x_bis.g.vcf.gz
 
 #This was only used to produce the gVCF file for the original (not subsampled) Macrogen Lynx canadensis sample:
 cd $B_PATH/MACROGEN_samples_25x
@@ -76,7 +76,7 @@ java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -X
     -R $REF \
     -I c_lc_zz_0001_recal_round-1_25x.bam \
     --emitRefConfidence GVCF \
-    -o $G_PATH/c_lc_zz_0001_recal_round-1_25x.g.vcf.gz
+    -o $G_PATH/macrogen_samples_25x/c_lc_zz_0001_recal_round-1_25x.g.vcf.gz
     
 #This was only used to produce the gVCF file for the original (not subsampled) Macrogen Lynx rufus sample:
 cd $B_PATH/MACROGEN_samples_25x
@@ -85,7 +85,7 @@ java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -X
     -R $REF \
     -I c_lr_zz_0001_recal_round-1_25x.bam \
     --emitRefConfidence GVCF \
-    -o $G_PATH/c_lr_zz_0001_recal_round-1_25x.g.vcf.gz
+    -o $G_PATH/macrogen_samples_25x/c_lr_zz_0001_recal_round-1_25x.g.vcf.gz
 
 ```
 
@@ -248,95 +248,75 @@ for i in ${GVCF_LIST[@]}
   $BCF view -s $INPUT -Ov -o $V_PATH/"$INPUT"_recal_round-1_25x.vcf $V_PATH/c_lp_ll_lc_lr_all_sites_renamed.vcf
   done
 
-grep -v '#' c_lp_sm_0298_recal_round-1_25x.vcf | wc -l #
-grep -v '#' c_ll_ki_0090_recal_round-1_25x.vcf | wc -l #
-grep -v '#' c_lc_zz_0001_recal_round-1_25x.vcf | wc -l #
-grep -v '#' c_lr_zz_0001_recal_round-1_25x.vcf | wc -l #
-
-#Obtain VCF for the eurasian and the rufus:
-cd $G_PATH
-GVCF_LIST=($G_PATH/genome_project_samples_25x/c_lp_sm_0298_recal_round-1_25x.g.vcf.gz $G_PATH/macrogen_samples_25x/c_ll_ki_0090_recal_round-1_25x.g.vcf.gz $G_PATH/macrogen_samples_25x/c_lc_zz_0001_recal_round-1_25x.g.vcf.gz $G_PATH/macrogen_samples_25x/c_lr_zz_0001_recal_round-1_25x.g.vcf.gz)
-!!!!!CHECK HOW THE FILES ARE NAMED WITHIN THE VCF
-$BCF view -s c_ll_ki_0090_recal_round-1_25x.g.vcf.gz c_lr_zz_0001_recal_round-1_25x.g.vcf.gz -Ov -o $V_PATH/c_ll_ki_0090_plus_c_lr_zz_0001_recal_round-1_25x.vcf $V_PATH/c_lp_ll_lc_lr_all_sites_renamed.vcf
+grep -v '#' c_lp_sm_0298_recal_round-1_25x.vcf | wc -l #2412763898
+grep -v '#' c_ll_ki_0090_recal_round-1_25x.vcf | wc -l #2412763898
+grep -v '#' c_lc_zz_0001_recal_round-1_25x.vcf | wc -l #2412763898
+grep -v '#' c_lr_zz_0001_recal_round-1_25x.vcf | wc -l #2412763898
 
 #Check whether the reference allele has changed between VCFs. To this end, let's compare all SNPs common to both species' variants list.
-grep -v '#' $V_PATH/c_lp_sm_0298_recal_round-1_25x.vcf | cut -d$'\t' -f1,2,4,5 | awk '{print $1"_"$2" "$3" "$4}' | sort -k 1,1 > $V_PATH/c_lp_sm_0298_recal_round-1_25x_variants.txt #creates variants list for lp.
+grep -v '#' $V_PATH/c_lr_zz_0001_recal_round-1_25x.vcf | cut -d$'\t' -f1,2,4,5 | awk '{print $1"_"$2" "$3" "$4}' | sort -k 1,1 > $V_PATH/c_lr_zz_0001_recal_round-1_25x_variants.txt #creates variants list for lr.
 grep -v '#' $V_PATH/c_ll_ki_0090_recal_round-1_25x.vcf | cut -d$'\t' -f1,2,4,5 | awk '{print $1"_"$2" "$3" "$4}' | sort -k 1,1 > $V_PATH/c_ll_ki_0090_recal_round-1_25x_variants.txt #creates variants list for ll.
-join -1 1 -2 1 -e0 -o'0,1.2,1.3,2.2,2.3' $V_PATH/c_lp_sm_0298_recal_round-1_25x_variants.txt $V_PATH/c_ll_ki_0090_recal_round-1_25x_variants.txt > c_lp_sm_0298_c_ll_ki_0090_joined_variants.txt #joins both lists and outputs only the common SNPs.
-awk '{if($2 == $4) print 1; else print 0; }' c_lp_sm_0298_c_ll_ki_0090_joined_variants.txt | sort | uniq #this should only return the value "1" when all SNPs share the same reference allele, or both "0" and "1" if some SNPs have different reference alleles between species. In this case it only returns "1", so everything is fine.
-cat c_lp_sm_0298_c_ll_ki_0090_joined_variants.txt | awk '{if($2 == $4) print $0" 1"; else print $0" 0"; }' c_lp_sm_0298_c_ll_ki_0090_joined_variants.txt | awk '$6 == 0' #in case there's any row where the reference allele has changed, return those rows. In this case, none are returned.
+join -1 1 -2 1 -e0 -o'0,1.2,1.3,2.2,2.3' $V_PATH/c_lr_zz_0001_recal_round-1_25x.vcf $V_PATH/c_ll_ki_0090_recal_round-1_25x_variants.txt > c_lr_zz_0001_c_ll_ki_0090_joined_variants.txt #joins both lists and outputs only the common SNPs.
+awk '{if($2 == $4) print 1; else print 0; }' c_lr_zz_0001_c_ll_ki_0090_joined_variants.txt | sort | uniq #this should only return the value "1" when all SNPs share the same reference allele, or both "0" and "1" if some SNPs have different reference alleles between species. In this case it only returns "1", so everything is fine.
+cat c_lr_zz_0001_c_ll_ki_0090_joined_variants.txt | awk '{if($2 == $4) print $0" 1"; else print $0" 0"; }' c_lr_zz_0001_c_ll_ki_0090_joined_variants.txt | awk '$6 == 0' #in case there's any row where the reference allele has changed, return those rows. In this case, none are returned.
 
 ```
 
-#4: Get substitutions between ll and lr. Build allele counts file with all positions in ll and lr, and mark all substitutions.
+#4a: Obtain joint VCF for eurasian and rufus. Extract data for the two species in order to catalogue substitutions.
+
+```{r Obtain joint VCF for eurasian and rufus, eval=FALSE, engine='bash'}
+
+#Obtain VCF for the eurasian and the rufus:
+cd $V_PATH
+$BCF view -s c_ll_ki_0090,c_lr_zz_0001 -Ov -o $V_PATH/c_ll_ki_0090_plus_c_lr_zz_0001_recal_round-1_25x.vcf $V_PATH/c_lp_ll_lc_lr_all_sites_renamed.vcf
+
+```
+
+#4b: Extract SNPs from the VCF. Subset the VCF files in order to keep only SNP variants.
+
+```{r Extract SNPs from the VCF, eval=FALSE, engine='bash'}
+
+#During this step, all INDELs will be dropped from the VCF.
+cd $V_PATH
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+  -T SelectVariants \
+  -selectType SNP \
+  -R $REF \
+  -V c_ll_ki_0090_plus_c_lr_zz_0001_recal_round-1_25x.vcf \
+  -o c_ll_ki_0090_plus_c_lr_zz_0001_recal_round-1_25x_SNPs.vcf
+
+#Check whether there's any position with the reference allele fixed (AC=0) or with the alternative allele fixed (AC=AN)
+grep -v '#' lp_species_SNPs.vcf | cut -d$'\t' -f8 | cut -d$';' -f1,3 --output-delimiter=' ' | cut -d$'=' -f2,3 --output-delimiter=' ' | cut -d$' ' -f1,3 | awk -F , '{if($1 == $2 || $1 == 0) print 0; else print 1; }' | sort | uniq #this should only return the value "1" when all positions are variable (i.e. when all positions have at least one reference or one alternative allele), whereas both "1" and "0" would be returned when there's any position with a fixed allele.
+
+grep -v '#' ll_species_SNPs.vcf | wc -l #14035279
+grep -v '#' lp_species_SNPs.vcf | wc -l #3364193
+
+```
+
+#5: Get substitutions between ll and lr. Build allele counts file with all positions in ll and lr, and mark all substitutions.
 
 ```{r Get substitutions between ll and lr, eval=FALSE, engine='bash'}
 
-MODIFICAR TODO!!!
 
 #First create the allelic counts file for Eurasian lynx (without the root):
 cd $V_PATH
-shopt -s extglob #the extglob shell option gives you more powerful pattern matching in the command line.
-POPLIST=($(ls ll*[^pv]_perpop_standard_filter.vcf | cut -d "_" -f1,2 | sort | uniq)) #selects all populations except for País Vasco
-cd $O_PATH
-rm SNP_names_treemix_input.txt
-SNP_LIST="$(ls "$V_PATH"/ll*_perpop_standard_filter.vcf | head -1)" #any population will be useful to retrieve the SNP list because I didn't trim the subVCFs so all populations have all the SNPs (from their species)
-grep -v '#' $SNP_LIST | cut -d$'\t' -f1,2,8 | cut -d$';' -f1,3 --output-delimiter=' ' | LANG=en_EN sort -k1,1 -k2,2n | awk '{print $1"_"$2}' > SNP_names_treemix_input.txt
-unset POPNAMES #removes the variable so that it starts all over again inside the loop
-POPNAMES="SNP"
-#echo "pop_name,total_SNPs,homoz_ref,heteroz,homoz_alt,unaccounted,unaccounted_cat" > c_VCF_raw.stats 
-for pop in "${POPLIST[@]}"
-  do
-  echo "${pop}"
-  NAME="${pop}"
-  POPNAMES=$POPNAMES" "$NAME
-  echo $POPNAMES
-  #done
-  SAMPLE_NUMBER="$(/opt/bcftools-1.6/bcftools query -l "$V_PATH/${pop}"_perpop_standard_filter.vcf | wc -l)"
-  echo $SAMPLE_NUMBER
-  TOTAL_SNPS="$(grep -v '#' "$V_PATH/${pop}"_perpop_standard_filter.vcf | wc -l)"
-  echo $TOTAL_SNPS
-  #done
-  grep -v '#' "$V_PATH/${pop}"_perpop_standard_filter.vcf | cut -d$'\t' -f1,2,8 | cut -d$';' -f1,3 --output-delimiter=' ' | cut -d$'=' -f1,2,3 --output-delimiter=' ' | awk '{print $1" "$2" "$6-$4","$4}' | LANG=en_EN sort -k1,1 -k2,2n | awk '{print $1"_"$2" "$3}' > temp_SNP_counts.txt
-  #LANG=en_EN join -j 1 <(LANG=en_EN sort -k1,1 -k2,2n SNP_names_treemix_input.txt | awk '{print $1"_"$2}') <(LANG=en_EN sort -k1,1 -k2,2n temp_SNP_counts.txt | awk '{print $1"_"$2" "$3}') > intermediate_file.borrar.txt
-  LANG=en_EN join -j 1 SNP_names_treemix_input.txt temp_SNP_counts.txt > intermediate_file.borrar.txt
-  mv intermediate_file.borrar.txt SNP_names_treemix_input.txt
-  done
-rm temp_SNP_counts.txt
-LONGNAMES=$(echo $POPNAMES | sed -e "s/ll_ba/Balkans/g; s/ll_cr/Carpathians/g; s/ll_ka/Khentii/g; s/ll_ki/Kirov/g; s/ll_la/Latvia/g; s/ll_no/Norway/g; s/ll_og/Ömnögovi/g; s/ll_po/Bialowieza/g; s/ll_to/Töv/g; s/ll_tu/Tuva/g; s/ll_ur/Urals/g; s/ll_vl/Vladivostok/g; s/ll_ya/Yakutia/g; s/lp_sm/Sierra Morena/g; s/lp_do/Doñana/g; s/lr_zz/Rufus/g") #swaps the short names with the full names
-echo $LONGNAMES
-sed -i -e '1i'"$LONGNAMES"'\' SNP_names_treemix_input.txt #adds the headers
+grep -v '#' c_ll_ki_0090_plus_c_lr_zz_0001_recal_round-1_25x.vcf | cut -f1,2,4,5,10,11 | awk '{printf ("%s\t%s\t%s\t%s\t%.3s\t%.3s\n", $1, $2, $3, $4, $5, $6)}' > c_ll_ki_0090_plus_c_lr_zz_0001_recal_round-1_25x.positions
+
+awk '{
+if ($5 == "./." || $6 == "./.")
+	print $0,"NA";
+else if (length($4) > 1)
+	print $0,"Multiallelic";
+else if (($5 == "0/0" && $6 == "1/1") || ($5 == "1/1" && $6 == "0/0"))
+	print $0,"Substitution";
+else if (($5 == "0/0" && $6 == "0/0") || ($5 == "1/1" && $6 == "1/1"))
+  print $0,"Invariable";
+else
+  print $0,"SNP"
+}' c_ll_ki_0090_plus_c_lr_zz_0001_recal_round-1_25x.positions > c_ll_ki_0090_plus_c_lr_zz_0001_recal_round-1_25x.positions_class
+
+NAMES="Scaffold Position Reference Alternative c_ll_ki_0090 c_lr_zz_0001 Class"
+sed -i -e '1i'"$NAMES"'\' c_ll_ki_0090_plus_c_lr_zz_0001_recal_round-1_25x.positions_class #adds the headers
 #sed -i "1s/.*/$LONGNAMES/" SNP_names_treemix_input.txt #substitutes old headers
-
-grep -v ' 0,0 ' SNP_names_treemix_input.txt | grep -v ' 0,0$' | cut -d$' ' -f 2- | gzip > treemix_input.txt.gz #removes rows with any missing data, and also the SNP names
-shopt -u extglob #disable extglob
-
-#Get a version of the TreeMix input without Balkans:
-cut -d$' ' -f2 --complement SNP_names_treemix_input.txt > SNP_names_treemix_input_wout_ba.txt #removes the Balkans column
-grep -v ' 0,0 ' SNP_names_treemix_input_wout_ba.txt | grep -v ' 0,0$' | cut -d$' ' -f 2- | gzip > treemix_input_wout_ba.txt.gz #removes rows with any missing data, and also the SNP names
-
-#Get a version of the TreeMix input that includes Lynx rufus as the outgroup:
-cd $O_PATH
-#LANG=en_EN sort -k1,1 -k2,2n SNP_names_treemix_input.txt
-grep -v '#' $V_PATH/c_lr_SNPs.vcf | cut -d$'\t' -f1,2,8 | cut -d$';' -f1,3 --output-delimiter=' ' | cut -d$'=' -f1,2,3 --output-delimiter=' ' | LANG=en_EN sort -k1,1 -k2,2n | awk '{print $1"_"$2" "$6-$4","$4}' > c_lr_SNP_counts.txt #gets the allele counts for all variable positions within the rufus individual
-sed -i -e '1i'"SNP Rufus"'\' c_lr_SNP_counts.txt #adds column names
-LANG=en_EN join -a1 -e 2,0 -o auto -j 1 <(LANG=en_EN sort -k1 SNP_names_treemix_input.txt | tail -n +2) <(LANG=en_EN sort -k1 c_lr_SNP_counts.txt | tail -n +2) | cut -d$'_' -f1,2 --output-delimiter=' ' | LANG=en_EN sort -k1,1 -k2,2n | awk '{print $1"_"$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "$10" "$11" "$12" "$13" "$14" "$15" "$16}' > intermediate_file.borrar.txt #joins the eurasian lynx allelic counts with the rufus allelic counts, assigning "2,0" for all missing positions from Rufus
-LANG=en_EN join -a2 -e 'NA' -o auto -j 1 <(LANG=en_EN sort -k1 SNP_names_treemix_input.txt | tail -n +2) <(LANG=en_EN sort -k1 c_lr_SNP_counts.txt | tail -n +2) | cut -d$'_' -f1,2 --output-delimiter=' ' | LANG=en_EN sort -k1,1 -k2,2n | awk '{print $1"_"$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "$10" "$11" "$12" "$13" "$14" "$15" "$16}' > intermediate_file_2.borrar.txt #joins the eurasian lynx allelic counts with the rufus allelic counts, assigning "NA" for all missing positions from Eurasian
-LANG=en_EN join -a1 -a2 -j 1 <(LANG=en_EN sort -k1 intermediate_file.borrar.txt) <(LANG=en_EN sort -k1 intermediate_file_2.borrar.txt) | cut -d$'_' -f1,2 --output-delimiter=' ' | LANG=en_EN sort -k1,1 -k2,2n | awk '{print $1"_"$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "$10" "$11" "$12" "$13" "$14" "$15" "$16}' > intermediate_file_joined.borrar.txt #joins both previous allelic count files in a single one with all variable positions
-cp intermediate_file_joined.borrar.txt intermediate_file_joined_2.borrar.txt #duplicates the joined intermediate file
-sed -i 's/NA NA NA NA NA NA NA NA NA NA NA NA NA/6,0 12,0 8,0 26,0 12,0 16,0 4,0 16,0 4,0 12,0 12,0 16,0 16,0/g' intermediate_file_joined_2.borrar.txt #replaces all rows with NA in the Eurasian fields with max allelic counts for the reference allele
-mv intermediate_file_joined_2.borrar.txt SNP_names_treemix_input_rooted.txt #final name
-sed -i -e '1i'"$LONGNAMES Rufus"'\' SNP_names_treemix_input_rooted.txt #adds headers with population names
-grep -v ' 0,0 ' SNP_names_treemix_input_rooted.txt | grep -v ' 0,0$' | cut -d$' ' -f 2- | gzip > treemix_input_rooted.txt.gz #removes rows with any missing data, and also the SNP names
-rm *.borrar.txt #removes all intermediate files
-
-#Get a version of the rufus-rooted TreeMix input without Balkans:
-cut -d$' ' -f2 --complement SNP_names_treemix_input_rooted.txt > SNP_names_treemix_input_rooted_wout_ba.txt #removes the Balkans column
-grep -v ' 0,0 ' SNP_names_treemix_input_rooted_wout_ba.txt | grep -v ' 0,0$' | cut -d$' ' -f 2- | gzip > treemix_input_rooted_wout_ba.txt.gz #removes rows with any missing data, and also the SNP names
-
-#Get a version of the rufus-rooted TreeMix input with Khentii, Töv & Ömnögovi
-cut -d$' ' -f1,4,8,10  SNP_names_treemix_input_rooted.txt | cut -d$',' -f1,2,3,4 --output-delimiter=' ' | cut -d$' ' -f1,2,3,4,5,6,7 | awk '{print $1" "$2+$4+$6","$3+$5+$7}' > SNP_names_threepop_input_ka_om_to.txt #sums allele counts for the three Mongolian populations
-sed -i '1s/.*/SNP Mongolia/' SNP_names_threepop_input_ka_om_to.txt #adds correct column names
-awk -v f2=SNP_names_treemix_input_rooted.txt '{ c = $2; getline < f2; print $0, c; }' SNP_names_threepop_input_ka_om_to.txt > SNP_names_treemix_input_rooted_w_mo.txt #copies the Mongolia column to a new TreeMix input that includes all prior populations plus Mongolia
 
 ```
