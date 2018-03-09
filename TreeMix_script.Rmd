@@ -284,11 +284,11 @@ for i in $(seq 1 $END)
 
 #Basic command to build a rooted ML tree without Balkans and with Mongolia, followed by a loop that runs TreeMix with different number of migration events
 cd $O_PATH/intergenic_plus_1000
-$T_PATH/treemix -i treemix_input_intergenic_rooted_wout_ba_w_mo.txt.gz -root Rufus -k 100 -o eurasian_lynx_intergenic_rooted_wout_ba_w_mo_out_stem
+$T_PATH/treemix -i treemix_input_intergenic_rooted_wout_ba_w_mo.txt.gz -root Rufus -k 100 -se -o eurasian_lynx_intergenic_rooted_wout_ba_w_mo_out_stem
 END=6
 for i in $(seq 1 $END)
   do echo "migration events number = " $i
-  $T_PATH/treemix -i treemix_input_intergenic_rooted_wout_ba_w_mo.txt.gz -root Rufus -k 100 -m ${i} -o eurasian_lynx_intergenic_rooted_wout_ba_w_mo_out_stem_"${i}"_migration
+  $T_PATH/treemix -i treemix_input_intergenic_rooted_wout_ba_w_mo.txt.gz -root Rufus -k 100 -m ${i} -se -o eurasian_lynx_intergenic_rooted_wout_ba_w_mo_out_stem_"${i}"_migration
   done
 
 #scp dkleinman@genomics-b.ebd.csic.es:/opt/treemix-1.12/src/plotting_funcs.R /Users/Dani/ownCloud/backup/annotation/TreeMix
@@ -303,7 +303,7 @@ scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/Tre
 scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/TreeMix/eurasian_lynx_rooted_wout_ba_w_mo_out_stem.* /Users/Dani/ownCloud/backup/annotation/TreeMix/all_positions/rooted/wout_ba_w_mo
 scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/TreeMix/eurasian_lynx_rooted_wout_ba_w_mo_out_stem*migration* /Users/Dani/ownCloud/backup/annotation/TreeMix/all_positions/rooted/wout_ba_w_mo/migration
 
-#COpy files for intergenic positions trees:
+#Copy files for intergenic positions trees:
 scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/TreeMix/intergenic_plus_1000/eurasian_lynx_intergenic_rooted_wout_ba_w_mo_out_stem.* /Users/Dani/ownCloud/backup/annotation/TreeMix/intergenic/rooted/wout_ba_w_mo
 scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/TreeMix/intergenic_plus_1000/eurasian_lynx_intergenic_rooted_wout_ba_w_mo_out_stem*migration* /Users/Dani/ownCloud/backup/annotation/TreeMix/intergenic/rooted/wout_ba_w_mo/migration
 
