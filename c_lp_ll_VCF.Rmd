@@ -441,10 +441,11 @@ for i in ${SPECIES[@]}
 
 ```
 
-#4b: Filter SNPs. Remove all SNPs tagged in the previous step.
+#4b: Filter SNPs. Remove all SNPs tagged in the previous step, and run additional filters.
 
 ```{r Filter SNPs, eval=FALSE, engine='bash'}
 
+#Filter previously tagged SNPs to obtain a standard-filter VCF.
 cd $V_PATH
 declare SPECIES=$(ls *_species_SNPs_tagged.vcf | cut -c1-2 | uniq)
 for i in ${SPECIES[@]}
@@ -462,7 +463,7 @@ grep -v '#' c_ll_species_SNPs_tagged_filtered.vcf | wc -l #8608569 this was for 
 grep -v '#' ll_species_SNPs_tagged_filtered.vcf | wc -l #11412781
 grep -v '#' lp_species_SNPs_tagged_filtered.vcf | wc -l #2707297
   
-#Now subset the previous VCF in order to keep only those SNPs above strict RankSum thresholds.
+#Now subset the standard VCF in order to keep only those SNPs above strict RankSum thresholds (strict-filter VCF).
 java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
 -T SelectVariants \
 -select "MQRankSum>-0.5 && ReadPosRankSum>-0.5" \
@@ -473,6 +474,7 @@ java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -X
 grep -v '#' c_ll_species_strict_filter.vcf | wc -l #6304158 this was for the old VCF (without 3 old samples)
 grep -v '#' ll_species_strict_filter.vcf | wc -l #7727248
 
+#Now subset the standard VCF in order to keep only those SNPs above super strict RankSum thresholds (super strict-filter VCF).
 java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
 -T SelectVariants \
 -select "MQRankSum>-0.1 && ReadPosRankSum>-0.1" \
@@ -483,6 +485,7 @@ java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -X
 grep -v '#' c_ll_species_super_strict_filter.vcf | wc -l #4866975 this was for the old VCF (without 3 old samples)
 grep -v '#' ll_species_super_strict_filter.vcf | wc -l #6154505
 
+#Now subset the standard VCF in order to keep only those SNPs above ultra strict RankSum thresholds (ultra strict-filter VCF).
 java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
 -T SelectVariants \
 -select "MQRankSum>0.0 && ReadPosRankSum>0.0" \
@@ -494,7 +497,7 @@ grep -v '#' c_ll_species_ultra_strict_filter.vcf | wc -l #198699
 
 ```
 
-#4c: Compare SNP filters.
+#4c: Compare SNP filters. Test effects of applying different filters.
 
 ```{r Filter SNPs, eval=FALSE, engine='bash'}
 
