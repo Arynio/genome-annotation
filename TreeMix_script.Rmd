@@ -317,7 +317,6 @@ library(readr)
 
 local_repo <- file.path("/Users/Dani/ownCloud/backup/annotation/TreeMix/")
 #poporder <- c("Balkans","Carpathians","Norway","Bialowieza","Latvia","Kirov","Urals","Tuva","Ömnögovi","Töv","Khentii","Mongolia","Yakutia","Vladivostok","Rufus")
-poporder <- read.table(paste0(local_repo, "all_positions/rooted/all_pops/migration/pop_order"),header=T)
 
 source("/Users/Dani/ownCloud/backup/annotation/TreeMix/plotting_funcs.R")
 pdf(paste0(local_repo,"toy/ll_toy_basic_tree.pdf"),width=20,height=10)
