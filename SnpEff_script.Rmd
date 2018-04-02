@@ -7,22 +7,31 @@ output: html_document
 
 http://snpeff.sourceforge.net/SnpEff_manual.html #I'll be following this manual for all configuration purposes
 
-#Search for the Lynx pardinus database
-Step 1. Search for the Lynx pardinus assembly database in the program's pre-built database. As of June the 6th, 2017, the Lynx pardinus genome isn't included in the snpEff database. Once the snpEff authors include it, a newer version of the database should be downloaded (ask the tech group). A second option would be building our own Lynx pardinus database, although it seems complicated.
+#0a: Define paths.
 
-```{r Search for the Lynx pardinus database, eval=FALSE, engine='bash'}
+```{r Define paths, eval=FALSE, engine='bash'}
 
 S_PATH=/opt/snpEff #software path
 C_PATH=/home/dkleinman/datos/snpEff #config file path
 O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+
+```
+
+
+#0b: Search for the Lynx pardinus database.
+Search for the Lynx pardinus assembly database in the program's pre-built database. As of June the 6th, 2017, the Lynx pardinus genome isn't included in the snpEff database. A second option would be building our own Lynx pardinus database.
+
+```{r Search for the Lynx pardinus database, eval=FALSE, engine='bash'}
 
 java -jar /opt/snpEff/snpEff.jar databases | grep -i pardinus
 
 ```
 
 
-#Build the Lynx pardinus genome database
-Step 2. In the end we opt to build our own database since we don't know when they will get themselves to add it. This step should be omitted if the desired database was found in step 1.
+#0c: Build the Lynx pardinus genome database.
+In the end we opt to build our own database since we don't know when they will get themselves to add it. This step should be omitted if the desired database was found in the previous step.
 
 ##Add entry to the config file
 
@@ -86,19 +95,19 @@ rm -r genomes/
 
 ```
 
-#Tutorial annotation
-Step 3. Annotate one of the examples that comes with the software
+#1: Tutorial annotation.
+Annotate one of the examples that comes with the software
 
-```{r Search for the Lynx pardinus database, eval=FALSE, engine='bash'}
+```{r Tutorial annotation, eval=FALSE, engine='bash'}
 
 java -Xmx16g -jar $S_PATH/snpEff.jar GRCh37.75 -s $O_PATH/toys/test.chr22.ann $S_PATH/examples/test.chr22.vcf > $O_PATH/toys/test.chr22.ann.vcf
 
 ```
 
-#Toy annotation using the immunocapture VCF
-Step 4. Annotate the immunocapture VCF 
+#2a: Toy annotation using the immunocapture VCF.
+Annotate the immunocapture VCF 
 
-```{r Search for the Lynx pardinus database, eval=FALSE, engine='bash'}
+```{r Toy annotation using the immunocapture VCF, eval=FALSE, engine='bash'}
 
 cd $C_PATH
 screen -S immuno_annot_test1 #open a dettachable screen in case the test takes too long
@@ -116,6 +125,40 @@ ctrl + D #terminate the script
 ctrl + D #terminate the screen
 
 scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/snpEff/immunocapture/immunocapture_test1.ann* /Users/Dani/ownCloud/backup/annotation/snpEff_results/immunocapture/ #execute this command out of the server to import to the pc the output files of this toy run
+
+```
+
+#2b: Annotation using the contemporary lp and ll VCFs.
+Annotate the contemporary VCFs.
+
+```{r Annotation using the contemporary lp and ll VCFs, eval=FALSE, engine='bash'}
+
+cd $C_PATH
+screen -S c_ll_lp_perpop_standard_filter_annotation.log #open a dettachable screen in case the test takes too long
+script c_ll_lp_perpop_standard_filter_annotation.log #initiate the log file
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+
+cd $V_PATH
+shopt -s extglob #the extglob shell option gives you more powerful pattern matching in the command line.
+POPLIST=($(ls l*[^pv]_perpop_standard_filter.vcf)) #selects all standard-filtered populational VCFs except for País Vasco
+for pop in "${POPLIST[@]}"
+  do
+  echo "${pop}"
+  #done
+  cd $C_PATH
+  java -Xmx16g -jar $S_PATH/snpEff.jar LYPA.23 -v -s $O_PATH/c_ll_lp_perpop_standard_filter_annotation/c_ll_lp_perpop_standard_filter_annotation.ann.html $V_PATH/${pop} > $O_PATH/c_ll_lp_perpop_standard_filter_annotation/${pop/.vcf/.ann.vcf} #run this code from the directory where the config is located.
+done
+shopt -u extglob #disable extglob
+
+
+ctrl + D #terminate the script
+ctrl + D #terminate the screen
+
 
 ```
 
