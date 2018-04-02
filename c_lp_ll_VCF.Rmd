@@ -701,6 +701,7 @@ for j in ${POP[@]}
 rm super_list_to_remove.txt
 
 
+#Get VCF from ll_pv:
 cd $G_PATH
 declare POP=$(ls h_ll_pv*.g.vcf.gz | cut -c3-7 | sort | uniq)
   for j in ${POP[@]}
@@ -729,13 +730,13 @@ rm list_to_remove.txt
 #First, check that all perpop VCFs have the same number of SNPs, as they are supposed to.
 cd $V_PATH/
 shopt -s extglob #the extglob shell option gives you more powerful pattern matching in the command line.
-POPLIST=($(ls ll*_perpop_super_strict_filter.vcf | cut -d "_" -f1,2 | sort | uniq))
+POPLIST=($(ls l*standard_filter.vcf | cut -d "_" -f1,2 | sort | uniq))
 for pop in "${POPLIST[@]}"
   do
   echo "${pop}"
-  SAMPLE_NUMBER="$($BCF query -l "${pop}"_perpop_strict_filter.vcf | wc -l)"
+  SAMPLE_NUMBER="$($BCF query -l "${pop}"_perpop_standard_filter.vcf | wc -l)"
   echo $SAMPLE_NUMBER
-  TOTAL_SNPS="$(grep -v '#' "$V_PATH/${pop}"_perpop_strict_filter.vcf | wc -l)"
+  TOTAL_SNPS="$(grep -v '#' "$V_PATH/${pop}"_perpop_standard_filter.vcf | wc -l)"
   echo $TOTAL_SNPS
   done
 shopt -u extglob #disable extglob
