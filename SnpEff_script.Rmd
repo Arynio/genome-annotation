@@ -41,13 +41,16 @@ In the end we opt to build our own database since we don't know when they will g
 #However, in my case I believe the tech group created a copy of the file in my folder after I sent them an e-mail, and this is the one that I was able to edit.
 
 cd /home/dkleinman/
-mv snpEffect.config $C_PATH #I move the config file that appeared in my folder to a subfolder that I created for snpEff
-vi snpEffect.config  #initiate the editing process
+mv snpEff.config $C_PATH #I move the config file that appeared in my folder to a subfolder that I created for snpEff
+vi snpEff.config  #initiate the editing process
 
 #Following the manual, I added the following two lines:
 
 # Lynx_pardinus
 LYPA.23.genome : Iberian lynx #from now on, LYPA.23 is the code for the Lynx pardinus reference genome (in snpEff)
+
+# Lynx_pardinus, detailed annotation
+LYPA.23b.genome : Iberian lynx #LYPA.23b is the code for the highly detailed annotation of the Lynx pardinus reference genome (in snpEff)
 
 ```
 
@@ -55,6 +58,7 @@ LYPA.23.genome : Iberian lynx #from now on, LYPA.23 is the code for the Lynx par
 
 ```{r Build the Lynx pardinus genome database, eval=FALSE, engine='bash'}
 
+#First for the regular annotation:
 mkdir $S_PATH/data/LYPA.23 #create a directory inside the software's dependencies whose name matches the code
 cd $S_PATH/data/LYPA.23
 
@@ -66,24 +70,34 @@ cd $S_PATH/data/genomes
 scp /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa $S_PATH/data/genomes #copy the reference genome fasta to the new genomes directory
 mv lp23.fa LYPA.23.fa #rename the file so that it matches the code
 
+
+
+
+#Second, for the detailed annotation:
+mkdir $C_PATH/data/LYPA.23b #create a directory inside the software's dependencies whose name matches the code
+cd $C_PATH/data/LYPA.23b
+
+scp /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.GENE.mRNA.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.intergenic.nr.gff3 $C_PATH/data/LYPA.23b/ #copy the annotation file (can be gff or gtf) to the newly created directory. This gff file is very detailed and includes CDS, introns, exons, genes, and many more.
+mv LYPA23C.GENE.mRNA.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.intergenic.nr.gff3 genes.gff #rename the file as the tutorial indicates
+
+cd $C_PATH/data/genomes
+scp LYPA.23.fa LYPA.23b.fa #copy the reference genome and rename it so that it also matches the detailed annotation entry
+
 ```
 
 ##Build the database
 
 ```{r Build the Lynx pardinus genome database, eval=FALSE, engine='bash'}
 
-cd $S_PATH
-screen -S build_snpEff_db #open a dettachable screen in case the database building takes too long
-
-C_PATH=/home/dkleinman/datos/snpEff #redefine the variable, since we're inside a screen
-
-script $C_PATH/data/build_snpEff_db.txt #initiate the log file
+cd $C_PATH
+screen -S build_snpEff_db_detailed #open a dettachable screen in case the database building takes too long
+script build_snpEff_db_detailed.txt #initiate the log file
 
 S_PATH=/opt/snpEff #redefine the variable, since we're inside a script
 C_PATH=/home/dkleinman/datos/snpEff #redefine the variable, since we're inside a script
 
 cd $S_PATH
-java -jar snpEff.jar build -gff3 -v LYPA.23 -c $C_PATH/snpEff.config -dataDir $S_PATH/data #build the database. Use the -gff3 command for gff files and -gtf22 for gtf files. Use -v for verbose (expanded information on the processes and the warnings/errors that may appear). Use -c to indicate the path to my own config file. Then use -dataDir to override the data directory from the config file (by default the software thinks that the data folder with the genome and the genes files is located where config is, so it's necessary to give it the correct path). Another option would be running it from the config folder and indicating instead the 
+java -jar snpEff.jar build -gff3 -v LYPA.23b -c $C_PATH/snpEff.config -dataDir $C_PATH/data #build the database. Use the -gff3 command for gff files and -gtf22 for gtf files. Use -v for verbose (expanded information on the processes and the warnings/errors that may appear). Use -c to indicate the path to my own config file. Then use -dataDir to override the data directory from the config file (by default the software thinks that the data folder with the genome and the genes files is located where config is, so it's necessary to give it the correct path). Another option would be running it from the config folder and indicating instead the 
 
 ctrl + D #terminate the script
 ctrl + D #terminate the screen
@@ -104,7 +118,7 @@ java -Xmx16g -jar $S_PATH/snpEff.jar GRCh37.75 -s $O_PATH/toys/test.chr22.ann $S
 
 ```
 
-#2a: Toy annotation using the immunocapture VCF.
+#2: Toy annotation using the immunocapture VCF.
 Annotate the immunocapture VCF 
 
 ```{r Toy annotation using the immunocapture VCF, eval=FALSE, engine='bash'}
@@ -128,7 +142,7 @@ scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/snpEff/immunocapture/
 
 ```
 
-#2b: Annotation using the contemporary lp and ll VCFs.
+#3a: Annotation (basic) using the contemporary lp and ll VCFs.
 Annotate the contemporary VCFs.
 
 ```{r Annotation using the contemporary lp and ll VCFs, eval=FALSE, engine='bash'}
@@ -151,17 +165,44 @@ for pop in "${POPLIST[@]}"
   echo "${pop}"
   #done
   cd $C_PATH
-  java -Xmx16g -jar $S_PATH/snpEff.jar LYPA.23 -v -s $O_PATH/c_ll_lp_perpop_standard_filter_annotation/c_ll_lp_perpop_standard_filter_annotation.ann.html $V_PATH/${pop} > $O_PATH/c_ll_lp_perpop_standard_filter_annotation/${pop/.vcf/.ann.vcf} #run this code from the directory where the config is located.
+  java -Xmx16g -jar $S_PATH/snpEff.jar LYPA.23 -v -csvStats $O_PATH/c_ll_lp_perpop_standard_filter_annotation/${pop/.vcf/.ann.csv} $V_PATH/${pop} > $O_PATH/c_ll_lp_perpop_standard_filter_annotation/${pop/.vcf/.ann.vcf} #run this code from the directory where the config is located.
+done
+shopt -u extglob #disable extglob
+
+scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/snpEff/c_ll_lp_perpop_standard_filter_annotation/l*csv /Users/Dani/ownCloud/backup/annotation/snpEff_results/c_ll_lp_perpop_standard_filter_annotation/
+scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/snpEff/c_ll_lp_perpop_standard_filter_annotation/*html /Users/Dani/ownCloud/backup/annotation/snpEff_results/c_ll_lp_perpop_standard_filter_annotation/
+#scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/snpEff/c_ll_lp_perpop_standard_filter_annotation/l*txt /Users/Dani/ownCloud/backup/annotation/snpEff_results/c_ll_lp_perpop_standard_filter_annotation/
+
+```
+
+#3b: Annotation (detailed) using the contemporary lp and ll VCFs.
+Annotate the contemporary VCFs.
+
+```{r Annotation using the contemporary lp and ll VCFs, eval=FALSE, engine='bash'}
+
+screen -S c_ll_lp_perpop_standard_filter_detailed_annotation.log #open a dettachable screen in case the test takes too long
+script /home/dkleinman/datos/snpEff/c_ll_lp_perpop_standard_filter_detailed_annotation/c_ll_lp_perpop_standard_filter_detailed_annotation.log #initiate the log file
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+
+cd $V_PATH
+shopt -s extglob #the extglob shell option gives you more powerful pattern matching in the command line.
+POPLIST=($(ls l*[^pv]_perpop_standard_filter.vcf)) #selects all standard-filtered populational VCFs except for País Vasco
+for pop in "${POPLIST[@]}"
+  do
+  echo "${pop}"
+  #done
+  cd $C_PATH
+  java -Xmx16g -jar $S_PATH/snpEff.jar LYPA.23b -v -csvStats $O_PATH/c_ll_lp_perpop_standard_filter_detailed_annotation/${pop/.vcf/.ann.csv} $V_PATH/${pop} > $O_PATH/c_ll_lp_perpop_standard_filter_detailed_annotation/${pop/.vcf/.ann.vcf} #run this code from the directory where the config is located.
 done
 shopt -u extglob #disable extglob
 
 
-ctrl + D #terminate the script
-ctrl + D #terminate the screen
-
-
 ```
-
 
 
 
