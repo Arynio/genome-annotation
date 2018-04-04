@@ -145,7 +145,7 @@ scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/snpEff/immunocapture/
 #3a: Annotation (basic) using the contemporary lp and ll VCFs.
 Annotate the contemporary VCFs.
 
-```{r Annotation using the contemporary lp and ll VCFs, eval=FALSE, engine='bash'}
+```{r Annotation (basic) using the contemporary lp and ll VCFs, eval=FALSE, engine='bash'}
 
 cd $C_PATH
 screen -S c_ll_lp_perpop_standard_filter_annotation.log #open a dettachable screen in case the test takes too long
@@ -176,10 +176,21 @@ scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/snpEff/c_ll_lp_perpop
 ```
 
 #3b: Annotation (detailed) using the contemporary lp and ll VCFs.
-Annotate the contemporary VCFs.
 
-```{r Annotation using the contemporary lp and ll VCFs, eval=FALSE, engine='bash'}
+##Create custom annotation bed file
 
+```{r Annotation (detailed) using the contemporary lp and ll VCFs, eval=FALSE, engine='bash'}
+
+#Create bed file with custom annotations based on the gff3 that María compiled.
+cut -d$'\t' -f1,3,4,5 LYPA23C.GENE.mRNA.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.intergenic.nr.gff3 | awk '{printf ("%s\t%s\t%s\t%s\n", $1, $3, $4, $2)}' > LYPA23C.GENE.mRNA.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.intergenic.nr.bed
+
+```
+
+##Annotate the contemporary VCFs with custom annotation
+
+```{r Annotation (detailed) using the contemporary lp and ll VCFs, eval=FALSE, engine='bash'}
+
+cd $O_PATH/c_ll_lp_perpop_standard_filter_detailed_annotation/
 screen -S c_ll_lp_perpop_standard_filter_detailed_annotation.log #open a dettachable screen in case the test takes too long
 script /home/dkleinman/datos/snpEff/c_ll_lp_perpop_standard_filter_detailed_annotation/c_ll_lp_perpop_standard_filter_detailed_annotation.log #initiate the log file
 
@@ -197,10 +208,13 @@ for pop in "${POPLIST[@]}"
   echo "${pop}"
   #done
   cd $C_PATH
-  java -Xmx16g -jar $S_PATH/snpEff.jar LYPA.23b -v -csvStats $O_PATH/c_ll_lp_perpop_standard_filter_detailed_annotation/${pop/.vcf/.ann.csv} $V_PATH/${pop} > $O_PATH/c_ll_lp_perpop_standard_filter_detailed_annotation/${pop/.vcf/.ann.vcf} #run this code from the directory where the config is located.
+  java -Xmx16g -jar $S_PATH/snpEff.jar LYPA.23 -v -s $O_PATH/c_ll_lp_perpop_standard_filter_detailed_annotation/${pop/.vcf/.ann.html} -csvStats $O_PATH/c_ll_lp_perpop_standard_filter_detailed_annotation/${pop/.vcf/.ann.csv} -interval $C_PATH/data/LYPA23C.GENE.mRNA.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.intergenic.nr.bed $V_PATH/${pop} > $O_PATH/c_ll_lp_perpop_standard_filter_detailed_annotation/${pop/.vcf/.ann.vcf} #run this code from the directory where the config is located.
 done
 shopt -u extglob #disable extglob
 
+scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/snpEff/c_ll_lp_perpop_standard_filter_detailed_annotation/l*csv /Users/Dani/ownCloud/backup/annotation/snpEff_results/c_ll_lp_perpop_standard_filter_detailed_annotation/
+scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/snpEff/c_ll_lp_perpop_standard_filter_detailed_annotation/*html /Users/Dani/ownCloud/backup/annotation/snpEff_results/c_ll_lp_perpop_standard_filter_detailed_annotation/
+#scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/snpEff/c_ll_lp_perpop_standard_filter_detailed_annotation/l*txt /Users/Dani/ownCloud/backup/annotation/snpEff_results/c_ll_lp_perpop_standard_filter_detailed_annotation/
 
 ```
 
