@@ -16,6 +16,8 @@ C_PATH=/home/dkleinman/datos/snpEff #config file path
 O_PATH=/home/dkleinman/datos/snpEff #output path
 I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
 V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+G_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
 
 ```
 
@@ -49,7 +51,7 @@ vi snpEff.config  #initiate the editing process
 # Lynx_pardinus
 LYPA.23.genome : Iberian lynx #from now on, LYPA.23 is the code for the Lynx pardinus reference genome (in snpEff)
 
-# Lynx_pardinus, detailed annotation
+# Lynx_pardinus, detailed annotation (obsolete)
 LYPA.23b.genome : Iberian lynx #LYPA.23b is the code for the highly detailed annotation of the Lynx pardinus reference genome (in snpEff)
 
 ```
@@ -71,8 +73,7 @@ scp /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa $S_PA
 mv lp23.fa LYPA.23.fa #rename the file so that it matches the code
 
 
-
-
+#In the end this won't be used. The detailed (custom) annotation will be intersected using a bed and the -interval command.
 #Second, for the detailed annotation:
 mkdir $C_PATH/data/LYPA.23b #create a directory inside the software's dependencies whose name matches the code
 cd $C_PATH/data/LYPA.23b
@@ -90,18 +91,19 @@ scp LYPA.23.fa LYPA.23b.fa #copy the reference genome and rename it so that it a
 ```{r Build the Lynx pardinus genome database, eval=FALSE, engine='bash'}
 
 cd $C_PATH
-screen -S build_snpEff_db_detailed #open a dettachable screen in case the database building takes too long
-script build_snpEff_db_detailed.txt #initiate the log file
+screen -S build_snpEff_db #open a dettachable screen in case the database building takes too long
+script build_snpEff_db.txt #initiate the log file
 
 S_PATH=/opt/snpEff #redefine the variable, since we're inside a script
 C_PATH=/home/dkleinman/datos/snpEff #redefine the variable, since we're inside a script
 
 cd $S_PATH
-java -jar snpEff.jar build -gff3 -v LYPA.23b -c $C_PATH/snpEff.config -dataDir $C_PATH/data #build the database. Use the -gff3 command for gff files and -gtf22 for gtf files. Use -v for verbose (expanded information on the processes and the warnings/errors that may appear). Use -c to indicate the path to my own config file. Then use -dataDir to override the data directory from the config file (by default the software thinks that the data folder with the genome and the genes files is located where config is, so it's necessary to give it the correct path). Another option would be running it from the config folder and indicating instead the 
+java -jar snpEff.jar build -gff3 -v LYPA.23 -c $C_PATH/snpEff.config -dataDir $C_PATH/data #build the database. Use the -gff3 command for gff files and -gtf22 for gtf files. Use -v for verbose (expanded information on the processes and the warnings/errors that may appear). Use -c to indicate the path to my own config file. Then use -dataDir to override the data directory from the config file (by default the software thinks that the data folder with the genome and the genes files is located where config is, so it's necessary to give it the correct path). Another option would be running it from the config folder and indicating instead the 
 
 ctrl + D #terminate the script
 ctrl + D #terminate the screen
 
+#The following is obsolete since I fixed the original code.
 scp -r $S_PATH/data $C_PATH #afterwards I realize anyone can access the data folder so I copy it to my own folder and then I remove the stuff I created inside the original data folder
 cd $S_PATH/data
 rm -r LYPA.23/
@@ -142,36 +144,18 @@ scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/snpEff/immunocapture/
 
 ```
 
-#3a: Annotation (basic) using the contemporary lp and ll VCFs.
-Annotate the contemporary VCFs.
+#3a: Trim contemporary population lp and ll VCFs. Trim previously generated VCFs with species-wide variants in order to keep populational variants only.
 
-```{r Annotation (basic) using the contemporary lp and ll VCFs, eval=FALSE, engine='bash'}
+```{r Trim contemporary population lp and ll VCFs, eval=FALSE, engine='bash'}
 
-cd $C_PATH
-screen -S c_ll_lp_perpop_standard_filter_annotation.log #open a dettachable screen in case the test takes too long
-script c_ll_lp_perpop_standard_filter_annotation.log #initiate the log file
-
-S_PATH=/opt/snpEff #software path
-C_PATH=/home/dkleinman/datos/snpEff #config file path
-O_PATH=/home/dkleinman/datos/snpEff #output path
-I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
-V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
-
+#Fixed positions within each population VCF will be dropped and only the variable ones will remain. These VCFs were previously generated in the c_lp_ll_VCF script.
 cd $V_PATH
-shopt -s extglob #the extglob shell option gives you more powerful pattern matching in the command line.
-POPLIST=($(ls l*[^pv]_perpop_standard_filter.vcf)) #selects all standard-filtered populational VCFs except for País Vasco
-for pop in "${POPLIST[@]}"
+declare POP=$(ls *perpop*.vcf | cut -c1-5 | uniq)
+for i in ${POP[@]}
   do
-  echo "${pop}"
-  #done
-  cd $C_PATH
-  java -Xmx16g -jar $S_PATH/snpEff.jar LYPA.23 -v -csvStats $O_PATH/c_ll_lp_perpop_standard_filter_annotation/${pop/.vcf/.ann.csv} $V_PATH/${pop} > $O_PATH/c_ll_lp_perpop_standard_filter_annotation/${pop/.vcf/.ann.vcf} #run this code from the directory where the config is located.
-done
-shopt -u extglob #disable extglob
-
-scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/snpEff/c_ll_lp_perpop_standard_filter_annotation/l*csv /Users/Dani/ownCloud/backup/annotation/snpEff_results/c_ll_lp_perpop_standard_filter_annotation/
-scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/snpEff/c_ll_lp_perpop_standard_filter_annotation/*html /Users/Dani/ownCloud/backup/annotation/snpEff_results/c_ll_lp_perpop_standard_filter_annotation/
-#scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/snpEff/c_ll_lp_perpop_standard_filter_annotation/l*txt /Users/Dani/ownCloud/backup/annotation/snpEff_results/c_ll_lp_perpop_standard_filter_annotation/
+  echo "${i}"
+  $BCF view --min-ac 1:minor -Ov -o $V_PATH/trimmed_VCFs/"${i}"_perpop_standard_filter.trimmed.vcf $V_PATH/"${i}"_perpop_standard_filter.vcf
+  done
 
 ```
 
@@ -200,15 +184,15 @@ O_PATH=/home/dkleinman/datos/snpEff #output path
 I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
 V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
 
-cd $V_PATH
+cd $V_PATH/trimmed_VCFs
 shopt -s extglob #the extglob shell option gives you more powerful pattern matching in the command line.
-POPLIST=($(ls l*[^pv]_perpop_standard_filter.vcf)) #selects all standard-filtered populational VCFs except for País Vasco
+POPLIST=($(ls l*[^pv]_perpop_standard_filter.trimmed.vcf)) #selects all standard-filtered populational VCFs except for País Vasco
 for pop in "${POPLIST[@]}"
   do
   echo "${pop}"
   #done
   cd $C_PATH
-  java -Xmx16g -jar $S_PATH/snpEff.jar LYPA.23 -v -s $O_PATH/c_ll_lp_perpop_standard_filter_detailed_annotation/${pop/.vcf/.ann.html} -csvStats $O_PATH/c_ll_lp_perpop_standard_filter_detailed_annotation/${pop/.vcf/.ann.csv} -interval $C_PATH/data/LYPA23C.GENE.mRNA.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.intergenic.nr.bed $V_PATH/${pop} > $O_PATH/c_ll_lp_perpop_standard_filter_detailed_annotation/${pop/.vcf/.ann.vcf} #run this code from the directory where the config is located.
+  java -Xmx16g -jar $S_PATH/snpEff.jar LYPA.23 -v -s $O_PATH/c_ll_lp_perpop_standard_filter_detailed_annotation/${pop/.vcf/.ann.html} -csvStats $O_PATH/c_ll_lp_perpop_standard_filter_detailed_annotation/${pop/.vcf/.ann.csv} -interval $C_PATH/data/LYPA23C.GENE.mRNA.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.intergenic.nr.bed $V_PATH/trimmed_VCFs/${pop} > $O_PATH/c_ll_lp_perpop_standard_filter_detailed_annotation/${pop/.vcf/.ann.vcf} #run this code from the directory where the config is located.
 done
 shopt -u extglob #disable extglob
 
@@ -218,7 +202,28 @@ scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/snpEff/c_ll_lp_perpop
 
 ```
 
+##Split the population VCFs into per individual VCFs. Generate a VCF for each individual.
 
+```{r Annotation (detailed) using the contemporary lp and ll VCFs, eval=FALSE, engine='bash'}
 
+cd $V_PATH/individual_VCFs/
+screen -S c_ll_lp_individual_standard_filter_annotation.log
+script c_ll_lp_individual_standard_filter_annotation.log
 
+#For each individual in the sm, do, ki, po & no populations, subset its variants from the respective population VCF:
+cd $G_PATH
+declare POP=$(ls c_{lp_sm*,lp_do*,ll_ki*,ll_po*,ll_no*}.g.vcf.gz | cut -c3-7 | uniq)
+for i in ${POP[@]}
+  do
+  echo "${i}"
+  declare INDIVIDUALS=$(ls c_"${i}"*.g.vcf.gz | cut -c1-12 | uniq)
+  for j in ${INDIVIDUALS[@]}
+    do
+    echo "${j}"
+    ID=$(echo "${j}")
+    $BCF view --min-ac 1:minor -s $ID -Ov -o $V_PATH/individual_VCFs/"${j}"_standard_filter.trimmed.vcf $V_PATH/trimmed_VCFs/"${i}"_perpop_standard_filter.trimmed.vcf
+    echo $V_PATH"/individual_VCFs/"${j}"_standard_filter.trimmed.vcf"
+    done
+  done
 
+```
