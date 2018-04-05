@@ -638,7 +638,7 @@ for i in ${SPECIES[@]}
     do
     echo "${j}"
     ls ${j}*g.vcf.gz | cut -c1-12 > list_to_remove.txt
-    $BCF view -c1 -S list_to_remove.txt -Ov -o $V_PATH/"${j}"_perpop.vcf $V_PATH/"${i}"_species_SNPs_tagged_filtered.vcf
+    $BCF view --min-ac 1:minor -S list_to_remove.txt -Ov -o $V_PATH/"${j}"_perpop.vcf $V_PATH/"${i}"_species_SNPs_tagged_filtered.vcf
     done
   done
 rm list_to_remove.txt
