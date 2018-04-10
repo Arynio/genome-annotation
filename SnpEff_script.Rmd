@@ -1,13 +1,13 @@
 ---
-title: "SnpEff_script"
+title: "genetic_load_annotation_contemporary"
 author: "Dani"
 date: "6 de junio de 2017"
 output: html_document
 ---
 
-http://snpeff.sourceforge.net/SnpEff_manual.html #I'll be following this manual for all configuration purposes
+http://snpeff.sourceforge.net/SnpEff_manual.html #I'll be following this manual for all SnpEff configuration purposes
 
-#0a: Define paths.
+#0: Define paths.
 
 ```{r Define paths, eval=FALSE, engine='bash'}
 
@@ -17,27 +17,55 @@ O_PATH=/home/dkleinman/datos/snpEff #output path
 I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
 V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
 G_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
 BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
 
 ```
 
+#1: Polarize contemporary VCF. Use VCFtools in order to polarize (ancestral vs. derived) the contemporary ll & lp VCF. The ancestral state was inferred by Maria.
 
-#0b: Search for the Lynx pardinus database.
+```{r Polarize contemporary VCF, eval=FALSE, engine='bash'}
+
+#This is the command to use in order to recode a VCF with ancestral/derived alleles: /opt/vcftools_0.1.13/perl/fill-aa. There's documentation inside that command that I'll follow here.
+
+#First, the ancestral alleles file should be bgzipped (according the documentation, they should be gzipped, but later on when trying to run faidx I got an error stating that files should be gzipped in order to build a fai index):
+bgzip -c /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa > /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa.gz
+
+#Next they should be fai indexed:
+/opt/samtools-1.6/samtools faidx /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa.gz
+
+#Code to annotate the AA (ancestral alleles) subfield from the INFO field in the VCF. I keep getting the following error: "Can't locate Vcf.pm in @INC". I look it up and apparently it's easy to solve: an environment variable PERL5LIB should be defined as the path to perl.
+screen -S c_ll_lp_plus_h_ll_polarized_vcf.log
+script c_ll_lp_plus_h_ll_polarized_vcf.log
+
+export PERL5LIB=/opt/vcftools_0.1.13/perl/ #set required environmental variable
+V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+
+cat $V_PATH/c_ll_lp_plus_h_ll_renamed.vcf | /opt/vcftools_0.1.13/perl/fill-aa -a /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa.gz > c_ll_lp_plus_h_ll_polarized.vcf
+
+#Next, polarize the VCF according to the new AA annotation.
+
+```
+
+
+#2: Set up SnpEff.
+##Search for the Lynx pardinus database. 
 Search for the Lynx pardinus assembly database in the program's pre-built database. As of June the 6th, 2017, the Lynx pardinus genome isn't included in the snpEff database. A second option would be building our own Lynx pardinus database.
 
-```{r Search for the Lynx pardinus database, eval=FALSE, engine='bash'}
+```{r Set up SnpEff, eval=FALSE, engine='bash'}
 
 java -jar /opt/snpEff/snpEff.jar databases | grep -i pardinus
 
 ```
 
 
-#0c: Build the Lynx pardinus genome database.
+##Build the Lynx pardinus genome database.
 In the end we opt to build our own database since we don't know when they will get themselves to add it. This step should be omitted if the desired database was found in the previous step.
 
-##Add entry to the config file
+###Add entry to the config file
 
-```{r Build the Lynx pardinus genome database, eval=FALSE, engine='bash'}
+```{r Set up SnpEff, eval=FALSE, engine='bash'}
 
 #Originally the config was just in the software folder and I didn't have writing permission. If this is the only config file available, writing permission is required, and when annotating later on, the file should be called using the -c command followed by the path to the file.
 #However, in my case I believe the tech group created a copy of the file in my folder after I sent them an e-mail, and this is the one that I was able to edit.
@@ -56,9 +84,9 @@ LYPA.23b.genome : Iberian lynx #LYPA.23b is the code for the highly detailed ann
 
 ```
 
-##Create directory and move files
+###Create directory and move files
 
-```{r Build the Lynx pardinus genome database, eval=FALSE, engine='bash'}
+```{r Set up SnpEff, eval=FALSE, engine='bash'}
 
 #First for the regular annotation:
 mkdir $S_PATH/data/LYPA.23 #create a directory inside the software's dependencies whose name matches the code
@@ -86,9 +114,9 @@ scp LYPA.23.fa LYPA.23b.fa #copy the reference genome and rename it so that it a
 
 ```
 
-##Build the database
+###Build the database
 
-```{r Build the Lynx pardinus genome database, eval=FALSE, engine='bash'}
+```{r Set up SnpEff, eval=FALSE, engine='bash'}
 
 cd $C_PATH
 screen -S build_snpEff_db #open a dettachable screen in case the database building takes too long
@@ -111,7 +139,7 @@ rm -r genomes/
 
 ```
 
-#1: Tutorial annotation.
+#3a: Tutorial annotation.
 Annotate one of the examples that comes with the software
 
 ```{r Tutorial annotation, eval=FALSE, engine='bash'}
@@ -120,7 +148,7 @@ java -Xmx16g -jar $S_PATH/snpEff.jar GRCh37.75 -s $O_PATH/toys/test.chr22.ann $S
 
 ```
 
-#2: Toy annotation using the immunocapture VCF.
+#3b: Toy annotation using the immunocapture VCF.
 Annotate the immunocapture VCF 
 
 ```{r Toy annotation using the immunocapture VCF, eval=FALSE, engine='bash'}
@@ -144,7 +172,7 @@ scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/snpEff/immunocapture/
 
 ```
 
-#3a: Trim contemporary population lp and ll VCFs. Trim previously generated VCFs with species-wide variants in order to keep populational variants only.
+#4a: Trim contemporary population lp and ll VCFs. Trim previously generated VCFs with species-wide variants in order to keep populational variants only.
 
 ```{r Trim contemporary population lp and ll VCFs, eval=FALSE, engine='bash'}
 
@@ -159,7 +187,7 @@ for i in ${POP[@]}
 
 ```
 
-#3b: Population annotation (detailed) using the contemporary lp and ll VCFs.
+#4b: Population annotation (detailed) using the contemporary lp and ll VCFs.
 
 ##Create custom annotation bed file
 
@@ -202,7 +230,33 @@ scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/snpEff/c_ll_lp_perpop
 
 ```
 
-#3c: Individual annotation (detailed) using the contemporary lp and ll VCFs.
+##Build SnpEff summary file.
+
+```{r Population annotation (detailed) using the contemporary lp and ll VCFs, eval=FALSE, engine='bash'}
+
+cd $O_PATH/c_ll_lp_perpop_standard_filter_detailed_annotation/
+echo "species,population,N_intergenic,N_intronic,N_exonic,N_missense,N_nonsense,N_silent,N_missense/silent" > snpeff_population_summary.borrar
+POPLIST=($(ls ls {lp_sm*,lp_do*,ll_ki*,ll_po*,ll_no*}.csv))
+for pop in "${POPLIST[@]}"
+  do
+  SPECIES=$(echo "${pop}" | cut -c1-2)
+  POPULATION=$(echo "${pop}" | cut -c4-5)
+  N_INTERGENIC=$(grep 'INTERGENIC' ${pop} | cut -d  "," -f2)
+  N_INTRONIC=$(grep 'INTRON' ${pop} | cut -d  "," -f2)
+  N_EXONIC=$(grep 'EXON' ${pop} | cut -d  "," -f2)
+  N_MISSENSE=$(grep 'MISSENSE' ${pop} | cut -d  "," -f2)
+  N_NONSENSE=$(grep 'NONSENSE' ${pop} | cut -d  "," -f2)
+  N_SILENT=$(grep 'SILENT' ${pop} | cut -d  "," -f2)
+  N_MISSENSE_SILENT=$(grep 'Missense_Silent_ratio' ${pop} | cut -d  "," -f2)
+  echo "$SPECIES,$POPULATION,$N_INTERGENIC,$N_INTRONIC,$N_EXONIC,$N_MISSENSE,$N_NONSENSE,$N_SILENT,$N_MISSENSE_SILENT" >> snpeff_population_summary.borrar
+  done
+cat snpeff_population_summary.borrar | tr -d "[:blank:]" > snpeff_population_summary.txt
+cat snpeff_population_summary.txt
+rm *.borrar
+
+```
+
+#4c: Individual annotation (detailed) using the contemporary lp and ll VCFs.
 
 ##Split the population VCFs into per individual VCFs. Generate a VCF for each individual.
 
@@ -254,8 +308,39 @@ for ind in "${INDLIST[@]}"
 done
 shopt -u extglob #disable extglob
 
-scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/snpEff/c_ll_lp_perpop_standard_filter_detailed_annotation/l*csv /Users/Dani/ownCloud/backup/annotation/snpEff_results/c_ll_lp_perpop_standard_filter_detailed_annotation/
-scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/snpEff/c_ll_lp_perpop_standard_filter_detailed_annotation/*html /Users/Dani/ownCloud/backup/annotation/snpEff_results/c_ll_lp_perpop_standard_filter_detailed_annotation/
-#scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/snpEff/c_ll_lp_perpop_standard_filter_detailed_annotation/l*txt /Users/Dani/ownCloud/backup/annotation/snpEff_results/c_ll_lp_perpop_standard_filter_detailed_annotation/
+c_lp_sm_0450_standard_filter.trimmed.ann.csv
+
+scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/snpEff/c_ll_lp_individual_standard_filter_detailed_annotation/*csv /Users/Dani/ownCloud/backup/annotation/snpEff_results/c_ll_lp_individual_standard_filter_detailed_annotation/
+scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/snpEff/c_ll_lp_individual_standard_filter_detailed_annotation/*html /Users/Dani/ownCloud/backup/annotation/snpEff_results/c_ll_lp_individual_standard_filter_detailed_annotation/
+#scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/snpEff/c_ll_lp_individual_standard_filter_detailed_annotation/l*txt /Users/Dani/ownCloud/backup/annotation/snpEff_results/c_ll_lp_individual_standard_filter_detailed_annotation/
 
 ```
+
+##Build SnpEff summary file.
+
+```{r Individual annotation (detailed) using the contemporary lp and ll VCFs, eval=FALSE, engine='bash'}
+
+cd $O_PATH/c_ll_lp_individual_standard_filter_detailed_annotation/
+echo "species,population,sample,N_intergenic,N_intronic,N_exonic,N_missense,N_nonsense,N_silent,N_missense/silent" > snpeff_individual_summary.borrar
+INDLIST=($(ls *.csv))
+for ind in "${INDLIST[@]}"
+  do
+  SPECIES=$(echo "${ind}" | cut -c3-4)
+  POPULATION=$(echo "${ind}" | cut -c6-7)
+  SAMPLE=$(echo "${ind}" | cut -c9-12)
+  N_INTERGENIC=$(grep 'INTERGENIC' ${ind} | cut -d  "," -f2)
+  N_INTRONIC=$(grep 'INTRON' ${ind} | cut -d  "," -f2)
+  N_EXONIC=$(grep 'EXON' ${ind} | cut -d  "," -f2)
+  N_MISSENSE=$(grep 'MISSENSE' ${ind} | cut -d  "," -f2)
+  N_NONSENSE=$(grep 'NONSENSE' ${ind} | cut -d  "," -f2)
+  N_SILENT=$(grep 'SILENT' ${ind} | cut -d  "," -f2)
+  N_MISSENSE_SILENT=$(grep 'Missense_Silent_ratio' ${ind} | cut -d  "," -f2)
+  echo "$SPECIES,$POPULATION,$SAMPLE,$N_INTERGENIC,$N_INTRONIC,$N_EXONIC,$N_MISSENSE,$N_NONSENSE,$N_SILENT,$N_MISSENSE_SILENT" >> snpeff_individual_summary.borrar
+  done
+cat snpeff_individual_summary.borrar | tr -d "[:blank:]" > snpeff_individual_summary.txt
+cat snpeff_individual_summary.txt
+
+```
+
+
+
