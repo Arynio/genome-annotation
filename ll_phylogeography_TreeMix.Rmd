@@ -1,5 +1,5 @@
 ---
-title: "TreeMix_script"
+title: "ll_phylogeography_TreeMix"
 author: "Dani"
 date: "8 de noviembre de 2017"
 output: html_document
