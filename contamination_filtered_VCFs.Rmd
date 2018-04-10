@@ -1,5 +1,5 @@
 ---
-title: "filtered_BAMs_analysis"
+title: "contamination_filtered_VCFs"
 author: "Dani"
 date: "15 de diciembre de 2017"
 output: html_document
