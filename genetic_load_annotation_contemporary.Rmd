@@ -46,6 +46,25 @@ cat $V_PATH/c_ll_lp_plus_h_ll_renamed.vcf | /opt/vcftools_0.1.13/perl/fill-aa -a
 
 #Next, polarize the VCF according to the new AA annotation.
 
+This needs to be resolved...
+
+
+
+#Another option is to generate a new VCF using the ancestral as the reference...
+#First, the reference genome should be properly indexed as follows:
+cd /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/
+java -jar /home/tmp/Software/Picard/picard-tools-1.66/CreateSequenceDictionary.jar \
+ R=c_lr_zz_0001_recal1.fa \
+ O=c_lr_zz_0001_recal1.dict
+
+#Then, combine all gVCFs into a single VCF using the ancestral state as the reference:
+cd $G_PATH
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
+-T GenotypeGVCFs \
+-R /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa \
+$(for var in *.g.vcf.gz; do echo -V ${var}" ";done) \
+-o $V_PATH/c_ll_lp_plus_h_ll_ancestral_ref.vcf
+
 ```
 
 
