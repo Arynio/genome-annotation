@@ -235,7 +235,7 @@ for i in ${POP[@]}
   echo "${i}"
   $BCF query -l $O_PATH/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter.ann.vcf | grep "${i}" > list_to_remove.txt
   $BCF view -S list_to_remove.txt -Ov -o $O_PATH/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation/perpop/"${i}"_aafilled_SNPs_standard_filter_perpop_all.ann.vcf $O_PATH/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter.ann.vcf
-  $BCF view -i '(INFO/AA == REF && INFO/AC > 0) || (INFO/AA == ALT && INFO/AC < INFO/AN) || (INFO/AA != REF && INFO/AA != ALT)' -Ov -o $O_PATH/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation/perpop/"${i}"_aafilled_SNPs_standard_filter_detailed_annotation_perpop_trimmed.ann.vcf $O_PATH/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation/perpop/"${i}"_aafilled_SNPs_standard_filter_detailed_annotation_perpop_all.ann.vcf
+  $BCF view -i '(INFO/AA == REF && INFO/AC > 0) || (INFO/AA == ALT && INFO/AC < INFO/AN) || (INFO/AA != REF && INFO/AA != ALT)' -Ov -o $O_PATH/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation/perpop/"${i}"_aafilled_SNPs_standard_filter_perpop_trimmed.ann.vcf $O_PATH/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation/perpop/"${i}"_aafilled_SNPs_standard_filter_perpop_all.ann.vcf
   done
 rm list_to_remove.txt
 
