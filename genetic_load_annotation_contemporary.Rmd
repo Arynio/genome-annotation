@@ -24,33 +24,35 @@ BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
 ```
 
 #1: Polarize contemporary VCF. Use VCFtools in order to polarize (ancestral vs. derived) the contemporary ll & lp VCF. The ancestral state was inferred by Maria.
+##Option A: add Ancestral Allele annotation to the VCF. Use vcftools to fill the INFO/AA field of the VCF.
 
 ```{r Polarize contemporary VCF, eval=FALSE, engine='bash'}
 
-#This is the command to use in order to recode a VCF with ancestral/derived alleles: /opt/vcftools_0.1.13/perl/fill-aa. There's documentation inside that command that I'll follow here.
+#This is the command to use in order to add to a VCF information on the ancestral/derived alleles: /opt/vcftools_0.1.13/perl/fill-aa. There's documentation inside that command that I'll follow here.
 
-#First, the ancestral alleles file should be bgzipped (according the documentation, they should be gzipped, but later on when trying to run faidx I got an error stating that files should be gzipped in order to build a fai index):
+#First, the ancestral alleles file should be bgzipped (according to the documentation, they should be gzipped, but later on when trying to run faidx I got an error stating that files should be gzipped in order to build a fai index):
 bgzip -c /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa > /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa.gz
 
 #Next they should be fai indexed:
 /opt/samtools-1.6/samtools faidx /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa.gz
 
 #Code to annotate the AA (ancestral alleles) subfield from the INFO field in the VCF. I keep getting the following error: "Can't locate Vcf.pm in @INC". I look it up and apparently it's easy to solve: an environment variable PERL5LIB should be defined as the path to perl.
-screen -S c_ll_lp_plus_h_ll_polarized_vcf.log
-script c_ll_lp_plus_h_ll_polarized_vcf.log
+screen -S c_ll_lp_plus_h_ll_aafilled_vcf.log
+script c_ll_lp_plus_h_ll_aafilled_vcf.log
 
 export PERL5LIB=/opt/vcftools_0.1.13/perl/ #set required environmental variable
 V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
 
-cat $V_PATH/c_ll_lp_plus_h_ll_renamed.vcf | /opt/vcftools_0.1.13/perl/fill-aa -a /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa.gz > c_ll_lp_plus_h_ll_polarized.vcf
+cat $V_PATH/c_ll_lp_plus_h_ll_renamed.vcf | /opt/vcftools_0.1.13/perl/fill-aa -a /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa.gz | bgzip -c > c_ll_lp_plus_h_ll_aafilled.vcf.gz #I tried to run this first without bgzipping it, and it was increasingly slow. Each day it did around half the previous day. When the server crashed, I relaunched it adding the bgzip command and it finished in a little over 24h.
 
-#Next, polarize the VCF according to the new AA annotation.
+```
 
-This needs to be resolved...
+##Option B: generate new VCF with the ancestral state as the reference. Use GATK to make a calling with lynx rufus as the reference.
 
-
+```{r Polarize contemporary VCF, eval=FALSE, engine='bash'}
 
 #Another option is to generate a new VCF using the ancestral as the reference...
+
 #First, the reference genome should be properly indexed as follows:
 cd /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/
 java -jar /home/tmp/Software/Picard/picard-tools-1.66/CreateSequenceDictionary.jar \
@@ -67,8 +69,27 @@ $(for var in *.g.vcf.gz; do echo -V ${var}" ";done) \
 
 ```
 
+#2: Extract SNPs. Subset the VCF files in order to keep only good quality biallelic SNP variants. INDELs, multiallelic SNPs and bad quality SNPs will be dropped at this step.
 
-#2: Set up SnpEff.
+```{r Extract SNPs, eval=FALSE, engine='bash'}
+
+#During this step, all INDELs as well as all multiallelic and bad quality SNPs will be dropped from the respective VCFs.
+screen -S c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_vcf.log
+script c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_vcf.log
+
+cd $V_PATH
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T SelectVariants \
+-selectType SNP \
+-restrictAllelesTo BIALLELIC \
+-select "QD >= 2.0 && FS <= 60.0 && MQ >= 40.0 && MQRankSum >= -12.5 && ReadPosRankSum >= -8.0" \
+-R $REF \
+-V c_ll_lp_plus_h_ll_aafilled.vcf \
+-o c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter.vcf
+
+```
+
+#3: Set up SnpEff.
 ##Search for the Lynx pardinus database. 
 Search for the Lynx pardinus assembly database in the program's pre-built database. As of June the 6th, 2017, the Lynx pardinus genome isn't included in the snpEff database. A second option would be building our own Lynx pardinus database.
 
@@ -158,7 +179,7 @@ rm -r genomes/
 
 ```
 
-#3a: Tutorial annotation.
+### Tutorial annotation
 Annotate one of the examples that comes with the software
 
 ```{r Tutorial annotation, eval=FALSE, engine='bash'}
@@ -167,31 +188,37 @@ java -Xmx16g -jar $S_PATH/snpEff.jar GRCh37.75 -s $O_PATH/toys/test.chr22.ann $S
 
 ```
 
-#3b: Toy annotation using the immunocapture VCF.
-Annotate the immunocapture VCF 
+#4: Variants annotation (detailed).
+##Create custom annotation bed file
 
-```{r Toy annotation using the immunocapture VCF, eval=FALSE, engine='bash'}
+```{r Variants annotation (detailed), eval=FALSE, engine='bash'}
 
-cd $C_PATH
-screen -S immuno_annot_test1 #open a dettachable screen in case the test takes too long
-
-script immunocapture/immuno_annot_test1.txt #initiate the log file
-
-S_PATH=/opt/snpEff #redefine the variable, since we're inside a script
-C_PATH=/home/dkleinman/datos/snpEff #redefine the variable, since we're inside a script
-O_PATH=/home/dkleinman/datos/snpEff #redefine the variable, since we're inside a script
-I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #write here the input path. This folder only exists in server A, so keep that in mind (I was looking for it for the longest time in server B >.<)
-
-java -Xmx16g -jar $S_PATH/snpEff.jar LYPA.23 -v -s $O_PATH/immunocapture/immunocapture_test1.ann.html $I_PATH/x_lx_xx_n201_filtered.vcf > $O_PATH/immunocapture/immunocapture_test1.ann.vcf #run this code from the directory where the config is located, and from server A (I_PATH doesn't exist in server B). I used the filtered version of the vcf which includes all lynx individuals in the immunocapture; there's also a raw version which can be tested.
-
-ctrl + D #terminate the script
-ctrl + D #terminate the screen
-
-scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/snpEff/immunocapture/immunocapture_test1.ann* /Users/Dani/ownCloud/backup/annotation/snpEff_results/immunocapture/ #execute this command out of the server to import to the pc the output files of this toy run
+#Create bed file with custom annotations based on the gff3 that María compiled.
+cut -d$'\t' -f1,3,4,5 /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.GENE.mRNA.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.intergenic.nr.gff3 | awk '{printf ("%s\t%s\t%s\t%s\n", $1, $3, $4, $2)}' > /home/dkleinman/datos/snpEff/data/LYPA23C.GENE.mRNA.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.intergenic.nr.bed
 
 ```
 
-#4a: Trim contemporary population lp and ll VCFs. Trim previously generated VCFs with species-wide variants in order to keep populational variants only.
+##Annotate the VCF with custom annotation
+
+```{r Variants annotation (detailed), eval=FALSE, engine='bash'}
+
+cd $O_PATH/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation/
+screen -S c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation.log #open a dettachable screen in case the test takes too long
+script c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation.log #initiate the log file
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+
+cd $C_PATH
+java -Xmx16g -jar $S_PATH/snpEff.jar LYPA.23 -v -s $O_PATH/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation.ann.html -csvStats $O_PATH/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation.ann.csv -interval $C_PATH/data/LYPA23C.GENE.mRNA.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.intergenic.nr.bed $V_PATH/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter.vcf > $O_PATH/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation.ann.vcf #run this code from the directory where the config is located.
+
+
+```
+
+#Xa: Trim contemporary population lp and ll VCFs. Trim previously generated VCFs with species-wide variants in order to keep populational variants only.
 
 ```{r Trim contemporary population lp and ll VCFs, eval=FALSE, engine='bash'}
 
@@ -206,7 +233,7 @@ for i in ${POP[@]}
 
 ```
 
-#4b: Population annotation (detailed) using the contemporary lp and ll VCFs.
+#Xb: Population annotation (detailed) using the contemporary lp and ll VCFs.
 
 ##Create custom annotation bed file
 
@@ -275,7 +302,7 @@ rm *.borrar
 
 ```
 
-#4c: Individual annotation (detailed) using the contemporary lp and ll VCFs.
+#Xc: Individual annotation (detailed) using the contemporary lp and ll VCFs.
 
 ##Split the population VCFs into per individual VCFs. Generate a VCF for each individual.
 
@@ -361,5 +388,26 @@ cat snpeff_individual_summary.txt
 
 ```
 
+#Z: Toy annotation using the immunocapture VCF.
+Annotate the immunocapture VCF 
 
+```{r Toy annotation using the immunocapture VCF, eval=FALSE, engine='bash'}
 
+cd $C_PATH
+screen -S immuno_annot_test1 #open a dettachable screen in case the test takes too long
+
+script immunocapture/immuno_annot_test1.txt #initiate the log file
+
+S_PATH=/opt/snpEff #redefine the variable, since we're inside a script
+C_PATH=/home/dkleinman/datos/snpEff #redefine the variable, since we're inside a script
+O_PATH=/home/dkleinman/datos/snpEff #redefine the variable, since we're inside a script
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #write here the input path. This folder only exists in server A, so keep that in mind (I was looking for it for the longest time in server B >.<)
+
+java -Xmx16g -jar $S_PATH/snpEff.jar LYPA.23 -v -s $O_PATH/immunocapture/immunocapture_test1.ann.html $I_PATH/x_lx_xx_n201_filtered.vcf > $O_PATH/immunocapture/immunocapture_test1.ann.vcf #run this code from the directory where the config is located, and from server A (I_PATH doesn't exist in server B). I used the filtered version of the vcf which includes all lynx individuals in the immunocapture; there's also a raw version which can be tested.
+
+ctrl + D #terminate the script
+ctrl + D #terminate the screen
+
+scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/snpEff/immunocapture/immunocapture_test1.ann* /Users/Dani/ownCloud/backup/annotation/snpEff_results/immunocapture/ #execute this command out of the server to import to the pc the output files of this toy run
+
+```
