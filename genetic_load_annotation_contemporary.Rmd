@@ -203,8 +203,8 @@ cut -d$'\t' -f1,3,4,5 /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.GENE
 ```{r Variants annotation (detailed), eval=FALSE, engine='bash'}
 
 cd $O_PATH/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation/
-screen -S c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation.log #open a dettachable screen in case the test takes too long
-script c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation.log #initiate the log file
+screen -S c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter.ann.log #open a dettachable screen in case the test takes too long
+script c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter.ann.log #initiate the log file
 
 S_PATH=/opt/snpEff #software path
 C_PATH=/home/dkleinman/datos/snpEff #config file path
@@ -213,8 +213,31 @@ I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
 V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
 
 cd $C_PATH
-java -Xmx16g -jar $S_PATH/snpEff.jar LYPA.23 -v -s $O_PATH/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation.ann.html -csvStats $O_PATH/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation.ann.csv -interval $C_PATH/data/LYPA23C.GENE.mRNA.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.intergenic.nr.bed $V_PATH/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter.vcf > $O_PATH/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation.ann.vcf #run this code from the directory where the config is located.
+java -Xmx16g -jar $S_PATH/snpEff.jar LYPA.23 -v -s $O_PATH/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter.ann.html -csvStats $O_PATH/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter.ann.csv -interval $C_PATH/data/LYPA23C.GENE.mRNA.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.intergenic.nr.bed $V_PATH/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter.vcf > $O_PATH/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter.ann.vcf #run this code from the directory where the config is located.
 
+```
+
+#5a: Split the VCF into per population VCFs. Generate a VCF for each population.
+
+```{r Split the VCF into per population VCFs, eval=FALSE, engine='bash'}
+
+#Split the annotated VCF into per population VCFs, and then keep only those positions that are variable or fixed for the derived allele within each population.
+
+cd $O_PATH/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation/perpop/
+screen -S c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_perpop.ann.log
+script c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_perpop.ann.log
+
+cd $G_PATH
+declare POP=$(ls c_{lp_sm*,lp_do*,ll_ki*,ll_po*,ll_no*}.g.vcf.gz | cut -c1-7 | uniq)
+cd $O_PATH/home/dkleinman/datos/snpEff/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation/perpop/
+for i in ${POP[@]}
+  do
+  echo "${i}"
+  $BCF query -l $O_PATH/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter.ann.vcf | grep "${i}" > list_to_remove.txt
+  $BCF view -S list_to_remove.txt -Ov -o $O_PATH/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation/perpop/"${i}"_aafilled_SNPs_standard_filter_perpop_all.ann.vcf $O_PATH/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter.ann.vcf
+  $BCF view -i '(INFO/AA == REF && INFO/AC > 0) || (INFO/AA == ALT && INFO/AC < INFO/AN) || (INFO/AA != REF && INFO/AA != ALT)' -Ov -o $O_PATH/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation/perpop/"${i}"_aafilled_SNPs_standard_filter_detailed_annotation_perpop_trimmed.ann.vcf $O_PATH/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation/perpop/"${i}"_aafilled_SNPs_standard_filter_detailed_annotation_perpop_all.ann.vcf
+  done
+rm list_to_remove.txt
 
 ```
 
@@ -282,7 +305,7 @@ scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/snpEff/c_ll_lp_perpop
 
 cd $O_PATH/c_ll_lp_perpop_standard_filter_detailed_annotation/
 echo "species,population,N_intergenic,N_intronic,N_exonic,N_missense,N_nonsense,N_silent,N_missense/silent" > snpeff_population_summary.borrar
-POPLIST=($(ls ls {lp_sm*,lp_do*,ll_ki*,ll_po*,ll_no*}.csv))
+POPLIST=($(ls {lp_sm*,lp_do*,ll_ki*,ll_po*,ll_no*}.csv))
 for pop in "${POPLIST[@]}"
   do
   SPECIES=$(echo "${pop}" | cut -c1-2)
