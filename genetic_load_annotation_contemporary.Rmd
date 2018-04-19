@@ -217,9 +217,10 @@ java -Xmx16g -jar $S_PATH/snpEff.jar LYPA.23 -v -s $O_PATH/c_ll_lp_plus_h_ll_aaf
 
 ```
 
-#5a: Split the VCF into per population VCFs. Generate a VCF for each population.
+#5: Get annotation statistics for each population.
+##Split the VCF into per population VCFs. Generate a VCF for each population.
 
-```{r Split the VCF into per population VCFs, eval=FALSE, engine='bash'}
+```{r Get annotation statistics for each population, eval=FALSE, engine='bash'}
 
 #Split the annotated VCF into per population VCFs, and then keep only those positions that are variable or fixed for the derived allele within each population.
 
@@ -229,7 +230,7 @@ script c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_perpop.ann.log
 
 cd $G_PATH
 declare POP=$(ls c_{lp_sm*,lp_do*,ll_ki*,ll_po*,ll_no*}.g.vcf.gz | cut -c1-7 | uniq)
-cd $O_PATH/home/dkleinman/datos/snpEff/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation/perpop/
+cd $O_PATH/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation/perpop/
 for i in ${POP[@]}
   do
   echo "${i}"
@@ -240,6 +241,59 @@ for i in ${POP[@]}
 rm list_to_remove.txt
 
 ```
+
+##Get snpEff stats for each population
+
+```{r Get annotation statistics for each population, eval=FALSE, engine='bash'}
+
+cd $O_PATH/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation/perpop/
+screen -S c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_perpop_snpeff.ann.log #open a dettachable screen in case the test takes too long
+script c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_perpop_snpeff.ann.log #initiate the log file
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+
+cd $O_PATH/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation/perpop/
+POPLIST=($(ls *trimmed.ann.vcf))
+for pop in "${POPLIST[@]}"
+  do
+  echo "${pop}"
+  #done
+  cd $C_PATH
+  java -Xmx16g -jar $S_PATH/snpEff.jar LYPA.23 -v -s $O_PATH/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation/perpop/${pop/trimmed.ann.vcf/trimmed_snpeff.ann.html} -csvStats $O_PATH/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation/perpop/${pop/trimmed.ann.vcf/trimmed_snpeff.ann.csv} -interval $C_PATH/data/LYPA23C.GENE.mRNA.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.intergenic.nr.bed $O_PATH/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation/perpop/${pop} > $O_PATH/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation/perpop/${pop/trimmed.ann.vcf/trimmed_snpeff.ann.vcf} #run this code from the directory where the config is located.
+done
+
+```
+
+##Build SnpEff summary file.
+
+```{r Get annotation statistics for each population, eval=FALSE, engine='bash'}
+
+cd $O_PATH/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation/perpop/
+echo "species,population,N_intergenic,N_intronic,N_exonic,N_missense,N_nonsense,N_silent,N_missense/silent" > snpeff_population_summary.borrar
+POPLIST=($(ls c_{lp_sm*,lp_do*,ll_ki*,ll_po*,ll_no*}.vcf))
+for pop in "${POPLIST[@]}"
+  do
+  SPECIES=$(echo "${pop}" | cut -c1-2)
+  POPULATION=$(echo "${pop}" | cut -c4-5)
+  N_INTERGENIC=$(grep 'INTERGENIC' ${pop} | wc -l)
+  N_INTRONIC=$(grep 'INTRON' ${pop} | wc -l)
+  N_EXONIC=$(grep 'EXON' ${pop} | wc -l)
+  N_MISSENSE=$(grep 'MISSENSE' ${pop} | wc -l)
+  N_NONSENSE=$(grep 'NONSENSE' ${pop} | wc -l)
+  N_SILENT=$(grep 'SILENT' ${pop} | wc -l)
+  N_MISSENSE_SILENT=$(grep 'Missense_Silent_ratio' ${pop} | wc -l)
+  echo "$SPECIES,$POPULATION,$N_INTERGENIC,$N_INTRONIC,$N_EXONIC,$N_MISSENSE,$N_NONSENSE,$N_SILENT,$N_MISSENSE_SILENT" >> snpeff_population_summary.borrar
+  done
+cat snpeff_population_summary.borrar | tr -d "[:blank:]" > snpeff_population_summary.txt
+cat snpeff_population_summary.txt
+rm *.borrar
+
+```
+
 
 #Xa: Trim contemporary population lp and ll VCFs. Trim previously generated VCFs with species-wide variants in order to keep populational variants only.
 
