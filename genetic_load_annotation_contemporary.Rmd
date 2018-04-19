@@ -45,6 +45,9 @@ V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
 
 cat $V_PATH/c_ll_lp_plus_h_ll_renamed.vcf | /opt/vcftools_0.1.13/perl/fill-aa -a /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa.gz | bgzip -c > c_ll_lp_plus_h_ll_aafilled.vcf.gz #I tried to run this first without bgzipping it, and it was increasingly slow. Each day it did around half the previous day. When the server crashed, I relaunched it adding the bgzip command and it finished in a little over 24h.
 
+#Test the VCF polarization using Federico Abascal's perl code:
+perl /home/dkleinman/datos/snpEff/data/polarize_vcf_fabascal.pl test.ann.vcf > test_polarized.ann.vcf #it doesn't work...
+
 ```
 
 ##Option B: generate new VCF with the ancestral state as the reference. Use GATK to make a calling with lynx rufus as the reference.
