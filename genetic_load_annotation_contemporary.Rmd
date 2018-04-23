@@ -24,7 +24,9 @@ BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
 ```
 
 #1: Polarize contemporary VCF. Use VCFtools in order to polarize (ancestral vs. derived) the contemporary ll & lp VCF. The ancestral state was inferred by Maria.
-##Option A: add Ancestral Allele annotation to the VCF. Use vcftools to fill the INFO/AA field of the VCF.
+##Option A: add Ancestral Allele annotation to the VCF, and then polarize it.
+
+###Use vcftools to fill the INFO/AA field of the VCF.
 
 ```{r Polarize contemporary VCF, eval=FALSE, engine='bash'}
 
@@ -50,11 +52,58 @@ perl /home/dkleinman/datos/snpEff/data/polarize_vcf_fabascal.pl test.ann.vcf > t
 
 ```
 
+###Use VcfFilterJdk to polarize the annotated VCF.
+
+```{r Polarize contemporary VCF, eval=FALSE, engine='bash'}
+
+#Polarize the AA-filled VCF based on the new INFO/AA column. Alleles will be switched whenever the ancestral allele matches the alternative one, and genotypes will be properly recoded as well.
+
+#So far, the current code yields the following error: "Allele C* is not an allele in the variant context". I contacted the author in case he knows what to do next.
+
+java -jar /opt/jvarkit/dist/vcffilterjdk.jar -e 'if(variant.getNAlleles()!=2 || !variant.hasAttribute("AA")) return true;
+final String aa = variant.getAttributeAsString("AA","");
+if(!variant.getAlleles().get(1).getDisplayString().equalsIgnoreCase(aa)) return true;
+VariantContextBuilder vb=new VariantContextBuilder(variant);
+
+Allele oldalt =  variant.getAlleles().get(1);
+Allele oldref =  variant.getAlleles().get(0);
+Allele ref= Allele.create(oldalt.getDisplayString(),true);
+Allele alt= Allele.create(oldref.getDisplayString(),false);
+
+vb.alleles(Arrays.asList(ref,alt));
+
+List<Genotype> genotypes= new ArrayList<>();
+for(Genotype g: variant.getGenotypes())
+    {
+    if(!g.isCalled()) { genotypes.add(g); continue;}
+    GenotypeBuilder gb = new GenotypeBuilder(g);
+    List<Allele> alleles = new ArrayList<>();
+    for(Allele a:g.getAlleles())
+        {
+        if(a.equals(oldalt)) { a=ref;}
+        else if(a.equals(oldref)) { a=alt;}
+        alleles.add(a);
+        }
+    if(g.hasPL()) {
+        int pl[] = g.getPL();
+        int pl2[] = new int[pl.length];
+        for(int i=0;i< pl.length;i++) pl2[i]=pl[(pl.length-1)-i];
+        gb.PL(pl2);
+        }
+    genotypes.add(gb.alleles(alleles).make());
+    }
+
+vb.attribute("AC",variant.getGenotypes().stream().flatMap(G->G.getAlleles().stream()).filter(A->A.equals(oldref)).count());
+
+return vb.make();' -o test_polarized.ann.vcf test.ann.vcf
+
+```
+
 ##Option B: generate new VCF with the ancestral state as the reference. Use GATK to make a calling with lynx rufus as the reference.
 
 ```{r Polarize contemporary VCF, eval=FALSE, engine='bash'}
 
-#Another option is to generate a new VCF using the ancestral as the reference...
+#Another option is to generate a new VCF using the ancestral as the reference... But this didn't work as intended. REF alleles were still those of the Iberian lynx reference genome, maybe because the gVCFs were first called against it. In the end option A was used.
 
 #First, the reference genome should be properly indexed as follows:
 cd /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/
@@ -101,7 +150,6 @@ Search for the Lynx pardinus assembly database in the program's pre-built databa
 java -jar /opt/snpEff/snpEff.jar databases | grep -i pardinus
 
 ```
-
 
 ##Build the Lynx pardinus genome database.
 In the end we opt to build our own database since we don't know when they will get themselves to add it. This step should be omitted if the desired database was found in the previous step.
