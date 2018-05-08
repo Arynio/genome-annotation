@@ -1,0 +1,31 @@
+---
+title: "IBD_tracts_analysis"
+author: "Dani"
+date: "8 de mayo de 2018"
+output: html_document
+---
+
+#0: Define paths.
+
+```{r Define paths, eval=FALSE, engine='bash'}
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+G_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+```
+
+#1: Prepare input files for ngsF-HMM.
+
+```{r Prepare input files for ngsF-HMM, eval=FALSE, engine='bash'}
+
+· GENOTYPE LIKELIHOODS
+· GENOME COORDINATES
+
+```
