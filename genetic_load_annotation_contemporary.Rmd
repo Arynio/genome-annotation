@@ -94,8 +94,10 @@ for(Genotype g: variant.getGenotypes())
     }
 
 vb.attribute("AC",variant.getGenotypes().stream().flatMap(G->G.getAlleles().stream()).filter(A->A.equals(oldref)).count());
-
+vb.genotypes(genotypes);
 return vb.make();' -o test_polarized.ann.vcf test.ann.vcf
+
+vb.attribute("AF",(variant.getGenotypes().stream().flatMap(G->G.getAlleles().stream()).filter(A->A.equals(oldref)).count())/(variant.getGenotypes().stream().flatMap(G->G.getAlleles().stream()).count()));
 
 ```
 
