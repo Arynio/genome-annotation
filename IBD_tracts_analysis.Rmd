@@ -9,12 +9,8 @@ output: html_document
 
 ```{r Define paths, eval=FALSE, engine='bash'}
 
-S_PATH=/opt/snpEff #software path
-C_PATH=/home/dkleinman/datos/snpEff #config file path
-O_PATH=/home/dkleinman/datos/snpEff #output path
-I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
-V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
-G_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+I_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis #IBD analysis folder path
+NGSF=/opt/ngsF-HMM/ngsF-HMM #ngsF-HMM path
 REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
 GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
 BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
@@ -22,10 +18,54 @@ BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
 ```
 
 #1: Prepare input files for ngsF-HMM.
+##Generate BEAGLE format file with genotype likelihoods using ANGSD:
 
 ```{r Prepare input files for ngsF-HMM, eval=FALSE, engine='bash'}
 
-· GENOTYPE LIKELIHOODS
-· GENOME COORDINATES
+#Add code to generate proper file that includes all individuals from the following populations: lp_sm, lp_do, ll_ki, ll_no, ll_po
+
+#Test file:
+less -S $I_PATH/c_ll_no-c_ll_ba-h_ll_ba-c_ll_cr-c_ll_po-c_ll_la-c_ll_ki-c_ll_ur-c_ll_tu-c_ll_to-c_ll_ka-c_ll_og-c_ll_ya-c_ll_vl_n080.genolike.beagle.gz
+
+```
+
+##Generate genome coordinates file:
+
+```{r Prepare input files for ngsF-HMM, eval=FALSE, engine='bash'}
+
+cd $I_PATH
+screen -S genome_coordinates.list.log
+script genome_coordinates.list.log
+
+cd $I_PATH
+rm $I_PATH/scaffolds_list.borrar
+rm $I_PATH/positions_list.borrar
+SC_DATA=$(awk '{print $1"_"$2}' /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/Length_scaffolds_lp23)
+for i in ${SC_DATA[@]}
+  do
+  echo "${i}"
+  SC_NAME=$(echo "${i}" | cut -d'_' -f1)
+  SC_LENGTH=$(echo "${i}" | cut -d'_' -f2)
+  for j in ${SC_LENGTH[@]}
+    do
+    echo "$SC_NAME" | awk '{for (k = 1; k <= '${j}'; k++) print $1}' >> $I_PATH/scaffolds_list.borrar
+    seq "${j}" >> $I_PATH/positions_list.borrar
+    done 
+  done
+paste $I_PATH/scaffolds_list.borrar $I_PATH/positions_list.borrar > genome_coordinates.list
+
+```
+
+#2: Run ngsF-HMM.
+##Run test:
+
+```{r Run ngsF-HMM, eval=FALSE, engine='bash'}
+
+cd $I_PATH
+screen -S ngsF-HMM_test.log
+script ngsF-HMM_test.log
+
+cd $I_PATH
+$NGSF --geno c_ll_no-c_ll_ba-h_ll_ba-c_ll_cr-c_ll_po-c_ll_la-c_ll_ki-c_ll_ur-c_ll_tu-c_ll_to-c_ll_ka-c_ll_og-c_ll_ya-c_ll_vl_n080.genolike.beagle.gz --lkl --pos genome_coordinates.list --n_ind 80 --n_sites 2413209059 --out $I_PATH/ngsF-HMM_test
 
 ```
