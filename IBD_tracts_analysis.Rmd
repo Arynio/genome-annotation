@@ -43,9 +43,173 @@ done
 
 
 #Second, following Maria's script, we need to generate the file named: "${POP}"_mean_sd_depthGlobal_lynx_per_pop_mean_folds_0.95.csv
-POP="c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm"  # <--CHANGE POP HERE
+
+screen -S depth_calculus_DANI
+script depth_calculus_DANI.log
+
+I_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis #IBD analysis folder path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+
+cd $I_PATH/beagle_gl
+
+#To launch one by one
+
+POP=(c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060)
+
+THREADS=5                    # no. of computer cores used 20 = OK, >20 = ask people first!
+REGIONFILE="/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_intergenic_capture/BAM_intergenic_capture_filtered/no_genes_Lypa_10000longest_center_final_slop20_dot.rf"
 
 
+BAMLIST=$(ls $I_PATH/beagle_gl/"$POP".bamlist)
+OUT_NAME="$I_PATH/beagle_gl/"$POP".subset.qc"
+NUMBER_IND=$(printf "%03d" `wc -l $BAMLIST | cut -f1 -d " "`)
+MAXDEPTH=$(expr $NUMBER_IND \* 1000)
+
+# Sanity checks: 
+ls $BAMLIST
+echo $OUT_NAME
+echo $NUMBER_IND
+echo $MAXDEPTH
+
+/opt/angsd/angsd/angsd \
+-P $THREADS \
+-b $BAMLIST \
+-ref $REF \
+-out $OUT_NAME \
+-uniqueOnly 1 \
+-remove_bads 1 \
+-only_proper_pairs 1 \
+-rf $REGIONFILE \
+-baq 1 \
+-C 50 \
+-doQsDist 1 \
+-doDepth 1 \
+-doCounts 1 \
+-maxDepth $MAXDEPTH  
+
+# Now I have to create the table using R
+```
+
+
+### MaxDepth R 
+  
+Cuando acabo me llevo los archivos generados de GlobalDepth a mi ordenador para aplicarles el script de R y calcular la cobertura mínima y máxima en cada caso.
+
+```{r, engine=bash, eval=FALSE}
+
+scp mlucena@genomics-b.ebd.csic.es:/home/mlucena/ANGSD_analysis/depth_calculus/*.depth* /Users/marialucenaperez/Dropbox/PhD/contemporary/ANGSD/depth_calculus/
+  
+```
+
+RScript:
+
+```{r}
+
+library(dplyr)
+library(plyr)
+library(ggplot2)
+library(gridExtra)
+library(knitr)
+
+## Functions
+get_mean <- function(dat) { with(dat, sum(as.numeric(freq)*value)/sum(as.numeric(freq))) }
+get_sd <- function(dat) { mu <- get_mean (dat) 
+with (dat, sqrt(sum(as.numeric(freq)*(value-mu)^2)/(sum(as.numeric(freq))-1))) } 
+
+#*******************************************************************************************
+
+my_files_depthGlobal = list.files(path = "/Users/marialucenaperez/Dropbox/PhD/contemporary/ANGSD/depth_calculus",pattern="*.depthGlobal$") 
+
+for (i in 1:length(my_files_depthGlobal)) { assign(my_files_depthGlobal[i], (scan(paste0("/Users/marialucenaperez/Dropbox/PhD/contemporary/ANGSD/depth_calculus/",my_files_depthGlobal[i],sep=""), sep = " ", dec = ".")) %>% .[!is.na(.)])}
+
+mean_folds = 0.95
+
+depth_per_sample <- data.frame()
+
+#Compute globaldepth for all populations found
+#*******************************************************************************************
+  
+for (i in 1:length(my_files_depthGlobal)) 
+  {
+  
+DF = read.table(paste0("/Users/marialucenaperez/Dropbox/PhD/contemporary/ANGSD/depth_calculus/",my_files_depthGlobal[i],sep=""),head=F, stringsAsFactors=F, check.names=FALSE)
+
+freq_table_DF <- data.frame (value = 1:length (DF), freq = t(DF))
+freq_table_truncated_DF <- filter(freq_table_DF, value < (nrow(freq_table_DF)))
+
+# Mean depth:
+
+my_mean_DF <-  get_mean (freq_table_DF)
+my_mean_truncated_DF <- get_mean (freq_table_truncated_DF)
+my_sd_DF <-  get_sd (freq_table_DF)
+my_sd_truncated_DF <- get_sd (freq_table_truncated_DF)
+
+# Max and min depth:
+
+maxDepth_DF = my_mean_DF + (mean_folds * my_mean_DF)
+minDepth_DF  = my_mean_DF - (mean_folds * my_mean_DF)
+maxDepth_truncated_DF = my_mean_truncated_DF + (mean_folds * my_sd_truncated_DF)
+minDepth_truncated_DF  = my_mean_truncated_DF - (mean_folds * my_sd_truncated_DF)
+
+
+# Esto funciona para una población
+#Per sample
+# epoch=unlist(strsplit(my_files_depthGlobal[i],"_"))[1]
+# specie=unlist(strsplit(my_files_depthGlobal[i],"_"))[2]
+# population2=unlist(strsplit(my_files_depthGlobal[i],"_"))[3]
+# # population=unlist(strsplit(population2,"[.]"))[1]
+# 
+# depth_per_sample <- rbind(depth_per_sample, 
+#   data.frame( epoch=epoch,  sp=specie, pop = population,
+#   mean = my_mean_DF, sd = my_sd_DF, 
+#   mean_truncated =  my_mean_truncated_DF, sd_truncated = my_sd_truncated_DF,
+#   maxDepth = maxDepth_DF, minDepth = minDepth_DF,
+#   maxDepth_truncated = maxDepth_truncated_DF, minDepth_truncated = minDepth_truncated_DF)) 
+
+# Para una o más poblaciones:
+population=unlist(strsplit(my_files_depthGlobal[i],"[.]"))[1]
+
+depth_per_sample <- rbind(depth_per_sample, 
+data.frame( pop = population,
+mean = my_mean_DF, sd = my_sd_DF, 
+mean_truncated =  my_mean_truncated_DF, sd_truncated = my_sd_truncated_DF,
+maxDepth = maxDepth_DF, minDepth = minDepth_DF,
+maxDepth_truncated = maxDepth_truncated_DF, minDepth_truncated = minDepth_truncated_DF)) 
+
+
+# Plotting:
+
+ggplot(freq_table_truncated_DF, aes(x = value, y = freq)) + 
+  geom_bar(stat = "identity", color = "black") +
+  scale_x_continuous(breaks = 0:250*10, limits = c(0, maxDepth_truncated_DF*1.5))+
+  scale_y_continuous(expand=c(0,0))+
+  ggtitle (paste(my_files_depthGlobal[i],"_", mean_folds, "_",maxDepth_truncated_DF, "_",maxDepth_DF) ) +
+  geom_vline(xintercept=maxDepth_DF,
+             linetype="dashed", size=0.5)+ 
+  geom_vline(xintercept=minDepth_DF,
+             linetype="dashed", size=0.5)+ 
+  geom_vline(xintercept=maxDepth_truncated_DF, colour ="grey",
+             linetype="dashed", size=0.5)+ 
+  geom_vline(xintercept=minDepth_truncated_DF,colour ="grey",
+             linetype="dashed", size=0.5)+ 
+  theme_classic()+ 
+  theme(text = element_text(size=10))
+
+plot_name=paste0("/Users/marialucenaperez/Dropbox/PhD/contemporary/ANGSD/depth_calculus/",my_files_depthGlobal[i],"_",mean_folds,".pdf",sep="")
+ggsave(filename = plot_name)
+
+}
+
+# When finished write the table
+
+write.table(x = depth_per_sample,file = paste("/Users/marialucenaperez/Dropbox/PhD/contemporary/ANGSD/depth_calculus/mean_sd_depthGlobal_lynx_per_pop_mean_folds_",mean_folds,".csv", sep= ""),quote=FALSE, col.names = FALSE, row.names = FALSE, sep= " ")
+
+```
+
+Bajar la tabla al servidor. 
+
+
+```{bash}
 
 #Third, run ANGSD to obtain the genotype likelihood files:
 RUTA=/home/mlucena/ANGSD_analysis
