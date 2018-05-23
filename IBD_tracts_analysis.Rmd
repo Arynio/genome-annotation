@@ -23,21 +23,22 @@ BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
 ```{r Prepare input files for ngsF-HMM, eval=FALSE, engine='bash'}
 
 #To generate BEAGLE format file with gl from the desired populations, first we need to build a list with the appropriate bam files:
-POPS="c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm"  # <--CHANGE POPS HERE
+
 cd $I_PATH/beagle_gl
+POPS="c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm"  # <--CHANGE POPS HERE
 for POP in ${POPS[@]}
 do
 echo $POP
-rm "$POP".intergenic.bamlist
+rm "$POP".bamlist
 echo $POP
 IFS='-' read -r -a POPS1 <<< "$POP" # this creates an array stripping by "-"
 for POP1 in "${POPS1[@]}"
 do
 echo "$POP --> $POP1"
-ls /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_intergenic_5x/*${POP1}*intergenic.bam  >> "$POP".intergenic.bamlist
+ls /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/*${POP1}*.bam  >> "$POP".bamlist
 done
-NUMBER_IND=$(printf "%03d" `wc -l "$POP".intergenic.bamlist | cut -f1 -d " "`);
-mv "$POP".intergenic.bamlist "$POP"_n"$NUMBER_IND".intergenic.bamlist
+NUMBER_IND=$(printf "%03d" `wc -l "$POP".bamlist | cut -f1 -d " "`);
+mv "$POP".bamlist "$POP"_n"$NUMBER_IND".bamlist
 done
 
 
@@ -74,7 +75,7 @@ echo $minDepth
 echo $SNP_PVAL
 
 # Running GL:
-$ANGSD/angsd -nThreads $THREADS -bam $RUTA/intergenic_analysis/"$POP".intergenic.bamlist -ref $REF  \
+$ANGSD/angsd -nThreads $THREADS -bam $RUTA/intergenic_analysis/"$POP".intergenic.bamlist -ref $REF  \ ¡¡¡CHANGE PATH TO BAMLIST AND NAME!!!
 -out "$POP".genolike \
 $FILTER1 \
 $FILTER2 \
