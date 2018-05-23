@@ -22,7 +22,81 @@ BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
 
 ```{r Prepare input files for ngsF-HMM, eval=FALSE, engine='bash'}
 
-#Add code to generate proper file that includes all individuals from the following populations: lp_sm, lp_do, ll_ki, ll_no, ll_po
+#To generate BEAGLE format file with gl from the desired populations, first we need to build a list with the appropriate bam files:
+POPS="c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm"  # <--CHANGE POPS HERE
+cd $I_PATH/beagle_gl
+for POP in ${POPS[@]}
+do
+echo $POP
+rm "$POP".intergenic.bamlist
+echo $POP
+IFS='-' read -r -a POPS1 <<< "$POP" # this creates an array stripping by "-"
+for POP1 in "${POPS1[@]}"
+do
+echo "$POP --> $POP1"
+ls /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_intergenic_5x/*${POP1}*intergenic.bam  >> "$POP".intergenic.bamlist
+done
+NUMBER_IND=$(printf "%03d" `wc -l "$POP".intergenic.bamlist | cut -f1 -d " "`);
+mv "$POP".intergenic.bamlist "$POP"_n"$NUMBER_IND".intergenic.bamlist
+done
+
+
+#Second, following Maria's script, we need to generate the file named: "${POP}"_mean_sd_depthGlobal_lynx_per_pop_mean_folds_0.95.csv
+POP="c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm"  # <--CHANGE POP HERE
+
+
+
+#Third, run ANGSD to obtain the genotype likelihood files:
+RUTA=/home/mlucena/ANGSD_analysis
+THREADS=15 #no. of computer cores used by bwa and samtools. 20 = OK, >20 = ask people first!
+
+read POP mean sd mean_truncated sd_truncated maxDepth minDepth maxDepth_truncated minDepth_truncated < $RUTA/"${POP}"_mean_sd_depthGlobal_lynx_per_pop_mean_folds_0.95.csv
+
+ANGSD="/opt/angsd/angsd"
+NGSTOOLS="/opt/angsd/angsd/misc"
+REF="/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23_without_repetitive_transposable_low_complexity.fa"
+ANC="/home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa"
+FILTER1=" -uniqueOnly 1 -remove_bads 1 -only_proper_pairs 1 -baq 1 -C 50 "
+FILTER2=" -minMapQ 30 -minQ 20 -doCounts 1 "
+N_IND=$(echo ${POP: -3} )
+MIN_IND=$(expr $N_IND / 2)
+SNP_PVAL="1e-4"
+
+RUTA=/home/mlucena/ANGSD_analysis
+RUTA=/home/dkleinman/IBD_tracts
+
+# Sanity checks:
+echo $POP
+echo $N_IND
+echo $MIN_IND
+echo $maxDepth
+echo $minDepth
+echo $SNP_PVAL
+
+# Running GL:
+$ANGSD/angsd -nThreads $THREADS -bam $RUTA/intergenic_analysis/"$POP".intergenic.bamlist -ref $REF  \
+-out "$POP".genolike \
+$FILTER1 \
+$FILTER2 \
+-GL 1  -doGlf 2 \
+-doMajorMinor 1 -doMaf 1 -SNP_pval $SNP_PVAL -skipTriallelic 1 \
+-minInd $MIN_IND -setMaxDepth $maxDepth -setMinDepth $minDepth 
+
+# Parameters chosen:
+# FILTER1=" -uniqueOnly 1 -remove_bads 1 -only_proper_pairs 1 -baq 1 -C 50 "
+# FILTER2=" -minMapQ 30 -minQ 20 -doCounts 1 "
+# GL 1 --> Use samtools
+# doGlf 2 --> beagle likelihood file
+# doMajorMinor 1 --> Infer major and minor from GL (other options would be: infer major and minor from allele counts, from a file, use reference as major, use ancestral as major)
+# doMaf 3 --> frequency (fixed major and minor/fixed major,unknownminor): Both are assumed to be known. Allele freq i obtained using based on GL.  
+# -doMajorMinor 1 -doMaf 3. Example for estimating the allele frequencies both while assuming known major and minor allele but also while taking the uncertaincy of the minor allele inference into account. The inference of the major and minor allele is done directly from the genotype likelihood
+# -SNP_pval [float]
+# The p-value used for calling snaps. see Allele_Frequency_estimation for additional options. 
+
+
+
+
+
 
 #Test file:
 less -S $I_PATH/c_ll_no-c_ll_ba-h_ll_ba-c_ll_cr-c_ll_po-c_ll_la-c_ll_ki-c_ll_ur-c_ll_tu-c_ll_to-c_ll_ka-c_ll_og-c_ll_ya-c_ll_vl_n080.genolike.beagle.gz
