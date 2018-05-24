@@ -19,6 +19,7 @@ BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
 
 #1: Prepare input files for ngsF-HMM.
 ##Generate BEAGLE format file with genotype likelihoods using ANGSD:
+###Generate list of BAMs:
 
 ```{r Prepare input files for ngsF-HMM, eval=FALSE, engine='bash'}
 
@@ -40,7 +41,11 @@ done
 NUMBER_IND=$(printf "%03d" `wc -l "$POP".bamlist | cut -f1 -d " "`);
 mv "$POP".bamlist "$POP"_n"$NUMBER_IND".bamlist
 done
+```
 
+###Obtain per population depth statistics:
+
+```{r Prepare input files for ngsF-HMM, eval=FALSE, engine='bash'}
 
 #Second, following Maria's script, we need to generate the file named: "${POP}"_mean_sd_depthGlobal_lynx_per_pop_mean_folds_0.95.csv
 
@@ -52,13 +57,11 @@ REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path
 
 cd $I_PATH/beagle_gl
 
-#To launch one by one
-
+#To launch one by one:
 POP=(c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060)
 
 THREADS=5                    # no. of computer cores used 20 = OK, >20 = ask people first!
 REGIONFILE="/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_intergenic_capture/BAM_intergenic_capture_filtered/no_genes_Lypa_10000longest_center_final_slop20_dot.rf"
-
 
 BAMLIST=$(ls $I_PATH/beagle_gl/"$POP".bamlist)
 OUT_NAME="$I_PATH/beagle_gl/"$POP".subset.qc"
@@ -87,23 +90,14 @@ echo $MAXDEPTH
 -doCounts 1 \
 -maxDepth $MAXDEPTH  
 
-# Now I have to create the table using R
+#Once done, download the depth files from the server in order to process them in R:
+scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/beagle_gl/*.depth* /Users/Dani/ownCloud/backup/annotation/IBD_analysis/beagle_gl
+
 ```
 
+###Generate csv table with several statistics.
 
-### MaxDepth R 
-  
-Cuando acabo me llevo los archivos generados de GlobalDepth a mi ordenador para aplicarles el script de R y calcular la cobertura mínima y máxima en cada caso.
-
-```{r, engine=bash, eval=FALSE}
-
-scp mlucena@genomics-b.ebd.csic.es:/home/mlucena/ANGSD_analysis/depth_calculus/*.depth* /Users/marialucenaperez/Dropbox/PhD/contemporary/ANGSD/depth_calculus/
-  
-```
-
-RScript:
-
-```{r}
+```{r Prepare input files for ngsF-HMM}
 
 library(dplyr)
 library(plyr)
@@ -111,64 +105,38 @@ library(ggplot2)
 library(gridExtra)
 library(knitr)
 
-## Functions
+#Functions that will be needed:
 get_mean <- function(dat) { with(dat, sum(as.numeric(freq)*value)/sum(as.numeric(freq))) }
 get_sd <- function(dat) { mu <- get_mean (dat) 
 with (dat, sqrt(sum(as.numeric(freq)*(value-mu)^2)/(sum(as.numeric(freq))-1))) } 
 
-#*******************************************************************************************
-
-my_files_depthGlobal = list.files(path = "/Users/marialucenaperez/Dropbox/PhD/contemporary/ANGSD/depth_calculus",pattern="*.depthGlobal$") 
-
-for (i in 1:length(my_files_depthGlobal)) { assign(my_files_depthGlobal[i], (scan(paste0("/Users/marialucenaperez/Dropbox/PhD/contemporary/ANGSD/depth_calculus/",my_files_depthGlobal[i],sep=""), sep = " ", dec = ".")) %>% .[!is.na(.)])}
-
+#Prepare files:
+my_files_depthGlobal = list.files(path = "/Users/Dani/ownCloud/backup/annotation/IBD_analysis/beagle_gl",pattern="*.depthGlobal$") 
+for (i in 1:length(my_files_depthGlobal)) { assign(my_files_depthGlobal[i], (scan(paste0("/Users/Dani/ownCloud/backup/annotation/IBD_analysis/beagle_gl/",my_files_depthGlobal[i],sep=""), sep = " ", dec = ".")) %>% .[!is.na(.)])}
 mean_folds = 0.95
-
 depth_per_sample <- data.frame()
 
-#Compute globaldepth for all populations found
-#*******************************************************************************************
-  
+#Compute globaldepth for all populations in the input:
 for (i in 1:length(my_files_depthGlobal)) 
-  {
-  
-DF = read.table(paste0("/Users/marialucenaperez/Dropbox/PhD/contemporary/ANGSD/depth_calculus/",my_files_depthGlobal[i],sep=""),head=F, stringsAsFactors=F, check.names=FALSE)
-
+{
+DF = read.table(paste0("/Users/Dani/ownCloud/backup/annotation/IBD_analysis/beagle_gl/",my_files_depthGlobal[i],sep=""),head=F, stringsAsFactors=F, check.names=FALSE)
 freq_table_DF <- data.frame (value = 1:length (DF), freq = t(DF))
 freq_table_truncated_DF <- filter(freq_table_DF, value < (nrow(freq_table_DF)))
 
-# Mean depth:
-
+#Mean depth:
 my_mean_DF <-  get_mean (freq_table_DF)
 my_mean_truncated_DF <- get_mean (freq_table_truncated_DF)
 my_sd_DF <-  get_sd (freq_table_DF)
 my_sd_truncated_DF <- get_sd (freq_table_truncated_DF)
 
-# Max and min depth:
-
+#Max and min depth:
 maxDepth_DF = my_mean_DF + (mean_folds * my_mean_DF)
 minDepth_DF  = my_mean_DF - (mean_folds * my_mean_DF)
 maxDepth_truncated_DF = my_mean_truncated_DF + (mean_folds * my_sd_truncated_DF)
 minDepth_truncated_DF  = my_mean_truncated_DF - (mean_folds * my_sd_truncated_DF)
 
-
-# Esto funciona para una población
-#Per sample
-# epoch=unlist(strsplit(my_files_depthGlobal[i],"_"))[1]
-# specie=unlist(strsplit(my_files_depthGlobal[i],"_"))[2]
-# population2=unlist(strsplit(my_files_depthGlobal[i],"_"))[3]
-# # population=unlist(strsplit(population2,"[.]"))[1]
-# 
-# depth_per_sample <- rbind(depth_per_sample, 
-#   data.frame( epoch=epoch,  sp=specie, pop = population,
-#   mean = my_mean_DF, sd = my_sd_DF, 
-#   mean_truncated =  my_mean_truncated_DF, sd_truncated = my_sd_truncated_DF,
-#   maxDepth = maxDepth_DF, minDepth = minDepth_DF,
-#   maxDepth_truncated = maxDepth_truncated_DF, minDepth_truncated = minDepth_truncated_DF)) 
-
-# Para una o más poblaciones:
+#Update populations:
 population=unlist(strsplit(my_files_depthGlobal[i],"[.]"))[1]
-
 depth_per_sample <- rbind(depth_per_sample, 
 data.frame( pop = population,
 mean = my_mean_DF, sd = my_sd_DF, 
@@ -176,9 +144,7 @@ mean_truncated =  my_mean_truncated_DF, sd_truncated = my_sd_truncated_DF,
 maxDepth = maxDepth_DF, minDepth = minDepth_DF,
 maxDepth_truncated = maxDepth_truncated_DF, minDepth_truncated = minDepth_truncated_DF)) 
 
-
-# Plotting:
-
+# Plot depth:
 ggplot(freq_table_truncated_DF, aes(x = value, y = freq)) + 
   geom_bar(stat = "identity", color = "black") +
   scale_x_continuous(breaks = 0:250*10, limits = c(0, maxDepth_truncated_DF*1.5))+
@@ -194,28 +160,34 @@ ggplot(freq_table_truncated_DF, aes(x = value, y = freq)) +
              linetype="dashed", size=0.5)+ 
   theme_classic()+ 
   theme(text = element_text(size=10))
-
-plot_name=paste0("/Users/marialucenaperez/Dropbox/PhD/contemporary/ANGSD/depth_calculus/",my_files_depthGlobal[i],"_",mean_folds,".pdf",sep="")
+plot_name=paste0("/Users/Dani/ownCloud/backup/annotation/IBD_analysis/beagle_gl/",my_files_depthGlobal[i],"_",mean_folds,".pdf",sep="")
 ggsave(filename = plot_name)
-
 }
 
-# When finished write the table
-
-write.table(x = depth_per_sample,file = paste("/Users/marialucenaperez/Dropbox/PhD/contemporary/ANGSD/depth_calculus/mean_sd_depthGlobal_lynx_per_pop_mean_folds_",mean_folds,".csv", sep= ""),quote=FALSE, col.names = FALSE, row.names = FALSE, sep= " ")
+#Write complete csv table:
+write.table(x = depth_per_sample,file = paste("/Users/Dani/ownCloud/backup/annotation/IBD_analysis/beagle_gl/mean_sd_depthGlobal_lynx_per_pop_mean_folds_",mean_folds,".csv", sep= ""),quote=FALSE, col.names = FALSE, row.names = FALSE, sep= " ")
 
 ```
 
-Bajar la tabla al servidor. 
+###Run ANGSD to obtain the BEAGLE format genotype likelihood files:
 
+```{r Prepare input files for ngsF-HMM, eval=FALSE, engine='bash'}
 
-```{bash}
+#Third, run ANGSD to obtain the genotype likelihood files.
 
-#Third, run ANGSD to obtain the genotype likelihood files:
-RUTA=/home/mlucena/ANGSD_analysis
-THREADS=15 #no. of computer cores used by bwa and samtools. 20 = OK, >20 = ask people first!
+#To that end, first the previously obtained depth table must be uploaded to the server (from the local computer).
+scp /Users/Dani/ownCloud/backup/annotation/IBD_analysis/beagle_gl/mean_sd_depthGlobal_lynx_per_pop_mean_folds_0.95.csv dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/beagle_gl/
 
-read POP mean sd mean_truncated sd_truncated maxDepth minDepth maxDepth_truncated minDepth_truncated < $RUTA/"${POP}"_mean_sd_depthGlobal_lynx_per_pop_mean_folds_0.95.csv
+#Prepare files and filters to run ANGSD:
+
+cd $I_PATH/beagle_gl
+screen -S c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060.genolike.log
+script c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060.genolike.log
+
+cd $I_PATH/beagle_gl
+THREADS=8 #no. of computer cores used by bwa and samtools. 20 = OK, >20 = ask people first!
+POP=(c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060)
+read POP mean sd mean_truncated sd_truncated maxDepth minDepth maxDepth_truncated minDepth_truncated < $I_PATH/beagle_gl/"${POP}"_mean_sd_depthGlobal_lynx_per_pop_mean_folds_0.95.csv
 
 ANGSD="/opt/angsd/angsd"
 NGSTOOLS="/opt/angsd/angsd/misc"
@@ -227,10 +199,7 @@ N_IND=$(echo ${POP: -3} )
 MIN_IND=$(expr $N_IND / 2)
 SNP_PVAL="1e-4"
 
-RUTA=/home/mlucena/ANGSD_analysis
-RUTA=/home/dkleinman/IBD_tracts
-
-# Sanity checks:
+#Sanity checks:
 echo $POP
 echo $N_IND
 echo $MIN_IND
@@ -239,13 +208,15 @@ echo $minDepth
 echo $SNP_PVAL
 
 # Running GL:
-$ANGSD/angsd -nThreads $THREADS -bam $RUTA/intergenic_analysis/"$POP".intergenic.bamlist -ref $REF  \ ¡¡¡CHANGE PATH TO BAMLIST AND NAME!!!
+$ANGSD/angsd -nThreads $THREADS -bam $I_PATH/beagle_gl/"$POP".bamlist -ref $REF  \
 -out "$POP".genolike \
 $FILTER1 \
 $FILTER2 \
--GL 1  -doGlf 2 \
+-GL 1 -doGlf 2 \
 -doMajorMinor 1 -doMaf 1 -SNP_pval $SNP_PVAL -skipTriallelic 1 \
--minInd $MIN_IND -setMaxDepth $maxDepth -setMinDepth $minDepth 
+-minInd $MIN_IND -setMaxDepth $maxDepth -setMinDepth $minDepth
+
+#And done.
 
 # Parameters chosen:
 # FILTER1=" -uniqueOnly 1 -remove_bads 1 -only_proper_pairs 1 -baq 1 -C 50 "
@@ -258,12 +229,7 @@ $FILTER2 \
 # -SNP_pval [float]
 # The p-value used for calling snaps. see Allele_Frequency_estimation for additional options. 
 
-
-
-
-
-
-#Test file:
+#Previously I ran everything using this test file (that Maria generated before):
 less -S $I_PATH/c_ll_no-c_ll_ba-h_ll_ba-c_ll_cr-c_ll_po-c_ll_la-c_ll_ki-c_ll_ur-c_ll_tu-c_ll_to-c_ll_ka-c_ll_og-c_ll_ya-c_ll_vl_n080.genolike.beagle.gz
 
 ```
