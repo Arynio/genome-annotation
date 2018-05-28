@@ -24,7 +24,7 @@ BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
 
 #I first did all these with the subsampled rufus BAM, but eventually I substituted them with the original one.
 
-#This was only used to produce the gVCF file for the original (not subsampled) Macrogen Lynx rufus sample, and was actually performed as part of the c_lp_ll_lc_lr_VCF script:
+#This was only used to produce the gVCF file for the original (not subsampled) Macrogen Lynx rufus sample, and was actually performed as part of the substitutions_lynx_genus_VCFs script:
 cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/MACROGEN_samples_25x
 java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar /opt/GATK-3.7/GenomeAnalysisTK.jar \
     -T HaplotypeCaller \
@@ -445,7 +445,7 @@ for (i in 2:10) {
   dev.off()
   source("/Users/Dani/ownCloud/backup/annotation/TreeMix/plotting_funcs.R")
   pdf(paste0(local_repo,"intergenic/rooted/wout_ba_w_mo/independent_m_2_runs/eurasian_lynx_intergenic_rooted_wout_ba_w_mo_out_stem_2_migration_run_",i,"_residuals.pdf"),width=20,height=10)
-  eurasian_lynx_rooted_migration <- plot_resid(paste0(local_repo,"intergenic/rooted/wout_ba_w_mo/independent_m_2_runs/eurasian_lynx_intergenic_rooted_wout_ba_w_mo_out_stem_2_migration_run_",i),paste0(local_repo,"intergenic/rooted/wout_ba_w_mo/pop_order"))
+  eurasian_lynx_rooted_migration <- plot_resid(paste0(local_repo,"intergenic/rooted/wout_ba_w_mo/independent_m_2_runs/eurasian_lynx_intergenic_rooted_wout_ba_w_mo_out_stem_2_migration_run_",i),paste0(local_repo,"intergenic/rooted/wout_ba_w_mo/independent_m_2_runs/pop_order"))
   eurasian_lynx_rooted_migration
   dev.off()
 }
