@@ -344,7 +344,7 @@ $BCF reheader -s list_to_remove.txt -o c_ll_lp_plus_h_ll_renamed.vcf c_ll_lp_plu
 
 ```{r Split the VCF into per species VCFs, eval=FALSE, engine='bash'}
 
-#Split the VCF in order to get one for each species. It will be necessary to get rid of substitutions. During this step, all fixed positions within each species (including substitutions) will also be removed (with minor allele count = 1).
+#Split the VCF in order to get one for each species. It will be necessary to get rid of substitutions. During this step, all fixed positions within each species (including substitutions) will also be removed (with minor allele count = 1). WARNING: BCFtools doesn't recalculate most VCF fields!!! This should be done first with GATK and then substitutions can be filtered out in a subsequent step with BCFtools.
 cd $G_PATH
 declare SPECIES=$(ls {*lp,*ll}_*.g.vcf.gz | cut -c3-4 | sort | uniq)
 for i in ${SPECIES[@]}
@@ -355,6 +355,7 @@ for i in ${SPECIES[@]}
   done
 rm list_to_remove.txt
 
+#The resulting per species VCFs won't have most fields recalculated!!!
 grep -v '#' ll_species.vcf | wc -l #18244146
 grep -v '#' lp_species.vcf | wc -l #4310101
 
