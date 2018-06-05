@@ -230,7 +230,7 @@ $FILTER2 \
 # The p-value used for calling snaps. see Allele_Frequency_estimation for additional options. 
 
 #Previously I ran everything using this test file (that Maria generated before):
-less -S $I_PATH/c_ll_no-c_ll_ba-h_ll_ba-c_ll_cr-c_ll_po-c_ll_la-c_ll_ki-c_ll_ur-c_ll_tu-c_ll_to-c_ll_ka-c_ll_og-c_ll_ya-c_ll_vl_n080.genolike.beagle.gz
+less -S $I_PATH/beagle_gl/c_ll_no-c_ll_ba-h_ll_ba-c_ll_cr-c_ll_po-c_ll_la-c_ll_ki-c_ll_ur-c_ll_tu-c_ll_to-c_ll_ka-c_ll_og-c_ll_ya-c_ll_vl_n080.genolike.beagle.gz
 
 ```
 
@@ -239,18 +239,19 @@ less -S $I_PATH/c_ll_no-c_ll_ba-h_ll_ba-c_ll_cr-c_ll_po-c_ll_la-c_ll_ki-c_ll_ur-
 ```{r Prepare input files for ngsF-HMM, eval=FALSE, engine='bash'}
 
 #If only variable positions are needed:
-cd $I_PATH
-zcat c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060.genolike.beagle.gz | cut -f1 | cut -d$'_' -f1,2 --output-delimiter=' ' > variable_coordinates.list
+cd $I_PATH/beagle_gl
+zcat c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060.genolike.beagle.gz | cut -f1 | cut -d$'_' -f1,2 --output-delimiter=' ' | tail -n +2 > $I_PATH/ngsF-HMM/variable_coordinates.list
+#Remove the tail command if the genolike file doesn't have headers.
 
 
 #If all positions are needed:
-cd $I_PATH
+cd $I_PATH/ngsF-HMM
 screen -S genome_coordinates.list.log
 script genome_coordinates.list.log
 
-cd $I_PATH
-rm $I_PATH/scaffolds_list.borrar
-rm $I_PATH/positions_list.borrar
+cd $I_PATH/ngsF-HMM
+rm $I_PATH/ngsF-HMM/scaffolds_list.borrar
+rm $I_PATH/ngsF-HMM/positions_list.borrar
 SC_DATA=$(awk '{print $1"_"$2}' /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/Length_scaffolds_lp23)
 for i in ${SC_DATA[@]}
   do
@@ -259,11 +260,11 @@ for i in ${SC_DATA[@]}
   SC_LENGTH=$(echo "${i}" | cut -d'_' -f2)
   for j in ${SC_LENGTH[@]}
     do
-    echo "$SC_NAME" | awk '{for (k = 1; k <= '${j}'; k++) print $1}' >> $I_PATH/scaffolds_list.borrar
-    seq "${j}" >> $I_PATH/positions_list.borrar
+    echo "$SC_NAME" | awk '{for (k = 1; k <= '${j}'; k++) print $1}' >> $I_PATH/ngsF-HMM/scaffolds_list.borrar
+    seq "${j}" >> $I_PATH/ngsF-HMM/positions_list.borrar
     done 
   done
-paste $I_PATH/scaffolds_list.borrar $I_PATH/positions_list.borrar > genome_coordinates.list
+paste $I_PATH/ngsF-HMM/scaffolds_list.borrar $I_PATH/ngsF-HMM/positions_list.borrar > genome_coordinates.list
 
 ```
 
@@ -272,11 +273,12 @@ paste $I_PATH/scaffolds_list.borrar $I_PATH/positions_list.borrar > genome_coord
 
 ```{r Run ngsF-HMM, eval=FALSE, engine='bash'}
 
-cd $I_PATH
-screen -S ngsF-HMM_test.log
-script ngsF-HMM_test.log
+cd $I_PATH/ngsF-HMM
+screen -S c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060_ngsF-HMM.log
+script c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060_ngsF-HMM.log
 
-cd $I_PATH
-$NGSF --geno c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060.genolike.beagle.gz --lkl --pos variable_coordinates.list --n_ind 60 --n_sites n! --out $I_PATH/ngsF-HMM_test
+cd $I_PATH/ngsF-HMM
+N_SITES=$(cat variable_coordinates.list | wc -l)
+$NGSF --geno $I_PATH/beagle_gl/c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060.genolike.beagle.gz --lkl --pos variable_coordinates.list --n_ind 60 --n_sites $N_SITES --out c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060_ngsF-HMM
 
 ```
