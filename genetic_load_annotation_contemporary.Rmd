@@ -141,6 +141,9 @@ java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -X
 -V c_ll_lp_plus_h_ll_aafilled.vcf \
 -o c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter.vcf
 
+!!!! REVIEW OTHER FILTERS
+!!!! REMOVE REPETITIONS
+
 ```
 
 #3: Set up SnpEff.
