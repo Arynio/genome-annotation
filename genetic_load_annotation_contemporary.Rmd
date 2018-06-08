@@ -56,48 +56,54 @@ perl /home/dkleinman/datos/snpEff/data/polarize_vcf_fabascal.pl test.ann.vcf > t
 
 ```{r Polarize contemporary VCF, eval=FALSE, engine='bash'}
 
-#Polarize the AA-filled VCF based on the new INFO/AA column. Alleles will be switched whenever the ancestral allele matches the alternative one, and genotypes will be properly recoded as well.
+#Polarize the AA-filled VCF based on the new INFO/AA column. Alleles will be switched whenever the ancestral allele matches the alternative one, and genotypes will be properly recoded as well. The following code was originally provided by Pierre Lindenbaum and modified by José Luis Castro
 
 #So far, the current code yields the following error: "Allele C* is not an allele in the variant context". I contacted the author in case he knows what to do next.
 
-java -jar /opt/jvarkit/dist/vcffilterjdk.jar -e 'if(variant.getNAlleles()!=2 || !variant.hasAttribute("AA")) return true;
-final String aa = variant.getAttributeAsString("AA","");
-if(!variant.getAlleles().get(1).getDisplayString().equalsIgnoreCase(aa)) return true;
-VariantContextBuilder vb=new VariantContextBuilder(variant);
+cd $V_PATH
 
-Allele oldalt =  variant.getAlleles().get(1);
-Allele oldref =  variant.getAlleles().get(0);
-Allele ref= Allele.create(oldalt.getDisplayString(),true);
+java -jar /opt/jvarkit/dist/vcffilterjdk.jar -e 'if(variant.getNAlleles()!=2 || !variant.hasAttribute("AA")) return true; 
+final String aa = variant.getAttributeAsString("AA",""); 
+if(!variant.getAlleles().get(1).getDisplayString().equalsIgnoreCase(aa)) return true; 
+VariantContextBuilder vb=new VariantContextBuilder(variant); 
+
+Allele oldalt = variant.getAlleles().get(1);
+Allele oldref = variant.getAlleles().get(0); 
+Allele ref= Allele.create(oldalt.getDisplayString(),true); 
 Allele alt= Allele.create(oldref.getDisplayString(),false);
 
-vb.alleles(Arrays.asList(ref,alt));
+vb.alleles(Arrays.asList(ref,alt)); 
 
-List<Genotype> genotypes= new ArrayList<>();
-for(Genotype g: variant.getGenotypes())
-    {
-    if(!g.isCalled()) { genotypes.add(g); continue;}
-    GenotypeBuilder gb = new GenotypeBuilder(g);
-    List<Allele> alleles = new ArrayList<>();
-    for(Allele a:g.getAlleles())
-        {
-        if(a.equals(oldalt)) { a=ref;}
-        else if(a.equals(oldref)) { a=alt;}
-        alleles.add(a);
-        }
-    if(g.hasPL()) {
-        int pl[] = g.getPL();
-        int pl2[] = new int[pl.length];
-        for(int i=0;i< pl.length;i++) pl2[i]=pl[(pl.length-1)-i];
-        gb.PL(pl2);
-        }
-    genotypes.add(gb.alleles(alleles).make());
-    }
+List genotypes= new ArrayList<>(); 
+for(Genotype g: variant.getGenotypes()) 
+  { 
+  if(!g.isCalled()) 
+  { genotypes.add(g); continue;} 
+  GenotypeBuilder gb = new GenotypeBuilder(g); 
+  List alleles = new ArrayList<>(); 
+  for(Allele a:g.getAlleles()) { 
+    if(a.equals(oldalt)) { a=ref;} 
+    else if(a.equals(oldref)) { a=alt;} 
+    alleles.add(a); 
+    } 
+  if(g.hasPL()) { 
+    int pl[] = g.getPL(); 
+    int pl2[] = new int[pl.length]; 
+    for(int i=0;i< pl.length;i++) pl2[i]=pl[(pl.length-1)-i]; 
+    gb.PL(pl2); 
+    } 
+  if(g.hasAD()) 
+    { int ad[] = g.getAD(); 
+    int ad2[] = new int[ad.length]; 
+    for(int i=0;i< ad.length;i++) ad2[i]=ad[(ad.length-1)-i];
+    gb.AD(ad2); 
+  } 
+  genotypes.add(gb.alleles(alleles).make()); 
+  }
 
-vb.attribute("AC",variant.getGenotypes().stream().flatMap(G->G.getAlleles().stream()).filter(A->A.equals(oldref)).count());
-vb.genotypes(genotypes);
-return vb.make();' -o test_polarized.ann.vcf test.ann.vcf
-
-vb.attribute("AF",(variant.getGenotypes().stream().flatMap(G->G.getAlleles().stream()).filter(A->A.equals(oldref)).count())/(variant.getGenotypes().stream().flatMap(G->G.getAlleles().stream()).count()));
+vb.attribute("AF",1.0d - Double.parseDouble(variant.getAttributeAsString("AF",""))); vb.attribute("AC",variant.getGenotypes().stream().flatMap(G->G.getAlleles().stream()).filter(A->A.equals(oldref)).count()); 
+vb.genotypes(genotypes); 
+return vb.make();' -o c_ll_lp_plus_h_ll_aafilled_polarized_SNPs_standard_filter.vcf c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter.vcf
 
 ```
 
@@ -258,9 +264,9 @@ cut -d$'\t' -f1,3,4,5 /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.GENE
 
 ```{r Variants annotation (detailed), eval=FALSE, engine='bash'}
 
-cd $O_PATH/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation/
-screen -S c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter.ann.log #open a dettachable screen in case the test takes too long
-script c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter.ann.log #initiate the log file
+cd $O_PATH/c_ll_lp_plus_h_ll_aafilled_polarized_SNPs_standard_filter_detailed_annotation/
+screen -S c_ll_lp_plus_h_ll_aafilled_polarized_SNPs_standard_filter.ann.log #open a dettachable screen in case the test takes too long
+script c_ll_lp_plus_h_ll_aafilled_polarized_SNPs_standard_filter.ann.log #initiate the log file
 
 S_PATH=/opt/snpEff #software path
 C_PATH=/home/dkleinman/datos/snpEff #config file path
@@ -269,7 +275,7 @@ I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
 V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
 
 cd $C_PATH
-java -Xmx16g -jar $S_PATH/snpEff.jar LYPA.23 -v -s $O_PATH/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter.ann.html -csvStats $O_PATH/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter.ann.csv -interval $C_PATH/data/LYPA23C.GENE.mRNA.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.intergenic.nr.bed $V_PATH/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter.vcf > $O_PATH/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter.ann.vcf #run this code from the directory where the config is located.
+java -Xmx16g -jar $S_PATH/snpEff.jar LYPA.23 -v -s $O_PATH/c_ll_lp_plus_h_ll_aafilled_polarized_SNPs_standard_filter_detailed_annotation/c_ll_lp_plus_h_ll_aafilled_polarized_SNPs_standard_filter.ann.html -csvStats $O_PATH/c_ll_lp_plus_h_ll_aafilled_polarized_SNPs_standard_filter_detailed_annotation/c_ll_lp_plus_h_ll_aafilled_polarized_SNPs_standard_filter.ann.csv -interval $C_PATH/data/LYPA23C.GENE.mRNA.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.intergenic.nr.bed $V_PATH/c_ll_lp_plus_h_ll_aafilled_polarized_SNPs_standard_filter.vcf > $O_PATH/c_ll_lp_plus_h_ll_aafilled_polarized_SNPs_standard_filter_detailed_annotation/c_ll_lp_plus_h_ll_aafilled_polarized_SNPs_standard_filter.ann.vcf #run this code from the directory where the config is located.
 
 ```
 
