@@ -24,7 +24,7 @@ BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
 ```
 
 #1: Polarize contemporary VCF. Use VCFtools in order to polarize (ancestral vs. derived) the contemporary ll & lp VCF. The ancestral state was inferred by Maria.
-##Option A: add Ancestral Allele annotation to the VCF, and then polarize it.
+##Option A: add Ancestral Allele annotation to the VCF, and then polarize it. This is the option that we ended up using.
 
 ###Use vcftools to fill the INFO/AA field of the VCF.
 
@@ -47,8 +47,7 @@ V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
 
 cat $V_PATH/c_ll_lp_plus_h_ll_renamed.vcf | /opt/vcftools_0.1.13/perl/fill-aa -a /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa.gz | bgzip -c > c_ll_lp_plus_h_ll_aafilled.vcf.gz #I tried to run this first without bgzipping it, and it was increasingly slow. Each day it did around half the previous day. When the server crashed, I relaunched it adding the bgzip command and it finished in a little over 24h.
 
-#Test the VCF polarization using Federico Abascal's perl code:
-perl /home/dkleinman/datos/snpEff/data/polarize_vcf_fabascal.pl test.ann.vcf > test_polarized.ann.vcf #it doesn't work...
+gzip -d -k c_ll_lp_plus_h_ll_aafilled.vcf.gz #Get decompressed version. I ran md5sum for both the gzipped and the unzipped versions and there were no differences.
 
 ```
 
@@ -61,6 +60,8 @@ perl /home/dkleinman/datos/snpEff/data/polarize_vcf_fabascal.pl test.ann.vcf > t
 #So far, the current code yields the following error: "Allele C* is not an allele in the variant context". I contacted the author in case he knows what to do next.
 
 cd $V_PATH
+screen -S c_ll_lp_plus_h_ll_polarized.log
+script c_ll_lp_plus_h_ll_polarized.log
 
 java -jar /opt/jvarkit/dist/vcffilterjdk.jar -e 'if(variant.getNAlleles()!=2 || !variant.hasAttribute("AA")) return true; 
 final String aa = variant.getAttributeAsString("AA",""); 
@@ -103,11 +104,11 @@ for(Genotype g: variant.getGenotypes())
 
 vb.attribute("AF",1.0d - Double.parseDouble(variant.getAttributeAsString("AF",""))); vb.attribute("AC",variant.getGenotypes().stream().flatMap(G->G.getAlleles().stream()).filter(A->A.equals(oldref)).count()); 
 vb.genotypes(genotypes); 
-return vb.make();' -o c_ll_lp_plus_h_ll_aafilled_polarized_SNPs_standard_filter.vcf c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter.vcf
+return vb.make();' -o c_ll_lp_plus_h_ll_polarized.vcf c_ll_lp_plus_h_ll_aafilled.vcf
 
 ```
 
-##Option B: generate new VCF with the ancestral state as the reference. Use GATK to make a calling with lynx rufus as the reference.
+##Option B: generate new VCF with the ancestral state as the reference. Use GATK to make a calling with lynx rufus as the reference. We opted for Option A instead.
 
 ```{r Polarize contemporary VCF, eval=FALSE, engine='bash'}
 
@@ -129,30 +130,7 @@ $(for var in *.g.vcf.gz; do echo -V ${var}" ";done) \
 
 ```
 
-#2: Extract SNPs. Subset the VCF files in order to keep only good quality biallelic SNP variants. INDELs, multiallelic SNPs and bad quality SNPs will be dropped at this step.
-
-```{r Extract SNPs, eval=FALSE, engine='bash'}
-
-#During this step, all INDELs as well as all multiallelic and bad quality SNPs will be dropped from the respective VCFs.
-screen -S c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_vcf.log
-script c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_vcf.log
-
-cd $V_PATH
-java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
--T SelectVariants \
--selectType SNP \
--restrictAllelesTo BIALLELIC \
--select "QD >= 2.0 && FS <= 60.0 && MQ >= 40.0 && MQRankSum >= -12.5 && ReadPosRankSum >= -8.0" \
--R $REF \
--V c_ll_lp_plus_h_ll_aafilled.vcf \
--o c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter.vcf
-
-!!!! REVIEW OTHER FILTERS
-!!!! REMOVE REPETITIONS
-
-```
-
-#3: Set up SnpEff.
+#2: Set up SnpEff.
 ##Search for the Lynx pardinus database. 
 Search for the Lynx pardinus assembly database in the program's pre-built database. As of June the 6th, 2017, the Lynx pardinus genome isn't included in the snpEff database. A second option would be building our own Lynx pardinus database.
 
@@ -208,8 +186,8 @@ mv lp23.fa LYPA.23.fa #rename the file so that it matches the code
 mkdir $C_PATH/data/LYPA.23b #create a directory inside the software's dependencies whose name matches the code
 cd $C_PATH/data/LYPA.23b
 
-scp /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.GENE.mRNA.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.intergenic.nr.gff3 $C_PATH/data/LYPA.23b/ #copy the annotation file (can be gff or gtf) to the newly created directory. This gff file is very detailed and includes CDS, introns, exons, genes, and many more.
-mv LYPA23C.GENE.mRNA.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.intergenic.nr.gff3 genes.gff #rename the file as the tutorial indicates
+scp /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.UCNE.intergenic.nr.gff3 $C_PATH/data/LYPA.23b/ #copy the annotation file (can be gff or gtf) to the newly created directory. This gff file is very detailed and includes CDS, introns, exons, genes, and many more.
+mv LYPA23C.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.UCNE.intergenic.nr.gff3 genes.gff #rename the file as the tutorial indicates
 
 cd $C_PATH/data/genomes
 scp LYPA.23.fa LYPA.23b.fa #copy the reference genome and rename it so that it also matches the detailed annotation entry
@@ -250,23 +228,23 @@ java -Xmx16g -jar $S_PATH/snpEff.jar GRCh37.75 -s $O_PATH/toys/test.chr22.ann $S
 
 ```
 
-#4: Variants annotation (detailed).
+#3: Annotate using SnpEff.
 ##Create custom annotation bed file
 
-```{r Variants annotation (detailed), eval=FALSE, engine='bash'}
+```{r Annotate using SnpEff, eval=FALSE, engine='bash'}
 
 #Create bed file with custom annotations based on the gff3 that María compiled.
-cut -d$'\t' -f1,3,4,5 /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.GENE.mRNA.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.intergenic.nr.gff3 | awk '{printf ("%s\t%s\t%s\t%s\n", $1, $3, $4, $2)}' > /home/dkleinman/datos/snpEff/data/LYPA23C.GENE.mRNA.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.intergenic.nr.bed
+cut -d$'\t' -f1,3,4,5 /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.UCNE.intergenic.nr.gff3 | awk '{printf ("%s\t%s\t%s\t%s\n", $1, $3, $4, $2)}' > /home/dkleinman/datos/snpEff/data/LYPA23C.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.UCNE.intergenic.nr.bed
 
 ```
 
 ##Annotate the VCF with custom annotation
 
-```{r Variants annotation (detailed), eval=FALSE, engine='bash'}
+```{r Annotate using SnpEff, eval=FALSE, engine='bash'}
 
-cd $O_PATH/c_ll_lp_plus_h_ll_aafilled_polarized_SNPs_standard_filter_detailed_annotation/
-screen -S c_ll_lp_plus_h_ll_aafilled_polarized_SNPs_standard_filter.ann.log #open a dettachable screen in case the test takes too long
-script c_ll_lp_plus_h_ll_aafilled_polarized_SNPs_standard_filter.ann.log #initiate the log file
+cd $V_PATH/annotation/
+screen -S c_ll_lp_plus_h_ll_polarized.ann.log #open a dettachable screen in case the test takes too long
+script c_ll_lp_plus_h_ll_polarized.ann.log #initiate the log file
 
 S_PATH=/opt/snpEff #software path
 C_PATH=/home/dkleinman/datos/snpEff #config file path
@@ -274,12 +252,39 @@ O_PATH=/home/dkleinman/datos/snpEff #output path
 I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
 V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
 
-cd $C_PATH
-java -Xmx16g -jar $S_PATH/snpEff.jar LYPA.23 -v -s $O_PATH/c_ll_lp_plus_h_ll_aafilled_polarized_SNPs_standard_filter_detailed_annotation/c_ll_lp_plus_h_ll_aafilled_polarized_SNPs_standard_filter.ann.html -csvStats $O_PATH/c_ll_lp_plus_h_ll_aafilled_polarized_SNPs_standard_filter_detailed_annotation/c_ll_lp_plus_h_ll_aafilled_polarized_SNPs_standard_filter.ann.csv -interval $C_PATH/data/LYPA23C.GENE.mRNA.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.intergenic.nr.bed $V_PATH/c_ll_lp_plus_h_ll_aafilled_polarized_SNPs_standard_filter.vcf > $O_PATH/c_ll_lp_plus_h_ll_aafilled_polarized_SNPs_standard_filter_detailed_annotation/c_ll_lp_plus_h_ll_aafilled_polarized_SNPs_standard_filter.ann.vcf #run this code from the directory where the config is located.
+cd $O_PATH #run this code from the directory where the config is located.
+java -Xmx16g -jar $S_PATH/snpEff.jar LYPA.23 -v -s $V_PATH/annotation/c_ll_lp_plus_h_ll_polarized.ann.html -csvStats $V_PATH/annotation/c_ll_lp_plus_h_ll_polarized.ann.csv -interval $C_PATH/data/LYPA23C.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.UCNE.intergenic.nr.bed $V_PATH/c_ll_lp_plus_h_ll_polarized.vcf > $V_PATH/annotation/c_ll_lp_plus_h_ll_polarized.ann.vcf #run this code from the directory where the config is located.
 
 ```
 
-#5: Get annotation statistics for each population.
+#4: Filter the annotated VCF. Subset the VCF files in order to keep only good quality biallelic SNP variants. INDELs, multiallelic SNPs and bad quality SNPs will be dropped at this step.
+
+```{r Filter the annotated VCF, eval=FALSE, engine='bash'}
+
+!!! HERE WE SHOULD REMOVE REPETITIVE REGIONS AND THOSE WITH BAD MAPPABILITY... ALSO INDELS AND MULTIALLELIC SNPS... ALSO APPLY STANDARD GATK FILTERS AND THEN SOME. THEN SPLIT BY SPECIES AND APPLY ADDITIONAL FILTERS !!!
+
+#During this step, all INDELs as well as all multiallelic and bad quality SNPs will be dropped from the respective VCFs.
+screen -S c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_vcf.log
+script c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_vcf.log
+
+cd $V_PATH
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T SelectVariants \
+-selectType SNP \
+-restrictAllelesTo BIALLELIC \
+-select "QD >= 2.0 && FS <= 60.0 && MQ >= 40.0 && MQRankSum >= -12.5 && ReadPosRankSum >= -8.0" \
+-R $REF \
+-V c_ll_lp_plus_h_ll_aafilled.vcf \
+-o c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter.vcf !!! RENAME EVERYTHING
+
+!!!! REVIEW OTHER FILTERS
+!!!! REMOVE REPETITIONS
+
+```
+
+
+
+#?: Get annotation statistics for each population.
 ##Split the VCF into per population VCFs. Generate a VCF for each population.
 
 ```{r Get annotation statistics for each population, eval=FALSE, engine='bash'}
