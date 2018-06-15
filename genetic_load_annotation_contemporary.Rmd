@@ -255,34 +255,236 @@ V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
 cd $O_PATH #run this code from the directory where the config is located.
 java -Xmx16g -jar $S_PATH/snpEff.jar LYPA.23 -v -s $V_PATH/annotation/c_ll_lp_plus_h_ll_polarized.ann.html -csvStats $V_PATH/annotation/c_ll_lp_plus_h_ll_polarized.ann.csv -interval $C_PATH/data/LYPA23C.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.UCNE.intergenic.nr.bed $V_PATH/c_ll_lp_plus_h_ll_polarized.vcf > $V_PATH/annotation/c_ll_lp_plus_h_ll_polarized.ann.vcf #run this code from the directory where the config is located.
 
+grep -v '#' c_ll_lp_plus_h_ll_polarized.ann.vcf | wc -l #23999314
+
 ```
 
 #4: Filter the annotated VCF. Subset the VCF files in order to keep only good quality biallelic SNP variants. INDELs, multiallelic SNPs and bad quality SNPs will be dropped at this step.
 
 ```{r Filter the annotated VCF, eval=FALSE, engine='bash'}
 
-!!! HERE WE SHOULD REMOVE REPETITIVE REGIONS AND THOSE WITH BAD MAPPABILITY... ALSO INDELS AND MULTIALLELIC SNPS... ALSO APPLY STANDARD GATK FILTERS AND THEN SOME. THEN SPLIT BY SPECIES AND APPLY ADDITIONAL FILTERS !!!
+#Remove repetitive regions and those with low mappability:
+cd $V_PATH/annotation
+bedtools subtract -a c_ll_lp_plus_h_ll_polarized.ann.vcf -b /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/repeats_and_lowcomp_no_redundant_mappability.k75_lessthan90.bed -header > c_ll_lp_plus_h_ll_polarized_filtered1.ann.vcf
+grep -v '#' c_ll_lp_plus_h_ll_polarized_filtered1.ann.vcf | wc -l #9308565
 
 #During this step, all INDELs as well as all multiallelic and bad quality SNPs will be dropped from the respective VCFs.
-screen -S c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_vcf.log
-script c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_vcf.log
-
-cd $V_PATH
+cd $V_PATH/annotation
 java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
 -T SelectVariants \
 -selectType SNP \
 -restrictAllelesTo BIALLELIC \
--select "QD >= 2.0 && FS <= 60.0 && MQ >= 40.0 && MQRankSum >= -12.5 && ReadPosRankSum >= -8.0" \
 -R $REF \
--V c_ll_lp_plus_h_ll_aafilled.vcf \
--o c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter.vcf !!! RENAME EVERYTHING
+-V c_ll_lp_plus_h_ll_polarized_filtered1.ann.vcf \
+-o c_ll_lp_plus_h_ll_polarized_filtered2.ann.vcf
+grep -v '#' c_ll_lp_plus_h_ll_polarized_filtered2.ann.vcf | wc -l #7598146
 
-!!!! REVIEW OTHER FILTERS
-!!!! REMOVE REPETITIONS
+#Apply GATK's recommended filters, and then some.     
+  #QD: QualByDepth (variant confidence divided by the unfiltered depth of non-reference samples). Default < 2.0.
+  #FS: FisherStrand (phred-scaled p-value using Fisher's Exact Test to detect strand bias in the reads). Default > 60.0.
+  #MQ: RMSMappingQuality (root mean square of Mapping Quality of reads across all samples). Default < 40.0.
+  #MQRankSum: MappingQualityRankSumTest (u-based z-approximation from Mann-Whitney Rank Sum Test for Mappin Qualities, i.e. reads with reference alleles vs. those with the alternate allele. Will only be applied to heterozygous calls). Default < -12.5. In theory, this would alleviate contamination problems.
+  #ReadPosRankSum: ReadPosRankSumTest (u-based z-approximation from Mann-Whitney Rank Sum Test for distance from end of the read for reads with the alternate allele. Will only be applied to heterozygous calls). Default < -8.0. In theory, this would alleviate damage problems.
+  #SOR: StrandOddsRatio (evaluates whether there's strand bias in the data). Default > 3.0.
+cd $V_PATH/annotation
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T SelectVariants \
+-select "QUAL >= 30 && QD >= 2.0 && FS <= 60.0 && MQ >= 40.0 && MQRankSum >= -12.5 && ReadPosRankSum >= -8.0" \
+-R $REF \
+-V c_ll_lp_plus_h_ll_polarized_filtered2.ann.vcf \
+-o c_ll_lp_plus_h_ll_polarized_filtered3.ann.vcf
+grep -v '#' c_ll_lp_plus_h_ll_polarized_filtered3.ann.vcf | wc -l #5176437
 
 ```
 
+#5: Split the VCF into per species VCFs. Generate a VCF for each species.
 
+```{r Get annotation statistics for each population, eval=FALSE, engine='bash'}
+
+#Split the annotated VCF into per species VCFs.
+cd $G_PATH
+declare SPECIES=$(ls {*_lp_*,*_ll_*}.g.vcf.gz | cut -c3-4 | sort | uniq)
+cd $V_PATH/annotation/
+for i in ${SPECIES[@]}
+  do
+  echo "${i}"
+  $BCF query -l $V_PATH/annotation/c_ll_lp_plus_h_ll_polarized_filtered3.ann.vcf | grep "${i}" > list_to_remove.txt
+  cat list_to_remove.txt
+  java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+  -T SelectVariants \
+  -R $REF \
+  -V $V_PATH/annotation/c_ll_lp_plus_h_ll_polarized_filtered3.ann.vcf \
+  -o $V_PATH/annotation/"${i}"_perspecies.ann.vcf \
+  --sample_file list_to_remove.txt
+  $BCF view --min-ac 1 -Ov -o $V_PATH/annotation/"${i}"_perspecies.trimmed.ann.vcf $V_PATH/annotation/"${i}"_perspecies.ann.vcf
+  done
+rm list_to_remove.txt
+
+grep -v '#' lp_perspecies.trimmed.ann.vcf | wc -l #
+grep -v '#' ll_perspecies.trimmed.ann.vcf | wc -l #4205538
+
+```
+
+#6: Depth range calculus. Obtain depth range for each species in order to filter low/high depth positions.
+##A
+
+```{r Depth range calculus, eval=FALSE, engine='bash'}
+
+#Depth for Eurasian lynx was already obtained by Maria. I'll use her code to get the same for Iberian lynx:
+#Since these populations are big, we'll be using Elena's captured intergenic fraction of the genome:
+
+POPS=(c_lp_do-c_lp_sm)
+cd /home/dkleinman/datos/c_lp_depth_calculus/
+
+screen -S c_lp_depth_calculus.log
+script c_lp_depth_calculus.log
+POP=(c_lp_do-c_lp_sm_n031)
+REF="/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa"
+THREADS=20                    # no. of computer cores used 20 = OK, >20 = ask people first!
+REGIONFILE="/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_intergenic_capture/BAM_intergenic_capture_filtered/no_genes_Lypa_10000longest_center_final_slop20_dot.rf"
+BAMLIST=$(ls /home/dkleinman/datos/c_lp_depth_calculus/"$POP".intergenic.bamlist)
+OUT_NAME="/home/dkleinman/datos/c_lp_depth_calculus/"$POP".intergenic.qc"
+NUMBER_IND=$(printf "%03d" `wc -l $BAMLIST | cut -f1 -d " "`)
+MAXDEPTH=$(expr $NUMBER_IND \* 1000)
+    
+#Sanity checks: 
+ls $BAMLIST
+echo $OUT_NAME
+echo $NUMBER_IND
+echo $MAXDEPTH
+    
+/opt/angsd/angsd/angsd \
+-P $THREADS \
+-b $BAMLIST \
+-ref $REF \
+-out $OUT_NAME \
+-uniqueOnly 1 \
+-remove_bads 1 \
+-only_proper_pairs 1 \
+-rf $REGIONFILE \
+-baq 1 \
+-C 50 \
+-doQsDist 1 \
+-doDepth 1 \
+-doCounts 1 \
+-maxDepth $MAXDEPTH
+
+#Once the files are ready, download them to continue working in R:
+scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/c_lp_depth_calculus/*.depth* /Users/Dani/ownCloud/backup/annotation/genetic_load/lp_depth
+
+```
+
+##B
+
+```{r Depth range calculus}
+
+#Now we use R to plot the depth distribution and to obtain a summary table:
+
+library(dplyr)
+library(plyr)
+library(ggplot2)
+library(gridExtra)
+library(knitr)
+    
+##Functions:
+get_mean <- function(dat) { with(dat, sum(as.numeric(freq)*value)/sum(as.numeric(freq))) }
+get_sd <- function(dat) { mu <- get_mean (dat) 
+with (dat, sqrt(sum(as.numeric(freq)*(value-mu)^2)/(sum(as.numeric(freq))-1))) } 
+    
+#*******************************************************************************************
+    
+my_files_depthGlobal = list.files(path = "/Users/Dani/ownCloud/backup/annotation/genetic_load/lp_depth",pattern="*.depthGlobal$") 
+    
+for (i in 1:length(my_files_depthGlobal)) {
+  assign(my_files_depthGlobal[i], (scan(paste0("/Users/Dani/ownCloud/backup/annotation/genetic_load/lp_depth/",my_files_depthGlobal[i],sep=""), sep = " ", dec = ".")) %>% .[!is.na(.)])
+  }
+mean_folds = 0.95
+depth_per_sample <- data.frame()
+    
+#Compute globaldepth for all populations found
+#*******************************************************************************************
+    
+for (i in 1:length(my_files_depthGlobal)) {
+  DF = read.table(paste0("/Users/Dani/ownCloud/backup/annotation/genetic_load/lp_depth/",my_files_depthGlobal[i],sep=""),head=F, stringsAsFactors=F, check.names=FALSE)
+  freq_table_DF <- data.frame (value = 1:length (DF), freq = t(DF))
+  freq_table_truncated_DF <- filter(freq_table_DF, value < (nrow(freq_table_DF)))
+  #Mean depth:
+  my_mean_DF <-  get_mean (freq_table_DF)
+  my_mean_truncated_DF <- get_mean (freq_table_truncated_DF)
+  my_sd_DF <-  get_sd (freq_table_DF)
+  my_sd_truncated_DF <- get_sd (freq_table_truncated_DF)
+  #Max and min depth:
+  maxDepth_DF = my_mean_DF + (mean_folds * my_mean_DF)
+  minDepth_DF  = my_mean_DF - (mean_folds * my_mean_DF)
+  maxDepth_truncated_DF = my_mean_truncated_DF + (mean_folds * my_sd_truncated_DF)
+  minDepth_truncated_DF  = my_mean_truncated_DF - (mean_folds * my_sd_truncated_DF)
+  #Para una o más poblaciones:
+  population=unlist(strsplit(my_files_depthGlobal[i],"[.]"))[1]
+  depth_per_sample <- rbind(depth_per_sample, 
+                            data.frame(pop = population,
+                                       mean = my_mean_DF, sd = my_sd_DF, 
+                                       mean_truncated =  my_mean_truncated_DF, sd_truncated = my_sd_truncated_DF,
+                                       maxDepth = maxDepth_DF, minDepth = minDepth_DF,
+                                       maxDepth_truncated = maxDepth_truncated_DF, minDepth_truncated = minDepth_truncated_DF)) 
+  #Plotting:
+  ggplot(freq_table_truncated_DF, aes(x = value, y = freq)) + 
+    geom_bar(stat = "identity", color = "black") +
+    scale_x_continuous(breaks = 0:250*10, limits = c(0, maxDepth_truncated_DF*1.5)) +
+    scale_y_continuous(expand=c(0,0)) +
+    ggtitle (paste(my_files_depthGlobal[i],"_", mean_folds, "_",maxDepth_truncated_DF, "_",maxDepth_DF) ) +
+    geom_vline(xintercept=maxDepth_DF,linetype="dashed", size=0.5) + 
+    geom_vline(xintercept=minDepth_DF,linetype="dashed", size=0.5) + 
+    geom_vline(xintercept=maxDepth_truncated_DF, colour ="grey",linetype="dashed", size=0.5) + 
+    geom_vline(xintercept=minDepth_truncated_DF,colour ="grey",linetype="dashed", size=0.5) + 
+    theme_classic() + 
+    theme(text = element_text(size=10))
+  plot_name=paste0("/Users/Dani/ownCloud/backup/annotation/genetic_load/lp_depth/",my_files_depthGlobal[i],"_",mean_folds,".pdf",sep="")
+  ggsave(filename = plot_name)
+  }
+
+#When finished write the table
+write.table(x = depth_per_sample,file = paste("/Users/Dani/ownCloud/backup/annotation/genetic_load/lp_depth/mean_sd_depthGlobal_lynx_per_pop_mean_folds_",mean_folds,".csv", sep= ""),quote=FALSE, col.names = FALSE, row.names = FALSE, sep= " ")
+    
+```
+
+##C
+
+```{r Depth range calculus, eval=FALSE, engine='bash'}
+
+#First upload the summary table to the server:
+scp /Users/Dani/ownCloud/backup/annotation/genetic_load/lp_depth/mean_sd_depthGlobal_lynx_per_pop_mean_folds_0.95.csv dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/c_lp_depth_calculus/
+
+#Separate in populations:
+cd /home/dkleinman/datos/c_lp_depth_calculus/
+POPS=$(cat /home/dkleinman/datos/c_lp_depth_calculus/mean_sd_depthGlobal_lynx_per_pop_mean_folds_0.95.csv | awk '{print $1}')
+for POP in ${POPS[@]}
+  do
+  echo $POP
+  grep "${POP} " /home/dkleinman/datos/c_lp_depth_calculus/mean_sd_depthGlobal_lynx_per_pop_mean_folds_0.95.csv > "$POP"_mean_sd_depthGlobal_lynx_per_pop_mean_folds_0.95.csv
+  done
+    
+```
+
+#7: Apply per species filters. Apply additional filters for each species' VCF that take into account depth, heterozygosity and number of genotyped individuals.
+
+```{r Apply per species filters, eval=FALSE, engine='bash'}
+
+cd $V_PATH/annotation/
+declare SPECIES=$(ls *_perspecies.trimmed.ann.vcf  | cut -c1-2 | uniq)
+for i in ${SPECIES[@]}
+  do
+  echo "${i}"
+  MIN_DP=$(cat /home/dkleinman/datos/c_lp_depth_calculus/c_"${i}"*.csv | awk '{print $8}')
+  MAX_DP=$(cat /home/dkleinman/datos/c_lp_depth_calculus/c_"${i}"*.csv | awk '{print $9}')
+  java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+  -T SelectVariants \
+  -select "DP > ${MIN_DP} && DP < ${MAX_DP}" \
+  -R $REF \
+  -V "${i}"_perspecies.trimmed.ann.vcf \
+  -o "${i}"_perspecies.trimmed_filtered.ann.vcf
+  done
+
+```
 
 #?: Get annotation statistics for each population.
 ##Split the VCF into per population VCFs. Generate a VCF for each population.
