@@ -320,7 +320,7 @@ for i in ${SPECIES[@]}
   done
 rm list_to_remove.txt
 
-grep -v '#' lp_perspecies.trimmed.ann.vcf | wc -l #
+grep -v '#' lp_perspecies.trimmed.ann.vcf | wc -l #1905227
 grep -v '#' ll_perspecies.trimmed.ann.vcf | wc -l #4205538
 
 ```
