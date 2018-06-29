@@ -469,20 +469,45 @@ for POP in ${POPS[@]}
 
 ```{r Apply per species filters, eval=FALSE, engine='bash'}
 
+#First, for each species exclude those positions that have more than 50% missing genotypes, as well as those that have lower (higher) depth than the minimum (maximum) within 0.95 of the distribution, as calculated above:
 cd $V_PATH/annotation/
-declare SPECIES=$(ls *_perspecies.trimmed.ann.vcf  | cut -c1-2 | uniq)
+declare SPECIES=$(ls *_perspecies.trimmed.ann.vcf | cut -c1-2 | uniq)
 for i in ${SPECIES[@]}
   do
   echo "${i}"
-  MIN_DP=$(cat /home/dkleinman/datos/c_lp_depth_calculus/c_"${i}"*.csv | awk '{print $8}')
-  MAX_DP=$(cat /home/dkleinman/datos/c_lp_depth_calculus/c_"${i}"*.csv | awk '{print $9}')
-  java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
-  -T SelectVariants \
-  -select "DP > ${MIN_DP} && DP < ${MAX_DP}" \
-  -R $REF \
-  -V "${i}"_perspecies.trimmed.ann.vcf \
-  -o "${i}"_perspecies.trimmed_filtered.ann.vcf
+  MIN_DP=$(cat /home/dkleinman/datos/c_lp_depth_calculus/c_"${i}"*.csv | awk '{print $9}')
+  MAX_DP=$(cat /home/dkleinman/datos/c_lp_depth_calculus/c_"${i}"*.csv | awk '{print $8}')
+  echo $MIN_DP
+  echo $MAX_DP
+  $BCF filter -e "DP < ${MIN_DP} || DP > ${MAX_DP} || F_MISSING > 0.5" -Ov -o $V_PATH/annotation/"${i}"_perspecies.trimmed_filtered1.ann.vcf $V_PATH/annotation/"${i}"_perspecies.trimmed.ann.vcf
   done
+grep -v '#' lp_perspecies.trimmed_filtered1.ann.vcf | wc -l #1829840
+grep -v '#' ll_perspecies.trimmed_filtered1.ann.vcf | wc -l #4121164
+
+#Next, for each species obtain a customized bed with the heterozygosity rate per variant. Observing the distribution of this rate, a threshold should be established, and only variants above it should be kept in this bed. In the next step, positions in this bed will be subtracted from the VCF.
+cd $V_PATH/annotation/
+declare SPECIES=$(ls *_perspecies.trimmed.ann.vcf | cut -c1-2 | uniq)
+for i in ${SPECIES[@]}
+  do
+  echo "${i}"
+  grep -v '^#' $V_PATH/annotation/"${i}"_perspecies.trimmed_filtered1.ann.vcf | perl -lne '@x=split /\s+/,$_;$var11=grep{/1\/1/}@x[9..$#x];$var01=(grep{/0\/1/}@x[9..$#x])+(grep{/1\/0/}@x[9..$#x]);$var00=grep{/0\/0/}@x[9..$#x];$varRAT=($var01/($var01+$var00+$var11));$varBED=$x[1]-1;print"$x[0]\t$varBED\t$x[1]\t$varRAT\n"' > "${i}"_perspecies.trimmed_filtered1.het.bed
+  #| awk -F"\t" '$4>0.8'
+  done
+  
+  !!! LLEVAR A R Y PLOTEAR DISTRIBUCIÓN
+  !!! DECIDIR UMBRAL DE CORTE Y AÑADIR AL BED
+  !!! CORRER SIGUIENTE SECCIÓN USANDO EL NOMBRE FINAL DEL BED
+
+#Remove variants with heterozygosity above the selected threshold:
+cd $V_PATH/annotation/
+declare SPECIES=$(ls *_perspecies.trimmed.ann.vcf | cut -c1-2 | uniq)
+for i in ${SPECIES[@]}
+  do
+  echo "${i}"
+  bedtools subtract -a "${i}"_perspecies.trimmed_filtered1.ann.vcf -b "${i}"_perspecies.trimmed_filtered1.het.bed -header > "${i}"_perspecies.trimmed_filtered2.ann.vcf
+  done
+grep -v '#' lp_perspecies.trimmed_filtered2.ann.vcf | wc -l #
+grep -v '#' ll_perspecies.trimmed_filtered2.ann.vcf | wc -l #
 
 ```
 
