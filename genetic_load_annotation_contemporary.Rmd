@@ -466,6 +466,7 @@ for POP in ${POPS[@]}
 ```
 
 #7: Apply per species filters. Apply additional filters for each species' VCF that take into account depth, heterozygosity and number of genotyped individuals.
+##Apply DP and missingness filters with BCF, and compute heterozygosity ratio using a custom script
 
 ```{r Apply per species filters, eval=FALSE, engine='bash'}
 
@@ -494,20 +495,45 @@ for i in ${SPECIES[@]}
   #| awk -F"\t" '$4>0.8'
   done
   
-  !!! LLEVAR A R Y PLOTEAR DISTRIBUCIÓN
-  !!! DECIDIR UMBRAL DE CORTE Y AÑADIR AL BED
-  !!! CORRER SIGUIENTE SECCIÓN USANDO EL NOMBRE FINAL DEL BED
+#Download from the server the bed files with the Het ratios, and jump to the next chunk to check the distributions in R:
+scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/l*.het.bed /Users/Dani/ownCloud/backup/annotation/genetic_load/het_ratio
 
+#In the R chunk that follows, we plot the distribution of Het ratio and decide not to exclude any SNP on the basis of high heterozygosity.
+
+#In the end we decide not to exclude any SNP on the basis of high heterozygosity.
 #Remove variants with heterozygosity above the selected threshold:
-cd $V_PATH/annotation/
-declare SPECIES=$(ls *_perspecies.trimmed.ann.vcf | cut -c1-2 | uniq)
-for i in ${SPECIES[@]}
-  do
-  echo "${i}"
-  bedtools subtract -a "${i}"_perspecies.trimmed_filtered1.ann.vcf -b "${i}"_perspecies.trimmed_filtered1.het.bed -header > "${i}"_perspecies.trimmed_filtered2.ann.vcf
-  done
-grep -v '#' lp_perspecies.trimmed_filtered2.ann.vcf | wc -l #
-grep -v '#' ll_perspecies.trimmed_filtered2.ann.vcf | wc -l #
+# cd $V_PATH/annotation/
+# declare SPECIES=$(ls *_perspecies.trimmed.ann.vcf | cut -c1-2 | uniq)
+# for i in ${SPECIES[@]}
+#   do
+#   echo "${i}"
+#   bedtools subtract -a "${i}"_perspecies.trimmed_filtered1.ann.vcf -b "${i}"_perspecies.trimmed_filtered1.het.bed -header > "${i}"_perspecies.trimmed_filtered2.ann.vcf
+#   done
+# grep -v '#' lp_perspecies.trimmed_filtered2.ann.vcf | wc -l #
+# grep -v '#' ll_perspecies.trimmed_filtered2.ann.vcf | wc -l #
+
+```
+
+##Plot the distribution of Het ratio to determine the filtering threshold
+
+```{r Apply per species filters}
+
+library(readr)
+library(ggplot2)
+
+ll_het_ratio <- read_tsv("/Users/Dani/ownCloud/backup/annotation/genetic_load/het_ratio/ll_perspecies.trimmed_filtered1.het.bed",col_names=F)
+ll_het_ratio
+ggplot(ll_het_ratio, aes(x=X4)) + geom_density()
+ggplot(ll_het_ratio, aes(x=X4)) + geom_histogram(binwidth=.001, colour="black", fill="white")
+ggplot(ll_het_ratio[ll_het_ratio$X4>=0.5,], aes(x=X4)) + geom_histogram(binwidth=.001, colour="black", fill="white")
+
+lp_het_ratio <- read_tsv("/Users/Dani/ownCloud/backup/annotation/genetic_load/het_ratio/lp_perspecies.trimmed_filtered1.het.bed",col_names=F)
+lp_het_ratio
+ggplot(lp_het_ratio, aes(x=X4)) + geom_density()
+ggplot(lp_het_ratio, aes(x=X4)) + geom_histogram(binwidth=.001, colour="black", fill="white")
+ggplot(lp_het_ratio[lp_het_ratio$X4>=0.5,], aes(x=X4)) + geom_histogram(binwidth=.001, colour="black", fill="white")
+
+#In the end we decide not to exclude any SNP on the basis of high heterozygosity.
 
 ```
 
