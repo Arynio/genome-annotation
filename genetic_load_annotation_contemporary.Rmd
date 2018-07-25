@@ -537,6 +537,55 @@ ggplot(lp_het_ratio[lp_het_ratio$X4>=0.5,], aes(x=X4)) + geom_histogram(binwidth
 
 ```
 
+#8: Obtain per population VCFs.
+##Split the VCF into per population VCFs. Generate a VCF for each population.
+
+```{r Obtain per population VCFs, eval=FALSE, engine='bash'}
+
+#Split the annotated VCF into per population VCFs, and then keep only those positions that are variable or fixed for the derived allele within each population.
+
+cd $V_PATH/annotation/
+screen -S perpop.ann.log
+script perpop.ann.log
+
+cd $G_PATH
+declare SPECIES=$(ls {*_lp_*,*_ll_*}.g.vcf.gz | cut -c3-4 | sort | uniq)
+cd $V_PATH/annotation/
+for i in ${SPECIES[@]}
+  do
+  echo "${i}"
+  cd $G_PATH
+  declare POP=$(ls c_{lp_sm*,lp_do*,ll_ki*,ll_po*,ll_no*}.g.vcf.gz | cut -c1-7 | uniq | grep "${i}")
+  cd $V_PATH/annotation/
+  for j in ${POP[@]}
+    do
+    echo "${j}"
+    rm pop_list_to_remove.txt
+    $BCF query -l $V_PATH/annotation/"${i}"_perspecies.trimmed_filtered1.ann.vcf | grep "${j}" > pop_list_to_remove.txt
+    cat pop_list_to_remove.txt
+    mkdir "${j}"_perpop
+    java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+    -T SelectVariants \
+    -R $REF \
+    -V $V_PATH/annotation/"${i}"_perspecies.trimmed_filtered1.ann.vcf \
+    -o $V_PATH/annotation/"${j}"_perpop.ann.vcf \
+    --sample_file pop_list_to_remove.txt
+    rm pop_list_to_remove.txt
+    done
+  done
+
+```
+
+##Subsample populations. Subsample all combinations of individuals from populations to the (per-species) minimum common number.
+
+```{r Obtain per population VCFs, eval=FALSE, engine='bash'}
+
+
+screen -dm -S "output_$i" ./run_my_program
+
+
+```
+
 #?: Get annotation statistics for each population.
 ##Split the VCF into per population VCFs. Generate a VCF for each population.
 
