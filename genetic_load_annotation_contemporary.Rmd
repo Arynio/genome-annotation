@@ -618,21 +618,132 @@ for i in ${SPECIES[@]}
 ```
 
 ###Subsample based on relatedness.
-####Obtain kinship coefficient estimates between individuals.
+####Obtain PLINK kinship coefficient estimates between individuals.
 
 ```{r Obtain per population VCFs, eval=FALSE, engine='bash'}
 
+#For SMO:
+
 #First, rename the samples in the VCF so that they can be converted into plink binary format (underscores aren't allowed):
 cd /home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_lp_sm_perpop/
-bcftools query -l toy.vcf | tr _ - > samples_renamed.txt
-bcftools reheader -s samples_renamed.txt toy.vcf > toy_renamed.vcf
-plink_1.9 --vcf toy_renamed.vcf --make-bed --out toy --allow-extra-chr #turn into plink binary format
-#Then download the files to use KING (it's in my local PC)
-./king -b toy.bed --kinship #it doesn't work because it doesn't recognize scaffolds as chromosomes...
+bcftools query -l c_lp_sm_perpop.ann.vcf | tr _ - > samples_renamed.txt
+bcftools reheader -s samples_renamed.txt c_lp_sm_perpop.ann.vcf > c_lp_sm_perpop_renamed.ann.vcf
+plink_1.9 --vcf c_lp_sm_perpop_renamed.ann.vcf --make-bed --out c_lp_sm_perpop_renamed --allow-extra-chr #turn into plink binary format
+plink_1.9 --vcf c_lp_sm_perpop_renamed.ann.vcf --genome --out c_lp_sm_perpop_renamed_relatedness --allow-extra-chr #obtain IBD estimates in plink
+awk '{ print $0, $10/2 }' c_lp_sm_perpop_renamed_relatedness.genome > c_lp_sm_perpop_renamed_kinship.genome #calculate the kinship coefficient (half the relatedness)
 
+#From outside of the server:
+scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_lp_sm_perpop/c_lp_sm_perpop_renamed_kinship.genome /Users/Dani/ownCloud/backup/annotation/g-w_relatedness/network_analysis/
+
+
+#For KIR:
+
+#First, rename the samples in the VCF so that they can be converted into plink binary format (underscores aren't allowed):
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_ll_ki_perpop/
+bcftools query -l c_ll_ki_perpop.ann.vcf | tr _ - > samples_renamed.txt
+bcftools reheader -s samples_renamed.txt c_ll_ki_perpop.ann.vcf > c_ll_ki_perpop_renamed.ann.vcf
+plink_1.9 --vcf c_ll_ki_perpop_renamed.ann.vcf --make-bed --out c_ll_ki_perpop_renamed --allow-extra-chr #turn into plink binary format
+plink_1.9 --vcf c_ll_ki_perpop_renamed.ann.vcf --genome --out c_ll_ki_perpop_renamed_relatedness --allow-extra-chr #obtain IBD estimates in plink
+awk '{ print $0, $10/2 }' c_ll_ki_perpop_renamed_relatedness.genome > c_ll_ki_perpop_renamed_kinship.genome #calculate the kinship coefficient (half the relatedness)
+
+!!!NO HAY KINSHIPS!!! VOLVER A CALCULAR TRAS HACER LD PRUNING?
+
+#From outside of the server:
+scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_ll_ki_perpop/c_ll_ki_perpop_renamed_kinship.genome /Users/Dani/ownCloud/backup/annotation/g-w_relatedness/network_analysis/
 
 ```
 
+####Obtain nodes and edges for network analysis.
+
+```{r Obtain per population VCFs}
+
+library(readr)
+library(dplyr)
+library(igraph)
+
+#For SMO:
+
+kinship_file <- read.delim("/Users/Dani/ownCloud/backup/annotation/g-w_relatedness/network_analysis/c_lp_sm_perpop_renamed_kinship.genome",sep="",stringsAsFactors=F)
+kinship_file
+colnames(kinship_file)[15] <- "KINSHIP"
+nodes <- unique(sort(c(kinship_file$IID1,kinship_file$IID2)))
+nodes
+
+edges_df <- kinship_file %>% filter(KINSHIP>0.1) %>% select(2,4)
+edges_df
+edges <- as.vector(t(edges_df))
+edges
+
+isolates <- setdiff(nodes,unique(sort(edges)))
+isolates
+
+graph_pop_19 <- graph(edges,isolates=isolates,directed=F)
+pdf("/Users/Dani/ownCloud/backup/annotation/g-w_relatedness/network_analysis/c_lp_sm_perpop_renamed_kinship_N19.pdf")
+plot(graph_pop_19)
+dev.off()
+centr_degree(graph_pop_19)$res
+V(graph_pop_19)$name[which.max(centr_degree(graph_pop_19)$res)]
+remove_ids <- V(graph_pop_19)$name[which.max(centr_degree(graph_pop_19)$res)]
+
+graph_pop <- graph_pop_19
+for (i in 1:7) {
+  graph_pop <- graph_pop - V(graph_pop)$name[which.max(centr_degree(graph_pop)$res)]
+  pdf(paste0("/Users/Dani/ownCloud/backup/annotation/g-w_relatedness/network_analysis/c_lp_sm_perpop_renamed_kinship_N",19-i,".pdf"))
+  plot(graph_pop)
+  dev.off()
+  print(centr_degree(graph_pop)$res)
+  print(V(graph_pop)$name[which.max(centr_degree(graph_pop)$res)])
+  if (i < 7) {
+    remove_ids <- c(remove_ids,V(graph_pop)$name[which.max(centr_degree(graph_pop)$res)])
+  }
+  i = i+1
+}
+remove_ids
+write(remove_ids,"/Users/Dani/ownCloud/backup/annotation/g-w_relatedness/network_analysis/c_lp_sm_remove_ids.txt")
+
+
+#For KIR: 
+
+kinship_file <- read.delim("/Users/Dani/ownCloud/backup/annotation/g-w_relatedness/network_analysis/c_ll_ki_perpop_renamed_kinship.genome",sep="",stringsAsFactors=F)
+kinship_file
+colnames(kinship_file)[15] <- "KINSHIP"
+nodes <- unique(sort(c(kinship_file$IID1,kinship_file$IID2)))
+nodes
+
+edges_df <- kinship_file %>% filter(KINSHIP>0.1) %>% select(2,4)
+edges_df
+edges <- as.vector(t(edges_df))
+edges
+
+isolates <- setdiff(nodes,unique(sort(edges)))
+isolates
+
+graph_pop_19 <- graph(edges,isolates=isolates,directed=F)
+pdf("/Users/Dani/ownCloud/backup/annotation/g-w_relatedness/network_analysis/c_ll_ki_perpop_renamed_kinship_N19.pdf")
+plot(graph_pop_19)
+dev.off()
+centr_degree(graph_pop_19)$res
+V(graph_pop_19)$name[which.max(centr_degree(graph_pop_19)$res)]
+remove_ids <- V(graph_pop_19)$name[which.max(centr_degree(graph_pop_19)$res)]
+
+graph_pop <- graph_pop_19
+for (i in 1:7) {
+  graph_pop <- graph_pop - V(graph_pop)$name[which.max(centr_degree(graph_pop)$res)]
+  pdf(paste0("/Users/Dani/ownCloud/backup/annotation/g-w_relatedness/network_analysis/c_ll_ki_perpop_renamed_kinship_N",19-i,".pdf"))
+  plot(graph_pop)
+  dev.off()
+  print(centr_degree(graph_pop)$res)
+  print(V(graph_pop)$name[which.max(centr_degree(graph_pop)$res)])
+  if (i < 7) {
+    remove_ids <- c(remove_ids,V(graph_pop)$name[which.max(centr_degree(graph_pop)$res)])
+  }
+  i = i+1
+}
+remove_ids
+write(remove_ids,"/Users/Dani/ownCloud/backup/annotation/g-w_relatedness/network_analysis/c_ll_ki_remove_ids.txt")
+
+
+```
 
 #?: Get annotation statistics for each population.
 ##Split the VCF into per population VCFs. Generate a VCF for each population.
