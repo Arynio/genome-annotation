@@ -575,6 +575,12 @@ for i in ${SPECIES[@]}
     done
   done
 
+grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_ll_no_perpop/c_ll_no_perpop.ann.vcf | wc -l #1861579
+grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_ll_po_perpop/c_ll_po_perpop.ann.vcf | wc -l #1915319
+grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_ll_ki_perpop/c_ll_ki_perpop.ann.vcf | wc -l #2353141
+grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_lp_do_perpop/c_lp_do_perpop.ann.vcf | wc -l #1343707
+grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_lp_sm_perpop/c_lp_sm_perpop.ann.vcf | wc -l #1708918
+
 ```
 
 ##Subsample populations.
@@ -646,7 +652,7 @@ plink_1.9 --vcf c_ll_ki_perpop_renamed.ann.vcf --make-bed --out c_ll_ki_perpop_r
 plink_1.9 --vcf c_ll_ki_perpop_renamed.ann.vcf --genome --out c_ll_ki_perpop_renamed_relatedness --allow-extra-chr #obtain IBD estimates in plink
 awk '{ print $0, $10/2 }' c_ll_ki_perpop_renamed_relatedness.genome > c_ll_ki_perpop_renamed_kinship.genome #calculate the kinship coefficient (half the relatedness)
 
-!!!NO HAY KINSHIPS!!! VOLVER A CALCULAR TRAS HACER LD PRUNING?
+#There are no kinships in KIR!
 
 #From outside of the server:
 scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_ll_ki_perpop/c_ll_ki_perpop_renamed_kinship.genome /Users/Dani/ownCloud/backup/annotation/g-w_relatedness/network_analysis/
@@ -704,12 +710,12 @@ $FILTER1 $FILTER2 \
 cat $POP_SHORT.intergenic.bamlist | rev | cut -d "/"  -f 1 | cut -d "_" -f 2,3,4,5 | rev  > $POP_SHORT.id
 
 #Then extract the frequency column from the allele frequency file and remove the header (to convert to the format NgsRelate needs):
-zcat *.intergenic.mafs.gz | cut -f6 | sed 1d > *.freq
+zcat $POP_SHORT.intergenic.mafs.gz | cut -f6 | sed 1d > $POP_SHORT.freq
 
 #Once we have these files we can use NgsRelate to estimate relatedness between any pairs of individuals. E.g. if we want to estimate relatedness between the first two individuals (numbered from 0, so 0 and 1) we can do it using the following command:
 
-/home/dkleinman/ngsRelate -g $POP.intergenic.glf.gz -n $N_IND -f $POP.freq -z $POP_SHORT.id > $POP.gl.res
-cat $POP.gl.res | awk '{if (substr($3, 1, 7)==substr($4, 1, 7)) print $0}' > $POP.perpop.gl.res
+/home/dkleinman/ngsRelate -g $POP_SHORT.intergenic.glf.gz -n $N_IND -f $POP_SHORT.freq -z $POP_SHORT.id > $POP_SHORT.gl.res
+cat $POP_SHORT.gl.res | awk '{if (substr($3, 1, 7)==substr($4, 1, 7)) print $0}' > $POP_SHORT.perpop.gl.res
 
 #Here we specify the name of our file with genotype likelihoods after the option "-g", the number of individuals in the file after the option "-n", the name of the file with allele frequencies after the option "-f" and the number of the two individuals after the options "-a" and "-b" . If -a and -b are not specified NgsRelate will loop through all pairs of individuals in the input file.
 
@@ -727,10 +733,7 @@ cat $POP.gl.res | awk '{if (substr($3, 1, 7)==substr($4, 1, 7)) print $0}' > $PO
 
 #The first two columns contain the information of about what two individuals were used for the analysis. The third column contains information about how many sites were used in the analysis. The following three columns are the maximum likelihood (ML) estimates of the relatedness coefficients. The seventh column is the log of the likelihood of the ML estimate. The eigth column is the number of iterations of the maximization algorithm that was used to find the MLE, and finally the ninth column is fraction of non-missing sites, i.e. the fraction of sites where data was available for both individuals, and where the minor allele frequency (MAF) above the threshold (default is 0.05 but the user may specify a different threshold). Note that in some cases nIter is -1. This indicates that values on the boundary of the parameter space had a higher likelihood than the values achieved using the EM-algorithm (ML methods sometimes have trouble finding the ML estimate when it is on the boundary of the parameter space, and we therefore test the boundary values explicitly and output these if these have the highest likelihood).
 
-
-
-scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/relatedness_analysis/ANGSD_relatedness/*.res  /Users/Dani/ownCloud/backup/annotation/g-w_relatedness/NGSrelate
-
+#Again, there are no kinships for KIR!
 
 ```
 
@@ -759,7 +762,7 @@ isolates <- setdiff(nodes,unique(sort(edges)))
 isolates
 
 graph_pop_19 <- graph(edges,isolates=isolates,directed=F)
-pdf("/Users/Dani/ownCloud/backup/annotation/g-w_relatedness/network_analysis/c_lp_sm_perpop_renamed_kinship_N19.pdf")
+#pdf("/Users/Dani/ownCloud/backup/annotation/g-w_relatedness/network_analysis/c_lp_sm_perpop_renamed_kinship_N19.pdf")
 plot(graph_pop_19)
 dev.off()
 centr_degree(graph_pop_19)$res
@@ -769,7 +772,7 @@ remove_ids <- V(graph_pop_19)$name[which.max(centr_degree(graph_pop_19)$res)]
 graph_pop <- graph_pop_19
 for (i in 1:7) {
   graph_pop <- graph_pop - V(graph_pop)$name[which.max(centr_degree(graph_pop)$res)]
-  pdf(paste0("/Users/Dani/ownCloud/backup/annotation/g-w_relatedness/network_analysis/c_lp_sm_perpop_renamed_kinship_N",19-i,".pdf"))
+  #pdf(paste0("/Users/Dani/ownCloud/backup/annotation/g-w_relatedness/network_analysis/c_lp_sm_perpop_renamed_kinship_N",19-i,".pdf"))
   plot(graph_pop)
   dev.off()
   print(centr_degree(graph_pop)$res)
@@ -780,10 +783,12 @@ for (i in 1:7) {
   i = i+1
 }
 remove_ids
-write(remove_ids,"/Users/Dani/ownCloud/backup/annotation/g-w_relatedness/network_analysis/c_lp_sm_remove_ids.txt")
+keep_ids <- gsub("-", "_", setdiff(nodes,remove_ids))
+keep_ids
+write(keep_ids,"/Users/Dani/ownCloud/backup/annotation/g-w_relatedness/network_analysis/c_lp_sm_perpop_kinship_ids.txt")
 
 
-#For KIR: 
+#For KIR (it doesn't work as there are no kinships): 
 
 kinship_file <- read.delim("/Users/Dani/ownCloud/backup/annotation/g-w_relatedness/network_analysis/c_ll_ki_perpop_renamed_kinship.genome",sep="",stringsAsFactors=F)
 kinship_file
@@ -810,7 +815,7 @@ remove_ids <- V(graph_pop_19)$name[which.max(centr_degree(graph_pop_19)$res)]
 graph_pop <- graph_pop_19
 for (i in 1:7) {
   graph_pop <- graph_pop - V(graph_pop)$name[which.max(centr_degree(graph_pop)$res)]
-  pdf(paste0("/Users/Dani/ownCloud/backup/annotation/g-w_relatedness/network_analysis/c_ll_ki_perpop_renamed_kinship_N",19-i,".pdf"))
+  #pdf(paste0("/Users/Dani/ownCloud/backup/annotation/g-w_relatedness/network_analysis/c_ll_ki_perpop_renamed_kinship_N",19-i,".pdf"))
   plot(graph_pop)
   dev.off()
   print(centr_degree(graph_pop)$res)
@@ -821,12 +826,172 @@ for (i in 1:7) {
   i = i+1
 }
 remove_ids
-write(remove_ids,"/Users/Dani/ownCloud/backup/annotation/g-w_relatedness/network_analysis/c_ll_ki_remove_ids.txt")
-
+keep_ids <- gsub("-", "_", setdiff(nodes,remove_ids))
+keep_ids
+write(keep_ids,"/Users/Dani/ownCloud/backup/annotation/g-w_relatedness/network_analysis/c_ll_ki_perpop_kinship_ids.txt")
 
 ```
 
-#?: Get annotation statistics for each population.
+####Perform the relatedness-based subsampling.
+
+```{r Obtain per population VCFs, eval=FALSE, engine='bash'}
+
+#From outside the server, copy the to-remove list to the appropriate folder inside the server:
+scp /Users/Dani/ownCloud/backup/annotation/g-w_relatedness/network_analysis/c_lp_sm_perpop_kinship_ids.txt dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_lp_sm_perpop 
+
+#For SMO:
+
+cd $V_PATH/annotation/c_lp_sm_perpop/
+screen -S c_lp_sm_perpop_kinship_subsample.ann.log
+script c_lp_sm_perpop_kinship_subsample.ann.log
+
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T SelectVariants \
+-R $REF \
+-V $V_PATH/annotation/c_lp_sm_perpop/c_lp_sm_perpop.ann.vcf \
+-o $V_PATH/annotation/c_lp_sm_perpop/c_lp_sm_perpop_kinship_subsample.ann.vcf \
+-env \
+--sample_file c_lp_sm_perpop_kinship_ids.txt
+
+grep '#' -v c_lp_sm_perpop_kinship_subsample.ann.vcf | wc -l #1654555
+
+#For KIR:
+
+#Can't be performed as there are no related individuals within the sample.
+
+```
+
+###Subsample randomly. Perform random removal of individuals from the populations with excess of individuals.
+
+```{r Obtain per population VCFs, eval=FALSE, engine='bash'}
+
+#For SMO:
+
+cd $V_PATH/annotation/c_lp_sm_perpop/
+screen -S c_lp_sm_perpop_random_subsample.ann.log
+script c_lp_sm_perpop_random_subsample.ann.log
+
+$BCF query -l $V_PATH/annotation/c_lp_sm_perpop/c_lp_sm_perpop.ann.vcf | shuf -n 12 > c_lp_sm_perpop_random_ids.txt #select 12 individuals (DON size) randomly
+cat c_lp_sm_perpop_random_ids.txt
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T SelectVariants \
+-R $REF \
+-V $V_PATH/annotation/c_lp_sm_perpop/c_lp_sm_perpop.ann.vcf \
+-o $V_PATH/annotation/c_lp_sm_perpop/c_lp_sm_perpop_random_subsample.ann.vcf \
+-env \
+--sample_file c_lp_sm_perpop_random_ids.txt
+
+grep '#' -v c_lp_sm_perpop_random_subsample.ann.vcf | wc -l #1641286
+
+
+#For KIR:
+
+cd $V_PATH/annotation/c_ll_ki_perpop/
+screen -S c_ll_ki_perpop_random_subsample.ann.log
+script c_ll_ki_perpop_random_subsample.ann.log
+
+$BCF query -l $V_PATH/annotation/c_ll_ki_perpop/c_ll_ki_perpop.ann.vcf | shuf -n 8 > c_ll_ki_perpop_random_ids.txt #select 8 individuals (NOR & POL size) randomly
+cat c_ll_ki_perpop_random_ids.txt
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T SelectVariants \
+-R $REF \
+-V $V_PATH/annotation/c_ll_ki_perpop/c_ll_ki_perpop.ann.vcf \
+-o $V_PATH/annotation/c_ll_ki_perpop/c_ll_ki_perpop_random_subsample.ann.vcf \
+-env \
+--sample_file c_ll_ki_perpop_random_ids.txt
+
+grep '#' -v c_ll_ki_perpop_random_subsample.ann.vcf | wc -l #2182554
+
+```
+
+#9: Split the population VCFs into per individual VCFs. Generate a VCF for each individual.
+
+```{r Split the population VCFs into per individual VCFs, eval=FALSE, engine='bash'}
+
+cd $V_PATH/annotation
+screen -S individuals.ann.log
+script individuals.ann.log
+
+#For each individual in the sm, do, ki, po & no populations, subset its variants from the respective population VCF:
+cd $G_PATH
+declare POP=$(ls c_{lp_sm*,lp_do*,ll_ki*,ll_po*,ll_no*}.g.vcf.gz | cut -c1-7 | uniq)
+for i in ${POP[@]}
+  do
+  echo "${i}"
+  mkdir $V_PATH/annotation/"${i}"_individuals
+  declare INDIVIDUALS=$(ls "${i}"*.g.vcf.gz | cut -c1-12 | uniq)
+  for j in ${INDIVIDUALS[@]}
+    do
+    echo "${j}"
+    ID=$(echo "${j}")
+    java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+    -T SelectVariants \
+    -R $REF \
+    -V $V_PATH/annotation/"${i}"_perpop/"${i}"_perpop.ann.vcf \
+    -o $V_PATH/annotation/"${i}"_individuals/"${j}"_individual.ann.vcf \
+    -env \
+    -sn $ID
+    done
+  done
+
+```
+
+#10: Get annotation statistics.
+##At the population level.
+
+```{r Get annotation statistics, eval=FALSE, engine='bash'}
+
+cd $V_PATH/annotation/
+echo "species,population,N_intergenic,N_intronic,N_exonic,N_missense,N_nonsense,N_silent,N_missense/silent" > snpeff_population_summary.borrar
+POPLIST=($(ls -d c_{lp_sm*,lp_do*,ll_ki*,ll_po*,ll_no*}))
+for pop in "${POPLIST[@]}"
+  do
+  echo "${pop}"
+  cd $V_PATH/annotation/"${pop}"/
+  SPECIES=$(echo "${pop}" | cut -c3-4)
+  POPULATION=$(echo "${pop}" | cut -c6-7)
+  N_INTERGENIC=$(grep 'INTERGENIC' ${pop}.vcf.ann | wc -l)
+  N_INTRONIC=$(grep 'INTRON' ${pop}.vcf.ann | wc -l)
+  N_EXONIC=$(grep 'EXON' ${pop}.vcf.ann | wc -l)
+  N_MISSENSE=$(grep 'MISSENSE' ${pop}.vcf.ann | wc -l)
+  N_NONSENSE=$(grep 'NONSENSE' ${pop}.vcf.ann | wc -l)
+  N_SILENT=$(grep 'SILENT' ${pop}.vcf.ann | wc -l)
+  N_MISSENSE_SILENT=$(grep 'Missense_Silent_ratio' ${pop}.vcf.ann | wc -l)
+  echo "$SPECIES,$POPULATION,$N_INTERGENIC,$N_INTRONIC,$N_EXONIC,$N_MISSENSE,$N_NONSENSE,$N_SILENT,$N_MISSENSE_SILENT" >> $V_PATH/annotation/snpeff_population_summary.borrar
+  done
+cd $V_PATH/annotation/
+cat snpeff_population_summary.borrar | tr -d "[:blank:]" > snpeff_population_summary.txt
+cat snpeff_population_summary.txt
+rm *.borrar
+
+```
+
+##At the individual level.
+
+```{r Get annotation statistics, eval=FALSE, engine='bash'}
+
+cd $O_PATH/c_ll_lp_individual_standard_filter_detailed_annotation/
+echo "species,population,sample,N_intergenic,N_intronic,N_exonic,N_missense,N_nonsense,N_silent,N_missense/silent" > snpeff_individual_summary.borrar
+INDLIST=($(ls *.csv))
+for ind in "${INDLIST[@]}"
+  do
+  SPECIES=$(echo "${ind}" | cut -c3-4)
+  POPULATION=$(echo "${ind}" | cut -c6-7)
+  SAMPLE=$(echo "${ind}" | cut -c9-12)
+  N_INTERGENIC=$(grep 'INTERGENIC' ${ind} | cut -d  "," -f2)
+  N_INTRONIC=$(grep 'INTRON' ${ind} | cut -d  "," -f2)
+  N_EXONIC=$(grep 'EXON' ${ind} | cut -d  "," -f2)
+  N_MISSENSE=$(grep 'MISSENSE' ${ind} | cut -d  "," -f2)
+  N_NONSENSE=$(grep 'NONSENSE' ${ind} | cut -d  "," -f2)
+  N_SILENT=$(grep 'SILENT' ${ind} | cut -d  "," -f2)
+  N_MISSENSE_SILENT=$(grep 'Missense_Silent_ratio' ${ind} | cut -d  "," -f2)
+  echo "$SPECIES,$POPULATION,$SAMPLE,$N_INTERGENIC,$N_INTRONIC,$N_EXONIC,$N_MISSENSE,$N_NONSENSE,$N_SILENT,$N_MISSENSE_SILENT" >> snpeff_individual_summary.borrar
+  done
+cat snpeff_individual_summary.borrar | tr -d "[:blank:]" > snpeff_individual_summary.txt
+cat snpeff_individual_summary.txt
+
+```
+
 ##Split the VCF into per population VCFs. Generate a VCF for each population.
 
 ```{r Get annotation statistics for each population, eval=FALSE, engine='bash'}
@@ -921,15 +1086,6 @@ for i in ${POP[@]}
 
 #Xb: Population annotation (detailed) using the contemporary lp and ll VCFs.
 
-##Create custom annotation bed file
-
-```{r Population annotation (detailed) using the contemporary lp and ll VCFs, eval=FALSE, engine='bash'}
-
-#Create bed file with custom annotations based on the gff3 that María compiled.
-cut -d$'\t' -f1,3,4,5 LYPA23C.GENE.mRNA.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.intergenic.nr.gff3 | awk '{printf ("%s\t%s\t%s\t%s\n", $1, $3, $4, $2)}' > LYPA23C.GENE.mRNA.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.intergenic.nr.bed
-
-```
-
 ##Annotate the contemporary population VCFs with custom annotation
 
 ```{r Population annotation (detailed) using the contemporary lp and ll VCFs, eval=FALSE, engine='bash'}
@@ -989,32 +1145,6 @@ rm *.borrar
 ```
 
 #Xc: Individual annotation (detailed) using the contemporary lp and ll VCFs.
-
-##Split the population VCFs into per individual VCFs. Generate a VCF for each individual.
-
-```{r Individual annotation (detailed) using the contemporary lp and ll VCFs, eval=FALSE, engine='bash'}
-
-cd $V_PATH/individual_VCFs/
-screen -S bcfstats_individual_trimmed_standard_filter_vcfs.log
-script bcfstats_individual_trimmed_standard_filter_vcfs.log
-
-#For each individual in the sm, do, ki, po & no populations, subset its variants from the respective population VCF:
-cd $G_PATH
-declare POP=$(ls c_{lp_sm*,lp_do*,ll_ki*,ll_po*,ll_no*}.g.vcf.gz | cut -c3-7 | uniq)
-for i in ${POP[@]}
-  do
-  echo "${i}"
-  declare INDIVIDUALS=$(ls c_"${i}"*.g.vcf.gz | cut -c1-12 | uniq)
-  for j in ${INDIVIDUALS[@]}
-    do
-    echo "${j}"
-    ID=$(echo "${j}")
-    $BCF view --min-ac 1:minor -s $ID -Ov -o $V_PATH/individual_VCFs/"${j}"_standard_filter.trimmed.vcf $V_PATH/trimmed_VCFs/"${i}"_perpop_standard_filter.trimmed.vcf
-    echo $V_PATH"/individual_VCFs/"${j}"_standard_filter.trimmed.vcf"
-    done
-  done
-
-```
 
 ##Annotate the contemporary individual VCFs with custom annotation
 
