@@ -942,22 +942,39 @@ for i in ${POP[@]}
 ```{r Get annotation statistics, eval=FALSE, engine='bash'}
 
 cd $V_PATH/annotation/
-echo "species,population,N_intergenic,N_intronic,N_exonic,N_missense,N_nonsense,N_silent,N_missense/silent" > snpeff_population_summary.borrar
-POPLIST=($(ls -d c_{lp_sm*,lp_do*,ll_ki*,ll_po*,ll_no*}))
+screen -S snpeff_population_summary.log
+script snpeff_population_summary.log
+
+rm snpeff_population_summary.borrar
+echo "species,population,N_total,N_intergenic,N_intronic,N_synonymous,N_missense,N_nonsense,N_missense/synonymous" > snpeff_population_summary.borrar
+POPLIST=($(ls -d c_{lp_sm*,lp_do*,ll_ki*,ll_po*,ll_no*}perpop))
 for pop in "${POPLIST[@]}"
   do
   echo "${pop}"
   cd $V_PATH/annotation/"${pop}"/
   SPECIES=$(echo "${pop}" | cut -c3-4)
   POPULATION=$(echo "${pop}" | cut -c6-7)
-  N_INTERGENIC=$(grep 'INTERGENIC' ${pop}.vcf.ann | wc -l)
-  N_INTRONIC=$(grep 'INTRON' ${pop}.vcf.ann | wc -l)
-  N_EXONIC=$(grep 'EXON' ${pop}.vcf.ann | wc -l)
-  N_MISSENSE=$(grep 'MISSENSE' ${pop}.vcf.ann | wc -l)
-  N_NONSENSE=$(grep 'NONSENSE' ${pop}.vcf.ann | wc -l)
-  N_SILENT=$(grep 'SILENT' ${pop}.vcf.ann | wc -l)
-  N_MISSENSE_SILENT=$(grep 'Missense_Silent_ratio' ${pop}.vcf.ann | wc -l)
-  echo "$SPECIES,$POPULATION,$N_INTERGENIC,$N_INTRONIC,$N_EXONIC,$N_MISSENSE,$N_NONSENSE,$N_SILENT,$N_MISSENSE_SILENT" >> $V_PATH/annotation/snpeff_population_summary.borrar
+  if [ -e ${pop}_random_subsample.ann.vcf ]; then
+    echo "Subsample available"
+    N_TOTAL=$(grep -v '#' ${pop}_random_subsample.ann.vcf | wc -l)
+    N_INTERGENIC=$(grep 'intergenic' ${pop}_random_subsample.ann.vcf | wc -l)
+    N_INTRONIC=$(grep 'intron' ${pop}_random_subsample.ann.vcf | wc -l)
+    N_SYNONYMOUS=$(grep 'synonymous' ${pop}_random_subsample.ann.vcf | wc -l)
+    N_MISSENSE=$(grep 'missense' ${pop}_random_subsample.ann.vcf | wc -l)
+    N_NONSENSE=$(grep -e 'lost' -e 'gained' ${pop}_random_subsample.ann.vcf | wc -l)
+    N_MISSENSE_SYNONYMOUS=$(echo "scale=3; $N_MISSENSE/$N_SYNONYMOUS" | bc)
+    echo "$SPECIES,$POPULATION,$N_TOTAL,$N_INTERGENIC,$N_INTRONIC,$N_SYNONYMOUS,$N_MISSENSE,$N_NONSENSE,$N_MISSENSE_SYNONYMOUS" >> $V_PATH/annotation/snpeff_population_summary.borrar
+  else
+    echo "Original available"
+    N_TOTAL=$(grep -v '#' ${pop}.ann.vcf | wc -l)
+    N_INTERGENIC=$(grep 'intergenic' ${pop}.ann.vcf | wc -l)
+    N_INTRONIC=$(grep 'intron' ${pop}.ann.vcf | wc -l)
+    N_SYNONYMOUS=$(grep 'synonymous' ${pop}.ann.vcf | wc -l)
+    N_MISSENSE=$(grep 'missense' ${pop}.ann.vcf | wc -l)
+    N_NONSENSE=$(grep -e 'lost' -e 'gained' ${pop}.ann.vcf | wc -l)
+    N_MISSENSE_SYNONYMOUS=$(echo "scale=3; $N_MISSENSE/$N_SYNONYMOUS" | bc)
+    echo "$SPECIES,$POPULATION,$N_TOTAL,$N_INTERGENIC,$N_INTRONIC,$N_SYNONYMOUS,$N_MISSENSE,$N_NONSENSE,$N_MISSENSE_SYNONYMOUS" >> $V_PATH/annotation/snpeff_population_summary.borrar
+  fi
   done
 cd $V_PATH/annotation/
 cat snpeff_population_summary.borrar | tr -d "[:blank:]" > snpeff_population_summary.txt
@@ -970,28 +987,38 @@ rm *.borrar
 
 ```{r Get annotation statistics, eval=FALSE, engine='bash'}
 
-cd $O_PATH/c_ll_lp_individual_standard_filter_detailed_annotation/
-echo "species,population,sample,N_intergenic,N_intronic,N_exonic,N_missense,N_nonsense,N_silent,N_missense/silent" > snpeff_individual_summary.borrar
-INDLIST=($(ls *.csv))
-for ind in "${INDLIST[@]}"
+cd $V_PATH/annotation/
+screen -S snpeff_individual_summary.log
+script snpeff_individual_summary.log
+
+rm snpeff_population_summary.borrar
+echo "species,population,sample,N_total,N_intergenic,N_intronic,N_synonymous,N_missense,N_nonsense,N_missense/synonymous" > snpeff_individual_summary.borrar
+INDLIST=($(ls `find . -name '*individual.ann.vcf' -print`))
+for i in "${INDLIST[@]}"
   do
+  echo "${i}"
+  ind=$(echo "${i}" | awk -F'[/]' '{print $3}')
+  echo "${ind}"
   SPECIES=$(echo "${ind}" | cut -c3-4)
   POPULATION=$(echo "${ind}" | cut -c6-7)
   SAMPLE=$(echo "${ind}" | cut -c9-12)
-  N_INTERGENIC=$(grep 'INTERGENIC' ${ind} | cut -d  "," -f2)
-  N_INTRONIC=$(grep 'INTRON' ${ind} | cut -d  "," -f2)
-  N_EXONIC=$(grep 'EXON' ${ind} | cut -d  "," -f2)
-  N_MISSENSE=$(grep 'MISSENSE' ${ind} | cut -d  "," -f2)
-  N_NONSENSE=$(grep 'NONSENSE' ${ind} | cut -d  "," -f2)
-  N_SILENT=$(grep 'SILENT' ${ind} | cut -d  "," -f2)
-  N_MISSENSE_SILENT=$(grep 'Missense_Silent_ratio' ${ind} | cut -d  "," -f2)
-  echo "$SPECIES,$POPULATION,$SAMPLE,$N_INTERGENIC,$N_INTRONIC,$N_EXONIC,$N_MISSENSE,$N_NONSENSE,$N_SILENT,$N_MISSENSE_SILENT" >> snpeff_individual_summary.borrar
+  N_TOTAL=$(grep -v '#' ${i} | wc -l)
+  N_INTERGENIC=$(grep 'intergenic' ${i} | wc -l)
+  N_INTRONIC=$(grep 'intron' ${i} | wc -l)
+  N_SYNONYMOUS=$(grep 'synonymous' ${i} | wc -l)
+  N_MISSENSE=$(grep 'missense' ${i} | wc -l)
+  N_NONSENSE=$(grep -e 'lost' -e 'gained' ${i} | wc -l)
+  N_MISSENSE_SYNONYMOUS=$(echo "scale=3; $N_MISSENSE/$N_SYNONYMOUS" | bc)
+  echo "$SPECIES,$POPULATION,$SAMPLE,$N_TOTAL,$N_INTERGENIC,$N_INTRONIC,$N_SYNONYMOUS,$N_MISSENSE,$N_NONSENSE,$N_MISSENSE_SYNONYMOUS" >> $V_PATH/annotation/snpeff_individual_summary.borrar
   done
 cat snpeff_individual_summary.borrar | tr -d "[:blank:]" > snpeff_individual_summary.txt
 cat snpeff_individual_summary.txt
+rm *.borrar
 
 ```
 
+
+#Old & obsolete code:
 ##Split the VCF into per population VCFs. Generate a VCF for each population.
 
 ```{r Get annotation statistics for each population, eval=FALSE, engine='bash'}
@@ -1069,7 +1096,7 @@ rm *.borrar
 ```
 
 
-#Xa: Trim contemporary population lp and ll VCFs. Trim previously generated VCFs with species-wide variants in order to keep populational variants only.
+##Xa: Trim contemporary population lp and ll VCFs. Trim previously generated VCFs with species-wide variants in order to keep populational variants only.
 
 ```{r Trim contemporary population lp and ll VCFs, eval=FALSE, engine='bash'}
 
@@ -1084,9 +1111,9 @@ for i in ${POP[@]}
 
 ```
 
-#Xb: Population annotation (detailed) using the contemporary lp and ll VCFs.
+##Xb: Population annotation (detailed) using the contemporary lp and ll VCFs.
 
-##Annotate the contemporary population VCFs with custom annotation
+###Annotate the contemporary population VCFs with custom annotation
 
 ```{r Population annotation (detailed) using the contemporary lp and ll VCFs, eval=FALSE, engine='bash'}
 
@@ -1118,7 +1145,7 @@ scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/snpEff/c_ll_lp_perpop
 
 ```
 
-##Build SnpEff summary file.
+###Build SnpEff summary file.
 
 ```{r Population annotation (detailed) using the contemporary lp and ll VCFs, eval=FALSE, engine='bash'}
 
@@ -1144,9 +1171,9 @@ rm *.borrar
 
 ```
 
-#Xc: Individual annotation (detailed) using the contemporary lp and ll VCFs.
+##Xc: Individual annotation (detailed) using the contemporary lp and ll VCFs.
 
-##Annotate the contemporary individual VCFs with custom annotation
+###Annotate the contemporary individual VCFs with custom annotation
 
 ```{r Individual annotation (detailed) using the contemporary lp and ll VCFs, eval=FALSE, engine='bash'}
 
@@ -1178,7 +1205,7 @@ scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/snpEff/c_ll_lp_indivi
 
 ```
 
-##Build SnpEff summary file.
+###Build SnpEff summary file.
 
 ```{r Individual annotation (detailed) using the contemporary lp and ll VCFs, eval=FALSE, engine='bash'}
 
@@ -1204,7 +1231,7 @@ cat snpeff_individual_summary.txt
 
 ```
 
-#Z: Toy annotation using the immunocapture VCF.
+##Z: Toy annotation using the immunocapture VCF.
 Annotate the immunocapture VCF 
 
 ```{r Toy annotation using the immunocapture VCF, eval=FALSE, engine='bash'}
