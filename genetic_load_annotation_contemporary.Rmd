@@ -624,9 +624,11 @@ for i in ${SPECIES[@]}
 ```
 
 ###Subsample based on relatedness.
-####Option A: Obtain PLINK kinship coefficient estimates between individuals.
+####Option A: Obtain PLINK kinship coefficient estimates between individuals. In the end we used option B.
 
 ```{r Obtain per population VCFs, eval=FALSE, engine='bash'}
+
+#Option B was finally chosen over this one.
 
 #For SMO:
 
@@ -659,7 +661,7 @@ scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/VCF
 
 ```
 
-####Option B: Obtain NGSrelate kinship coefficient estimates between individuals.
+####Option B: Obtain NGSrelate kinship coefficient estimates between individuals. This is the chosen option.
 
 ```{r Obtain per population VCFs, eval=FALSE, engine='bash'}
 
@@ -713,7 +715,6 @@ cat $POP_SHORT.intergenic.bamlist | rev | cut -d "/"  -f 1 | cut -d "_" -f 2,3,4
 zcat $POP_SHORT.intergenic.mafs.gz | cut -f6 | sed 1d > $POP_SHORT.freq
 
 #Once we have these files we can use NgsRelate to estimate relatedness between any pairs of individuals. E.g. if we want to estimate relatedness between the first two individuals (numbered from 0, so 0 and 1) we can do it using the following command:
-
 /home/dkleinman/ngsRelate -g $POP_SHORT.intergenic.glf.gz -n $N_IND -f $POP_SHORT.freq -z $POP_SHORT.id > $POP_SHORT.gl.res
 cat $POP_SHORT.gl.res | awk '{if (substr($3, 1, 7)==substr($4, 1, 7)) print $0}' > $POP_SHORT.perpop.gl.res
 
@@ -733,11 +734,59 @@ cat $POP_SHORT.gl.res | awk '{if (substr($3, 1, 7)==substr($4, 1, 7)) print $0}'
 
 #The first two columns contain the information of about what two individuals were used for the analysis. The third column contains information about how many sites were used in the analysis. The following three columns are the maximum likelihood (ML) estimates of the relatedness coefficients. The seventh column is the log of the likelihood of the ML estimate. The eigth column is the number of iterations of the maximization algorithm that was used to find the MLE, and finally the ninth column is fraction of non-missing sites, i.e. the fraction of sites where data was available for both individuals, and where the minor allele frequency (MAF) above the threshold (default is 0.05 but the user may specify a different threshold). Note that in some cases nIter is -1. This indicates that values on the boundary of the parameter space had a higher likelihood than the values achieved using the EM-algorithm (ML methods sometimes have trouble finding the ML estimate when it is on the boundary of the parameter space, and we therefore test the boundary values explicitly and output these if these have the highest likelihood).
 
+#Finally, calculate kinship coefficients (k1/2 + k2):
+awk '{printf("%s\t%s\n", $0, $7/2 + $8) }' $POP_SHORT.perpop.gl.res > $POP_SHORT.perpop.kinship.gl.res
+
 #Again, there are no kinships for KIR!
 
 ```
 
-####Network analysis: obtain nodes and edges, and sequentially remove central individuals.
+#####Option A: identify highest kinship individuals. Visualise which pairs of individuals have higher kinship coefficient values, in order to later remove individuals involved.
+
+```{r Obtain per population VCFs}
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+
+#Import kinship coefficients data for all 5 populations:
+pops <- c("c_ll_ki","c_ll_no","c_ll_po","c_lp_sm","c_lp_do")
+kinship_df <- data_frame()
+for (i in pops) {
+  print(i)
+  kinship_file <- read_tsv(paste0("/Users/Dani/ownCloud/backup/annotation/g-w_relatedness/NGSrelate/",i,".perpop.kinship.gl.res"),col_names=F) %>% select(3,4,12) %>% mutate(pop=i,pair=paste(X3,X4,sep="_")) %>% select(4,5,3)
+  colnames(kinship_file)[3] <- "kinship"
+  kinship_file <- kinship_file[order(-kinship_file$kinship),]
+  kinship_file
+  kinship_df <- rbind(kinship_df, kinship_file)
+}
+kinship_df
+
+#Plot kinship coefficients for all 5 populations:
+kinship_plot <- ggplot(kinship_df,aes(x=pair,y=kinship)) +
+  geom_col(position="identity", colour="grey40", alpha=0.2) +
+  facet_grid(. ~ pop) +
+  theme(axis.text.x=element_text(angle=90,hjust=0,size=2,colour="black")
+  )
+kinship_plot
+ggsave("/Users/Dani/ownCloud/backup/annotation/g-w_relatedness/NGSrelate/all_kinships.pdf", width=50, height=10, units="cm", device="pdf")
+
+#Visualise highest kinship pairs in order to exclude individuals with kinship > 0.35
+kinship_df[order(-kinship_df$kinship),]
+
+#From each pair with kinship > 0.35, we'll exclude the one individual that is first involved in another high pair: c_lp_sm_0208, c_lp_sm_0325 and c_lp_sm_0185. The rest of the c_lp_sm individuals to remove (in order to subsample the pop) will be chosen randomly.
+
+```
+
+#####Perform the highest-kinship relatedness-based subsampling.
+
+```{r Obtain per population VCFs, eval=FALSE, engine='bash'}
+
+#For SMO: three individuals with kinships > 0.35 will be excluded, along with some other randomly selected, in the "Subsample randomly" section.
+
+```
+
+#####Option B: identify most central individuals. Obtain nodes and edges to perform network analysis, and sequentially identify central individuals that will be removed later. This option was discarded.
 
 ```{r Obtain per population VCFs}
 
@@ -832,9 +881,11 @@ write(keep_ids,"/Users/Dani/ownCloud/backup/annotation/g-w_relatedness/network_a
 
 ```
 
-####Perform the relatedness-based subsampling.
+#####Perform the most-central relatedness-based subsampling. This option was discarded.
 
 ```{r Obtain per population VCFs, eval=FALSE, engine='bash'}
+
+#In the end we didn't use this subsampling method.
 
 #From outside the server, copy the to-remove list to the appropriate folder inside the server:
 scp /Users/Dani/ownCloud/backup/annotation/g-w_relatedness/network_analysis/c_lp_sm_perpop_kinship_ids.txt dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_lp_sm_perpop 
@@ -946,7 +997,7 @@ screen -S snpeff_population_summary.log
 script snpeff_population_summary.log
 
 rm snpeff_population_summary.txt
-echo -e "species\tpopulation\ttotal_V\tintergenic_V\tintronic_V\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tmissense/synonymous_V\tmissense/synonymous_A" > snpeff_population_summary.txt
+echo -e "species\tpopulation\ttotal_V\tintergenic_V\tintronic_V\tcoding\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tmissense/synonymous_V\tmissense/synonymous_A" > snpeff_population_summary.txt
 POPLIST=($(ls -d c_{lp_sm*,lp_do*,ll_ki*,ll_po*,ll_no*}perpop))
 for pop in "${POPLIST[@]}"
   do
@@ -958,30 +1009,32 @@ for pop in "${POPLIST[@]}"
     echo "Subsample available"
     TOTAL_V=$(grep -v '#' ${pop}_random_subsample.ann.vcf | wc -l)
     INTERGENIC_V=$(grep 'intergenic' ${pop}_random_subsample.ann.vcf | wc -l)
-    INTRONIC_V=$(grep 'intron' ${pop}_random_subsample.ann.vcf | wc -l)
-    SYNONYMOUS_V=$(grep 'synonymous' ${pop}_random_subsample.ann.vcf | wc -l)
-    SYNONYMOUS_A=$(grep 'synonymous' ${pop}_random_subsample.ann.vcf | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
-    MISSENSE_V=$(grep 'missense' ${pop}_random_subsample.ann.vcf | wc -l)
-    MISSENSE_A=$(grep 'missense' ${pop}_random_subsample.ann.vcf | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+    INTRONIC_V=$(grep 'intron_variant' ${pop}_random_subsample.ann.vcf | wc -l)
+    CODING_V=$(grep 'CDS' ${pop}_random_subsample.ann.vcf | wc -l)
+    SYNONYMOUS_V=$(grep 'synonymous_variant' ${pop}_random_subsample.ann.vcf | wc -l)
+    SYNONYMOUS_A=$(grep 'synonymous_variant' ${pop}_random_subsample.ann.vcf | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+    MISSENSE_V=$(grep 'missense_variant' ${pop}_random_subsample.ann.vcf | wc -l)
+    MISSENSE_A=$(grep 'missense_variant' ${pop}_random_subsample.ann.vcf | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
     NONSENSE_V=$(grep -e 'lost' -e 'gained' ${pop}_random_subsample.ann.vcf | wc -l)
     NONSENSE_A=$(grep -e 'lost' -e 'gained' ${pop}_random_subsample.ann.vcf | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
     MISSENSE_SYNONYMOUS_V=$(echo "scale=3; $MISSENSE_V/$SYNONYMOUS_V" | bc)
     MISSENSE_SYNONYMOUS_A=$(echo "scale=3; $MISSENSE_A/$SYNONYMOUS_A" | bc)
-    echo -e "$SPECIES\t$POPULATION\t$TOTAL_V\t$INTERGENIC_V\t$INTRONIC_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A" >> $V_PATH/annotation/snpeff_population_summary.txt
+    echo -e "$SPECIES\t$POPULATION\t$TOTAL_V\t$INTERGENIC_V\t$INTRONIC_V\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A" >> $V_PATH/annotation/snpeff_population_summary.txt
   else
     echo "Original available"
     TOTAL_V=$(grep -v '#' ${pop}.ann.vcf | wc -l)
     INTERGENIC_V=$(grep 'intergenic' ${pop}.ann.vcf | wc -l)
-    INTRONIC_V=$(grep 'intron' ${pop}.ann.vcf | wc -l)
-    SYNONYMOUS_V=$(grep 'synonymous' ${pop}.ann.vcf | wc -l)
-    SYNONYMOUS_A=$(grep 'synonymous' ${pop}.ann.vcf | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
-    MISSENSE_V=$(grep 'missense' ${pop}.ann.vcf | wc -l)
-    MISSENSE_A=$(grep 'missense' ${pop}.ann.vcf | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+    INTRONIC_V=$(grep 'intron_variant' ${pop}.ann.vcf | wc -l)
+    CODING_V=$(grep 'CDS' ${pop}.ann.vcf | wc -l)
+    SYNONYMOUS_V=$(grep 'synonymous_variant' ${pop}.ann.vcf | wc -l)
+    SYNONYMOUS_A=$(grep 'synonymous_variant' ${pop}.ann.vcf | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+    MISSENSE_V=$(grep 'missense_variant' ${pop}.ann.vcf | wc -l)
+    MISSENSE_A=$(grep 'missense_variant' ${pop}.ann.vcf | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
     NONSENSE_V=$(grep -e 'lost' -e 'gained' ${pop}.ann.vcf | wc -l)
     NONSENSE_A=$(grep -e 'lost' -e 'gained' ${pop}.ann.vcf | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
     MISSENSE_SYNONYMOUS_V=$(echo "scale=3; $MISSENSE_V/$SYNONYMOUS_V" | bc)
     MISSENSE_SYNONYMOUS_A=$(echo "scale=3; $MISSENSE_A/$SYNONYMOUS_A" | bc)
-    echo -e "$SPECIES\t$POPULATION\t$TOTAL_V\t$INTERGENIC_V\t$INTRONIC_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A" >> $V_PATH/annotation/snpeff_population_summary.txt
+    echo -e "$SPECIES\t$POPULATION\t$TOTAL_V\t$INTERGENIC_V\t$INTRONIC_V\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A" >> $V_PATH/annotation/snpeff_population_summary.txt
   fi
   done
 
@@ -996,7 +1049,7 @@ screen -S snpeff_individual_summary.log
 script snpeff_individual_summary.log
 
 rm snpeff_individual_summary.txt
-echo -e "species\tpopulation\tsample\ttotal_V\tintergenic_V\tintronic_V\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tmissense/synonymous_V\tmissense/synonymous_A" > snpeff_individual_summary.txt
+echo -e "species\tpopulation\tsample\ttotal_V\tintergenic_V\tintronic_V\tcoding\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tmissense/synonymous_V\tmissense/synonymous_A" > snpeff_individual_summary.txt
 INDLIST=($(ls `find . -name '*individual.ann.vcf' -print`))
 for i in "${INDLIST[@]}"
   do
@@ -1008,16 +1061,17 @@ for i in "${INDLIST[@]}"
   SAMPLE=$(echo "${ind}" | cut -c9-12)
   TOTAL=$(grep -v '#' ${i} | wc -l)
   INTERGENIC_V=$(grep 'intergenic' ${i} | wc -l)
-  INTRONIC_V=$(grep 'intron' ${i} | wc -l)
-  SYNONYMOUS_V=$(grep 'synonymous' ${i} | wc -l)
-  SYNONYMOUS_A=$(grep 'synonymous' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
-  MISSENSE_V=$(grep 'missense' ${i} | wc -l)
-  MISSENSE_A=$(grep 'missense' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  INTRONIC_V=$(grep 'intron_variant' ${i} | wc -l)
+  CODING_V=$(grep 'CDS' ${i} | wc -l)
+  SYNONYMOUS_V=$(grep 'synonymous_variant' ${i} | wc -l)
+  SYNONYMOUS_A=$(grep 'synonymous_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_V=$(grep 'missense_variant' ${i} | wc -l)
+  MISSENSE_A=$(grep 'missense_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
   NONSENSE_V=$(grep -e 'lost' -e 'gained' ${i} | wc -l)
   NONSENSE_A=$(grep -e 'lost' -e 'gained' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
   MISSENSE_SYNONYMOUS_V=$(echo "scale=3; $MISSENSE_V/$SYNONYMOUS_V" | bc)
   MISSENSE_SYNONYMOUS_A=$(echo "scale=3; $MISSENSE_A/$SYNONYMOUS_A" | bc)
-  echo -e "$SPECIES\t$POPULATION\t$SAMPLE\t$TOTAL_V\t$INTERGENIC_V\t$INTRONIC_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A" >> $V_PATH/annotation/snpeff_individual_summary.txt
+  echo -e "$SPECIES\t$POPULATION\t$SAMPLE\t$TOTAL_V\t$INTERGENIC_V\t$INTRONIC_V\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A" >> $V_PATH/annotation/snpeff_individual_summary.txt
   done
 
 ```
