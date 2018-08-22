@@ -624,7 +624,7 @@ for i in ${SPECIES[@]}
 ```
 
 ###Subsample based on relatedness.
-####Option A: Obtain PLINK kinship coefficient estimates between individuals. In the end we used option B.
+####Option A: obtain PLINK kinship coefficient estimates between individuals. In the end we used option B.
 
 ```{r Obtain per population VCFs, eval=FALSE, engine='bash'}
 
@@ -661,7 +661,7 @@ scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/VCF
 
 ```
 
-####Option B: Obtain NGSrelate kinship coefficient estimates between individuals. This is the chosen option.
+####Option B: obtain NGSrelate kinship coefficient estimates between individuals. This is the chosen option.
 
 ```{r Obtain per population VCFs, eval=FALSE, engine='bash'}
 
@@ -912,11 +912,12 @@ grep '#' -v c_lp_sm_perpop_kinship_subsample.ann.vcf | wc -l #1654555
 
 ```
 
-###Subsample randomly. Perform random removal of individuals from the populations with excess of individuals.
+###Subsample randomly. Perform completely (or partially) random removal of individuals from the populations with excess of individuals.
+####To the smallest per species number (for lp, mixed SM subset of size 12; for ll, random KI subset of size 8).
 
 ```{r Obtain per population VCFs, eval=FALSE, engine='bash'}
 
-#For SMO:
+#100% random subset for SMO (we won't use this in the end. Instead, we'll use the mixed approach from below, but it will require the 'c_lp_sm_perpop_random_ids.txt' file generated here):
 
 cd $V_PATH/annotation/c_lp_sm_perpop/
 screen -S c_lp_sm_perpop_random_subsample.ann.log
@@ -935,13 +936,43 @@ java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -X
 grep '#' -v c_lp_sm_perpop_random_subsample.ann.vcf | wc -l #1641286
 
 
-#For KIR:
+#Mixed subset for SMO (partially random: 12 individuals are randomly selected after discarding 3 with high kinship):
+
+cd $V_PATH/annotation/c_lp_sm_perpop/
+screen -S c_lp_sm_perpop_mixed_subsample.ann.log
+script c_lp_sm_perpop_mixed_subsample.ann.log
+
+$BCF query -l $V_PATH/annotation/c_lp_sm_perpop/c_lp_sm_perpop.ann.vcf > c_lp_sm_perpop_all_ids.txt #Obtain all sm ids
+
+#Get a file with only the 3 previously selected high kinship individuals (see section "Option A: identify highest kinship individuals"):
+rm c_lp_sm_perpop_threshold_ids.txt
+#cat > c_lp_sm_perpop_threshold_ids.txt <<- EOM #Unmark this line when running it (I marked it in R because it doesn't understand it and messes the colours of subsequent lines).
+c_lp_sm_0208
+c_lp_sm_0325
+c_lp_sm_0185
+EOM
+
+awk 'NR==FNR{a[$0]=1;next}!a[$0]' c_lp_sm_perpop_threshold_ids.txt c_lp_sm_perpop_all_ids.txt | shuf -n 12 > c_lp_sm_perpop_mixed_ids.txt #remove the 3 individuals above the threshold and then randomly select 12 out of the remaining 16.
+
+cat c_lp_sm_perpop_mixed_ids.txt
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T SelectVariants \
+-R $REF \
+-V $V_PATH/annotation/c_lp_sm_perpop/c_lp_sm_perpop.ann.vcf \
+-o $V_PATH/annotation/c_lp_sm_perpop/c_lp_sm_perpop_mixed_subsample.ann.vcf \
+-env \
+--sample_file c_lp_sm_perpop_mixed_ids.txt
+
+grep '#' -v c_lp_sm_perpop_mixed_subsample.ann.vcf | wc -l #1640979
+
+
+#100% random subset for KIR:
 
 cd $V_PATH/annotation/c_ll_ki_perpop/
 screen -S c_ll_ki_perpop_random_subsample.ann.log
 script c_ll_ki_perpop_random_subsample.ann.log
 
-$BCF query -l $V_PATH/annotation/c_ll_ki_perpop/c_ll_ki_perpop.ann.vcf | shuf -n 8 > c_ll_ki_perpop_random_ids.txt #select 8 individuals (NOR & POL size) randomly
+$BCF query -l $V_PATH/annotation/c_ll_ki_perpop/c_ll_ki_perpop.ann.vcf | shuf -n 8 > c_ll_ki_perpop_random_ids.txt #select 8 individuals (NOR & POL size) randomly.
 cat c_ll_ki_perpop_random_ids.txt
 java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
 -T SelectVariants \
@@ -952,6 +983,51 @@ java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -X
 --sample_file c_ll_ki_perpop_random_ids.txt
 
 grep '#' -v c_ll_ki_perpop_random_subsample.ann.vcf | wc -l #2182554
+
+```
+
+####To the smallest global number (for SM, mixed subset of size 8; for DO, random subset of size 8).
+
+```{r Obtain per population VCFs, eval=FALSE, engine='bash'}
+
+#Minimum size subset for SM (partially random: 8 individuals are randomly selected after discarding 3 with high kinship):
+
+cd $V_PATH/annotation/c_lp_sm_perpop/
+screen -S c_lp_sm_perpop_minimum_subsample.ann.log
+script c_lp_sm_perpop_minimum_subsample.ann.log
+
+awk 'NR==FNR{a[$0]=1;next}!a[$0]' c_lp_sm_perpop_threshold_ids.txt c_lp_sm_perpop_all_ids.txt | shuf -n 8 > c_lp_sm_perpop_minimum_ids.txt #remove the 3 individuals above the threshold and then randomly select 8 out of the remaining 16. Both files were generated in the previous section (mixed subsample).
+
+cat c_lp_sm_perpop_minimum_ids.txt
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T SelectVariants \
+-R $REF \
+-V $V_PATH/annotation/c_lp_sm_perpop/c_lp_sm_perpop.ann.vcf \
+-o $V_PATH/annotation/c_lp_sm_perpop/c_lp_sm_perpop_minimum_subsample.ann.vcf \
+-env \
+--sample_file c_lp_sm_perpop_minimum_ids.txt
+
+grep '#' -v c_lp_sm_perpop_minimum_subsample.ann.vcf | wc -l #1577071
+
+
+#Minimum size subset for DO (all 8 individuals are randomly selected):
+
+cd $V_PATH/annotation/c_lp_do_perpop/
+screen -S c_lp_do_perpop_minimum_subsample.ann.log
+script c_lp_do_perpop_minimum_subsample.ann.log
+
+$BCF query -l $V_PATH/annotation/c_lp_do_perpop/c_lp_do_perpop.ann.vcf | shuf -n 8 > c_lp_do_perpop_minimum_ids.txt #randomly select 8 individuals out of the 12.
+
+cat c_lp_do_perpop_minimum_ids.txt
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T SelectVariants \
+-R $REF \
+-V $V_PATH/annotation/c_lp_do_perpop/c_lp_do_perpop.ann.vcf \
+-o $V_PATH/annotation/c_lp_do_perpop/c_lp_do_perpop_minimum_subsample.ann.vcf \
+-env \
+--sample_file c_lp_do_perpop_minimum_ids.txt
+
+grep '#' -v c_lp_do_perpop_minimum_subsample.ann.vcf | wc -l #1296581
 
 ```
 
@@ -988,16 +1064,16 @@ for i in ${POP[@]}
 ```
 
 #10: Get annotation statistics.
-##At the population level.
+##At the population level (within species comparison).
 
 ```{r Get annotation statistics, eval=FALSE, engine='bash'}
 
 cd $V_PATH/annotation/
-screen -S snpeff_population_summary.log
-script snpeff_population_summary.log
+screen -S snpeff_population_within_summary.log
+script snpeff_population_within_summary.log
 
-rm snpeff_population_summary.txt
-echo -e "species\tpopulation\ttotal_V\tintergenic_V\tintronic_V\tcoding\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tmissense/synonymous_V\tmissense/synonymous_A" > snpeff_population_summary.txt
+rm snpeff_population_within_summary.txt
+echo -e "species\tpopulation\tsize\ttotal_V\tintergenic_V\tintronic_V\tcoding\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tmissense/synonymous_V\tmissense/synonymous_A" > snpeff_population_within_summary.txt
 POPLIST=($(ls -d c_{lp_sm*,lp_do*,ll_ki*,ll_po*,ll_no*}perpop))
 for pop in "${POPLIST[@]}"
   do
@@ -1005,37 +1081,75 @@ for pop in "${POPLIST[@]}"
   cd $V_PATH/annotation/"${pop}"/
   SPECIES=$(echo "${pop}" | cut -c3-4)
   POPULATION=$(echo "${pop}" | cut -c6-7)
-  if [ -e ${pop}_random_subsample.ann.vcf ]; then
-    echo "Subsample available"
-    TOTAL_V=$(grep -v '#' ${pop}_random_subsample.ann.vcf | wc -l)
-    INTERGENIC_V=$(grep 'intergenic' ${pop}_random_subsample.ann.vcf | wc -l)
-    INTRONIC_V=$(grep 'intron_variant' ${pop}_random_subsample.ann.vcf | wc -l)
-    CODING_V=$(grep 'CDS' ${pop}_random_subsample.ann.vcf | wc -l)
-    SYNONYMOUS_V=$(grep 'synonymous_variant' ${pop}_random_subsample.ann.vcf | wc -l)
-    SYNONYMOUS_A=$(grep 'synonymous_variant' ${pop}_random_subsample.ann.vcf | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
-    MISSENSE_V=$(grep 'missense_variant' ${pop}_random_subsample.ann.vcf | wc -l)
-    MISSENSE_A=$(grep 'missense_variant' ${pop}_random_subsample.ann.vcf | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
-    NONSENSE_V=$(grep -e 'lost' -e 'gained' ${pop}_random_subsample.ann.vcf | wc -l)
-    NONSENSE_A=$(grep -e 'lost' -e 'gained' ${pop}_random_subsample.ann.vcf | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
-    MISSENSE_SYNONYMOUS_V=$(echo "scale=3; $MISSENSE_V/$SYNONYMOUS_V" | bc)
-    MISSENSE_SYNONYMOUS_A=$(echo "scale=3; $MISSENSE_A/$SYNONYMOUS_A" | bc)
-    echo -e "$SPECIES\t$POPULATION\t$TOTAL_V\t$INTERGENIC_V\t$INTRONIC_V\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A" >> $V_PATH/annotation/snpeff_population_summary.txt
+  if [ -e ${pop}_mixed_subsample.ann.vcf ]; then
+    echo "Mixed "$POPULATION" subsample available"
+    FILE=${pop}_mixed_subsample.ann.vcf
+  elif [ -e ${pop}_random_subsample.ann.vcf ]; then
+    echo "Random "$POPULATION" subsample available"
+    FILE=${pop}_random_subsample.ann.vcf
   else
-    echo "Original available"
-    TOTAL_V=$(grep -v '#' ${pop}.ann.vcf | wc -l)
-    INTERGENIC_V=$(grep 'intergenic' ${pop}.ann.vcf | wc -l)
-    INTRONIC_V=$(grep 'intron_variant' ${pop}.ann.vcf | wc -l)
-    CODING_V=$(grep 'CDS' ${pop}.ann.vcf | wc -l)
-    SYNONYMOUS_V=$(grep 'synonymous_variant' ${pop}.ann.vcf | wc -l)
-    SYNONYMOUS_A=$(grep 'synonymous_variant' ${pop}.ann.vcf | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
-    MISSENSE_V=$(grep 'missense_variant' ${pop}.ann.vcf | wc -l)
-    MISSENSE_A=$(grep 'missense_variant' ${pop}.ann.vcf | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
-    NONSENSE_V=$(grep -e 'lost' -e 'gained' ${pop}.ann.vcf | wc -l)
-    NONSENSE_A=$(grep -e 'lost' -e 'gained' ${pop}.ann.vcf | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
-    MISSENSE_SYNONYMOUS_V=$(echo "scale=3; $MISSENSE_V/$SYNONYMOUS_V" | bc)
-    MISSENSE_SYNONYMOUS_A=$(echo "scale=3; $MISSENSE_A/$SYNONYMOUS_A" | bc)
-    echo -e "$SPECIES\t$POPULATION\t$TOTAL_V\t$INTERGENIC_V\t$INTRONIC_V\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A" >> $V_PATH/annotation/snpeff_population_summary.txt
+    echo "Original "$POPULATION" available"
+    FILE=${pop}.ann.vcf
   fi
+  SIZE=$($BCF query -l $FILE | wc -l)
+  TOTAL_V=$(grep -v '#' $FILE | wc -l)
+  INTERGENIC_V=$(grep 'intergenic' $FILE | wc -l)
+  INTRONIC_V=$(grep 'intron_variant' $FILE | wc -l)
+  CODING_V=$(grep 'CDS' $FILE | wc -l)
+  SYNONYMOUS_V=$(grep 'synonymous_variant' $FILE | wc -l)
+  SYNONYMOUS_A=$(grep 'synonymous_variant' $FILE | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_V=$(grep 'missense_variant' $FILE | wc -l)
+  MISSENSE_A=$(grep 'missense_variant' $FILE | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  NONSENSE_V=$(grep -e 'lost' -e 'gained' $FILE | wc -l)
+  NONSENSE_A=$(grep -e 'lost' -e 'gained' $FILE | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_SYNONYMOUS_V=$(echo "scale=3; $MISSENSE_V/$SYNONYMOUS_V" | bc)
+  MISSENSE_SYNONYMOUS_A=$(echo "scale=3; $MISSENSE_A/$SYNONYMOUS_A" | bc)
+  echo -e "$SPECIES\t$POPULATION\t$SIZE\t$TOTAL_V\t$INTERGENIC_V\t$INTRONIC_V\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A" >> $V_PATH/annotation/snpeff_population_within_summary.txt
+  done
+
+```
+
+##At the population level (between species comparison).
+
+```{r Get annotation statistics, eval=FALSE, engine='bash'}
+
+cd $V_PATH/annotation/
+screen -S snpeff_population_between_summary.log
+script snpeff_population_between_summary.log
+
+rm snpeff_population_between_summary.txt
+echo -e "species\tpopulation\tsize\ttotal_V\tintergenic_V\tintronic_V\tcoding\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tmissense/synonymous_V\tmissense/synonymous_A" > snpeff_population_between_summary.txt
+POPLIST=($(ls -d c_{lp_sm*,lp_do*,ll_ki*,ll_po*,ll_no*}perpop))
+for pop in "${POPLIST[@]}"
+  do
+  echo "${pop}"
+  cd $V_PATH/annotation/"${pop}"/
+  SPECIES=$(echo "${pop}" | cut -c3-4)
+  POPULATION=$(echo "${pop}" | cut -c6-7)
+  if [ -e ${pop}_minimum_subsample.ann.vcf ]; then
+    echo "Minimum "$POPULATION" subsample available"
+    FILE=${pop}_minimum_subsample.ann.vcf
+  elif [ -e ${pop}_random_subsample.ann.vcf ]; then
+    echo "Random "$POPULATION" subsample available"
+    FILE=${pop}_random_subsample.ann.vcf
+  else
+    echo "Original "$POPULATION" available"
+    FILE=${pop}.ann.vcf
+  fi
+  SIZE=$($BCF query -l $FILE | wc -l)
+  TOTAL_V=$(grep -v '#' $FILE | wc -l)
+  INTERGENIC_V=$(grep 'intergenic' $FILE | wc -l)
+  INTRONIC_V=$(grep 'intron_variant' $FILE | wc -l)
+  CODING_V=$(grep 'CDS' $FILE | wc -l)
+  SYNONYMOUS_V=$(grep 'synonymous_variant' $FILE | wc -l)
+  SYNONYMOUS_A=$(grep 'synonymous_variant' $FILE | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_V=$(grep 'missense_variant' $FILE | wc -l)
+  MISSENSE_A=$(grep 'missense_variant' $FILE | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  NONSENSE_V=$(grep -e 'lost' -e 'gained' $FILE | wc -l)
+  NONSENSE_A=$(grep -e 'lost' -e 'gained' $FILE | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_SYNONYMOUS_V=$(echo "scale=3; $MISSENSE_V/$SYNONYMOUS_V" | bc)
+  MISSENSE_SYNONYMOUS_A=$(echo "scale=3; $MISSENSE_A/$SYNONYMOUS_A" | bc)
+  echo -e "$SPECIES\t$POPULATION\t$SIZE\t$TOTAL_V\t$INTERGENIC_V\t$INTRONIC_V\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A" >> $V_PATH/annotation/snpeff_population_between_summary.txt
   done
 
 ```
