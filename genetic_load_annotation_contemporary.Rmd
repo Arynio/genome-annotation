@@ -297,7 +297,8 @@ grep -v '#' c_ll_lp_plus_h_ll_polarized_filtered3.ann.vcf | wc -l #5176437
 
 ```
 
-#5: Split the VCF into per species VCFs. Generate a VCF for each species.
+#5: Split the VCF into per species VCFs and then test per population and per individual splits without filtering. 
+##Generate a VCF for each species.
 
 ```{r Get annotation statistics for each population, eval=FALSE, engine='bash'}
 
@@ -322,6 +323,155 @@ rm list_to_remove.txt
 
 grep -v '#' lp_perspecies.trimmed.ann.vcf | wc -l #1905227
 grep -v '#' ll_perspecies.trimmed.ann.vcf | wc -l #4205538
+
+```
+
+##Test: split the VCF into per population VCFs, subsample populations, and split the VCF into per individual VCFs. Then get annotation statistics for all populational and individual VCFs.
+
+```{r Obtain per population VCFs, eval=FALSE, engine='bash'}
+
+cd $V_PATH/annotation/
+screen -S testing_allele_counts.ann.log
+script testing_allele_counts.ann.log
+
+cd $G_PATH
+declare SPECIES=$(ls {*_lp_*,*_ll_*}.g.vcf.gz | cut -c3-4 | sort | uniq)
+cd $V_PATH/annotation/
+for i in ${SPECIES[@]}
+  do
+  echo "${i}"
+  cd $G_PATH
+  declare POP=$(ls c_{lp_sm*,lp_do*,ll_ki*,ll_po*,ll_no*}.g.vcf.gz | cut -c1-7 | uniq | grep "${i}")
+  cd $V_PATH/annotation/
+  for j in ${POP[@]}
+    do
+    
+#Split the annotated VCF into per population VCFs, and then keep only those positions that are variable or fixed for the derived allele within each population (with -env flag).
+    
+    echo "${j}"
+    rm pop_list_to_remove.txt
+    $BCF query -l $V_PATH/annotation/"${i}"_perspecies.trimmed.ann.vcf | grep "${j}" > pop_list_to_remove.txt
+    cat pop_list_to_remove.txt
+    java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+    -T SelectVariants \
+    -R $REF \
+    -V $V_PATH/annotation/"${i}"_perspecies.trimmed.ann.vcf \
+    -o $V_PATH/annotation/"${j}"_perpop/"${j}"_perpop_test_allele_counts.ann.vcf \
+    -env \
+    --sample_file pop_list_to_remove.txt
+    rm pop_list_to_remove.txt
+
+#Subsample all populations that need subsampling (original code where the files with the ids are created is in section 8):
+
+    cd $V_PATH/annotation/"${j}"_perpop
+    if [ -e ${pop}_perpop_minimum_subsample.ann.vcf ]; then
+      echo "Minimum "$POPULATION" subsample available"
+      FILE=${pop}_perpop_minimum_ids.txt
+      java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+      -T SelectVariants \
+      -R $REF \
+      -V $V_PATH/annotation/"${j}"_perpop/"${j}"_perpop_test_allele_counts.ann.vcf \
+      -o $V_PATH/annotation/"${j}"_perpop/"${j}"_perpop_minimum_subsample_test_allele_counts.ann.vcf \
+      -env \
+      --sample_file $FILE
+     elif [ -e ${pop}_perpop_random_subsample.ann.vcf ]; then
+      echo "Random "$POPULATION" subsample available"
+      FILE=${pop}_perpop_random_ids.txt
+      java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+      -T SelectVariants \
+      -R $REF \
+      -V $V_PATH/annotation/"${j}"_perpop/"${j}"_perpop_test_allele_counts.ann.vcf \
+      -o $V_PATH/annotation/"${j}"_perpop/"${j}"_perpop_random_subsample_test_allele_counts.ann.vcf \
+      -env \
+      --sample_file $FILE
+    fi
+    
+#Split the population VCFs into per individual VCFs. Generate a VCF for each individual.
+
+    cd $G_PATH
+    declare INDIVIDUALS=$(ls "${j}"*.g.vcf.gz | cut -c1-12 | uniq)
+    for k in ${INDIVIDUALS[@]}
+      do
+      echo "${k}"
+      ID=$(echo "${k}")
+      java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+      -T SelectVariants \
+      -R $REF \
+      -V $V_PATH/annotation/"${j}"_perpop/"${j}"_perpop_test_allele_counts.ann.vcf \
+      -o $V_PATH/annotation/"${j}"_individuals/"${k}"_individual_test_allele_counts.ann.vcf \
+      -env \
+      -sn $ID
+      done
+    done
+  done
+
+#Get annotation statistics at the population level:  
+
+cd $V_PATH/annotation/
+rm snpeff_population_between_test_allele_counts.txt
+echo -e "species\tpopulation\tsize\ttotal_V\tintergenic_V\tintronic_V\tcoding\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tmissense/synonymous_V\tmissense/synonymous_A" > snpeff_population_between_test_allele_counts.txt
+POPLIST=($(ls -d c_{lp_sm*,lp_do*,ll_ki*,ll_po*,ll_no*}perpop))
+for pop in "${POPLIST[@]}"
+  do
+  echo "${pop}"
+  cd $V_PATH/annotation/"${pop}"/
+  SPECIES=$(echo "${pop}" | cut -c3-4)
+  POPULATION=$(echo "${pop}" | cut -c6-7)
+  if [ -e ${pop}_minimum_subsample_test_allele_counts.ann.vcf ]; then
+    echo "Minimum "$POPULATION" subsample available"
+    FILE=${pop}_minimum_subsample_test_allele_counts.ann.vcf
+  elif [ -e ${pop}_random_subsample_test_allele_counts.ann.vcf ]; then
+    echo "Random "$POPULATION" subsample available"
+    FILE=${pop}_random_subsample_test_allele_counts.ann.vcf
+  else
+    echo "Original "$POPULATION" available"
+    FILE=${pop}_test_allele_counts.ann.vcf
+  fi
+  SIZE=$($BCF query -l $FILE | wc -l)
+  TOTAL_V=$(grep -v '#' $FILE | wc -l)
+  INTERGENIC_V=$(grep 'intergenic' $FILE | wc -l)
+  INTRONIC_V=$(grep 'intron_variant' $FILE | wc -l)
+  CODING_V=$(grep 'CDS' $FILE | wc -l)
+  SYNONYMOUS_V=$(grep 'synonymous_variant' $FILE | wc -l)
+  SYNONYMOUS_A=$(grep 'synonymous_variant' $FILE | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_V=$(grep 'missense_variant' $FILE | wc -l)
+  MISSENSE_A=$(grep 'missense_variant' $FILE | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  NONSENSE_V=$(grep -e 'lost' -e 'gained' $FILE | wc -l)
+  NONSENSE_A=$(grep -e 'lost' -e 'gained' $FILE | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_SYNONYMOUS_V=$(echo "scale=3; $MISSENSE_V/$SYNONYMOUS_V" | bc)
+  MISSENSE_SYNONYMOUS_A=$(echo "scale=3; $MISSENSE_A/$SYNONYMOUS_A" | bc)
+  echo -e "$SPECIES\t$POPULATION\t$SIZE\t$TOTAL_V\t$INTERGENIC_V\t$INTRONIC_V\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A" >> $V_PATH/annotation/snpeff_population_between_test_allele_counts.txt
+  done
+  
+#Get annotation statistics at the individual level:  
+
+cd $V_PATH/annotation/
+rm snpeff_individual_test_allele_counts.txt
+echo -e "species\tpopulation\tsample\ttotal_V\tintergenic_V\tintronic_V\tcoding\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tmissense/synonymous_V\tmissense/synonymous_A" > snpeff_individual_test_allele_counts.txt
+INDLIST=($(ls `find . -name '*individual.ann.vcf' -print`))
+for i in "${INDLIST[@]}"
+  do
+  echo "${i}"
+  ind=$(echo "${i}" | awk -F'[/]' '{print $3}')
+  echo "${ind}"
+  SPECIES=$(echo "${ind}" | cut -c3-4)
+  POPULATION=$(echo "${ind}" | cut -c6-7)
+  SAMPLE=$(echo "${ind}" | cut -c9-12)
+  TOTAL=$(grep -v '#' ${i} | wc -l)
+  INTERGENIC_V=$(grep 'intergenic' ${i} | wc -l)
+  INTRONIC_V=$(grep 'intron_variant' ${i} | wc -l)
+  CODING_V=$(grep 'CDS' ${i} | wc -l)
+  SYNONYMOUS_V=$(grep 'synonymous_variant' ${i} | wc -l)
+  SYNONYMOUS_A=$(grep 'synonymous_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_V=$(grep 'missense_variant' ${i} | wc -l)
+  MISSENSE_A=$(grep 'missense_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  NONSENSE_V=$(grep -e 'lost' -e 'gained' ${i} | wc -l)
+  NONSENSE_A=$(grep -e 'lost' -e 'gained' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_SYNONYMOUS_V=$(echo "scale=3; $MISSENSE_V/$SYNONYMOUS_V" | bc)
+  MISSENSE_SYNONYMOUS_A=$(echo "scale=3; $MISSENSE_A/$SYNONYMOUS_A" | bc)
+  echo -e "$SPECIES\t$POPULATION\t$SAMPLE\t$TOTAL_V\t$INTERGENIC_V\t$INTRONIC_V\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A" >> $V_PATH/annotation/snpeff_individual_test_allele_counts.txt
+  done
+
 
 ```
 
