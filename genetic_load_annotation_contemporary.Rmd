@@ -330,6 +330,8 @@ grep -v '#' ll_perspecies.trimmed.ann.vcf | wc -l #4205538
 
 ```{r Obtain per population VCFs, eval=FALSE, engine='bash'}
 
+#This code is adapted from that from subsequent sections (8-10). It ends up yielding allele counts for all populations (subsampled to the minimum size -8-, and for all individuals) starting from the original per species VCFs (without any filtering), to test if the strange patterns found with the filtered ones -high number of synonymous mutations in pardinus- was already present prior to the differential per species filtering.
+
 cd $V_PATH/annotation/
 screen -S testing_allele_counts.ann.log
 script testing_allele_counts.ann.log
@@ -364,9 +366,9 @@ for i in ${SPECIES[@]}
 #Subsample all populations that need subsampling (original code where the files with the ids are created is in section 8):
 
     cd $V_PATH/annotation/"${j}"_perpop
-    if [ -e ${pop}_perpop_minimum_subsample.ann.vcf ]; then
+    if [ -e "${j}"_perpop_minimum_subsample.ann.vcf ]; then
       echo "Minimum "$POPULATION" subsample available"
-      FILE=${pop}_perpop_minimum_ids.txt
+      FILE="${j}"_perpop_minimum_ids.txt
       java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
       -T SelectVariants \
       -R $REF \
@@ -374,9 +376,9 @@ for i in ${SPECIES[@]}
       -o $V_PATH/annotation/"${j}"_perpop/"${j}"_perpop_minimum_subsample_test_allele_counts.ann.vcf \
       -env \
       --sample_file $FILE
-     elif [ -e ${pop}_perpop_random_subsample.ann.vcf ]; then
+     elif [ -e "${j}"_perpop_random_subsample.ann.vcf ]; then
       echo "Random "$POPULATION" subsample available"
-      FILE=${pop}_perpop_random_ids.txt
+      FILE="${j}"_perpop_random_ids.txt
       java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
       -T SelectVariants \
       -R $REF \
@@ -384,7 +386,9 @@ for i in ${SPECIES[@]}
       -o $V_PATH/annotation/"${j}"_perpop/"${j}"_perpop_random_subsample_test_allele_counts.ann.vcf \
       -env \
       --sample_file $FILE
-    fi
+      else
+      echo "Original "$POPULATION" available"
+      fi
     
 #Split the population VCFs into per individual VCFs. Generate a VCF for each individual.
 
@@ -448,7 +452,7 @@ for pop in "${POPLIST[@]}"
 cd $V_PATH/annotation/
 rm snpeff_individual_test_allele_counts.txt
 echo -e "species\tpopulation\tsample\ttotal_V\tintergenic_V\tintronic_V\tcoding\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tmissense/synonymous_V\tmissense/synonymous_A" > snpeff_individual_test_allele_counts.txt
-INDLIST=($(ls `find . -name '*individual.ann.vcf' -print`))
+INDLIST=($(ls `find . -name '*individual_test_allele_counts.ann.vcf' -print`))
 for i in "${INDLIST[@]}"
   do
   echo "${i}"
@@ -457,7 +461,7 @@ for i in "${INDLIST[@]}"
   SPECIES=$(echo "${ind}" | cut -c3-4)
   POPULATION=$(echo "${ind}" | cut -c6-7)
   SAMPLE=$(echo "${ind}" | cut -c9-12)
-  TOTAL=$(grep -v '#' ${i} | wc -l)
+  TOTAL_V=$(grep -v '#' ${i} | wc -l)
   INTERGENIC_V=$(grep 'intergenic' ${i} | wc -l)
   INTRONIC_V=$(grep 'intron_variant' ${i} | wc -l)
   CODING_V=$(grep 'CDS' ${i} | wc -l)
@@ -472,6 +476,7 @@ for i in "${INDLIST[@]}"
   echo -e "$SPECIES\t$POPULATION\t$SAMPLE\t$TOTAL_V\t$INTERGENIC_V\t$INTRONIC_V\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A" >> $V_PATH/annotation/snpeff_individual_test_allele_counts.txt
   done
 
+#All NS/S rations are a bit higher than in the final, filtered VCFs, but they are proportionally higher for all populations, i.e. those disparate ratios between ll and lp are truly in our data.
 
 ```
 
@@ -1323,7 +1328,7 @@ for i in "${INDLIST[@]}"
   SPECIES=$(echo "${ind}" | cut -c3-4)
   POPULATION=$(echo "${ind}" | cut -c6-7)
   SAMPLE=$(echo "${ind}" | cut -c9-12)
-  TOTAL=$(grep -v '#' ${i} | wc -l)
+  TOTAL_V=$(grep -v '#' ${i} | wc -l)
   INTERGENIC_V=$(grep 'intergenic' ${i} | wc -l)
   INTRONIC_V=$(grep 'intron_variant' ${i} | wc -l)
   CODING_V=$(grep 'CDS' ${i} | wc -l)
