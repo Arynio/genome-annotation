@@ -1218,8 +1218,61 @@ for i in ${POP[@]}
 
 ```
 
-#10: Get annotation statistics.
-##At the population level (within species comparison).
+#10: Mask positions. Subset the VCFs in order to remove certain variants.
+##Mask unpolarized positions from all VCFs. Remove all variants where AA=N.
+
+```{r Mask positions, eval=FALSE, engine='bash'}
+
+#During the polarization step, we didn't code any solution for AA=N, so those were left unresolved (AA=REF). We shouldn't take into account those positions since they could introduce a bias against AF=1 in SM (as we noticed when counting alleles), so we'll remove all of them from all perpop and per individual VCFs before counting alleles again.
+
+screen -S remove_AA_N_positions.log
+script remove_AA_N_positions.log
+
+cd $V_PATH/annotation/
+POP_VCFS=$(find $V_PATH/annotation/ -name "*perpop*.ann.vcf" | grep -v 'woutN')
+for pop in ${POP_VCFS[@]}
+  do
+  echo "${pop}"
+  grep -v "AA=N" ${pop} > ${pop/.ann.vcf/_woutN.ann.vcf}
+  done
+IND_VCFS=$(find $V_PATH/annotation/ -name "*individual.ann.vcf" | grep -v 'woutN')
+for ind in ${IND_VCFS[@]}
+  do
+  echo "${ind}"
+  grep -v "AA=N" ${ind} > ${ind/.ann.vcf/_woutN.ann.vcf}
+  done
+
+```
+
+##Mask fixed positions from all VCFs. Remove all variants where AF=1.
+
+```{r Mask positions, eval=FALSE, engine='bash'}
+
+#In order to test if truly variable positions behave as obtained in previous studies (genome project, Godoy), remove all variants fixed for the derived allele.
+
+cd $V_PATH/annotation/
+screen -S remove_AF_1_positions.log
+script remove_AF_1_positions.log
+
+cd $V_PATH/annotation/
+POP_VCFS=$(find $V_PATH/annotation/ -name "*perpop*woutN.ann.vcf" | grep -v 'wout1')
+for pop in ${POP_VCFS[@]}
+  do
+  echo "${pop}"
+  grep -v "AF=1.00" ${pop} > ${pop/.ann.vcf/_wout1.ann.vcf}
+  done
+IND_VCFS=$(find $V_PATH/annotation/ -name "*individual_woutN.ann.vcf" | grep -v 'wout1')
+for ind in ${IND_VCFS[@]}
+  do
+  echo "${ind}"
+  grep -v "AF=1.00" ${ind} > ${ind/.ann.vcf/_wout1.ann.vcf}
+  done
+
+```
+
+#11: Get annotation statistics.
+##Without N. Obtain statistics for all VCFs where AA=N positions have been removed.
+###At the population level (within species comparison).
 
 ```{r Get annotation statistics, eval=FALSE, engine='bash'}
 
@@ -1236,15 +1289,15 @@ for pop in "${POPLIST[@]}"
   cd $V_PATH/annotation/"${pop}"/
   SPECIES=$(echo "${pop}" | cut -c3-4)
   POPULATION=$(echo "${pop}" | cut -c6-7)
-  if [ -e ${pop}_mixed_subsample.ann.vcf ]; then
+  if [ -e ${pop}_mixed_subsample_woutN.ann.vcf ]; then
     echo "Mixed "$POPULATION" subsample available"
-    FILE=${pop}_mixed_subsample.ann.vcf
-  elif [ -e ${pop}_random_subsample.ann.vcf ]; then
+    FILE=${pop}_mixed_subsample_woutN.ann.vcf
+  elif [ -e ${pop}_random_subsample_woutN.ann.vcf ]; then
     echo "Random "$POPULATION" subsample available"
-    FILE=${pop}_random_subsample.ann.vcf
+    FILE=${pop}_random_subsample_woutN.ann.vcf
   else
     echo "Original "$POPULATION" available"
-    FILE=${pop}.ann.vcf
+    FILE=${pop}_woutN.ann.vcf
   fi
   SIZE=$($BCF query -l $FILE | wc -l)
   TOTAL_V=$(grep -v '#' $FILE | wc -l)
@@ -1264,7 +1317,7 @@ for pop in "${POPLIST[@]}"
 
 ```
 
-##At the population level (between species comparison).
+###At the population level (between species comparison).
 
 ```{r Get annotation statistics, eval=FALSE, engine='bash'}
 
@@ -1281,15 +1334,15 @@ for pop in "${POPLIST[@]}"
   cd $V_PATH/annotation/"${pop}"/
   SPECIES=$(echo "${pop}" | cut -c3-4)
   POPULATION=$(echo "${pop}" | cut -c6-7)
-  if [ -e ${pop}_minimum_subsample.ann.vcf ]; then
+  if [ -e ${pop}_minimum_subsample_woutN.ann.vcf ]; then
     echo "Minimum "$POPULATION" subsample available"
-    FILE=${pop}_minimum_subsample.ann.vcf
-  elif [ -e ${pop}_random_subsample.ann.vcf ]; then
+    FILE=${pop}_minimum_subsample_woutN.ann.vcf
+  elif [ -e ${pop}_random_subsample_woutN.ann.vcf ]; then
     echo "Random "$POPULATION" subsample available"
-    FILE=${pop}_random_subsample.ann.vcf
+    FILE=${pop}_random_subsample_woutN.ann.vcf
   else
     echo "Original "$POPULATION" available"
-    FILE=${pop}.ann.vcf
+    FILE=${pop}_woutN.ann.vcf
   fi
   SIZE=$($BCF query -l $FILE | wc -l)
   TOTAL_V=$(grep -v '#' $FILE | wc -l)
@@ -1309,7 +1362,7 @@ for pop in "${POPLIST[@]}"
 
 ```
 
-##At the individual level.
+###At the individual level.
 
 ```{r Get annotation statistics, eval=FALSE, engine='bash'}
 
@@ -1319,7 +1372,7 @@ script snpeff_individual_summary.log
 
 rm snpeff_individual_summary.txt
 echo -e "species\tpopulation\tsample\ttotal_V\tintergenic_V\tintronic_V\tcoding\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tmissense/synonymous_V\tmissense/synonymous_A" > snpeff_individual_summary.txt
-INDLIST=($(ls `find . -name '*individual.ann.vcf' -print`))
+INDLIST=($(ls `find . -name '*individual_woutN.ann.vcf' -print`))
 for i in "${INDLIST[@]}"
   do
   echo "${i}"
@@ -1345,6 +1398,281 @@ for i in "${INDLIST[@]}"
 
 ```
 
+##Without 1. Obtain statistics for all VCFs where AA=N and AF=1 positions have been removed.
+###At the population level (within species comparison).
+
+```{r Get annotation statistics, eval=FALSE, engine='bash'}
+
+cd $V_PATH/annotation/
+screen -S snpeff_population_within_summary_wout1.log
+script snpeff_population_within_summary_wout1.log
+
+rm snpeff_population_within_summary_wout1.txt
+echo -e "species\tpopulation\tsize\ttotal_V\tintergenic_V\tintronic_V\tcoding\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tmissense/synonymous_V\tmissense/synonymous_A" > snpeff_population_within_summary_wout1.txt
+POPLIST=($(ls -d c_{lp_sm*,lp_do*,ll_ki*,ll_po*,ll_no*}perpop))
+for pop in "${POPLIST[@]}"
+  do
+  echo "${pop}"
+  cd $V_PATH/annotation/"${pop}"/
+  SPECIES=$(echo "${pop}" | cut -c3-4)
+  POPULATION=$(echo "${pop}" | cut -c6-7)
+  if [ -e ${pop}_mixed_subsample_woutN_wout1.ann.vcf ]; then
+    echo "Mixed "$POPULATION" subsample available"
+    FILE=${pop}_mixed_subsample_woutN_wout1.ann.vcf
+  elif [ -e ${pop}_random_subsample_woutN_wout1.ann.vcf ]; then
+    echo "Random "$POPULATION" subsample available"
+    FILE=${pop}_random_subsample_woutN_wout1.ann.vcf
+  else
+    echo "Original "$POPULATION" available"
+    FILE=${pop}_woutN_wout1.ann.vcf
+  fi
+  SIZE=$($BCF query -l $FILE | wc -l)
+  TOTAL_V=$(grep -v '#' $FILE | wc -l)
+  INTERGENIC_V=$(grep 'intergenic' $FILE | wc -l)
+  INTRONIC_V=$(grep 'intron_variant' $FILE | wc -l)
+  CODING_V=$(grep 'CDS' $FILE | wc -l)
+  SYNONYMOUS_V=$(grep 'synonymous_variant' $FILE | wc -l)
+  SYNONYMOUS_A=$(grep 'synonymous_variant' $FILE | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_V=$(grep 'missense_variant' $FILE | wc -l)
+  MISSENSE_A=$(grep 'missense_variant' $FILE | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  NONSENSE_V=$(grep -e 'lost' -e 'gained' $FILE | wc -l)
+  NONSENSE_A=$(grep -e 'lost' -e 'gained' $FILE | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_SYNONYMOUS_V=$(echo "scale=3; $MISSENSE_V/$SYNONYMOUS_V" | bc)
+  MISSENSE_SYNONYMOUS_A=$(echo "scale=3; $MISSENSE_A/$SYNONYMOUS_A" | bc)
+  echo -e "$SPECIES\t$POPULATION\t$SIZE\t$TOTAL_V\t$INTERGENIC_V\t$INTRONIC_V\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A" >> $V_PATH/annotation/snpeff_population_within_summary_wout1.txt
+  done
+
+```
+
+###At the population level (between species comparison).
+
+```{r Get annotation statistics, eval=FALSE, engine='bash'}
+
+cd $V_PATH/annotation/
+screen -S snpeff_population_between_summary_wout1.log
+script snpeff_population_between_summary_wout1.log
+
+rm snpeff_population_between_summary_wout1.txt
+echo -e "species\tpopulation\tsize\ttotal_V\tintergenic_V\tintronic_V\tcoding\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tmissense/synonymous_V\tmissense/synonymous_A" > snpeff_population_between_summary_wout1.txt
+POPLIST=($(ls -d c_{lp_sm*,lp_do*,ll_ki*,ll_po*,ll_no*}perpop))
+for pop in "${POPLIST[@]}"
+  do
+  echo "${pop}"
+  cd $V_PATH/annotation/"${pop}"/
+  SPECIES=$(echo "${pop}" | cut -c3-4)
+  POPULATION=$(echo "${pop}" | cut -c6-7)
+  if [ -e ${pop}_minimum_subsample_woutN_wout1.ann.vcf ]; then
+    echo "Minimum "$POPULATION" subsample available"
+    FILE=${pop}_minimum_subsample_woutN_wout1.ann.vcf
+  elif [ -e ${pop}_random_subsample_woutN_wout1.ann.vcf ]; then
+    echo "Random "$POPULATION" subsample available"
+    FILE=${pop}_random_subsample_woutN_wout1.ann.vcf
+  else
+    echo "Original "$POPULATION" available"
+    FILE=${pop}_woutN_wout1.ann.vcf
+  fi
+  SIZE=$($BCF query -l $FILE | wc -l)
+  TOTAL_V=$(grep -v '#' $FILE | wc -l)
+  INTERGENIC_V=$(grep 'intergenic' $FILE | wc -l)
+  INTRONIC_V=$(grep 'intron_variant' $FILE | wc -l)
+  CODING_V=$(grep 'CDS' $FILE | wc -l)
+  SYNONYMOUS_V=$(grep 'synonymous_variant' $FILE | wc -l)
+  SYNONYMOUS_A=$(grep 'synonymous_variant' $FILE | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_V=$(grep 'missense_variant' $FILE | wc -l)
+  MISSENSE_A=$(grep 'missense_variant' $FILE | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  NONSENSE_V=$(grep -e 'lost' -e 'gained' $FILE | wc -l)
+  NONSENSE_A=$(grep -e 'lost' -e 'gained' $FILE | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_SYNONYMOUS_V=$(echo "scale=3; $MISSENSE_V/$SYNONYMOUS_V" | bc)
+  MISSENSE_SYNONYMOUS_A=$(echo "scale=3; $MISSENSE_A/$SYNONYMOUS_A" | bc)
+  echo -e "$SPECIES\t$POPULATION\t$SIZE\t$TOTAL_V\t$INTERGENIC_V\t$INTRONIC_V\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A" >> $V_PATH/annotation/snpeff_population_between_summary_wout1.txt
+  done
+
+```
+
+###At the individual level.
+
+```{r Get annotation statistics, eval=FALSE, engine='bash'}
+
+cd $V_PATH/annotation/
+screen -S snpeff_individual_summary_wout1.log
+script snpeff_individual_summary_wout1.log
+
+rm snpeff_individual_summary_wout1.txt
+echo -e "species\tpopulation\tsample\ttotal_V\tintergenic_V\tintronic_V\tcoding\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tmissense/synonymous_V\tmissense/synonymous_A" > snpeff_individual_summary_wout1.txt
+INDLIST=($(ls `find . -name '*individual_woutN_wout1.ann.vcf' -print`))
+for i in "${INDLIST[@]}"
+  do
+  echo "${i}"
+  ind=$(echo "${i}" | awk -F'[/]' '{print $3}')
+  echo "${ind}"
+  SPECIES=$(echo "${ind}" | cut -c3-4)
+  POPULATION=$(echo "${ind}" | cut -c6-7)
+  SAMPLE=$(echo "${ind}" | cut -c9-12)
+  TOTAL_V=$(grep -v '#' ${i} | wc -l)
+  INTERGENIC_V=$(grep 'intergenic' ${i} | wc -l)
+  INTRONIC_V=$(grep 'intron_variant' ${i} | wc -l)
+  CODING_V=$(grep 'CDS' ${i} | wc -l)
+  SYNONYMOUS_V=$(grep 'synonymous_variant' ${i} | wc -l)
+  SYNONYMOUS_A=$(grep 'synonymous_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_V=$(grep 'missense_variant' ${i} | wc -l)
+  MISSENSE_A=$(grep 'missense_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  NONSENSE_V=$(grep -e 'lost' -e 'gained' ${i} | wc -l)
+  NONSENSE_A=$(grep -e 'lost' -e 'gained' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_SYNONYMOUS_V=$(echo "scale=3; $MISSENSE_V/$SYNONYMOUS_V" | bc)
+  MISSENSE_SYNONYMOUS_A=$(echo "scale=3; $MISSENSE_A/$SYNONYMOUS_A" | bc)
+  echo -e "$SPECIES\t$POPULATION\t$SAMPLE\t$TOTAL_V\t$INTERGENIC_V\t$INTRONIC_V\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A" >> $V_PATH/annotation/snpeff_individual_summary_wout1.txt
+  done
+
+```
+
+##Draw annotation statistics.
+
+```{r Get annotation statistics}
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+
+!!! MODIFY
+
+features_frequency_distribution <- read_delim("/Users/Dani/ownCloud/backup/annotation/genetic_load/features_frequency_distribution/features_frequency_distribution.txt",col_names=c("AF","pop","feat"),delim=" ")
+features_frequency_distribution
+pops <- unique(features_frequency_distribution$pop)
+pops
+features <- unique(features_frequency_distribution$feat)
+features
+
+for (pop in pops) {
+  for (feat in features) {
+    plot_data <- features_frequency_distribution %>% filter(features_frequency_distribution$pop == !!pop & features_frequency_distribution$feat == !!feat) #the two !! allow R to evaluate the text and distinguish looping variables from col_names
+    plot_data
+    pop_feat_ggplot <- ggplot(data=plot_data, aes(AF)) +
+    geom_histogram(aes(AF),binwidth=0.01) +
+    ggtitle(paste0("AF distribution for ",pop," ",feat)) +
+    #ylab("density") +
+    #xlab("heritability") +
+    theme_bw() +
+    theme(text=element_text(size=12,face="bold"),
+          rect=element_rect(size=1),
+          axis.line=element_line(colour="black"),
+          axis.title=element_text(size=16),
+          #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+          #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+          #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+          panel.background=element_blank(),
+          panel.border=element_rect(colour="black"),
+          #panel.grid=element_blank(),
+          #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+          plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+          #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+          legend.background=element_rect(linetype="solid", colour="black", size=.5),
+          #legend.justification=c(0,0),
+          legend.key=element_rect(colour="white"),
+          #legend.key.size=unit(1.3,"cm"),
+          legend.position=c(0.92,0.86),
+          legend.title=element_blank()
+    )
+    pop_feat_ggplot
+    ggsave(paste0(pop,"_",feat,"_AF_distribution"), width=30, height=15, units="cm", device="pdf", path="/Users/Dani/ownCloud/backup/annotation/genetic_load/features_frequency_distribution/")
+  }
+}
+
+```
+
+##Obtain frequency distribution.
+
+```{r Get annotation statistics, eval=FALSE, engine='bash'}
+
+#For each population (minimum subsample) extract allele frequency from all SNPs in each class of interest, and save them in a file:
+
+cd $V_PATH/annotation/
+screen -S features_frequency_distribution.log
+script features_frequency_distribution.log
+
+rm $V_PATH/annotation/features_frequency_distribution.txt
+POPLIST=($(ls -d c_{lp_sm*,lp_do*,ll_ki*,ll_po*,ll_no*}perpop))
+for pop in "${POPLIST[@]}"
+  do
+  echo "${pop}"
+  cd $V_PATH/annotation/"${pop}"/
+  SPECIES=$(echo "${pop}" | cut -c3-4)
+  POPULATION=$(echo "${pop}" | cut -c6-7)
+  if [ -e ${pop}_minimum_subsample_woutN.ann.vcf ]; then
+    echo "Minimum "$POPULATION" subsample available"
+    FILE=${pop}_minimum_subsample_woutN.ann.vcf
+  elif [ -e ${pop}_random_subsample_woutN.ann.vcf ]; then
+    echo "Random "$POPULATION" subsample available"
+    FILE=${pop}_random_subsample_woutN.ann.vcf
+  else
+    echo "Original "$POPULATION" available"
+    FILE=${pop}_woutN.ann.vcf
+  fi
+  declare -a FEATURES=("intergenic" "intron_variant" "synonymous_variant" "missense_variant")
+  for feat in "${FEATURES[@]}"
+    do
+    echo "${feat}"
+    grep "${feat}" $FILE | cut -f8 | cut -d';' -f3 | cut -d'=' -f2 | awk -v pop="$POPULATION" -v feat="${feat}" '{print $1" "pop" "feat}' >> $V_PATH/annotation/features_frequency_distribution.txt
+    done
+    cd $V_PATH/annotation/
+  done
+
+scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/features_frequency_distribution.txt /Users/Dani/ownCloud/backup/annotation/genetic_load/features_frequency_distribution/
+
+#Then manually add _withN or _woutN to the file depending on which files were used.
+
+```
+
+##Draw frequency distribution.
+
+```{r Get annotation statistics}
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+
+features_frequency_distribution <- read_delim("/Users/Dani/ownCloud/backup/annotation/genetic_load/features_frequency_distribution/features_frequency_distribution_woutN.txt",col_names=c("AF","pop","feat"),delim=" ")
+features_frequency_distribution
+pops <- unique(features_frequency_distribution$pop)
+pops
+features <- unique(features_frequency_distribution$feat)
+features
+
+for (pop in pops) {
+  for (feat in features) {
+    plot_data <- features_frequency_distribution %>% filter(features_frequency_distribution$pop == !!pop & features_frequency_distribution$feat == !!feat) #the two !! allow R to evaluate the text and distinguish looping variables from col_names
+    plot_data
+    pop_feat_ggplot <- ggplot(data=plot_data, aes(AF)) +
+    geom_histogram(aes(AF),binwidth=0.01) +
+    ggtitle(paste0("AF distribution for ",pop," ",feat)) +
+    #ylab("density") +
+    #xlab("heritability") +
+    theme_bw() +
+    theme(text=element_text(size=12,face="bold"),
+          rect=element_rect(size=1),
+          axis.line=element_line(colour="black"),
+          axis.title=element_text(size=16),
+          #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+          #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+          #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+          panel.background=element_blank(),
+          panel.border=element_rect(colour="black"),
+          #panel.grid=element_blank(),
+          #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+          plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+          #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+          legend.background=element_rect(linetype="solid", colour="black", size=.5),
+          #legend.justification=c(0,0),
+          legend.key=element_rect(colour="white"),
+          #legend.key.size=unit(1.3,"cm"),
+          legend.position=c(0.92,0.86),
+          legend.title=element_blank()
+    )
+    pop_feat_ggplot
+    ggsave(paste0(pop,"_",feat,"_AF_distribution_woutN"), width=30, height=15, units="cm", device="pdf", path="/Users/Dani/ownCloud/backup/annotation/genetic_load/features_frequency_distribution/woutN/")
+  }
+}
+
+```
 
 #Old & obsolete code:
 ##Split the VCF into per population VCFs. Generate a VCF for each population.
