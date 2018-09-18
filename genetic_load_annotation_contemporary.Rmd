@@ -1531,51 +1531,59 @@ for i in "${INDLIST[@]}"
 
 library(readr)
 library(dplyr)
+library(tidyr)
 library(ggplot2)
+library(RColorBrewer)
 
-!!! MODIFY
-
-features_frequency_distribution <- read_delim("/Users/Dani/ownCloud/backup/annotation/genetic_load/features_frequency_distribution/features_frequency_distribution.txt",col_names=c("AF","pop","feat"),delim=" ")
-features_frequency_distribution
-pops <- unique(features_frequency_distribution$pop)
-pops
-features <- unique(features_frequency_distribution$feat)
-features
-
-for (pop in pops) {
-  for (feat in features) {
-    plot_data <- features_frequency_distribution %>% filter(features_frequency_distribution$pop == !!pop & features_frequency_distribution$feat == !!feat) #the two !! allow R to evaluate the text and distinguish looping variables from col_names
-    plot_data
-    pop_feat_ggplot <- ggplot(data=plot_data, aes(AF)) +
-    geom_histogram(aes(AF),binwidth=0.01) +
-    ggtitle(paste0("AF distribution for ",pop," ",feat)) +
-    #ylab("density") +
-    #xlab("heritability") +
-    theme_bw() +
-    theme(text=element_text(size=12,face="bold"),
-          rect=element_rect(size=1),
-          axis.line=element_line(colour="black"),
-          axis.title=element_text(size=16),
-          #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
-          #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
-          #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
-          panel.background=element_blank(),
-          panel.border=element_rect(colour="black"),
-          #panel.grid=element_blank(),
-          #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
-          plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
-          #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
-          legend.background=element_rect(linetype="solid", colour="black", size=.5),
-          #legend.justification=c(0,0),
-          legend.key=element_rect(colour="white"),
-          #legend.key.size=unit(1.3,"cm"),
-          legend.position=c(0.92,0.86),
-          legend.title=element_blank()
-    )
-    pop_feat_ggplot
-    ggsave(paste0(pop,"_",feat,"_AF_distribution"), width=30, height=15, units="cm", device="pdf", path="/Users/Dani/ownCloud/backup/annotation/genetic_load/features_frequency_distribution/")
-  }
+wd <- file.path("/Users/Dani/ownCloud/backup/annotation/genetic_load")
+setwd(wd)
+files <- grep(grep(list.files(file.path("/Users/Dani/ownCloud/backup/annotation/genetic_load"), pattern = "snpeff", full.names=T), pattern='test_allele_counts', inv=T, value=T),pattern='between', value=T)
+files
+perpop_between_statistics <- data_frame("population"=character(0),"category"=character(0),"value"=numeric(0),"dataset"=character(0))
+for (f in c(1,3,2)) {
+  current_file <- read_tsv(files[f])
+  current_file <- current_file %>% mutate("I_ratio"=intronic_V/intergenic_V,"S_ratio*10"=10*synonymous_V/intergenic_V,"NS_ratio*10"=10*missense_V/intergenic_V,"LOF_ratio*1000"=1000*nonsense_V/intergenic_V,"NS/S_v"=missense_V/synonymous_V,"NS/S_a"=missense_A/synonymous_A,"LOF/S_v*100"=100*nonsense_V/synonymous_V,"LOF/S_a*100"=100*nonsense_A/synonymous_A,dataset=unlist(strsplit(files[f],"/|_|\\."))[length(unlist(strsplit(files[f],"/|_|\\.")))-1]) %>% select(2,c(16:24))
+  current_file
+  current_file_tidy <- current_file %>% gather(category,value,-population,-dataset) %>% select(1,3,4,2)
+  current_file_tidy
+  perpop_between_statistics <- rbind(perpop_between_statistics,current_file_tidy)
 }
+perpop_between_statistics$population <- as.factor(perpop_between_statistics$population)
+perpop_between_statistics$population = factor(perpop_between_statistics$population,levels(perpop_between_statistics$population)[c(2:5,1)])
+perpop_between_statistics$category <- as.factor(perpop_between_statistics$category)
+perpop_between_statistics$category = factor(perpop_between_statistics$category,levels(perpop_between_statistics$category)[c(1,8,5,2,7,6,4,3)])
+perpop_between_statistics$dataset <- as.factor(perpop_between_statistics$dataset)
+perpop_between_statistics$dataset = factor(perpop_between_statistics$dataset,levels(perpop_between_statistics$dataset)[c(1,3,2)])
+perpop_between_statistics
+
+ggplot_perpop_between <- ggplot(data=perpop_between_statistics, aes(x=category,y=value)) +
+  geom_point(aes(colour = population)) + 
+  scale_color_manual(values=c(brewer.pal(12,"Paired")[1], brewer.pal(12,"Paired")[2], brewer.pal(12,"Paired")[4], brewer.pal(8,"Greys")[5],brewer.pal(8,"Greys")[8])) +
+  facet_grid(. ~ dataset) +
+  ggtitle("Ratios per population (N=8)") +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+        rect=element_rect(size=1),
+        axis.line=element_line(colour="black"),
+        axis.title=element_text(size=16),
+        axis.text.x=element_text(angle=90,hjust=1,vjust=0.5),
+        #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+        #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+        panel.background=element_blank(),
+        panel.border=element_rect(colour="black"),
+        #panel.grid=element_blank(),
+        #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+        plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+        #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+        legend.background=element_rect(linetype="solid", colour="black", size=.5),
+        #legend.justification=c(0,0),
+        legend.key=element_rect(colour="white"),
+        #legend.key.size=unit(1.3,"cm"),
+        #legend.position=c(0.92,0.86),
+        legend.title=element_blank()
+  )
+ggplot_perpop_between
+ggsave("perpop_counts_ratios.pdf", width=30, height=15, units="cm", device="pdf", path="/Users/Dani/ownCloud/backup/annotation/genetic_load/")
 
 ```
 
