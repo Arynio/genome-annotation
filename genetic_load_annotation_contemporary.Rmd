@@ -1591,13 +1591,13 @@ ggsave("perpop_counts_ratios.pdf", width=30, height=15, units="cm", device="pdf"
 
 ```{r Get annotation statistics, eval=FALSE, engine='bash'}
 
-#For each population (minimum subsample) extract allele frequency from all SNPs in each class of interest, and save them in a file:
+#woutN: for each population (minimum subsample, woutN version) extract allele frequency from all SNPs in each class of interest, and save them in a file:
 
 cd $V_PATH/annotation/
-screen -S features_frequency_distribution.log
-script features_frequency_distribution.log
+screen -S features_frequency_distribution_woutN.log
+script features_frequency_distribution_woutN.log
 
-rm $V_PATH/annotation/features_frequency_distribution.txt
+rm $V_PATH/annotation/features_frequency_distribution_woutN.txt
 POPLIST=($(ls -d c_{lp_sm*,lp_do*,ll_ki*,ll_po*,ll_no*}perpop))
 for pop in "${POPLIST[@]}"
   do
@@ -1619,14 +1619,49 @@ for pop in "${POPLIST[@]}"
   for feat in "${FEATURES[@]}"
     do
     echo "${feat}"
-    grep "${feat}" $FILE | cut -f8 | cut -d';' -f3 | cut -d'=' -f2 | awk -v pop="$POPULATION" -v feat="${feat}" '{print $1" "pop" "feat}' >> $V_PATH/annotation/features_frequency_distribution.txt
+    grep "${feat}" $FILE | cut -f8 | cut -d';' -f3 | cut -d'=' -f2 | awk -v pop="$POPULATION" -v feat="${feat}" '{print $1" "pop" "feat}' >> $V_PATH/annotation/features_frequency_distribution_woutN.txt
     done
     cd $V_PATH/annotation/
   done
 
-scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/features_frequency_distribution.txt /Users/Dani/ownCloud/backup/annotation/genetic_load/features_frequency_distribution/
+scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/features_frequency_distribution_woutN.txt /Users/Dani/ownCloud/backup/annotation/genetic_load/features_frequency_distribution/
 
-#Then manually add _withN or _woutN to the file depending on which files were used.
+
+#wout1: for each population (minimum subsample, wout1 version) extract allele frequency from all SNPs in each class of interest, and save them in a file:
+
+cd $V_PATH/annotation/
+screen -S features_frequency_distribution_wout1.log
+script features_frequency_distribution_wout1.log
+
+rm $V_PATH/annotation/features_frequency_distribution_wout1.txt
+POPLIST=($(ls -d c_{lp_sm*,lp_do*,ll_ki*,ll_po*,ll_no*}perpop))
+for pop in "${POPLIST[@]}"
+  do
+  echo "${pop}"
+  cd $V_PATH/annotation/"${pop}"/
+  SPECIES=$(echo "${pop}" | cut -c3-4)
+  POPULATION=$(echo "${pop}" | cut -c6-7)
+  if [ -e ${pop}_minimum_subsample_woutN_wout1.ann.vcf ]; then
+    echo "Minimum "$POPULATION" subsample available"
+    FILE=${pop}_minimum_subsample_woutN_wout1.ann.vcf
+  elif [ -e ${pop}_random_subsample_woutN_wout1.ann.vcf ]; then
+    echo "Random "$POPULATION" subsample available"
+    FILE=${pop}_random_subsample_woutN_wout1.ann.vcf
+  else
+    echo "Original "$POPULATION" available"
+    FILE=${pop}_woutN_wout1.ann.vcf
+  fi
+  declare -a FEATURES=("intergenic" "intron_variant" "synonymous_variant" "missense_variant")
+  for feat in "${FEATURES[@]}"
+    do
+    echo "${feat}"
+    grep "${feat}" $FILE | cut -f8 | cut -d';' -f3 | cut -d'=' -f2 | awk -v pop="$POPULATION" -v feat="${feat}" '{print $1" "pop" "feat}' >> $V_PATH/annotation/features_frequency_distribution_wout1.txt
+    done
+    cd $V_PATH/annotation/
+  done
+
+scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/features_frequency_distribution_wout1.txt /Users/Dani/ownCloud/backup/annotation/genetic_load/features_frequency_distribution/
+
 
 ```
 
@@ -1638,49 +1673,160 @@ library(readr)
 library(dplyr)
 library(ggplot2)
 
+#woutN:
+
 features_frequency_distribution <- read_delim("/Users/Dani/ownCloud/backup/annotation/genetic_load/features_frequency_distribution/features_frequency_distribution_woutN.txt",col_names=c("AF","pop","feat"),delim=" ")
 features_frequency_distribution
+features_frequency_distribution$feat <- as.factor(features_frequency_distribution$feat)
+features_frequency_distribution$feat = factor(features_frequency_distribution$feat,levels(features_frequency_distribution$feat)[c(1,2,4,3)])
 pops <- unique(features_frequency_distribution$pop)
 pops
 features <- unique(features_frequency_distribution$feat)
 features
 
 for (pop in pops) {
-  for (feat in features) {
-    plot_data <- features_frequency_distribution %>% filter(features_frequency_distribution$pop == !!pop & features_frequency_distribution$feat == !!feat) #the two !! allow R to evaluate the text and distinguish looping variables from col_names
-    plot_data
-    pop_feat_ggplot <- ggplot(data=plot_data, aes(AF)) +
-    geom_histogram(aes(AF),binwidth=0.01) +
-    ggtitle(paste0("AF distribution for ",pop," ",feat)) +
-    #ylab("density") +
-    #xlab("heritability") +
-    theme_bw() +
-    theme(text=element_text(size=12,face="bold"),
-          rect=element_rect(size=1),
-          axis.line=element_line(colour="black"),
-          axis.title=element_text(size=16),
-          #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
-          #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
-          #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
-          panel.background=element_blank(),
-          panel.border=element_rect(colour="black"),
-          #panel.grid=element_blank(),
-          #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
-          plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
-          #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
-          legend.background=element_rect(linetype="solid", colour="black", size=.5),
-          #legend.justification=c(0,0),
-          legend.key=element_rect(colour="white"),
-          #legend.key.size=unit(1.3,"cm"),
-          legend.position=c(0.92,0.86),
-          legend.title=element_blank()
-    )
-    pop_feat_ggplot
-    ggsave(paste0(pop,"_",feat,"_AF_distribution_woutN"), width=30, height=15, units="cm", device="pdf", path="/Users/Dani/ownCloud/backup/annotation/genetic_load/features_frequency_distribution/woutN/")
-  }
+  plot_data <- features_frequency_distribution %>% filter(features_frequency_distribution$pop == !!pop) #the two !! allow R to evaluate the text and distinguish looping variables from col_names
+  plot_data
+  pop_feat_ggplot <- ggplot(data=plot_data, aes(AF)) +
+  facet_grid(feat ~ ., scales="free") +
+  geom_histogram(aes(AF),binwidth=0.01) +
+  ggtitle(paste0("AF distribution for ",pop)) +
+  #ylab("density") +
+  #xlab("heritability") +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+        rect=element_rect(size=1),
+        axis.line=element_line(colour="black"),
+        axis.title=element_text(size=16),
+        #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+        #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+        #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+        panel.background=element_blank(),
+        panel.border=element_rect(colour="black"),
+        #panel.grid=element_blank(),
+        #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+        plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+        #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+        legend.background=element_rect(linetype="solid", colour="black", size=.5),
+        #legend.justification=c(0,0),
+        legend.key=element_rect(colour="white"),
+        #legend.key.size=unit(1.3,"cm"),
+        legend.position=c(0.92,0.86),
+        legend.title=element_blank()
+  )
+  pop_feat_ggplot
+  ggsave(paste0(pop,"_AF_distribution_woutN"), width=30, height=25, units="cm", device="pdf", path="/Users/Dani/ownCloud/backup/annotation/genetic_load/features_frequency_distribution/woutN/")
 }
 
+#wout1:
+
+features_frequency_distribution <- read_delim("/Users/Dani/ownCloud/backup/annotation/genetic_load/features_frequency_distribution/features_frequency_distribution_wout1.txt",col_names=c("AF","pop","feat"),delim=" ")
+features_frequency_distribution
+features_frequency_distribution$feat <- as.factor(features_frequency_distribution$feat)
+features_frequency_distribution$feat = factor(features_frequency_distribution$feat,levels(features_frequency_distribution$feat)[c(1,2,4,3)])
+pops <- unique(features_frequency_distribution$pop)
+pops
+features <- unique(features_frequency_distribution$feat)
+features
+
+for (pop in pops) {
+  plot_data <- features_frequency_distribution %>% filter(features_frequency_distribution$pop == !!pop) #the two !! allow R to evaluate the text and distinguish looping variables from col_names
+  plot_data
+  pop_feat_ggplot <- ggplot(data=plot_data, aes(AF)) +
+  facet_grid(feat ~ ., scales="free") +
+  geom_histogram(aes(AF),binwidth=0.01) +
+  ggtitle(paste0("AF distribution for ",pop)) +
+  #ylab("density") +
+  #xlab("heritability") +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+        rect=element_rect(size=1),
+        axis.line=element_line(colour="black"),
+        axis.title=element_text(size=16),
+        #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+        #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+        #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+        panel.background=element_blank(),
+        panel.border=element_rect(colour="black"),
+        #panel.grid=element_blank(),
+        #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+        plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+        #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+        legend.background=element_rect(linetype="solid", colour="black", size=.5),
+        #legend.justification=c(0,0),
+        legend.key=element_rect(colour="white"),
+        #legend.key.size=unit(1.3,"cm"),
+        legend.position=c(0.92,0.86),
+        legend.title=element_blank()
+  )
+  pop_feat_ggplot
+  ggsave(paste0(pop,"_AF_distribution_wout1"), width=30, height=25, units="cm", device="pdf", path="/Users/Dani/ownCloud/backup/annotation/genetic_load/features_frequency_distribution/wout1/")
+}
+
+
 ```
+
+#12: Other stuff.
+##Get NS/S ratio for the whole Iberian lynx (sm + do).
+
+```{r Other stuff, eval=FALSE, engine='bash'}
+
+cd $V_PATH/annotation/
+rm $V_PATH/annotation/snpeff_lp_total_synonymous_woutN.txt
+rm $V_PATH/annotation/snpeff_lp_total_nonsynonymous_woutN.txt
+POPLIST=($(ls -d c_{lp_sm*,lp_do*}perpop))
+for pop in "${POPLIST[@]}"
+  do
+  echo "${pop}"
+  cd $V_PATH/annotation/"${pop}"/
+  POPULATION=$(echo "${pop}" | cut -c6-7)
+  if [ -e ${pop}_minimum_subsample_woutN.ann.vcf ]; then
+    echo "Minimum "$POPULATION" subsample available"
+    FILE=${pop}_minimum_subsample_woutN.ann.vcf
+  elif [ -e ${pop}_random_subsample_woutN.ann.vcf ]; then
+    echo "Random "$POPULATION" subsample available"
+    FILE=${pop}_random_subsample_woutN.ann.vcf
+  else
+    echo "Original "$POPULATION" available"
+    FILE=${pop}_woutN.ann.vcf
+  fi
+  grep 'synonymous_variant' $FILE | cut -f1-2 >> $V_PATH/annotation/snpeff_lp_total_synonymous_woutN.txt
+  grep 'missense_variant' $FILE | cut -f1-2 >> $V_PATH/annotation/snpeff_lp_total_nonsynonymous_woutN.txt
+  done
+  cd $V_PATH/annotation/
+  S_V=$(cat $V_PATH/annotation/snpeff_lp_total_synonymous_woutN.txt | wc -l)
+  NS_V=$(cat $V_PATH/annotation/snpeff_lp_total_nonsynonymous_woutN.txt | wc -l)
+  echo "scale=3 ; $NS_V / $S_V" | bc #equals 0.272, which is about the same than for each population separately
+  
+cd $V_PATH/annotation/
+rm $V_PATH/annotation/snpeff_lp_total_synonymous_wout1.txt
+rm $V_PATH/annotation/snpeff_lp_total_nonsynonymous_wout1.txt
+POPLIST=($(ls -d c_{lp_sm*,lp_do*}perpop))
+for pop in "${POPLIST[@]}"
+  do
+  echo "${pop}"
+  cd $V_PATH/annotation/"${pop}"/
+  POPULATION=$(echo "${pop}" | cut -c6-7)
+  if [ -e ${pop}_minimum_subsample_woutN_wout1.ann.vcf ]; then
+    echo "Minimum "$POPULATION" subsample available"
+    FILE=${pop}_minimum_subsample_woutN_wout1.ann.vcf
+  elif [ -e ${pop}_random_subsample_woutN_wout1.ann.vcf ]; then
+    echo "Random "$POPULATION" subsample available"
+    FILE=${pop}_random_subsample_woutN_wout1.ann.vcf
+  else
+    echo "Original "$POPULATION" available"
+    FILE=${pop}_woutN_wout1.ann.vcf
+  fi
+  grep 'synonymous_variant' $FILE | cut -f1-2 >> $V_PATH/annotation/snpeff_lp_total_synonymous_wout1.txt
+  grep 'missense_variant' $FILE | cut -f1-2 >> $V_PATH/annotation/snpeff_lp_total_nonsynonymous_wout1.txt
+  done
+  cd $V_PATH/annotation/
+  S_V=$(cat $V_PATH/annotation/snpeff_lp_total_synonymous_wout1.txt | wc -l)
+  NS_V=$(cat $V_PATH/annotation/snpeff_lp_total_nonsynonymous_wout1.txt | wc -l)
+  echo "scale=3 ; $NS_V / $S_V" | bc #equals 0.350, which is about the same than for each population separately
+
+```
+
 
 #Old & obsolete code:
 ##Split the VCF into per population VCFs. Generate a VCF for each population.
