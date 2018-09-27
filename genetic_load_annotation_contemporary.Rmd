@@ -49,6 +49,8 @@ cat $V_PATH/c_ll_lp_plus_h_ll_renamed.vcf | /opt/vcftools_0.1.13/perl/fill-aa -a
 
 gzip -d -k c_ll_lp_plus_h_ll_aafilled.vcf.gz #Get decompressed version. I ran md5sum for both the gzipped and the unzipped versions and there were no differences.
 
+grep ';AF=1' c_ll_lp_plus_h_ll_renamed.vcf | wc -l #
+
 ```
 
 ###Use VcfFilterJdk to polarize the annotated VCF.
@@ -106,6 +108,9 @@ vb.attribute("AF",1.0d - Double.parseDouble(variant.getAttributeAsString("AF",""
 vb.genotypes(genotypes); 
 return vb.make();' -o c_ll_lp_plus_h_ll_polarized.vcf c_ll_lp_plus_h_ll_aafilled.vcf
 
+grep -v '#' c_ll_lp_plus_h_ll_polarized.vcf | wc - #23999314
+grep ";AF=1" c_ll_lp_plus_h_ll_polarized.vcf | wc -l #31548
+
 ```
 
 ##Option B: generate new VCF with the ancestral state as the reference. Use GATK to make a calling with lynx rufus as the reference. We opted for Option A instead.
@@ -141,7 +146,7 @@ java -jar /opt/snpEff/snpEff.jar databases | grep -i pardinus
 ```
 
 ##Build the Lynx pardinus genome database.
-In the end we opt to build our own database since we don't know when they will get themselves to add it. This step should be omitted if the desired database was found in the previous step.
+In the end we opt to build our own database since we don't know when they will get themselves to add it. This step should be omitted if the desired database was found in the previous step. In the end it's best to use the Lynx rufus genome as reference if the VCF is polarized based on Lynx rufus, else the polarized SNPs are wrongly annotated.
 
 ###Add entry to the config file
 
@@ -154,13 +159,15 @@ cd /home/dkleinman/
 mv snpEff.config $C_PATH #I move the config file that appeared in my folder to a subfolder that I created for snpEff
 vi snpEff.config  #initiate the editing process
 
-#Following the manual, I added the following two lines:
+#Following the manual, I added the following two lines (use :o to start editing -watch out for the current line- and :wq to save and exit):
 
 # Lynx_pardinus
 LYPA.23.genome : Iberian lynx #from now on, LYPA.23 is the code for the Lynx pardinus reference genome (in snpEff)
 
 # Lynx_pardinus, detailed annotation (obsolete)
 LYPA.23b.genome : Iberian lynx #LYPA.23b is the code for the highly detailed annotation of the Lynx pardinus reference genome (in snpEff)
+
+#In the end it's best to use the Lynx rufus genome as reference if the VCF is polarized based on Lynx rufus, else the polarized SNPs are wrongly annotated.
 
 ```
 
@@ -172,7 +179,7 @@ LYPA.23b.genome : Iberian lynx #LYPA.23b is the code for the highly detailed ann
 mkdir $S_PATH/data/LYPA.23 #create a directory inside the software's dependencies whose name matches the code
 cd $S_PATH/data/LYPA.23
 
-scp /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.all.fix.nr.gff3 $S_PATH/data/LYPA.23/ #copy the annotation file (can be gff or gtf) to the newly created directory. This gff file includes CDS, introns, exons and genes, so it's very basic. A more complex version that Maria created which includes lncRNAs, etc., could be tested in the future.
+scp /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.all.fix.nr.gff3 $S_PATH/data/LYPA.23/ #copy the annotation file (can be gff or gtf) to the newly created directory. This gff file includes CDS, introns, exons and genes, so it's very basic. A more complex version that Maria created which includes lncRNAs, etc., will be considered as custom annotation.
 mv LYPA23C.all.fix.nr.gff3 genes.gff #rename the file as the tutorial indicates
 
 mkdir $S_PATH/data/genomes #create a directory inside the software's dependencies called genomes
@@ -206,7 +213,7 @@ S_PATH=/opt/snpEff #redefine the variable, since we're inside a script
 C_PATH=/home/dkleinman/datos/snpEff #redefine the variable, since we're inside a script
 
 cd $S_PATH
-java -jar snpEff.jar build -gff3 -v LYPA.23 -c $C_PATH/snpEff.config -dataDir $C_PATH/data #build the database. Use the -gff3 command for gff files and -gtf22 for gtf files. Use -v for verbose (expanded information on the processes and the warnings/errors that may appear). Use -c to indicate the path to my own config file. Then use -dataDir to override the data directory from the config file (by default the software thinks that the data folder with the genome and the genes files is located where config is, so it's necessary to give it the correct path). Another option would be running it from the config folder and indicating instead the 
+java -jar snpEff.jar build -gff3 -v LYPA.23 -c $C_PATH/snpEff.config -dataDir $C_PATH/data #build the database. Use the -gff3 command for gff files and -gtf22 for gtf files. Use -v for verbose (expanded information on the processes and the warnings/errors that may appear). Use -c to indicate the path to my own config file. Then use -dataDir to override the data directory from the config file (by default the software thinks that the data folder with the genome and the genes files is located where config is, so it's necessary to give it the correct path).
 
 ctrl + D #terminate the script
 ctrl + D #terminate the screen
@@ -228,6 +235,64 @@ java -Xmx16g -jar $S_PATH/snpEff.jar GRCh37.75 -s $O_PATH/toys/test.chr22.ann $S
 
 ```
 
+##Build the Lynx rufus genome database.
+In the end we opt to build our own database since we don't know when they will get themselves to add it. This step should be omitted if the desired database was found in the previous step. Annotating against the Lynx rufus genome is the correct option if the VCF has been polarized based on that genome.
+
+###Add entry to the config file
+
+```{r Set up SnpEff, eval=FALSE, engine='bash'}
+
+#Originally the config was just in the software folder and I didn't have writing permission. If this is the only config file available, writing permission is required, and when annotating later on, the file should be called using the -c command followed by the path to the file.
+#However, in my case I believe the tech group created a copy of the file in my folder after I sent them an e-mail, and this is the one that I was able to edit.
+
+cd /home/dkleinman/
+mv snpEff.config $C_PATH #I move the config file that appeared in my folder to a subfolder that I created for snpEff
+vi snpEff.config  #initiate the editing process
+
+#Following the manual, I added the following two lines (use :o to start editing -watch out for the current line- and :wq to save and exit):
+
+# Lynx_rufus
+LYRU.23.genome : Bobcat #from now on, LYRU.23 is the code for the Lynx rufus c_lr_zz_0001_recal1.fa genome (in snpEff)
+
+```
+
+###Create directory and move files
+
+```{r Set up SnpEff, eval=FALSE, engine='bash'}
+
+#First for the regular annotation:
+mkdir $C_PATH/data/LYRU.23 #create a directory inside the software's dependencies whose name matches the code
+cd $C_PATH/data/LYRU.23
+
+scp /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.all.fix.nr.gff3 $C_PATH/data/LYRU.23/ #copy the annotation file (can be gff or gtf) to the newly created directory. This gff file includes CDS, introns, exons and genes, so it's very basic. A more complex version that Maria created which includes lncRNAs, etc., will be considered as custom annotation.
+mv LYPA23C.all.fix.nr.gff3 genes.gff #rename the file as the tutorial indicates
+
+mkdir $C_PATH/data/genomes #create a directory inside the software's dependencies called genomes
+cd $C_PATH/data/genomes
+scp /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa $C_PATH/data/genomes #copy the reference genome fasta to the new genomes directory
+mv c_lr_zz_0001_recal1.fa LYRU.23.fa #rename the file so that it matches the code
+
+```
+
+###Build the database
+
+```{r Set up SnpEff, eval=FALSE, engine='bash'}
+
+cd $C_PATH
+screen -S build_LYRU_snpEff_db #open a dettachable screen in case the database building takes too long
+script build_LYRU_snpEff_db.txt #initiate the log file
+
+S_PATH=/opt/snpEff #redefine the variable, since we're inside a script
+C_PATH=/home/dkleinman/datos/snpEff #redefine the variable, since we're inside a script
+
+cd $S_PATH
+java -jar snpEff.jar build -gff3 -v LYRU.23 -c $C_PATH/snpEff.config -dataDir $C_PATH/data #build the database. Use the -gff3 command for gff files and -gtf22 for gtf files. Use -v for verbose (expanded information on the processes and the warnings/errors that may appear). Use -c to indicate the path to my own config file. Then use -dataDir to override the data directory from the config file (by default the software thinks that the data folder with the genome and the genes files is located where config is, so it's necessary to give it the correct path).
+
+ctrl + D #terminate the script
+ctrl + D #terminate the screen
+
+```
+
 #3: Annotate using SnpEff.
 ##Create custom annotation bed file
 
@@ -243,8 +308,8 @@ cut -d$'\t' -f1,3,4,5 /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.CDS.
 ```{r Annotate using SnpEff, eval=FALSE, engine='bash'}
 
 cd $V_PATH/annotation/
-screen -S c_ll_lp_plus_h_ll_polarized.ann.log #open a dettachable screen in case the test takes too long
-script c_ll_lp_plus_h_ll_polarized.ann.log #initiate the log file
+screen -S c_ll_lp_plus_h_ll_polarized.lr_ann.log #open a dettachable screen in case the test takes too long
+script c_ll_lp_plus_h_ll_polarized.lr_ann.log #initiate the log file
 
 S_PATH=/opt/snpEff #software path
 C_PATH=/home/dkleinman/datos/snpEff #config file path
@@ -253,31 +318,64 @@ I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
 V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
 
 cd $O_PATH #run this code from the directory where the config is located.
-java -Xmx16g -jar $S_PATH/snpEff.jar LYPA.23 -v -s $V_PATH/annotation/c_ll_lp_plus_h_ll_polarized.ann.html -csvStats $V_PATH/annotation/c_ll_lp_plus_h_ll_polarized.ann.csv -interval $C_PATH/data/LYPA23C.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.UCNE.intergenic.nr.bed $V_PATH/c_ll_lp_plus_h_ll_polarized.vcf > $V_PATH/annotation/c_ll_lp_plus_h_ll_polarized.ann.vcf #run this code from the directory where the config is located.
+java -Xmx16g -jar $S_PATH/snpEff.jar LYRU.23 -v -s $V_PATH/annotation/c_ll_lp_plus_h_ll_polarized.lr_ann.html -csvStats $V_PATH/annotation/c_ll_lp_plus_h_ll_polarized.lr_ann.csv -interval $C_PATH/data/LYPA23C.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.UCNE.intergenic.nr.bed $V_PATH/c_ll_lp_plus_h_ll_polarized.vcf > $V_PATH/annotation/c_ll_lp_plus_h_ll_polarized.lr_ann.vcf #run this code from the directory where the config is located.
 
-grep -v '#' c_ll_lp_plus_h_ll_polarized.ann.vcf | wc -l #23999314
+grep -v '#' c_ll_lp_plus_h_ll_polarized.lr_ann.vcf | wc -l #23999314
 
 ```
 
-#4: Filter the annotated VCF. Subset the VCF files in order to keep only good quality biallelic SNP variants. INDELs, multiallelic SNPs and bad quality SNPs will be dropped at this step.
+#4: Filter the annotated VCF. Subset the VCF files in order to keep only good quality biallelic SNP variants. 
+##Remove repetitive and low mappability regions.
 
 ```{r Filter the annotated VCF, eval=FALSE, engine='bash'}
 
 #Remove repetitive regions and those with low mappability:
 cd $V_PATH/annotation
-bedtools subtract -a c_ll_lp_plus_h_ll_polarized.ann.vcf -b /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/repeats_and_lowcomp_no_redundant_mappability.k75_lessthan90.bed -header > c_ll_lp_plus_h_ll_polarized_filtered1.ann.vcf
-grep -v '#' c_ll_lp_plus_h_ll_polarized_filtered1.ann.vcf | wc -l #9308565
+screen -S c_ll_lp_plus_h_ll_polarized_filtered1.lr_ann.log
+script c_ll_lp_plus_h_ll_polarized_filtered1.lr_ann.log
+
+bedtools subtract -a c_ll_lp_plus_h_ll_polarized.lr_ann.vcf -b /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/repeats_and_lowcomp_no_redundant_mappability.k75_lessthan90.bed -header > c_ll_lp_plus_h_ll_polarized_filtered1.lr_ann.vcf
+grep -v '#' c_ll_lp_plus_h_ll_polarized_filtered1.lr_ann.vcf | wc -l #9308565
+
+```
+
+##Remove INDELs and multiallelic SNPs.
+
+```{r Filter the annotated VCF, eval=FALSE, engine='bash'}
 
 #During this step, all INDELs as well as all multiallelic and bad quality SNPs will be dropped from the respective VCFs.
 cd $V_PATH/annotation
+screen -S c_ll_lp_plus_h_ll_polarized_filtered2.lr_ann.log
+script c_ll_lp_plus_h_ll_polarized_filtered2.lr_ann.log
+
 java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
 -T SelectVariants \
 -selectType SNP \
 -restrictAllelesTo BIALLELIC \
 -R $REF \
--V c_ll_lp_plus_h_ll_polarized_filtered1.ann.vcf \
--o c_ll_lp_plus_h_ll_polarized_filtered2.ann.vcf
-grep -v '#' c_ll_lp_plus_h_ll_polarized_filtered2.ann.vcf | wc -l #7598146
+-V c_ll_lp_plus_h_ll_polarized_filtered1.lr_ann.vcf \
+-o c_ll_lp_plus_h_ll_polarized_filtered2.lr_ann.vcf
+grep -v '#' c_ll_lp_plus_h_ll_polarized_filtered2.lr_ann.vcf | wc -l #7598146
+
+```
+
+##Remove unpolarizable and fixed positions. Variants where AA is different from REF/ALT alleles (including AA=N) will be dropped at this step, as will all where AF=1 (i.e. low depth, reference genome sequencing errors...) or AF=0 (same but for polarized positions).
+
+```{r Filter the annotated VCF, eval=FALSE, engine='bash'}
+
+#Remove fixed variants (AF=1) or those that weren't polarizable (AA different from either REF or ALT):
+cd $V_PATH/annotation
+screen -S c_ll_lp_plus_h_ll_polarized_filtered3.lr_ann.log
+script c_ll_lp_plus_h_ll_polarized_filtered3.lr_ann.log
+
+$BCF view -e '(INFO/AA!=REF & INFO/AA!=ALT) | INFO/AF=1.00 | INFO/AF=0.00' c_ll_lp_plus_h_ll_polarized_filtered2.lr_ann.vcf > c_ll_lp_plus_h_ll_polarized_filtered3.lr_ann.vcf
+grep -v '#' c_ll_lp_plus_h_ll_polarized_filtered3.lr_ann.vcf | wc -l #7422027
+
+```
+
+##Remove bad quality SNPs. Standard hard-filtering criteria will be applied.
+
+```{r Filter the annotated VCF, eval=FALSE, engine='bash'}
 
 #Apply GATK's recommended filters, and then some.     
   #QD: QualByDepth (variant confidence divided by the unfiltered depth of non-reference samples). Default < 2.0.
@@ -287,13 +385,16 @@ grep -v '#' c_ll_lp_plus_h_ll_polarized_filtered2.ann.vcf | wc -l #7598146
   #ReadPosRankSum: ReadPosRankSumTest (u-based z-approximation from Mann-Whitney Rank Sum Test for distance from end of the read for reads with the alternate allele. Will only be applied to heterozygous calls). Default < -8.0. In theory, this would alleviate damage problems.
   #SOR: StrandOddsRatio (evaluates whether there's strand bias in the data). Default > 3.0.
 cd $V_PATH/annotation
+screen -S c_ll_lp_plus_h_ll_polarized_filtered4.lr_ann.log
+script c_ll_lp_plus_h_ll_polarized_filtered4.lr_ann.log
+
 java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
 -T SelectVariants \
 -select "QUAL >= 30 && QD >= 2.0 && FS <= 60.0 && MQ >= 40.0 && MQRankSum >= -12.5 && ReadPosRankSum >= -8.0" \
 -R $REF \
--V c_ll_lp_plus_h_ll_polarized_filtered2.ann.vcf \
--o c_ll_lp_plus_h_ll_polarized_filtered3.ann.vcf
-grep -v '#' c_ll_lp_plus_h_ll_polarized_filtered3.ann.vcf | wc -l #5176437
+-V c_ll_lp_plus_h_ll_polarized_filtered3.lr_ann.vcf \
+-o c_ll_lp_plus_h_ll_polarized_filtered4.lr_ann.vcf
+grep -v '#' c_ll_lp_plus_h_ll_polarized_filtered4.lr_ann.vcf | wc -l #5063416
 
 ```
 
@@ -303,26 +404,30 @@ grep -v '#' c_ll_lp_plus_h_ll_polarized_filtered3.ann.vcf | wc -l #5176437
 ```{r Get annotation statistics for each population, eval=FALSE, engine='bash'}
 
 #Split the annotated VCF into per species VCFs.
+cd $V_PATH/annotation/
+screen -S perspecies.ann.log
+script perspecies.ann.log
+
 cd $G_PATH
 declare SPECIES=$(ls {*_lp_*,*_ll_*}.g.vcf.gz | cut -c3-4 | sort | uniq)
 cd $V_PATH/annotation/
 for i in ${SPECIES[@]}
   do
   echo "${i}"
-  $BCF query -l $V_PATH/annotation/c_ll_lp_plus_h_ll_polarized_filtered3.ann.vcf | grep "${i}" > list_to_remove.txt
+  $BCF query -l $V_PATH/annotation/c_ll_lp_plus_h_ll_polarized_filtered4.lr_ann.vcf | grep "${i}" > list_to_remove.txt
   cat list_to_remove.txt
   java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
   -T SelectVariants \
   -R $REF \
-  -V $V_PATH/annotation/c_ll_lp_plus_h_ll_polarized_filtered3.ann.vcf \
-  -o $V_PATH/annotation/"${i}"_perspecies.ann.vcf \
+  -V $V_PATH/annotation/c_ll_lp_plus_h_ll_polarized_filtered4.lr_ann.vcf \
+  -o $V_PATH/annotation/"${i}"_perspecies.lr_ann.vcf \
   --sample_file list_to_remove.txt
-  $BCF view --min-ac 1 -Ov -o $V_PATH/annotation/"${i}"_perspecies.trimmed.ann.vcf $V_PATH/annotation/"${i}"_perspecies.ann.vcf
+  $BCF view --min-ac 1 -Ov -o $V_PATH/annotation/"${i}"_perspecies.trimmed.lr_ann.vcf $V_PATH/annotation/"${i}"_perspecies.lr_ann.vcf
   done
 rm list_to_remove.txt
 
-grep -v '#' lp_perspecies.trimmed.ann.vcf | wc -l #1905227
-grep -v '#' ll_perspecies.trimmed.ann.vcf | wc -l #4205538
+grep -v '#' lp_perspecies.trimmed.lr_ann.vcf | wc -l #1849314
+grep -v '#' ll_perspecies.trimmed.lr_ann.vcf | wc -l #4104697
 
 ```
 
@@ -525,7 +630,7 @@ echo $MAXDEPTH
 -maxDepth $MAXDEPTH
 
 #Once the files are ready, download them to continue working in R:
-scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/c_lp_depth_calculus/*.depth* /Users/Dani/ownCloud/backup/annotation/genetic_load/lp_depth
+scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/c_lp_depth_calculus/*.depth* /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/lp_depth
 
 ```
 
@@ -548,10 +653,10 @@ with (dat, sqrt(sum(as.numeric(freq)*(value-mu)^2)/(sum(as.numeric(freq))-1))) }
     
 #*******************************************************************************************
     
-my_files_depthGlobal = list.files(path = "/Users/Dani/ownCloud/backup/annotation/genetic_load/lp_depth",pattern="*.depthGlobal$") 
+my_files_depthGlobal = list.files(path = "/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/lp_depth",pattern="*.depthGlobal$") 
     
 for (i in 1:length(my_files_depthGlobal)) {
-  assign(my_files_depthGlobal[i], (scan(paste0("/Users/Dani/ownCloud/backup/annotation/genetic_load/lp_depth/",my_files_depthGlobal[i],sep=""), sep = " ", dec = ".")) %>% .[!is.na(.)])
+  assign(my_files_depthGlobal[i], (scan(paste0("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/lp_depth/",my_files_depthGlobal[i],sep=""), sep = " ", dec = ".")) %>% .[!is.na(.)])
   }
 mean_folds = 0.95
 depth_per_sample <- data.frame()
@@ -560,7 +665,7 @@ depth_per_sample <- data.frame()
 #*******************************************************************************************
     
 for (i in 1:length(my_files_depthGlobal)) {
-  DF = read.table(paste0("/Users/Dani/ownCloud/backup/annotation/genetic_load/lp_depth/",my_files_depthGlobal[i],sep=""),head=F, stringsAsFactors=F, check.names=FALSE)
+  DF = read.table(paste0("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/lp_depth/",my_files_depthGlobal[i],sep=""),head=F, stringsAsFactors=F, check.names=FALSE)
   freq_table_DF <- data.frame (value = 1:length (DF), freq = t(DF))
   freq_table_truncated_DF <- filter(freq_table_DF, value < (nrow(freq_table_DF)))
   #Mean depth:
@@ -593,12 +698,12 @@ for (i in 1:length(my_files_depthGlobal)) {
     geom_vline(xintercept=minDepth_truncated_DF,colour ="grey",linetype="dashed", size=0.5) + 
     theme_classic() + 
     theme(text = element_text(size=10))
-  plot_name=paste0("/Users/Dani/ownCloud/backup/annotation/genetic_load/lp_depth/",my_files_depthGlobal[i],"_",mean_folds,".pdf",sep="")
+  plot_name=paste0("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/lp_depth/",my_files_depthGlobal[i],"_",mean_folds,".pdf",sep="")
   ggsave(filename = plot_name)
   }
 
 #When finished write the table
-write.table(x = depth_per_sample,file = paste("/Users/Dani/ownCloud/backup/annotation/genetic_load/lp_depth/mean_sd_depthGlobal_lynx_per_pop_mean_folds_",mean_folds,".csv", sep= ""),quote=FALSE, col.names = FALSE, row.names = FALSE, sep= " ")
+write.table(x = depth_per_sample,file = paste("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/lp_depth/mean_sd_depthGlobal_lynx_per_pop_mean_folds_",mean_folds,".csv", sep= ""),quote=FALSE, col.names = FALSE, row.names = FALSE, sep= " ")
     
 ```
 
@@ -607,7 +712,7 @@ write.table(x = depth_per_sample,file = paste("/Users/Dani/ownCloud/backup/annot
 ```{r Depth range calculus, eval=FALSE, engine='bash'}
 
 #First upload the summary table to the server:
-scp /Users/Dani/ownCloud/backup/annotation/genetic_load/lp_depth/mean_sd_depthGlobal_lynx_per_pop_mean_folds_0.95.csv dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/c_lp_depth_calculus/
+scp /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/lp_depth/mean_sd_depthGlobal_lynx_per_pop_mean_folds_0.95.csv dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/c_lp_depth_calculus/
 
 #Separate in populations:
 cd /home/dkleinman/datos/c_lp_depth_calculus/
@@ -621,68 +726,77 @@ for POP in ${POPS[@]}
 ```
 
 #7: Apply per species filters. Apply additional filters for each species' VCF that take into account depth, heterozygosity and number of genotyped individuals.
-##Apply DP and missingness filters with BCF, and compute heterozygosity ratio using a custom script
+##Apply low and high DP and high missingness filters.
 
 ```{r Apply per species filters, eval=FALSE, engine='bash'}
 
 #First, for each species exclude those positions that have more than 50% missing genotypes, as well as those that have lower (higher) depth than the minimum (maximum) within 0.95 of the distribution, as calculated above:
 cd $V_PATH/annotation/
-declare SPECIES=$(ls *_perspecies.trimmed.ann.vcf | cut -c1-2 | uniq)
+screen -S perspecies_filtered1.lr_ann.log
+script perspecies_filtered1.lr_ann.log
+
+declare SPECIES=$(ls *_perspecies.trimmed.lr_ann.vcf | cut -c1-2 | uniq)
 for i in ${SPECIES[@]}
   do
   echo "${i}"
-  MIN_DP=$(cat /home/dkleinman/datos/c_lp_depth_calculus/c_"${i}"*.csv | awk '{print $9}')
-  MAX_DP=$(cat /home/dkleinman/datos/c_lp_depth_calculus/c_"${i}"*.csv | awk '{print $8}')
+  MIN_DP=$(cat /home/dkleinman/datos/c_lp_depth_calculus/c_"${i}"*.csv | awk '{print $9}') #Obtained in section 6
+  MAX_DP=$(cat /home/dkleinman/datos/c_lp_depth_calculus/c_"${i}"*.csv | awk '{print $8}') #Obtained in section 6
   echo $MIN_DP
   echo $MAX_DP
-  $BCF filter -e "DP < ${MIN_DP} || DP > ${MAX_DP} || F_MISSING > 0.5" -Ov -o $V_PATH/annotation/"${i}"_perspecies.trimmed_filtered1.ann.vcf $V_PATH/annotation/"${i}"_perspecies.trimmed.ann.vcf
+  $BCF filter -e "DP < ${MIN_DP} || DP > ${MAX_DP} || F_MISSING > 0.5" -Ov -o $V_PATH/annotation/"${i}"_perspecies.trimmed_filtered1.lr_ann.vcf $V_PATH/annotation/"${i}"_perspecies.trimmed.lr_ann.vcf
   done
-grep -v '#' lp_perspecies.trimmed_filtered1.ann.vcf | wc -l #1829840
-grep -v '#' ll_perspecies.trimmed_filtered1.ann.vcf | wc -l #4121164
+grep -v '#' lp_perspecies.trimmed_filtered1.lr_ann.vcf | wc -l #1808148
+grep -v '#' ll_perspecies.trimmed_filtered1.lr_ann.vcf | wc -l #4065488
+
+```
+
+##Compute heterozygosity ratio using a custom script. Unused in final version.
+
+```{r Apply per species filters, eval=FALSE, engine='bash'}
 
 #Next, for each species obtain a customized bed with the heterozygosity rate per variant. Observing the distribution of this rate, a threshold should be established, and only variants above it should be kept in this bed. In the next step, positions in this bed will be subtracted from the VCF.
 cd $V_PATH/annotation/
-declare SPECIES=$(ls *_perspecies.trimmed.ann.vcf | cut -c1-2 | uniq)
+declare SPECIES=$(ls *_perspecies.trimmed.lr_ann.vcf | cut -c1-2 | uniq)
 for i in ${SPECIES[@]}
   do
   echo "${i}"
-  grep -v '^#' $V_PATH/annotation/"${i}"_perspecies.trimmed_filtered1.ann.vcf | perl -lne '@x=split /\s+/,$_;$var11=grep{/1\/1/}@x[9..$#x];$var01=(grep{/0\/1/}@x[9..$#x])+(grep{/1\/0/}@x[9..$#x]);$var00=grep{/0\/0/}@x[9..$#x];$varRAT=($var01/($var01+$var00+$var11));$varBED=$x[1]-1;print"$x[0]\t$varBED\t$x[1]\t$varRAT\n"' > "${i}"_perspecies.trimmed_filtered1.het.bed
+  grep -v '^#' $V_PATH/annotation/"${i}"_perspecies.trimmed_filtered1.lr_ann.vcf | perl -lne '@x=split /\s+/,$_;$var11=grep{/1\/1/}@x[9..$#x];$var01=(grep{/0\/1/}@x[9..$#x])+(grep{/1\/0/}@x[9..$#x]);$var00=grep{/0\/0/}@x[9..$#x];$varRAT=($var01/($var01+$var00+$var11));$varBED=$x[1]-1;print"$x[0]\t$varBED\t$x[1]\t$varRAT\n"' > "${i}"_perspecies.trimmed_filtered1.het.bed
   #| awk -F"\t" '$4>0.8'
   done
   
 #Download from the server the bed files with the Het ratios, and jump to the next chunk to check the distributions in R:
-scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/l*.het.bed /Users/Dani/ownCloud/backup/annotation/genetic_load/het_ratio
+scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/l*.het.bed /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/het_ratio
 
 #In the R chunk that follows, we plot the distribution of Het ratio and decide not to exclude any SNP on the basis of high heterozygosity.
 
 #In the end we decide not to exclude any SNP on the basis of high heterozygosity.
 #Remove variants with heterozygosity above the selected threshold:
 # cd $V_PATH/annotation/
-# declare SPECIES=$(ls *_perspecies.trimmed.ann.vcf | cut -c1-2 | uniq)
+# declare SPECIES=$(ls *_perspecies.trimmed.lr_ann.vcf | cut -c1-2 | uniq)
 # for i in ${SPECIES[@]}
 #   do
 #   echo "${i}"
-#   bedtools subtract -a "${i}"_perspecies.trimmed_filtered1.ann.vcf -b "${i}"_perspecies.trimmed_filtered1.het.bed -header > "${i}"_perspecies.trimmed_filtered2.ann.vcf
+#   bedtools subtract -a "${i}"_perspecies.trimmed_filtered1.lr_ann.vcf -b "${i}"_perspecies.trimmed_filtered1.het.bed -header > "${i}"_perspecies.trimmed_filtered2.lr_ann.vcf
 #   done
-# grep -v '#' lp_perspecies.trimmed_filtered2.ann.vcf | wc -l #
-# grep -v '#' ll_perspecies.trimmed_filtered2.ann.vcf | wc -l #
+# grep -v '#' lp_perspecies.trimmed_filtered2.lr_ann.vcf | wc -l #
+# grep -v '#' ll_perspecies.trimmed_filtered2.lr_ann.vcf | wc -l #
 
 ```
 
-##Plot the distribution of Het ratio to determine the filtering threshold
+##Plot the distribution of Het ratio to determine the filtering threshold. Unused in final version.
 
 ```{r Apply per species filters}
 
 library(readr)
 library(ggplot2)
 
-ll_het_ratio <- read_tsv("/Users/Dani/ownCloud/backup/annotation/genetic_load/het_ratio/ll_perspecies.trimmed_filtered1.het.bed",col_names=F)
+ll_het_ratio <- read_tsv("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/het_ratio/ll_perspecies.trimmed_filtered1.het.bed",col_names=F)
 ll_het_ratio
 ggplot(ll_het_ratio, aes(x=X4)) + geom_density()
 ggplot(ll_het_ratio, aes(x=X4)) + geom_histogram(binwidth=.001, colour="black", fill="white")
 ggplot(ll_het_ratio[ll_het_ratio$X4>=0.5,], aes(x=X4)) + geom_histogram(binwidth=.001, colour="black", fill="white")
 
-lp_het_ratio <- read_tsv("/Users/Dani/ownCloud/backup/annotation/genetic_load/het_ratio/lp_perspecies.trimmed_filtered1.het.bed",col_names=F)
+lp_het_ratio <- read_tsv("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/het_ratio/lp_perspecies.trimmed_filtered1.het.bed",col_names=F)
 lp_het_ratio
 ggplot(lp_het_ratio, aes(x=X4)) + geom_density()
 ggplot(lp_het_ratio, aes(x=X4)) + geom_histogram(binwidth=.001, colour="black", fill="white")
@@ -700,8 +814,8 @@ ggplot(lp_het_ratio[lp_het_ratio$X4>=0.5,], aes(x=X4)) + geom_histogram(binwidth
 #Split the annotated VCF into per population VCFs, and then keep only those positions that are variable or fixed for the derived allele within each population (with -env flag).
 
 cd $V_PATH/annotation/
-screen -S perpop.ann.log
-script perpop.ann.log
+screen -S perpop.lr_ann.log
+script perpop.lr_ann.log
 
 cd $G_PATH
 declare SPECIES=$(ls {*_lp_*,*_ll_*}.g.vcf.gz | cut -c3-4 | sort | uniq)
@@ -716,25 +830,25 @@ for i in ${SPECIES[@]}
     do
     echo "${j}"
     rm pop_list_to_remove.txt
-    $BCF query -l $V_PATH/annotation/"${i}"_perspecies.trimmed_filtered1.ann.vcf | grep "${j}" > pop_list_to_remove.txt
+    $BCF query -l $V_PATH/annotation/"${i}"_perspecies.trimmed_filtered1.lr_ann.vcf | grep "${j}" > pop_list_to_remove.txt
     cat pop_list_to_remove.txt
     mkdir "${j}"_perpop
     java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
     -T SelectVariants \
     -R $REF \
-    -V $V_PATH/annotation/"${i}"_perspecies.trimmed_filtered1.ann.vcf \
-    -o $V_PATH/annotation/"${j}"_perpop/"${j}"_perpop.ann.vcf \
+    -V $V_PATH/annotation/"${i}"_perspecies.trimmed_filtered1.lr_ann.vcf \
+    -o $V_PATH/annotation/"${j}"_perpop/"${j}"_perpop_with1.lr_ann.vcf \
     -env \
     --sample_file pop_list_to_remove.txt
     rm pop_list_to_remove.txt
     done
   done
 
-grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_ll_no_perpop/c_ll_no_perpop.ann.vcf | wc -l #1861579
-grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_ll_po_perpop/c_ll_po_perpop.ann.vcf | wc -l #1915319
-grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_ll_ki_perpop/c_ll_ki_perpop.ann.vcf | wc -l #2353141
-grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_lp_do_perpop/c_lp_do_perpop.ann.vcf | wc -l #1343707
-grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_lp_sm_perpop/c_lp_sm_perpop.ann.vcf | wc -l #1708918
+grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_ll_no_perpop/c_ll_no_perpop_with1.lr_ann.vcf | wc -l #1861579
+grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_ll_po_perpop/c_ll_po_perpop_with1.lr_ann.vcf | wc -l #1915319
+grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_ll_ki_perpop/c_ll_ki_perpop_with1.lr_ann.vcf | wc -l #2353141
+grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_lp_do_perpop/c_lp_do_perpop_with1.lr_ann.vcf | wc -l #1343707
+grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_lp_sm_perpop/c_lp_sm_perpop_with1.lr_ann.vcf | wc -l #1708918
 
 ```
 
@@ -757,7 +871,7 @@ for i in ${SPECIES[@]}
   for j in ${POP[@]}
     do
     echo "${j}"
-    declare POP_N=$($BCF query -l $V_PATH/annotation/"${j}"_perpop/"${j}"_perpop.ann.vcf | wc -l)
+    declare POP_N=$($BCF query -l $V_PATH/annotation/"${j}"_perpop/"${j}"_perpop_with1.lr_ann.vcf | wc -l)
     echo $POP_N >> "${i}"_pops_N.txt
     done
   cat "${i}"_pops_N.txt
@@ -766,7 +880,7 @@ for i in ${SPECIES[@]}
   for j in ${POP[@]}
     do
     echo "${j}"
-    declare POP_N=$($BCF query -l $V_PATH/annotation/"${j}"_perpop/"${j}"_perpop.ann.vcf | wc -l)
+    declare POP_N=$($BCF query -l $V_PATH/annotation/"${j}"_perpop/"${j}"_perpop_with1.lr_ann.vcf | wc -l)
     if [ $POP_N -ne $MIN_N ]
     then
     echo "Pop ${j} needs subsampling"
@@ -778,45 +892,45 @@ for i in ${SPECIES[@]}
 
 ```
 
-###Subsample based on relatedness.
-####Option A: obtain PLINK kinship coefficient estimates between individuals. In the end we used option B.
+###Subsample based on relatedness. In the end we decided to use random subsampling.
+####Option A: obtain PLINK kinship coefficient estimates between individuals. Option B is preferred.
 
 ```{r Obtain per population VCFs, eval=FALSE, engine='bash'}
 
-#Option B was finally chosen over this one.
+#Option B was finally chosen over this one, so the code isn't adapted to the new names (e.g. "_with1" isn't added).
 
 #For SMO:
 
 #First, rename the samples in the VCF so that they can be converted into plink binary format (underscores aren't allowed):
 cd /home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_lp_sm_perpop/
-bcftools query -l c_lp_sm_perpop.ann.vcf | tr _ - > samples_renamed.txt
-bcftools reheader -s samples_renamed.txt c_lp_sm_perpop.ann.vcf > c_lp_sm_perpop_renamed.ann.vcf
-plink_1.9 --vcf c_lp_sm_perpop_renamed.ann.vcf --make-bed --out c_lp_sm_perpop_renamed --allow-extra-chr #turn into plink binary format
-plink_1.9 --vcf c_lp_sm_perpop_renamed.ann.vcf --genome --out c_lp_sm_perpop_renamed_relatedness --allow-extra-chr #obtain IBD estimates in plink
+bcftools query -l c_lp_sm_perpop.lr_ann.vcf | tr _ - > samples_renamed.txt
+bcftools reheader -s samples_renamed.txt c_lp_sm_perpop.lr_ann.vcf > c_lp_sm_perpop_renamed.lr_ann.vcf
+plink_1.9 --vcf c_lp_sm_perpop_renamed.lr_ann.vcf --make-bed --out c_lp_sm_perpop_renamed --allow-extra-chr #turn into plink binary format
+plink_1.9 --vcf c_lp_sm_perpop_renamed.lr_ann.vcf --genome --out c_lp_sm_perpop_renamed_relatedness --allow-extra-chr #obtain IBD estimates in plink
 awk '{ print $0, $10/2 }' c_lp_sm_perpop_renamed_relatedness.genome > c_lp_sm_perpop_renamed_kinship.genome #calculate the kinship coefficient (half the relatedness)
 
 #From outside of the server:
-scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_lp_sm_perpop/c_lp_sm_perpop_renamed_kinship.genome /Users/Dani/ownCloud/backup/annotation/g-w_relatedness/network_analysis/
+scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_lp_sm_perpop/c_lp_sm_perpop_renamed_kinship.genome /Users/Dani/ownCloud/backup/g-w_analysis/g-w_relatedness/network_analysis/
 
 
 #For KIR:
 
 #First, rename the samples in the VCF so that they can be converted into plink binary format (underscores aren't allowed):
 cd /home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_ll_ki_perpop/
-bcftools query -l c_ll_ki_perpop.ann.vcf | tr _ - > samples_renamed.txt
-bcftools reheader -s samples_renamed.txt c_ll_ki_perpop.ann.vcf > c_ll_ki_perpop_renamed.ann.vcf
-plink_1.9 --vcf c_ll_ki_perpop_renamed.ann.vcf --make-bed --out c_ll_ki_perpop_renamed --allow-extra-chr #turn into plink binary format
-plink_1.9 --vcf c_ll_ki_perpop_renamed.ann.vcf --genome --out c_ll_ki_perpop_renamed_relatedness --allow-extra-chr #obtain IBD estimates in plink
+bcftools query -l c_ll_ki_perpop.lr_ann.vcf | tr _ - > samples_renamed.txt
+bcftools reheader -s samples_renamed.txt c_ll_ki_perpop.lr_ann.vcf > c_ll_ki_perpop_renamed.lr_ann.vcf
+plink_1.9 --vcf c_ll_ki_perpop_renamed.lr_ann.vcf --make-bed --out c_ll_ki_perpop_renamed --allow-extra-chr #turn into plink binary format
+plink_1.9 --vcf c_ll_ki_perpop_renamed.lr_ann.vcf --genome --out c_ll_ki_perpop_renamed_relatedness --allow-extra-chr #obtain IBD estimates in plink
 awk '{ print $0, $10/2 }' c_ll_ki_perpop_renamed_relatedness.genome > c_ll_ki_perpop_renamed_kinship.genome #calculate the kinship coefficient (half the relatedness)
 
 #There are no kinships in KIR!
 
 #From outside of the server:
-scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_ll_ki_perpop/c_ll_ki_perpop_renamed_kinship.genome /Users/Dani/ownCloud/backup/annotation/g-w_relatedness/network_analysis/
+scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_ll_ki_perpop/c_ll_ki_perpop_renamed_kinship.genome /Users/Dani/ownCloud/backup/g-w_analysis/g-w_relatedness/network_analysis/
 
 ```
 
-####Option B: obtain NGSrelate kinship coefficient estimates between individuals. This is the chosen option.
+####Option B: obtain NGSrelate kinship coefficient estimates between individuals. This is the preferred option.
 
 ```{r Obtain per population VCFs, eval=FALSE, engine='bash'}
 
@@ -909,7 +1023,7 @@ pops <- c("c_ll_ki","c_ll_no","c_ll_po","c_lp_sm","c_lp_do")
 kinship_df <- data_frame()
 for (i in pops) {
   print(i)
-  kinship_file <- read_tsv(paste0("/Users/Dani/ownCloud/backup/annotation/g-w_relatedness/NGSrelate/",i,".perpop.kinship.gl.res"),col_names=F) %>% select(3,4,12) %>% mutate(pop=i,pair=paste(X3,X4,sep="_")) %>% select(4,5,3)
+  kinship_file <- read_tsv(paste0("/Users/Dani/ownCloud/backup/g-w_analysis/g-w_relatedness/NGSrelate/",i,".perpop.kinship.gl.res"),col_names=F) %>% select(3,4,12) %>% mutate(pop=i,pair=paste(X3,X4,sep="_")) %>% select(4,5,3)
   colnames(kinship_file)[3] <- "kinship"
   kinship_file <- kinship_file[order(-kinship_file$kinship),]
   kinship_file
@@ -924,7 +1038,7 @@ kinship_plot <- ggplot(kinship_df,aes(x=pair,y=kinship)) +
   theme(axis.text.x=element_text(angle=90,hjust=0,size=2,colour="black")
   )
 kinship_plot
-ggsave("/Users/Dani/ownCloud/backup/annotation/g-w_relatedness/NGSrelate/all_kinships.pdf", width=50, height=10, units="cm", device="pdf")
+ggsave("/Users/Dani/ownCloud/backup/g-w_analysis/g-w_relatedness/NGSrelate/all_kinships.pdf", width=50, height=10, units="cm", device="pdf")
 
 #Visualise highest kinship pairs in order to exclude individuals with kinship > 0.35
 kinship_df[order(-kinship_df$kinship),]
@@ -951,7 +1065,7 @@ library(igraph)
 
 #For SMO:
 
-kinship_file <- read.delim("/Users/Dani/ownCloud/backup/annotation/g-w_relatedness/network_analysis/c_lp_sm_perpop_renamed_kinship.genome",sep="",stringsAsFactors=F)
+kinship_file <- read.delim("/Users/Dani/ownCloud/backup/g-w_analysis/g-w_relatedness/network_analysis/c_lp_sm_perpop_renamed_kinship.genome",sep="",stringsAsFactors=F)
 kinship_file
 colnames(kinship_file)[15] <- "KINSHIP"
 nodes <- unique(sort(c(kinship_file$IID1,kinship_file$IID2)))
@@ -966,7 +1080,7 @@ isolates <- setdiff(nodes,unique(sort(edges)))
 isolates
 
 graph_pop_19 <- graph(edges,isolates=isolates,directed=F)
-#pdf("/Users/Dani/ownCloud/backup/annotation/g-w_relatedness/network_analysis/c_lp_sm_perpop_renamed_kinship_N19.pdf")
+#pdf("/Users/Dani/ownCloud/backup/g-w_analysis/g-w_relatedness/network_analysis/c_lp_sm_perpop_renamed_kinship_N19.pdf")
 plot(graph_pop_19)
 dev.off()
 centr_degree(graph_pop_19)$res
@@ -976,7 +1090,7 @@ remove_ids <- V(graph_pop_19)$name[which.max(centr_degree(graph_pop_19)$res)]
 graph_pop <- graph_pop_19
 for (i in 1:7) {
   graph_pop <- graph_pop - V(graph_pop)$name[which.max(centr_degree(graph_pop)$res)]
-  #pdf(paste0("/Users/Dani/ownCloud/backup/annotation/g-w_relatedness/network_analysis/c_lp_sm_perpop_renamed_kinship_N",19-i,".pdf"))
+  #pdf(paste0("/Users/Dani/ownCloud/backup/g-w_analysis/g-w_relatedness/network_analysis/c_lp_sm_perpop_renamed_kinship_N",19-i,".pdf"))
   plot(graph_pop)
   dev.off()
   print(centr_degree(graph_pop)$res)
@@ -989,12 +1103,12 @@ for (i in 1:7) {
 remove_ids
 keep_ids <- gsub("-", "_", setdiff(nodes,remove_ids))
 keep_ids
-write(keep_ids,"/Users/Dani/ownCloud/backup/annotation/g-w_relatedness/network_analysis/c_lp_sm_perpop_kinship_ids.txt")
+write(keep_ids,"/Users/Dani/ownCloud/backup/g-w_analysis/g-w_relatedness/network_analysis/c_lp_sm_perpop_kinship_ids.txt")
 
 
 #For KIR (it doesn't work as there are no kinships): 
 
-kinship_file <- read.delim("/Users/Dani/ownCloud/backup/annotation/g-w_relatedness/network_analysis/c_ll_ki_perpop_renamed_kinship.genome",sep="",stringsAsFactors=F)
+kinship_file <- read.delim("/Users/Dani/ownCloud/backup/g-w_analysis/g-w_relatedness/network_analysis/c_ll_ki_perpop_renamed_kinship.genome",sep="",stringsAsFactors=F)
 kinship_file
 colnames(kinship_file)[15] <- "KINSHIP"
 nodes <- unique(sort(c(kinship_file$IID1,kinship_file$IID2)))
@@ -1009,7 +1123,7 @@ isolates <- setdiff(nodes,unique(sort(edges)))
 isolates
 
 graph_pop_19 <- graph(edges,isolates=isolates,directed=F)
-pdf("/Users/Dani/ownCloud/backup/annotation/g-w_relatedness/network_analysis/c_ll_ki_perpop_renamed_kinship_N19.pdf")
+pdf("/Users/Dani/ownCloud/backup/g-w_analysis/g-w_relatedness/network_analysis/c_ll_ki_perpop_renamed_kinship_N19.pdf")
 plot(graph_pop_19)
 dev.off()
 centr_degree(graph_pop_19)$res
@@ -1019,7 +1133,7 @@ remove_ids <- V(graph_pop_19)$name[which.max(centr_degree(graph_pop_19)$res)]
 graph_pop <- graph_pop_19
 for (i in 1:7) {
   graph_pop <- graph_pop - V(graph_pop)$name[which.max(centr_degree(graph_pop)$res)]
-  #pdf(paste0("/Users/Dani/ownCloud/backup/annotation/g-w_relatedness/network_analysis/c_ll_ki_perpop_renamed_kinship_N",19-i,".pdf"))
+  #pdf(paste0("/Users/Dani/ownCloud/backup/g-w_analysis/g-w_relatedness/network_analysis/c_ll_ki_perpop_renamed_kinship_N",19-i,".pdf"))
   plot(graph_pop)
   dev.off()
   print(centr_degree(graph_pop)$res)
@@ -1032,7 +1146,7 @@ for (i in 1:7) {
 remove_ids
 keep_ids <- gsub("-", "_", setdiff(nodes,remove_ids))
 keep_ids
-write(keep_ids,"/Users/Dani/ownCloud/backup/annotation/g-w_relatedness/network_analysis/c_ll_ki_perpop_kinship_ids.txt")
+write(keep_ids,"/Users/Dani/ownCloud/backup/g-w_analysis/g-w_relatedness/network_analysis/c_ll_ki_perpop_kinship_ids.txt")
 
 ```
 
@@ -1043,23 +1157,23 @@ write(keep_ids,"/Users/Dani/ownCloud/backup/annotation/g-w_relatedness/network_a
 #In the end we didn't use this subsampling method.
 
 #From outside the server, copy the to-remove list to the appropriate folder inside the server:
-scp /Users/Dani/ownCloud/backup/annotation/g-w_relatedness/network_analysis/c_lp_sm_perpop_kinship_ids.txt dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_lp_sm_perpop 
+scp /Users/Dani/ownCloud/backup/g-w_analysis/g-w_relatedness/network_analysis/c_lp_sm_perpop_kinship_ids.txt dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_lp_sm_perpop 
 
 #For SMO:
 
 cd $V_PATH/annotation/c_lp_sm_perpop/
-screen -S c_lp_sm_perpop_kinship_subsample.ann.log
-script c_lp_sm_perpop_kinship_subsample.ann.log
+screen -S c_lp_sm_perpop_kinship_subsample.lr_ann.log
+script c_lp_sm_perpop_kinship_subsample.lr_ann.log
 
 java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
 -T SelectVariants \
 -R $REF \
--V $V_PATH/annotation/c_lp_sm_perpop/c_lp_sm_perpop.ann.vcf \
--o $V_PATH/annotation/c_lp_sm_perpop/c_lp_sm_perpop_kinship_subsample.ann.vcf \
+-V $V_PATH/annotation/c_lp_sm_perpop/c_lp_sm_perpop.lr_ann.vcf \
+-o $V_PATH/annotation/c_lp_sm_perpop/c_lp_sm_perpop_kinship_subsample.lr_ann.vcf \
 -env \
 --sample_file c_lp_sm_perpop_kinship_ids.txt
 
-grep '#' -v c_lp_sm_perpop_kinship_subsample.ann.vcf | wc -l #1654555
+grep '#' -v c_lp_sm_perpop_kinship_subsample.lr_ann.vcf | wc -l #1654555
 
 #For KIR:
 
@@ -1075,29 +1189,29 @@ grep '#' -v c_lp_sm_perpop_kinship_subsample.ann.vcf | wc -l #1654555
 #100% random subset for SMO (we won't use this in the end. Instead, we'll use the mixed approach from below, but it will require the 'c_lp_sm_perpop_random_ids.txt' file generated here):
 
 cd $V_PATH/annotation/c_lp_sm_perpop/
-screen -S c_lp_sm_perpop_random_subsample.ann.log
-script c_lp_sm_perpop_random_subsample.ann.log
+screen -S c_lp_sm_perpop_random_subsample.lr_ann.log
+script c_lp_sm_perpop_random_subsample.lr_ann.log
 
-$BCF query -l $V_PATH/annotation/c_lp_sm_perpop/c_lp_sm_perpop.ann.vcf | shuf -n 12 > c_lp_sm_perpop_random_ids.txt #select 12 individuals (DON size) randomly
+$BCF query -l $V_PATH/annotation/c_lp_sm_perpop/c_lp_sm_perpop_with1.lr_ann.vcf | shuf -n 12 > c_lp_sm_perpop_random_ids.txt #select 12 individuals (DON size) randomly
 cat c_lp_sm_perpop_random_ids.txt
 java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
 -T SelectVariants \
 -R $REF \
--V $V_PATH/annotation/c_lp_sm_perpop/c_lp_sm_perpop.ann.vcf \
--o $V_PATH/annotation/c_lp_sm_perpop/c_lp_sm_perpop_random_subsample.ann.vcf \
+-V $V_PATH/annotation/c_lp_sm_perpop/c_lp_sm_perpop_with1.lr_ann.vcf \
+-o $V_PATH/annotation/c_lp_sm_perpop/c_lp_sm_perpop_random_subsample_with1.lr_ann.vcf \
 -env \
 --sample_file c_lp_sm_perpop_random_ids.txt
 
-grep '#' -v c_lp_sm_perpop_random_subsample.ann.vcf | wc -l #1641286
+grep '#' -v c_lp_sm_perpop_random_subsample_with1.lr_ann.vcf | wc -l #1641286
 
 
 #Mixed subset for SMO (partially random: 12 individuals are randomly selected after discarding 3 with high kinship):
 
 cd $V_PATH/annotation/c_lp_sm_perpop/
-screen -S c_lp_sm_perpop_mixed_subsample.ann.log
-script c_lp_sm_perpop_mixed_subsample.ann.log
+screen -S c_lp_sm_perpop_mixed_subsample.lr_ann.log
+script c_lp_sm_perpop_mixed_subsample.lr_ann.log
 
-$BCF query -l $V_PATH/annotation/c_lp_sm_perpop/c_lp_sm_perpop.ann.vcf > c_lp_sm_perpop_all_ids.txt #Obtain all sm ids
+$BCF query -l $V_PATH/annotation/c_lp_sm_perpop/c_lp_sm_perpop_with1.lr_ann.vcf > c_lp_sm_perpop_all_ids.txt #Obtain all sm ids
 
 #Get a file with only the 3 previously selected high kinship individuals (see section "Option A: identify highest kinship individuals"):
 rm c_lp_sm_perpop_threshold_ids.txt
@@ -1113,31 +1227,31 @@ cat c_lp_sm_perpop_mixed_ids.txt
 java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
 -T SelectVariants \
 -R $REF \
--V $V_PATH/annotation/c_lp_sm_perpop/c_lp_sm_perpop.ann.vcf \
--o $V_PATH/annotation/c_lp_sm_perpop/c_lp_sm_perpop_mixed_subsample.ann.vcf \
+-V $V_PATH/annotation/c_lp_sm_perpop/c_lp_sm_perpop_with1.lr_ann.vcf \
+-o $V_PATH/annotation/c_lp_sm_perpop/c_lp_sm_perpop_mixed_subsample_with1.lr_ann.vcf \
 -env \
 --sample_file c_lp_sm_perpop_mixed_ids.txt
 
-grep '#' -v c_lp_sm_perpop_mixed_subsample.ann.vcf | wc -l #1640979
+grep '#' -v c_lp_sm_perpop_mixed_subsample_with1.lr_ann.vcf | wc -l #1640979
 
 
 #100% random subset for KIR:
 
 cd $V_PATH/annotation/c_ll_ki_perpop/
-screen -S c_ll_ki_perpop_random_subsample.ann.log
-script c_ll_ki_perpop_random_subsample.ann.log
+screen -S c_ll_ki_perpop_random_subsample.lr_ann.log
+script c_ll_ki_perpop_random_subsample.lr_ann.log
 
-$BCF query -l $V_PATH/annotation/c_ll_ki_perpop/c_ll_ki_perpop.ann.vcf | shuf -n 8 > c_ll_ki_perpop_random_ids.txt #select 8 individuals (NOR & POL size) randomly.
+$BCF query -l $V_PATH/annotation/c_ll_ki_perpop/c_ll_ki_perpop_with1.lr_ann.vcf | shuf -n 8 > c_ll_ki_perpop_random_ids.txt #select 8 individuals (NOR & POL size) randomly.
 cat c_ll_ki_perpop_random_ids.txt
 java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
 -T SelectVariants \
 -R $REF \
--V $V_PATH/annotation/c_ll_ki_perpop/c_ll_ki_perpop.ann.vcf \
--o $V_PATH/annotation/c_ll_ki_perpop/c_ll_ki_perpop_random_subsample.ann.vcf \
+-V $V_PATH/annotation/c_ll_ki_perpop/c_ll_ki_perpop_with1.lr_ann.vcf \
+-o $V_PATH/annotation/c_ll_ki_perpop/c_ll_ki_perpop_random_subsample_with1.lr_ann.vcf \
 -env \
 --sample_file c_ll_ki_perpop_random_ids.txt
 
-grep '#' -v c_ll_ki_perpop_random_subsample.ann.vcf | wc -l #2182554
+grep '#' -v c_ll_ki_perpop_random_subsample_with1.lr_ann.vcf | wc -l #2182554
 
 ```
 
@@ -1148,8 +1262,8 @@ grep '#' -v c_ll_ki_perpop_random_subsample.ann.vcf | wc -l #2182554
 #Minimum size subset for SM (partially random: 8 individuals are randomly selected after discarding 3 with high kinship):
 
 cd $V_PATH/annotation/c_lp_sm_perpop/
-screen -S c_lp_sm_perpop_minimum_subsample.ann.log
-script c_lp_sm_perpop_minimum_subsample.ann.log
+screen -S c_lp_sm_perpop_minimum_subsample.lr_ann.log
+script c_lp_sm_perpop_minimum_subsample.lr_ann.log
 
 awk 'NR==FNR{a[$0]=1;next}!a[$0]' c_lp_sm_perpop_threshold_ids.txt c_lp_sm_perpop_all_ids.txt | shuf -n 8 > c_lp_sm_perpop_minimum_ids.txt #remove the 3 individuals above the threshold and then randomly select 8 out of the remaining 16. Both files were generated in the previous section (mixed subsample).
 
@@ -1157,32 +1271,32 @@ cat c_lp_sm_perpop_minimum_ids.txt
 java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
 -T SelectVariants \
 -R $REF \
--V $V_PATH/annotation/c_lp_sm_perpop/c_lp_sm_perpop.ann.vcf \
--o $V_PATH/annotation/c_lp_sm_perpop/c_lp_sm_perpop_minimum_subsample.ann.vcf \
+-V $V_PATH/annotation/c_lp_sm_perpop/c_lp_sm_perpop_with1.lr_ann.vcf \
+-o $V_PATH/annotation/c_lp_sm_perpop/c_lp_sm_perpop_minimum_subsample_with1.lr_ann.vcf \
 -env \
 --sample_file c_lp_sm_perpop_minimum_ids.txt
 
-grep '#' -v c_lp_sm_perpop_minimum_subsample.ann.vcf | wc -l #1577071
+grep '#' -v c_lp_sm_perpop_minimum_subsample_with1.lr_ann.vcf | wc -l #1577071
 
 
 #Minimum size subset for DO (all 8 individuals are randomly selected):
 
 cd $V_PATH/annotation/c_lp_do_perpop/
-screen -S c_lp_do_perpop_minimum_subsample.ann.log
-script c_lp_do_perpop_minimum_subsample.ann.log
+screen -S c_lp_do_perpop_minimum_subsample.lr_ann.log
+script c_lp_do_perpop_minimum_subsample.lr_ann.log
 
-$BCF query -l $V_PATH/annotation/c_lp_do_perpop/c_lp_do_perpop.ann.vcf | shuf -n 8 > c_lp_do_perpop_minimum_ids.txt #randomly select 8 individuals out of the 12.
+$BCF query -l $V_PATH/annotation/c_lp_do_perpop/c_lp_do_perpop_with1.lr_ann.vcf | shuf -n 8 > c_lp_do_perpop_minimum_ids.txt #randomly select 8 individuals out of the 12.
 
 cat c_lp_do_perpop_minimum_ids.txt
 java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
 -T SelectVariants \
 -R $REF \
--V $V_PATH/annotation/c_lp_do_perpop/c_lp_do_perpop.ann.vcf \
--o $V_PATH/annotation/c_lp_do_perpop/c_lp_do_perpop_minimum_subsample.ann.vcf \
+-V $V_PATH/annotation/c_lp_do_perpop/c_lp_do_perpop_with1.lr_ann.vcf \
+-o $V_PATH/annotation/c_lp_do_perpop/c_lp_do_perpop_minimum_subsample_with1.lr_ann.vcf \
 -env \
 --sample_file c_lp_do_perpop_minimum_ids.txt
 
-grep '#' -v c_lp_do_perpop_minimum_subsample.ann.vcf | wc -l #1296581
+grep '#' -v c_lp_do_perpop_minimum_subsample_with1.lr_ann.vcf | wc -l #1296581
 
 ```
 
@@ -1191,8 +1305,8 @@ grep '#' -v c_lp_do_perpop_minimum_subsample.ann.vcf | wc -l #1296581
 ```{r Split the population VCFs into per individual VCFs, eval=FALSE, engine='bash'}
 
 cd $V_PATH/annotation
-screen -S individuals.ann.log
-script individuals.ann.log
+screen -S individuals.lr_ann.log
+script individuals.lr_ann.log
 
 #For each individual in the sm, do, ki, po & no populations, subset its variants from the respective population VCF:
 cd $G_PATH
@@ -1200,7 +1314,7 @@ declare POP=$(ls c_{lp_sm*,lp_do*,ll_ki*,ll_po*,ll_no*}.g.vcf.gz | cut -c1-7 | u
 for i in ${POP[@]}
   do
   echo "${i}"
-  mkdir $V_PATH/annotation/"${i}"_individuals
+  #mkdir $V_PATH/annotation/"${i}"_individuals
   declare INDIVIDUALS=$(ls "${i}"*.g.vcf.gz | cut -c1-12 | uniq)
   for j in ${INDIVIDUALS[@]}
     do
@@ -1209,8 +1323,8 @@ for i in ${POP[@]}
     java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
     -T SelectVariants \
     -R $REF \
-    -V $V_PATH/annotation/"${i}"_perpop/"${i}"_perpop.ann.vcf \
-    -o $V_PATH/annotation/"${i}"_individuals/"${j}"_individual.ann.vcf \
+    -V $V_PATH/annotation/"${i}"_perpop/"${i}"_perpop_with1.lr_ann.vcf \
+    -o $V_PATH/annotation/"${i}"_individuals/"${j}"_individual_with1.lr_ann.vcf \
     -env \
     -sn $ID
     done
@@ -1218,35 +1332,9 @@ for i in ${POP[@]}
 
 ```
 
-#10: Mask positions. Subset the VCFs in order to remove certain variants.
-##Mask unpolarized positions from all VCFs. Remove all variants where AA=N.
+#10: Mask fixed positions. Subset the VCFs in order to remove fixed derived variants within each population.
 
-```{r Mask positions, eval=FALSE, engine='bash'}
-
-#During the polarization step, we didn't code any solution for AA=N, so those were left unresolved (AA=REF). We shouldn't take into account those positions since they could introduce a bias against AF=1 in SM (as we noticed when counting alleles), so we'll remove all of them from all perpop and per individual VCFs before counting alleles again.
-
-screen -S remove_AA_N_positions.log
-script remove_AA_N_positions.log
-
-cd $V_PATH/annotation/
-POP_VCFS=$(find $V_PATH/annotation/ -name "*perpop*.ann.vcf" | grep -v 'woutN')
-for pop in ${POP_VCFS[@]}
-  do
-  echo "${pop}"
-  grep -v "AA=N" ${pop} > ${pop/.ann.vcf/_woutN.ann.vcf}
-  done
-IND_VCFS=$(find $V_PATH/annotation/ -name "*individual.ann.vcf" | grep -v 'woutN')
-for ind in ${IND_VCFS[@]}
-  do
-  echo "${ind}"
-  grep -v "AA=N" ${ind} > ${ind/.ann.vcf/_woutN.ann.vcf}
-  done
-
-```
-
-##Mask fixed positions from all VCFs. Remove all variants where AF=1.
-
-```{r Mask positions, eval=FALSE, engine='bash'}
+```{r Mask fixed positions, eval=FALSE, engine='bash'}
 
 #In order to test if truly variable positions behave as obtained in previous studies (genome project, Godoy), remove all variants fixed for the derived allele.
 
@@ -1255,33 +1343,43 @@ screen -S remove_AF_1_positions.log
 script remove_AF_1_positions.log
 
 cd $V_PATH/annotation/
-POP_VCFS=$(find $V_PATH/annotation/ -name "*perpop*woutN.ann.vcf" | grep -v 'wout1')
+POP_VCFS=$(find $V_PATH/annotation/ -name "*perpop*with1.lr_ann.vcf" | grep -v 'wout1')
 for pop in ${POP_VCFS[@]}
   do
   echo "${pop}"
-  grep -v "AF=1.00" ${pop} > ${pop/.ann.vcf/_wout1.ann.vcf}
+  grep -v ";AF=1.00" ${pop} > ${pop/_with1.lr_ann.vcf/_wout1.lr_ann.vcf}
   done
-IND_VCFS=$(find $V_PATH/annotation/ -name "*individual_woutN.ann.vcf" | grep -v 'wout1')
+IND_VCFS=$(find $V_PATH/annotation/ -name "*individual_with1.lr_ann.vcf" | grep -v 'wout1')
 for ind in ${IND_VCFS[@]}
   do
   echo "${ind}"
-  grep -v "AF=1.00" ${ind} > ${ind/.ann.vcf/_wout1.ann.vcf}
+  grep -v ";AF=1.00" ${ind} > ${ind/_with1.lr_ann.vcf/_wout1.lr_ann.vcf}
   done
 
 ```
 
 #11: Get annotation statistics.
-##Without N. Obtain statistics for all VCFs where AA=N positions have been removed.
+##With 1. Obtain statistics for all VCFs where AF=1 positions are included.
 ###At the population level (within species comparison).
 
 ```{r Get annotation statistics, eval=FALSE, engine='bash'}
 
-cd $V_PATH/annotation/
-screen -S snpeff_population_within_summary.log
-script snpeff_population_within_summary.log
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+G_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
 
-rm snpeff_population_within_summary.txt
-echo -e "species\tpopulation\tsize\ttotal_V\tintergenic_V\tintronic_V\tcoding\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tmissense/synonymous_V\tmissense/synonymous_A" > snpeff_population_within_summary.txt
+cd $V_PATH/annotation/
+screen -S snpeff_population_within_summary_with1.lr_ann.log
+script snpeff_population_within_summary_with1.lr_ann.log
+
+rm snpeff_population_within_summary_with1.lr_ann.txt
+echo -e "species\tpopulation\tsize\ttotal_V\tintergenic_V\tintronic_V\tcoding\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tmissense/synonymous_V\tmissense/synonymous_A" > snpeff_population_within_summary_with1.lr_ann.txt
 POPLIST=($(ls -d c_{lp_sm*,lp_do*,ll_ki*,ll_po*,ll_no*}perpop))
 for pop in "${POPLIST[@]}"
   do
@@ -1289,15 +1387,15 @@ for pop in "${POPLIST[@]}"
   cd $V_PATH/annotation/"${pop}"/
   SPECIES=$(echo "${pop}" | cut -c3-4)
   POPULATION=$(echo "${pop}" | cut -c6-7)
-  if [ -e ${pop}_mixed_subsample_woutN.ann.vcf ]; then
+  if [ -e ${pop}_mixed_subsample_with1.lr_ann.vcf ]; then
     echo "Mixed "$POPULATION" subsample available"
-    FILE=${pop}_mixed_subsample_woutN.ann.vcf
-  elif [ -e ${pop}_random_subsample_woutN.ann.vcf ]; then
+    FILE=${pop}_mixed_subsample_with1.lr_ann.vcf
+  elif [ -e ${pop}_random_subsample_with1.lr_ann.vcf ]; then
     echo "Random "$POPULATION" subsample available"
-    FILE=${pop}_random_subsample_woutN.ann.vcf
+    FILE=${pop}_random_subsample_with1.lr_ann.vcf
   else
     echo "Original "$POPULATION" available"
-    FILE=${pop}_woutN.ann.vcf
+    FILE=${pop}_with1.lr_ann.vcf
   fi
   SIZE=$($BCF query -l $FILE | wc -l)
   TOTAL_V=$(grep -v '#' $FILE | wc -l)
@@ -1312,7 +1410,7 @@ for pop in "${POPLIST[@]}"
   NONSENSE_A=$(grep -e 'lost' -e 'gained' $FILE | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
   MISSENSE_SYNONYMOUS_V=$(echo "scale=3; $MISSENSE_V/$SYNONYMOUS_V" | bc)
   MISSENSE_SYNONYMOUS_A=$(echo "scale=3; $MISSENSE_A/$SYNONYMOUS_A" | bc)
-  echo -e "$SPECIES\t$POPULATION\t$SIZE\t$TOTAL_V\t$INTERGENIC_V\t$INTRONIC_V\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A" >> $V_PATH/annotation/snpeff_population_within_summary.txt
+  echo -e "$SPECIES\t$POPULATION\t$SIZE\t$TOTAL_V\t$INTERGENIC_V\t$INTRONIC_V\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A" >> $V_PATH/annotation/snpeff_population_within_summary_with1.lr_ann.txt
   done
 
 ```
@@ -1322,11 +1420,11 @@ for pop in "${POPLIST[@]}"
 ```{r Get annotation statistics, eval=FALSE, engine='bash'}
 
 cd $V_PATH/annotation/
-screen -S snpeff_population_between_summary.log
-script snpeff_population_between_summary.log
+screen -S snpeff_population_between_summary_with1.lr_ann.log
+script snpeff_population_between_summary_with1.lr_ann.log
 
-rm snpeff_population_between_summary.txt
-echo -e "species\tpopulation\tsize\ttotal_V\tintergenic_V\tintronic_V\tcoding\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tmissense/synonymous_V\tmissense/synonymous_A" > snpeff_population_between_summary.txt
+rm snpeff_population_between_summary_with1.lr_ann.txt
+echo -e "species\tpopulation\tsize\ttotal_V\tintergenic_V\tintronic_V\tcoding\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tmissense/synonymous_V\tmissense/synonymous_A" > snpeff_population_between_summary_with1.lr_ann.txt
 POPLIST=($(ls -d c_{lp_sm*,lp_do*,ll_ki*,ll_po*,ll_no*}perpop))
 for pop in "${POPLIST[@]}"
   do
@@ -1334,15 +1432,15 @@ for pop in "${POPLIST[@]}"
   cd $V_PATH/annotation/"${pop}"/
   SPECIES=$(echo "${pop}" | cut -c3-4)
   POPULATION=$(echo "${pop}" | cut -c6-7)
-  if [ -e ${pop}_minimum_subsample_woutN.ann.vcf ]; then
+  if [ -e ${pop}_minimum_subsample_with1.lr_ann.vcf ]; then
     echo "Minimum "$POPULATION" subsample available"
-    FILE=${pop}_minimum_subsample_woutN.ann.vcf
-  elif [ -e ${pop}_random_subsample_woutN.ann.vcf ]; then
+    FILE=${pop}_minimum_subsample_with1.lr_ann.vcf
+  elif [ -e ${pop}_random_subsample_with1.lr_ann.vcf ]; then
     echo "Random "$POPULATION" subsample available"
-    FILE=${pop}_random_subsample_woutN.ann.vcf
+    FILE=${pop}_random_subsample_with1.lr_ann.vcf
   else
     echo "Original "$POPULATION" available"
-    FILE=${pop}_woutN.ann.vcf
+    FILE=${pop}_with1.lr_ann.vcf
   fi
   SIZE=$($BCF query -l $FILE | wc -l)
   TOTAL_V=$(grep -v '#' $FILE | wc -l)
@@ -1357,7 +1455,7 @@ for pop in "${POPLIST[@]}"
   NONSENSE_A=$(grep -e 'lost' -e 'gained' $FILE | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
   MISSENSE_SYNONYMOUS_V=$(echo "scale=3; $MISSENSE_V/$SYNONYMOUS_V" | bc)
   MISSENSE_SYNONYMOUS_A=$(echo "scale=3; $MISSENSE_A/$SYNONYMOUS_A" | bc)
-  echo -e "$SPECIES\t$POPULATION\t$SIZE\t$TOTAL_V\t$INTERGENIC_V\t$INTRONIC_V\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A" >> $V_PATH/annotation/snpeff_population_between_summary.txt
+  echo -e "$SPECIES\t$POPULATION\t$SIZE\t$TOTAL_V\t$INTERGENIC_V\t$INTRONIC_V\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A" >> $V_PATH/annotation/snpeff_population_between_summary_with1.lr_ann.txt
   done
 
 ```
@@ -1367,12 +1465,12 @@ for pop in "${POPLIST[@]}"
 ```{r Get annotation statistics, eval=FALSE, engine='bash'}
 
 cd $V_PATH/annotation/
-screen -S snpeff_individual_summary.log
-script snpeff_individual_summary.log
+screen -S snpeff_individual_summary_with1.lr_ann.log
+script snpeff_individual_summary_with1.lr_ann.log
 
-rm snpeff_individual_summary.txt
-echo -e "species\tpopulation\tsample\ttotal_V\tintergenic_V\tintronic_V\tcoding\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tmissense/synonymous_V\tmissense/synonymous_A" > snpeff_individual_summary.txt
-INDLIST=($(ls `find . -name '*individual_woutN.ann.vcf' -print`))
+rm snpeff_individual_summary_with1.lr_ann.txt
+echo -e "species\tpopulation\tsample\ttotal_V\tintergenic_V\tintronic_V\tcoding\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tmissense/synonymous_V\tmissense/synonymous_A" > snpeff_individual_summary_with1.lr_ann.txt
+INDLIST=($(ls `find . -name '*individual_with1.lr_ann.vcf' -print`))
 for i in "${INDLIST[@]}"
   do
   echo "${i}"
@@ -1393,7 +1491,7 @@ for i in "${INDLIST[@]}"
   NONSENSE_A=$(grep -e 'lost' -e 'gained' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
   MISSENSE_SYNONYMOUS_V=$(echo "scale=3; $MISSENSE_V/$SYNONYMOUS_V" | bc)
   MISSENSE_SYNONYMOUS_A=$(echo "scale=3; $MISSENSE_A/$SYNONYMOUS_A" | bc)
-  echo -e "$SPECIES\t$POPULATION\t$SAMPLE\t$TOTAL_V\t$INTERGENIC_V\t$INTRONIC_V\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A" >> $V_PATH/annotation/snpeff_individual_summary.txt
+  echo -e "$SPECIES\t$POPULATION\t$SAMPLE\t$TOTAL_V\t$INTERGENIC_V\t$INTRONIC_V\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A" >> $V_PATH/annotation/snpeff_individual_summary_with1.lr_ann.txt
   done
 
 ```
@@ -1404,11 +1502,11 @@ for i in "${INDLIST[@]}"
 ```{r Get annotation statistics, eval=FALSE, engine='bash'}
 
 cd $V_PATH/annotation/
-screen -S snpeff_population_within_summary_wout1.log
-script snpeff_population_within_summary_wout1.log
+screen -S snpeff_population_within_summary_wout1.lr_ann.log
+script snpeff_population_within_summary_wout1.lr_ann.log
 
-rm snpeff_population_within_summary_wout1.txt
-echo -e "species\tpopulation\tsize\ttotal_V\tintergenic_V\tintronic_V\tcoding\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tmissense/synonymous_V\tmissense/synonymous_A" > snpeff_population_within_summary_wout1.txt
+rm snpeff_population_within_summary_wout1.lr_ann.txt
+echo -e "species\tpopulation\tsize\ttotal_V\tintergenic_V\tintronic_V\tcoding\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tmissense/synonymous_V\tmissense/synonymous_A" > snpeff_population_within_summary_wout1.lr_ann.txt
 POPLIST=($(ls -d c_{lp_sm*,lp_do*,ll_ki*,ll_po*,ll_no*}perpop))
 for pop in "${POPLIST[@]}"
   do
@@ -1416,15 +1514,15 @@ for pop in "${POPLIST[@]}"
   cd $V_PATH/annotation/"${pop}"/
   SPECIES=$(echo "${pop}" | cut -c3-4)
   POPULATION=$(echo "${pop}" | cut -c6-7)
-  if [ -e ${pop}_mixed_subsample_woutN_wout1.ann.vcf ]; then
+  if [ -e ${pop}_mixed_subsample_wout1.lr_ann.vcf ]; then
     echo "Mixed "$POPULATION" subsample available"
-    FILE=${pop}_mixed_subsample_woutN_wout1.ann.vcf
-  elif [ -e ${pop}_random_subsample_woutN_wout1.ann.vcf ]; then
+    FILE=${pop}_mixed_subsample_wout1.lr_ann.vcf
+  elif [ -e ${pop}_random_subsample_wout1.lr_ann.vcf ]; then
     echo "Random "$POPULATION" subsample available"
-    FILE=${pop}_random_subsample_woutN_wout1.ann.vcf
+    FILE=${pop}_random_subsample_wout1.lr_ann.vcf
   else
     echo "Original "$POPULATION" available"
-    FILE=${pop}_woutN_wout1.ann.vcf
+    FILE=${pop}_wout1.lr_ann.vcf
   fi
   SIZE=$($BCF query -l $FILE | wc -l)
   TOTAL_V=$(grep -v '#' $FILE | wc -l)
@@ -1439,7 +1537,7 @@ for pop in "${POPLIST[@]}"
   NONSENSE_A=$(grep -e 'lost' -e 'gained' $FILE | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
   MISSENSE_SYNONYMOUS_V=$(echo "scale=3; $MISSENSE_V/$SYNONYMOUS_V" | bc)
   MISSENSE_SYNONYMOUS_A=$(echo "scale=3; $MISSENSE_A/$SYNONYMOUS_A" | bc)
-  echo -e "$SPECIES\t$POPULATION\t$SIZE\t$TOTAL_V\t$INTERGENIC_V\t$INTRONIC_V\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A" >> $V_PATH/annotation/snpeff_population_within_summary_wout1.txt
+  echo -e "$SPECIES\t$POPULATION\t$SIZE\t$TOTAL_V\t$INTERGENIC_V\t$INTRONIC_V\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A" >> $V_PATH/annotation/snpeff_population_within_summary_wout1.lr_ann.txt
   done
 
 ```
@@ -1449,11 +1547,11 @@ for pop in "${POPLIST[@]}"
 ```{r Get annotation statistics, eval=FALSE, engine='bash'}
 
 cd $V_PATH/annotation/
-screen -S snpeff_population_between_summary_wout1.log
-script snpeff_population_between_summary_wout1.log
+screen -S snpeff_population_between_summary_wout1.lr_ann.log
+script snpeff_population_between_summary_wout1.lr_ann.log
 
-rm snpeff_population_between_summary_wout1.txt
-echo -e "species\tpopulation\tsize\ttotal_V\tintergenic_V\tintronic_V\tcoding\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tmissense/synonymous_V\tmissense/synonymous_A" > snpeff_population_between_summary_wout1.txt
+rm snpeff_population_between_summary_wout1.lr_ann.txt
+echo -e "species\tpopulation\tsize\ttotal_V\tintergenic_V\tintronic_V\tcoding\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tmissense/synonymous_V\tmissense/synonymous_A" > snpeff_population_between_summary_wout1.lr_ann.txt
 POPLIST=($(ls -d c_{lp_sm*,lp_do*,ll_ki*,ll_po*,ll_no*}perpop))
 for pop in "${POPLIST[@]}"
   do
@@ -1461,15 +1559,15 @@ for pop in "${POPLIST[@]}"
   cd $V_PATH/annotation/"${pop}"/
   SPECIES=$(echo "${pop}" | cut -c3-4)
   POPULATION=$(echo "${pop}" | cut -c6-7)
-  if [ -e ${pop}_minimum_subsample_woutN_wout1.ann.vcf ]; then
+  if [ -e ${pop}_minimum_subsample_wout1.lr_ann.vcf ]; then
     echo "Minimum "$POPULATION" subsample available"
-    FILE=${pop}_minimum_subsample_woutN_wout1.ann.vcf
-  elif [ -e ${pop}_random_subsample_woutN_wout1.ann.vcf ]; then
+    FILE=${pop}_minimum_subsample_wout1.lr_ann.vcf
+  elif [ -e ${pop}_random_subsample_wout1.lr_ann.vcf ]; then
     echo "Random "$POPULATION" subsample available"
-    FILE=${pop}_random_subsample_woutN_wout1.ann.vcf
+    FILE=${pop}_random_subsample_wout1.lr_ann.vcf
   else
     echo "Original "$POPULATION" available"
-    FILE=${pop}_woutN_wout1.ann.vcf
+    FILE=${pop}_wout1.lr_ann.vcf
   fi
   SIZE=$($BCF query -l $FILE | wc -l)
   TOTAL_V=$(grep -v '#' $FILE | wc -l)
@@ -1484,7 +1582,7 @@ for pop in "${POPLIST[@]}"
   NONSENSE_A=$(grep -e 'lost' -e 'gained' $FILE | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
   MISSENSE_SYNONYMOUS_V=$(echo "scale=3; $MISSENSE_V/$SYNONYMOUS_V" | bc)
   MISSENSE_SYNONYMOUS_A=$(echo "scale=3; $MISSENSE_A/$SYNONYMOUS_A" | bc)
-  echo -e "$SPECIES\t$POPULATION\t$SIZE\t$TOTAL_V\t$INTERGENIC_V\t$INTRONIC_V\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A" >> $V_PATH/annotation/snpeff_population_between_summary_wout1.txt
+  echo -e "$SPECIES\t$POPULATION\t$SIZE\t$TOTAL_V\t$INTERGENIC_V\t$INTRONIC_V\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A" >> $V_PATH/annotation/snpeff_population_between_summary_wout1.lr_ann.txt
   done
 
 ```
@@ -1494,12 +1592,12 @@ for pop in "${POPLIST[@]}"
 ```{r Get annotation statistics, eval=FALSE, engine='bash'}
 
 cd $V_PATH/annotation/
-screen -S snpeff_individual_summary_wout1.log
-script snpeff_individual_summary_wout1.log
+screen -S snpeff_individual_summary_wout1.lr_ann.log
+script snpeff_individual_summary_wout1.lr_ann.log
 
-rm snpeff_individual_summary_wout1.txt
-echo -e "species\tpopulation\tsample\ttotal_V\tintergenic_V\tintronic_V\tcoding\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tmissense/synonymous_V\tmissense/synonymous_A" > snpeff_individual_summary_wout1.txt
-INDLIST=($(ls `find . -name '*individual_woutN_wout1.ann.vcf' -print`))
+rm snpeff_individual_summary_wout1.lr_ann.txt
+echo -e "species\tpopulation\tsample\ttotal_V\tintergenic_V\tintronic_V\tcoding\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tmissense/synonymous_V\tmissense/synonymous_A" > snpeff_individual_summary_wout1.lr_ann.txt
+INDLIST=($(ls `find . -name '*individual_wout1.lr_ann.vcf' -print`))
 for i in "${INDLIST[@]}"
   do
   echo "${i}"
@@ -1520,7 +1618,7 @@ for i in "${INDLIST[@]}"
   NONSENSE_A=$(grep -e 'lost' -e 'gained' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
   MISSENSE_SYNONYMOUS_V=$(echo "scale=3; $MISSENSE_V/$SYNONYMOUS_V" | bc)
   MISSENSE_SYNONYMOUS_A=$(echo "scale=3; $MISSENSE_A/$SYNONYMOUS_A" | bc)
-  echo -e "$SPECIES\t$POPULATION\t$SAMPLE\t$TOTAL_V\t$INTERGENIC_V\t$INTRONIC_V\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A" >> $V_PATH/annotation/snpeff_individual_summary_wout1.txt
+  echo -e "$SPECIES\t$POPULATION\t$SAMPLE\t$TOTAL_V\t$INTERGENIC_V\t$INTRONIC_V\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A" >> $V_PATH/annotation/snpeff_individual_summary_wout1.lr_ann.txt
   done
 
 ```
@@ -1535,14 +1633,16 @@ library(tidyr)
 library(ggplot2)
 library(RColorBrewer)
 
-wd <- file.path("/Users/Dani/ownCloud/backup/annotation/genetic_load")
+#lp based annotation:
+
+wd <- file.path("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios")
 setwd(wd)
-files <- grep(grep(list.files(file.path("/Users/Dani/ownCloud/backup/annotation/genetic_load"), pattern = "snpeff", full.names=T), pattern='test_allele_counts', inv=T, value=T),pattern='between', value=T)
+files <- grep(grep(list.files(file.path("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios"), pattern = "lp_ann", full.names=T), pattern='test_allele_counts', inv=T, value=T),pattern='between', value=T)
 files
 perpop_between_statistics <- data_frame("population"=character(0),"category"=character(0),"value"=numeric(0),"dataset"=character(0))
-for (f in c(1,3,2)) {
+for (f in c(2,1)) {
   current_file <- read_tsv(files[f])
-  current_file <- current_file %>% mutate("I_ratio"=intronic_V/intergenic_V,"S_ratio*10"=10*synonymous_V/intergenic_V,"NS_ratio*10"=10*missense_V/intergenic_V,"LOF_ratio*1000"=1000*nonsense_V/intergenic_V,"NS/S_v"=missense_V/synonymous_V,"NS/S_a"=missense_A/synonymous_A,"LOF/S_v*100"=100*nonsense_V/synonymous_V,"LOF/S_a*100"=100*nonsense_A/synonymous_A,dataset=unlist(strsplit(files[f],"/|_|\\."))[length(unlist(strsplit(files[f],"/|_|\\.")))-1]) %>% select(2,c(16:24))
+  current_file <- current_file %>% mutate("I_ratio"=intronic_V/intergenic_V,"S_ratio*15"=15*synonymous_V/intergenic_V,"NS_ratio*15"=15*missense_V/intergenic_V,"LOF_ratio*2000"=2000*nonsense_V/intergenic_V,"NS/S_v"=missense_V/synonymous_V,"NS/S_a"=missense_A/synonymous_A,"LOF/S_v*50"=50*nonsense_V/synonymous_V,"LOF/S_a*50"=50*nonsense_A/synonymous_A,dataset=unlist(strsplit(files[f],"/|_|\\."))[length(unlist(strsplit(files[f],"/|_|\\.")))-3]) %>% select(2,c(16:24))
   current_file
   current_file_tidy <- current_file %>% gather(category,value,-population,-dataset) %>% select(1,3,4,2)
   current_file_tidy
@@ -1553,14 +1653,15 @@ perpop_between_statistics$population = factor(perpop_between_statistics$populati
 perpop_between_statistics$category <- as.factor(perpop_between_statistics$category)
 perpop_between_statistics$category = factor(perpop_between_statistics$category,levels(perpop_between_statistics$category)[c(1,8,5,2,7,6,4,3)])
 perpop_between_statistics$dataset <- as.factor(perpop_between_statistics$dataset)
-perpop_between_statistics$dataset = factor(perpop_between_statistics$dataset,levels(perpop_between_statistics$dataset)[c(1,3,2)])
+perpop_between_statistics$dataset = factor(perpop_between_statistics$dataset,levels(perpop_between_statistics$dataset)[c(2,1)])
 perpop_between_statistics
 
 ggplot_perpop_between <- ggplot(data=perpop_between_statistics, aes(x=category,y=value)) +
   geom_point(aes(colour = population)) + 
   scale_color_manual(values=c(brewer.pal(12,"Paired")[1], brewer.pal(12,"Paired")[2], brewer.pal(12,"Paired")[4], brewer.pal(8,"Greys")[5],brewer.pal(8,"Greys")[8])) +
   facet_grid(. ~ dataset) +
-  ggtitle("Ratios per population (N=8)") +
+  ggtitle("Ratios per population (N=8) with pardinus based annotation") +
+  ylim(0.0,1.0) +
   theme_bw() +
   theme(text=element_text(size=12,face="bold"),
         rect=element_rect(size=1),
@@ -1583,7 +1684,60 @@ ggplot_perpop_between <- ggplot(data=perpop_between_statistics, aes(x=category,y
         legend.title=element_blank()
   )
 ggplot_perpop_between
-ggsave("perpop_counts_ratios.pdf", width=30, height=15, units="cm", device="pdf", path="/Users/Dani/ownCloud/backup/annotation/genetic_load/")
+ggsave("perpop_counts_ratios.lp_ann.pdf", width=30, height=15, units="cm", device="pdf", path="/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios")
+
+#lr based annotation:
+
+wd <- file.path("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios")
+setwd(wd)
+files <- grep(grep(list.files(file.path("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios"), pattern = "lr_ann", full.names=T), pattern='test_allele_counts', inv=T, value=T),pattern='between', value=T)
+files
+perpop_between_statistics <- data_frame("population"=character(0),"category"=character(0),"value"=numeric(0),"dataset"=character(0))
+for (f in c(2,1)) {
+  current_file <- read_tsv(files[f])
+  current_file <- current_file %>% mutate("I_ratio"=intronic_V/intergenic_V,"S_ratio*15"=15*synonymous_V/intergenic_V,"NS_ratio*15"=15*missense_V/intergenic_V,"LOF_ratio*2000"=2000*nonsense_V/intergenic_V,"NS/S_v"=missense_V/synonymous_V,"NS/S_a"=missense_A/synonymous_A,"LOF/S_v*50"=50*nonsense_V/synonymous_V,"LOF/S_a*50"=50*nonsense_A/synonymous_A,dataset=unlist(strsplit(files[f],"/|_|\\."))[length(unlist(strsplit(files[f],"/|_|\\.")))-3]) %>% select(2,c(16:24))
+  current_file
+  current_file_tidy <- current_file %>% gather(category,value,-population,-dataset) %>% select(1,3,4,2)
+  current_file_tidy
+  perpop_between_statistics <- rbind(perpop_between_statistics,current_file_tidy)
+}
+perpop_between_statistics$population <- as.factor(perpop_between_statistics$population)
+perpop_between_statistics$population = factor(perpop_between_statistics$population,levels(perpop_between_statistics$population)[c(2:5,1)])
+perpop_between_statistics$category <- as.factor(perpop_between_statistics$category)
+perpop_between_statistics$category = factor(perpop_between_statistics$category,levels(perpop_between_statistics$category)[c(1,8,5,2,7,6,4,3)])
+perpop_between_statistics$dataset <- as.factor(perpop_between_statistics$dataset)
+perpop_between_statistics$dataset = factor(perpop_between_statistics$dataset,levels(perpop_between_statistics$dataset)[c(2,1)])
+perpop_between_statistics
+
+ggplot_perpop_between <- ggplot(data=perpop_between_statistics, aes(x=category,y=value)) +
+  geom_point(aes(colour = population)) + 
+  scale_color_manual(values=c(brewer.pal(12,"Paired")[1], brewer.pal(12,"Paired")[2], brewer.pal(12,"Paired")[4], brewer.pal(8,"Greys")[5],brewer.pal(8,"Greys")[8])) +
+  facet_grid(. ~ dataset) +
+  ggtitle("Ratios per population (N=8) with rufus based annotation") +
+  ylim(0.0,1.0) +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+        rect=element_rect(size=1),
+        axis.line=element_line(colour="black"),
+        axis.title=element_text(size=16),
+        axis.text.x=element_text(angle=90,hjust=1,vjust=0.5),
+        #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+        #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+        panel.background=element_blank(),
+        panel.border=element_rect(colour="black"),
+        #panel.grid=element_blank(),
+        #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+        plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+        #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+        legend.background=element_rect(linetype="solid", colour="black", size=.5),
+        #legend.justification=c(0,0),
+        legend.key=element_rect(colour="white"),
+        #legend.key.size=unit(1.3,"cm"),
+        #legend.position=c(0.92,0.86),
+        legend.title=element_blank()
+  )
+ggplot_perpop_between
+ggsave("perpop_counts_ratios.lr_ann.pdf", width=30, height=15, units="cm", device="pdf", path="/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios")
 
 ```
 
@@ -1591,13 +1745,13 @@ ggsave("perpop_counts_ratios.pdf", width=30, height=15, units="cm", device="pdf"
 
 ```{r Get annotation statistics, eval=FALSE, engine='bash'}
 
-#woutN: for each population (minimum subsample, woutN version) extract allele frequency from all SNPs in each class of interest, and save them in a file:
+#with1: for each population (minimum subsample, with1 version) extract allele frequency from all SNPs in each class of interest, and save them in a file:
 
 cd $V_PATH/annotation/
-screen -S features_frequency_distribution_woutN.log
-script features_frequency_distribution_woutN.log
+screen -S features_frequency_distribution_with1.lr_ann.log
+script features_frequency_distribution_with1.lr_ann.log
 
-rm $V_PATH/annotation/features_frequency_distribution_woutN.txt
+rm $V_PATH/annotation/features_frequency_distribution_with1.lr_ann.txt
 POPLIST=($(ls -d c_{lp_sm*,lp_do*,ll_ki*,ll_po*,ll_no*}perpop))
 for pop in "${POPLIST[@]}"
   do
@@ -1605,35 +1759,35 @@ for pop in "${POPLIST[@]}"
   cd $V_PATH/annotation/"${pop}"/
   SPECIES=$(echo "${pop}" | cut -c3-4)
   POPULATION=$(echo "${pop}" | cut -c6-7)
-  if [ -e ${pop}_minimum_subsample_woutN.ann.vcf ]; then
+  if [ -e ${pop}_minimum_subsample_with1.lr_ann.vcf ]; then
     echo "Minimum "$POPULATION" subsample available"
-    FILE=${pop}_minimum_subsample_woutN.ann.vcf
-  elif [ -e ${pop}_random_subsample_woutN.ann.vcf ]; then
+    FILE=${pop}_minimum_subsample_with1.lr_ann.vcf
+  elif [ -e ${pop}_random_subsample_with1.lr_ann.vcf ]; then
     echo "Random "$POPULATION" subsample available"
-    FILE=${pop}_random_subsample_woutN.ann.vcf
+    FILE=${pop}_random_subsample_with1.lr_ann.vcf
   else
     echo "Original "$POPULATION" available"
-    FILE=${pop}_woutN.ann.vcf
+    FILE=${pop}_with1.lr_ann.vcf
   fi
   declare -a FEATURES=("intergenic" "intron_variant" "synonymous_variant" "missense_variant")
   for feat in "${FEATURES[@]}"
     do
     echo "${feat}"
-    grep "${feat}" $FILE | cut -f8 | cut -d';' -f3 | cut -d'=' -f2 | awk -v pop="$POPULATION" -v feat="${feat}" '{print $1" "pop" "feat}' >> $V_PATH/annotation/features_frequency_distribution_woutN.txt
+    grep "${feat}" $FILE | cut -f8 | cut -d';' -f3 | cut -d'=' -f2 | awk -v pop="$POPULATION" -v feat="${feat}" '{print $1" "pop" "feat}' >> $V_PATH/annotation/features_frequency_distribution_with1.lr_ann.txt
     done
     cd $V_PATH/annotation/
   done
 
-scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/features_frequency_distribution_woutN.txt /Users/Dani/ownCloud/backup/annotation/genetic_load/features_frequency_distribution/
+scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/features_frequency_distribution_with1.lr_ann.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/features_frequency_distribution/
 
 
 #wout1: for each population (minimum subsample, wout1 version) extract allele frequency from all SNPs in each class of interest, and save them in a file:
 
 cd $V_PATH/annotation/
-screen -S features_frequency_distribution_wout1.log
-script features_frequency_distribution_wout1.log
+screen -S features_frequency_distribution_wout1.lr_ann.log
+script features_frequency_distribution_wout1.lr_ann.log
 
-rm $V_PATH/annotation/features_frequency_distribution_wout1.txt
+rm $V_PATH/annotation/features_frequency_distribution_wout1.lr_ann.txt
 POPLIST=($(ls -d c_{lp_sm*,lp_do*,ll_ki*,ll_po*,ll_no*}perpop))
 for pop in "${POPLIST[@]}"
   do
@@ -1641,26 +1795,26 @@ for pop in "${POPLIST[@]}"
   cd $V_PATH/annotation/"${pop}"/
   SPECIES=$(echo "${pop}" | cut -c3-4)
   POPULATION=$(echo "${pop}" | cut -c6-7)
-  if [ -e ${pop}_minimum_subsample_woutN_wout1.ann.vcf ]; then
+  if [ -e ${pop}_minimum_subsample_wout1.lr_ann.vcf ]; then
     echo "Minimum "$POPULATION" subsample available"
-    FILE=${pop}_minimum_subsample_woutN_wout1.ann.vcf
-  elif [ -e ${pop}_random_subsample_woutN_wout1.ann.vcf ]; then
+    FILE=${pop}_minimum_subsample_wout1.lr_ann.vcf
+  elif [ -e ${pop}_random_subsample_wout1.lr_ann.vcf ]; then
     echo "Random "$POPULATION" subsample available"
-    FILE=${pop}_random_subsample_woutN_wout1.ann.vcf
+    FILE=${pop}_random_subsample_wout1.lr_ann.vcf
   else
     echo "Original "$POPULATION" available"
-    FILE=${pop}_woutN_wout1.ann.vcf
+    FILE=${pop}_wout1.lr_ann.vcf
   fi
   declare -a FEATURES=("intergenic" "intron_variant" "synonymous_variant" "missense_variant")
   for feat in "${FEATURES[@]}"
     do
     echo "${feat}"
-    grep "${feat}" $FILE | cut -f8 | cut -d';' -f3 | cut -d'=' -f2 | awk -v pop="$POPULATION" -v feat="${feat}" '{print $1" "pop" "feat}' >> $V_PATH/annotation/features_frequency_distribution_wout1.txt
+    grep "${feat}" $FILE | cut -f8 | cut -d';' -f3 | cut -d'=' -f2 | awk -v pop="$POPULATION" -v feat="${feat}" '{print $1" "pop" "feat}' >> $V_PATH/annotation/features_frequency_distribution_wout1.lr_ann.txt
     done
     cd $V_PATH/annotation/
   done
 
-scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/features_frequency_distribution_wout1.txt /Users/Dani/ownCloud/backup/annotation/genetic_load/features_frequency_distribution/
+scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/features_frequency_distribution_wout1.lr_ann.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/features_frequency_distribution/
 
 
 ```
@@ -1673,9 +1827,9 @@ library(readr)
 library(dplyr)
 library(ggplot2)
 
-#woutN:
+#with1:
 
-features_frequency_distribution <- read_delim("/Users/Dani/ownCloud/backup/annotation/genetic_load/features_frequency_distribution/features_frequency_distribution_woutN.txt",col_names=c("AF","pop","feat"),delim=" ")
+features_frequency_distribution <- read_delim("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/features_frequency_distribution/features_frequency_distribution_with1.lr_ann.txt",col_names=c("AF","pop","feat"),delim=" ")
 features_frequency_distribution
 features_frequency_distribution$feat <- as.factor(features_frequency_distribution$feat)
 features_frequency_distribution$feat = factor(features_frequency_distribution$feat,levels(features_frequency_distribution$feat)[c(1,2,4,3)])
@@ -1690,7 +1844,7 @@ for (pop in pops) {
   pop_feat_ggplot <- ggplot(data=plot_data, aes(AF)) +
   facet_grid(feat ~ ., scales="free") +
   geom_histogram(aes(AF),binwidth=0.01) +
-  ggtitle(paste0("AF distribution for ",pop)) +
+  ggtitle(paste0("AF distribution for ",pop," with rufus based annotation")) +
   #ylab("density") +
   #xlab("heritability") +
   theme_bw() +
@@ -1715,12 +1869,12 @@ for (pop in pops) {
         legend.title=element_blank()
   )
   pop_feat_ggplot
-  ggsave(paste0(pop,"_AF_distribution_woutN"), width=30, height=25, units="cm", device="pdf", path="/Users/Dani/ownCloud/backup/annotation/genetic_load/features_frequency_distribution/woutN/")
+  ggsave(paste0(pop,"_AF_distribution_with1.lr_ann.pdf"), width=30, height=25, units="cm", device="pdf", path="/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/features_frequency_distribution/lr_ann/with1/")
 }
 
 #wout1:
 
-features_frequency_distribution <- read_delim("/Users/Dani/ownCloud/backup/annotation/genetic_load/features_frequency_distribution/features_frequency_distribution_wout1.txt",col_names=c("AF","pop","feat"),delim=" ")
+features_frequency_distribution <- read_delim("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/features_frequency_distribution/features_frequency_distribution_wout1.lr_ann.txt",col_names=c("AF","pop","feat"),delim=" ")
 features_frequency_distribution
 features_frequency_distribution$feat <- as.factor(features_frequency_distribution$feat)
 features_frequency_distribution$feat = factor(features_frequency_distribution$feat,levels(features_frequency_distribution$feat)[c(1,2,4,3)])
@@ -1735,7 +1889,7 @@ for (pop in pops) {
   pop_feat_ggplot <- ggplot(data=plot_data, aes(AF)) +
   facet_grid(feat ~ ., scales="free") +
   geom_histogram(aes(AF),binwidth=0.01) +
-  ggtitle(paste0("AF distribution for ",pop)) +
+  ggtitle(paste0("AF distribution for ",pop," with rufus based annotation")) +
   #ylab("density") +
   #xlab("heritability") +
   theme_bw() +
@@ -1760,9 +1914,8 @@ for (pop in pops) {
         legend.title=element_blank()
   )
   pop_feat_ggplot
-  ggsave(paste0(pop,"_AF_distribution_wout1"), width=30, height=25, units="cm", device="pdf", path="/Users/Dani/ownCloud/backup/annotation/genetic_load/features_frequency_distribution/wout1/")
+  ggsave(paste0(pop,"_AF_distribution_wout1.lr_ann.pdf"), width=30, height=25, units="cm", device="pdf", path="/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/features_frequency_distribution/lr_ann/wout1/")
 }
-
 
 ```
 
@@ -1772,30 +1925,30 @@ for (pop in pops) {
 ```{r Other stuff, eval=FALSE, engine='bash'}
 
 cd $V_PATH/annotation/
-rm $V_PATH/annotation/snpeff_lp_total_synonymous_woutN.txt
-rm $V_PATH/annotation/snpeff_lp_total_nonsynonymous_woutN.txt
+rm $V_PATH/annotation/snpeff_lp_total_synonymous_with1.txt
+rm $V_PATH/annotation/snpeff_lp_total_nonsynonymous_with1.txt
 POPLIST=($(ls -d c_{lp_sm*,lp_do*}perpop))
 for pop in "${POPLIST[@]}"
   do
   echo "${pop}"
   cd $V_PATH/annotation/"${pop}"/
   POPULATION=$(echo "${pop}" | cut -c6-7)
-  if [ -e ${pop}_minimum_subsample_woutN.ann.vcf ]; then
+  if [ -e ${pop}_minimum_subsample_with1.lr_ann.vcf ]; then
     echo "Minimum "$POPULATION" subsample available"
-    FILE=${pop}_minimum_subsample_woutN.ann.vcf
-  elif [ -e ${pop}_random_subsample_woutN.ann.vcf ]; then
+    FILE=${pop}_minimum_subsample_with1.lr_ann.vcf
+  elif [ -e ${pop}_random_subsample_with1.lr_ann.vcf ]; then
     echo "Random "$POPULATION" subsample available"
-    FILE=${pop}_random_subsample_woutN.ann.vcf
+    FILE=${pop}_random_subsample_with1.lr_ann.vcf
   else
     echo "Original "$POPULATION" available"
-    FILE=${pop}_woutN.ann.vcf
+    FILE=${pop}_with1.lr_ann.vcf
   fi
-  grep 'synonymous_variant' $FILE | cut -f1-2 >> $V_PATH/annotation/snpeff_lp_total_synonymous_woutN.txt
-  grep 'missense_variant' $FILE | cut -f1-2 >> $V_PATH/annotation/snpeff_lp_total_nonsynonymous_woutN.txt
+  grep 'synonymous_variant' $FILE | cut -f1-2 >> $V_PATH/annotation/snpeff_lp_total_synonymous_with1.txt
+  grep 'missense_variant' $FILE | cut -f1-2 >> $V_PATH/annotation/snpeff_lp_total_nonsynonymous_with1.txt
   done
   cd $V_PATH/annotation/
-  S_V=$(cat $V_PATH/annotation/snpeff_lp_total_synonymous_woutN.txt | wc -l)
-  NS_V=$(cat $V_PATH/annotation/snpeff_lp_total_nonsynonymous_woutN.txt | wc -l)
+  S_V=$(cat $V_PATH/annotation/snpeff_lp_total_synonymous_with1.txt | wc -l)
+  NS_V=$(cat $V_PATH/annotation/snpeff_lp_total_nonsynonymous_with1.txt | wc -l)
   echo "scale=3 ; $NS_V / $S_V" | bc #equals 0.272, which is about the same than for each population separately
   
 cd $V_PATH/annotation/
@@ -1807,15 +1960,15 @@ for pop in "${POPLIST[@]}"
   echo "${pop}"
   cd $V_PATH/annotation/"${pop}"/
   POPULATION=$(echo "${pop}" | cut -c6-7)
-  if [ -e ${pop}_minimum_subsample_woutN_wout1.ann.vcf ]; then
+  if [ -e ${pop}_minimum_subsample_wout1.lr_ann.vcf ]; then
     echo "Minimum "$POPULATION" subsample available"
-    FILE=${pop}_minimum_subsample_woutN_wout1.ann.vcf
-  elif [ -e ${pop}_random_subsample_woutN_wout1.ann.vcf ]; then
+    FILE=${pop}_minimum_subsample_wout1.lr_ann.vcf
+  elif [ -e ${pop}_random_subsample_wout1.lr_ann.vcf ]; then
     echo "Random "$POPULATION" subsample available"
-    FILE=${pop}_random_subsample_woutN_wout1.ann.vcf
+    FILE=${pop}_random_subsample_wout1.lr_ann.vcf
   else
     echo "Original "$POPULATION" available"
-    FILE=${pop}_woutN_wout1.ann.vcf
+    FILE=${pop}_wout1.lr_ann.vcf
   fi
   grep 'synonymous_variant' $FILE | cut -f1-2 >> $V_PATH/annotation/snpeff_lp_total_synonymous_wout1.txt
   grep 'missense_variant' $FILE | cut -f1-2 >> $V_PATH/annotation/snpeff_lp_total_nonsynonymous_wout1.txt
@@ -1827,6 +1980,36 @@ for pop in "${POPLIST[@]}"
 
 ```
 
+##Compare SYN and NON-SYN annotation between the genome project and the current one. Part 1.
+
+```{r Other stuff, eval=FALSE, engine='bash'}
+
+LANG=en_EN join <(grep -v '#' c_ll_lp_plus_h_ll_polarized_filtered4.lr_ann.vcf | awk '{print $1"_"$2" "$8}' | LANG=en_EN sort -k1) <(LANG=en_EN sort -k1 old_rubioseq.snps.cds.vcf | awk '{print $1"_"$2" "$3}') > joined_old_rubioseq_c_ll_lp_plus_h_ll_polarized_filtered4_annotation.txt
+
+scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/joined_old_rubioseq_c_ll_lp_plus_h_ll_polarized_filtered4_annotation.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/
+
+```
+
+##Compare SYN and NON-SYN annotation between the genome project and the current one. Part 2.
+
+```{r Other stuff}
+
+library(readr)
+library(dplyr)
+
+raw_joined <- read_delim("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/joined_old_rubioseq_c_ll_lp_plus_h_ll_polarized_filtered4_annotation.txt",delim=" ",col_names=F)
+raw_joined
+checked_joined <- raw_joined %>% mutate(X4=ifelse((grepl("synonymous_variant",raw_joined$X2)&raw_joined$X3=="SYN")|(grepl("missense_variant",raw_joined$X2)&raw_joined$X3=="NON-SYN"),T,F))
+checked_joined
+
+nrow(checked_joined[checked_joined$X4==T,])
+nrow(checked_joined[checked_joined$X4==F,])
+
+colnames(checked_joined) <- c("SNP","my_ann","rubio_ann","check")
+
+write_tsv(checked_joined,"/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/joined_old_rubioseq_c_ll_lp_plus_h_ll_polarized_filtered4_annotation_checked.txt")
+
+```
 
 #Old & obsolete code:
 ##Split the VCF into per population VCFs. Generate a VCF for each population.
@@ -1949,9 +2132,9 @@ for pop in "${POPLIST[@]}"
 done
 shopt -u extglob #disable extglob
 
-scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/snpEff/c_ll_lp_perpop_standard_filter_detailed_annotation/l*csv /Users/Dani/ownCloud/backup/annotation/snpEff_results/c_ll_lp_perpop_standard_filter_detailed_annotation/
-scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/snpEff/c_ll_lp_perpop_standard_filter_detailed_annotation/*html /Users/Dani/ownCloud/backup/annotation/snpEff_results/c_ll_lp_perpop_standard_filter_detailed_annotation/
-#scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/snpEff/c_ll_lp_perpop_standard_filter_detailed_annotation/l*txt /Users/Dani/ownCloud/backup/annotation/snpEff_results/c_ll_lp_perpop_standard_filter_detailed_annotation/
+scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/snpEff/c_ll_lp_perpop_standard_filter_detailed_annotation/l*csv /Users/Dani/ownCloud/backup/g-w_analysis/snpEff_results/c_ll_lp_perpop_standard_filter_detailed_annotation/
+scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/snpEff/c_ll_lp_perpop_standard_filter_detailed_annotation/*html /Users/Dani/ownCloud/backup/g-w_analysis/snpEff_results/c_ll_lp_perpop_standard_filter_detailed_annotation/
+#scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/snpEff/c_ll_lp_perpop_standard_filter_detailed_annotation/l*txt /Users/Dani/ownCloud/backup/g-w_analysis/snpEff_results/c_ll_lp_perpop_standard_filter_detailed_annotation/
 
 ```
 
@@ -2009,9 +2192,9 @@ shopt -u extglob #disable extglob
 
 c_lp_sm_0450_standard_filter.trimmed.ann.csv
 
-scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/snpEff/c_ll_lp_individual_standard_filter_detailed_annotation/*csv /Users/Dani/ownCloud/backup/annotation/snpEff_results/c_ll_lp_individual_standard_filter_detailed_annotation/
-scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/snpEff/c_ll_lp_individual_standard_filter_detailed_annotation/*html /Users/Dani/ownCloud/backup/annotation/snpEff_results/c_ll_lp_individual_standard_filter_detailed_annotation/
-#scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/snpEff/c_ll_lp_individual_standard_filter_detailed_annotation/l*txt /Users/Dani/ownCloud/backup/annotation/snpEff_results/c_ll_lp_individual_standard_filter_detailed_annotation/
+scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/snpEff/c_ll_lp_individual_standard_filter_detailed_annotation/*csv /Users/Dani/ownCloud/backup/g-w_analysis/snpEff_results/c_ll_lp_individual_standard_filter_detailed_annotation/
+scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/snpEff/c_ll_lp_individual_standard_filter_detailed_annotation/*html /Users/Dani/ownCloud/backup/g-w_analysis/snpEff_results/c_ll_lp_individual_standard_filter_detailed_annotation/
+#scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/snpEff/c_ll_lp_individual_standard_filter_detailed_annotation/l*txt /Users/Dani/ownCloud/backup/g-w_analysis/snpEff_results/c_ll_lp_individual_standard_filter_detailed_annotation/
 
 ```
 
@@ -2061,6 +2244,6 @@ java -Xmx16g -jar $S_PATH/snpEff.jar LYPA.23 -v -s $O_PATH/immunocapture/immunoc
 ctrl + D #terminate the script
 ctrl + D #terminate the screen
 
-scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/snpEff/immunocapture/immunocapture_test1.ann* /Users/Dani/ownCloud/backup/annotation/snpEff_results/immunocapture/ #execute this command out of the server to import to the pc the output files of this toy run
+scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/snpEff/immunocapture/immunocapture_test1.ann* /Users/Dani/ownCloud/backup/g-w_analysis/snpEff_results/immunocapture/ #execute this command out of the server to import to the pc the output files of this toy run
 
 ```
