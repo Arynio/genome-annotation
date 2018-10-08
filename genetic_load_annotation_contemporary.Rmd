@@ -1765,7 +1765,6 @@ for pop in "${POPLIST[@]}"
   echo -e "$SPECIES\t$POPULATION\t$SIZE\t$TOTAL_V\t$INTERGENIC_V\t$INTRONIC_V\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A" >> $V_PATH/annotation/snpeff_population_between_summary_filtered2_with1.lr_ann.txt
   done
 
-
 ```
 
 ###At the individual level.
@@ -2785,7 +2784,7 @@ theme(text=element_text(size=12,face="bold"),
       legend.title=element_blank()
 )
 head_lp_ll_af_distr_ggplot
-ggsave("head_lp_ll_AF_distribution_all_variants.lr_ann.pdf", width=50, height=50, units="cm", device="pdf", path="/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/features_frequency_distribution/")
+ggsave("lp_ll_AF_distribution_all_variants_head.lr_ann.pdf", width=50, height=50, units="cm", device="pdf", path="/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/features_frequency_distribution/")
 
 pop_af_distr_ggplot <- ggplot(data=plot_data, aes(AF)) +
   geom_histogram(aes(AF),binwidth=0.01) +
@@ -2852,8 +2851,255 @@ theme(text=element_text(size=12,face="bold"),
 subst_af_distr_ggplot
 ggsave("ll_subst_lp_AF_distribution_all_variants.lr_ann.pdf", width=50, height=50, units="cm", device="pdf", path="/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/features_frequency_distribution/")
 
+```
+
+##Compute number of variants and substitutions per species.
+
+```{r Other stuff}
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+
+#First build the per variant AF data frame:
+allele_frequency_distribution <- read_tsv("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/features_frequency_distribution/lp_ll_perspecies.lr_ann.af",col_names=c("SNP","AF","pop"))
+allele_frequency_distribution
+allele_frequency_distribution$pop <- as.factor(allele_frequency_distribution$pop)
+lp_ll_allele_frequency_distribution <- cbind(allele_frequency_distribution[allele_frequency_distribution$pop=="lp",c(1,2)],allele_frequency_distribution[allele_frequency_distribution$pop=="ll",c(2)])
+colnames(lp_ll_allele_frequency_distribution) <- c("SNP","lp_AF","ll_AF")
+lp_ll_allele_frequency_distribution
+
+data_frame("population"=character(0),"category"=character(0),"value"=numeric(0),"dataset"=character(0))
+
+n_variants = matrix(,nrow=3,ncol=3)
+colnames(n_variants) <- c("lp_0","lp_var","lp_1")
+rownames(n_variants) <- c("ll_0","ll_var","ll_1")
+n_variants[1,1] <- nrow(filter(lp_ll_allele_frequency_distribution,ll_AF==0 & lp_AF==0))
+n_variants[1,2] <- nrow(filter(lp_ll_allele_frequency_distribution,ll_AF==0 & lp_AF>0 & lp_AF<1))
+n_variants[1,3] <- nrow(filter(lp_ll_allele_frequency_distribution,ll_AF==0 & lp_AF==1))
+n_variants[2,1] <- nrow(filter(lp_ll_allele_frequency_distribution,ll_AF>0 & ll_AF<1 & lp_AF==0))
+n_variants[2,2] <- nrow(filter(lp_ll_allele_frequency_distribution,ll_AF>0 & ll_AF<1 & lp_AF>0 & lp_AF<1))
+n_variants[2,3] <- nrow(filter(lp_ll_allele_frequency_distribution,ll_AF>0 & ll_AF<1 & lp_AF==1))
+n_variants[3,1] <- nrow(filter(lp_ll_allele_frequency_distribution,ll_AF==1 & lp_AF==0))
+n_variants[3,2] <- nrow(filter(lp_ll_allele_frequency_distribution,ll_AF==1 & lp_AF>0 & lp_AF<1))
+n_variants[3,3] <- nrow(filter(lp_ll_allele_frequency_distribution,ll_AF==1 & lp_AF==1))
+n_variants
+sum(n_variants)==nrow(lp_ll_allele_frequency_distribution)
+write.table(n_variants,"/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/features_frequency_distribution/lp_ll_variants_summary.txt",row.names=T,col.names=T)
 
 ```
+
+##Obtain frequency distribution for the substitutions.
+
+```{r Other stuff, eval=FALSE, engine='bash'}
+
+#Per species frequency distribution for all variable positions and for the other species' substitutions only:
+
+cd $V_PATH/annotation/
+screen -S features_frequency_distribution_persp_with1.lr_ann.log
+script features_frequency_distribution_persp_with1.lr_ann.log
+
+rm $V_PATH/annotation/features_frequency_distribution_persp_with1.lr_ann.txt
+rm $V_PATH/annotation/features_frequency_distribution_persp_with1_subst_only.lr_ann.txt
+cd $G_PATH
+declare SPECIES=$(ls {*_lp_*,*_ll_*}.g.vcf.gz | cut -c3-4 | sort | uniq)
+cd $V_PATH/annotation/
+for i in ${SPECIES[@]}
+  do
+  echo "current species is ${i}"
+  if [ ${i} = "ll" ]; then
+    j="lp"
+  elif [ ${i} = "lp" ]; then
+    j="ll"
+  fi #this if condition stores the other species as variable j
+  echo "the other species is ${j}"
+  FILE_i=${i}_perspecies.trimmed.lr_ann.vcf
+  FILE_j=${j}_perspecies.trimmed.lr_ann.vcf
+  $BCF view ${i}_perspecies.trimmed.lr_ann.vcf -Oz -o ${i}_perspecies.trimmed.lr_ann.vcf.gz #compresses file so that bcftools can perform -R
+  echo "compressed VCF ready"
+  $BCF index ${i}_perspecies.trimmed.lr_ann.vcf.gz #adds index to compressed file so that bcftools can perform -R
+  echo "VCF index ready"
+  $BCF filter -i "AF = 1" $FILE_j | grep -v '#' | awk '{printf ("%s\t%s\t%s\n", $1, $2-1, $2)}' > ${j}_perspecies_subst.trimmed.lr_ann.bed #Obtains the oper species' substitutions
+  echo "coordinates BED ready"
+  $BCF filter -R ${j}_perspecies_subst.trimmed.lr_ann.bed -Ov -o $V_PATH/annotation/${i}_perspecies_${j}_substitutions.trimmed.lr_ann.vcf $V_PATH/annotation/${i}_perspecies.trimmed.lr_ann.vcf.gz #Filters VCF in order to keep only the other species' substitutions
+  echo "substitutions VCF ready"
+  FILE_s=${i}_perspecies_${j}_substitutions.trimmed.lr_ann.vcf
+  declare -a FEATURES=("intergenic" "intron_variant" "synonymous_variant" "missense_variant")
+  for feat in "${FEATURES[@]}"
+    do
+    echo "${feat}"
+    grep "${feat}" $FILE_i | cut -f8 | cut -d';' -f3 | cut -d'=' -f2 | awk -v sp="$i" -v feat="${feat}" '{print $1" "sp" "feat}' >> $V_PATH/annotation/features_frequency_distribution_persp_with1.lr_ann.txt #Per species features frequency distribution for all positions
+    echo "all variants done"
+    grep "${feat}" $FILE_s | cut -f8 | cut -d';' -f3 | cut -d'=' -f2 | awk -v sp="$i" -v feat="${feat}" '{print $1" "sp" "feat}' >> $V_PATH/annotation/features_frequency_distribution_persp_with1_subst_only.lr_ann.txt #Per species features frequency distribution for the other species' substitutions
+    echo "substitutions only done"
+    done
+  done
+
+scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/features_frequency_distribution_persp*txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/features_frequency_distribution/
+
+```
+
+##Draw per species frequency distribution (for all variants and substitutions).
+
+```{r Other stuff}
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+
+#for all positions:
+
+features_frequency_distribution <- read_delim("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/features_frequency_distribution/features_frequency_distribution_persp_with1.lr_ann.txt",col_names=c("AF","sp","feat"),delim=" ")
+features_frequency_distribution
+features_frequency_distribution$feat <- as.factor(features_frequency_distribution$feat)
+features_frequency_distribution$feat = factor(features_frequency_distribution$feat,levels(features_frequency_distribution$feat)[c(1,2,4,3)])
+sp <- unique(features_frequency_distribution$sp)
+sp
+features <- unique(features_frequency_distribution$feat)
+features
+
+for (sp in sp) {
+  plot_data <- features_frequency_distribution %>% filter(features_frequency_distribution$sp == !!sp) #the two !! allow R to evaluate the text and distinguish looping variables from col_names
+  plot_data
+  pop_feat_ggplot <- ggplot(data=plot_data, aes(AF)) +
+  facet_grid(feat ~ ., scales="free") +
+  geom_histogram(aes(AF),binwidth=0.01) +
+  ggtitle(paste0("AF distribution for ",sp," with rufus based annotation")) +
+  #ylab("density") +
+  #xlab("heritability") +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+        rect=element_rect(size=1),
+        axis.line=element_line(colour="black"),
+        axis.title=element_text(size=16),
+        #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+        #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+        #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+        panel.background=element_blank(),
+        panel.border=element_rect(colour="black"),
+        #panel.grid=element_blank(),
+        #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+        plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+        #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+        legend.background=element_rect(linetype="solid", colour="black", size=.5),
+        #legend.justification=c(0,0),
+        legend.key=element_rect(colour="white"),
+        #legend.key.size=unit(1.3,"cm"),
+        legend.position=c(0.92,0.86),
+        legend.title=element_blank()
+  )
+  pop_feat_ggplot
+  ggsave(paste0(sp,"_AF_distribution_with1.lr_ann.pdf"), width=30, height=25, units="cm", device="pdf", path="/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/features_frequency_distribution/lr_ann_persp/")
+}
+
+#for the other species' substitutions:
+
+features_frequency_distribution <- read_delim("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/features_frequency_distribution/features_frequency_distribution_persp_with1_subst_only.lr_ann.txt",col_names=c("AF","sp","feat"),delim=" ")
+features_frequency_distribution
+features_frequency_distribution$feat <- as.factor(features_frequency_distribution$feat)
+features_frequency_distribution$feat = factor(features_frequency_distribution$feat,levels(features_frequency_distribution$feat)[c(1,2,4,3)])
+sp <- unique(features_frequency_distribution$sp)
+sp
+features <- unique(features_frequency_distribution$feat)
+features
+
+for (sp in sp) {
+  plot_data <- features_frequency_distribution %>% filter(features_frequency_distribution$sp == !!sp) #the two !! allow R to evaluate the text and distinguish looping variables from col_names
+  plot_data
+  pop_feat_ggplot <- ggplot(data=plot_data, aes(AF)) +
+  facet_grid(feat ~ ., scales="free") +
+  geom_histogram(aes(AF),binwidth=0.01) +
+  ggtitle(paste0("AF distribution for ",sp," (substitutions from the other species) with rufus based annotation")) +
+  #ylab("density") +
+  #xlab("heritability") +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+        rect=element_rect(size=1),
+        axis.line=element_line(colour="black"),
+        axis.title=element_text(size=16),
+        #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+        #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+        #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+        panel.background=element_blank(),
+        panel.border=element_rect(colour="black"),
+        #panel.grid=element_blank(),
+        #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+        plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+        #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+        legend.background=element_rect(linetype="solid", colour="black", size=.5),
+        #legend.justification=c(0,0),
+        legend.key=element_rect(colour="white"),
+        #legend.key.size=unit(1.3,"cm"),
+        legend.position=c(0.92,0.86),
+        legend.title=element_blank()
+  )
+  pop_feat_ggplot
+  ggsave(paste0(sp,"_AF_distribution_with1_subst_only.lr_ann.pdf"), width=30, height=25, units="cm", device="pdf", path="/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/features_frequency_distribution/lr_ann_persp/")
+}
+
+```
+
+##Split the VCFs with the other species' substitutions into per population and per individual VCFs. Generate a VCF for each population, and then for each individual.
+
+```{r Other stuff, eval=FALSE, engine='bash'}
+
+#Filtered2: Split the annotated filtered2 VCF into per population VCFs, and then keep only those positions that are variable or fixed for the derived allele within each population (with -env flag).
+
+cd $V_PATH/annotation/
+screen -S perpop_perind_subst.lr_ann.log
+script perpop_perind_subst.lr_ann.log
+
+cd $G_PATH
+declare SPECIES=$(ls {*_lp_*,*_ll_*}.g.vcf.gz | cut -c3-4 | sort | uniq)
+cd $V_PATH/annotation/
+for i in ${SPECIES[@]}
+  do
+  echo "${i}"
+  cd $G_PATH
+  declare POP=$(ls c_{lp_sm*,lp_do*,ll_ki*,ll_po*,ll_no*}.g.vcf.gz | cut -c1-7 | uniq | grep "${i}")
+  cd $V_PATH/annotation/
+  for j in ${POP[@]}
+    do
+    echo "${j}"
+    rm pop_list_to_remove.txt
+    $BCF query -l $V_PATH/annotation/"${i}"_perspecies*substitutions.trimmed.lr_ann.vcf | grep "${j}" > pop_list_to_remove.txt
+    cat pop_list_to_remove.txt
+    #mkdir "${j}"_perpop
+    java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+    -T SelectVariants \
+    -R $REF \
+    -V $V_PATH/annotation/"${i}"_perspecies*substitutions.trimmed.lr_ann.vcf \
+    -o $V_PATH/annotation/"${j}"_perpop/"${j}"_perpop_substitutions_with1.lr_ann.vcf \
+    -env \
+    --sample_file pop_list_to_remove.txt
+    rm pop_list_to_remove.txt
+    done
+  done
+
+#For each individual in the sm, do, ki, po & no populations, subset its variants from the respective population VCF:
+cd $G_PATH
+declare POP=$(ls c_{lp_sm*,lp_do*,ll_ki*,ll_po*,ll_no*}.g.vcf.gz | cut -c1-7 | uniq)
+for i in ${POP[@]}
+  do
+  echo "${i}"
+  #mkdir $V_PATH/annotation/"${i}"_individuals
+  declare INDIVIDUALS=$(ls "${i}"*.g.vcf.gz | cut -c1-12 | uniq)
+  for j in ${INDIVIDUALS[@]}
+    do
+    echo "${j}"
+    ID=$(echo "${j}")
+    java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+    -T SelectVariants \
+    -R $REF \
+    -V $V_PATH/annotation/"${i}"_perpop/"${i}"_perpop_substitutions_with1.lr_ann.vcf \
+    -o $V_PATH/annotation/"${i}"_individuals/"${j}"_individual_substitutions_with1.lr_ann.vcf \
+    -env \
+    -sn $ID
+    done
+  done
+
+```
+
 
 #13: Genome project variants behaviour in pardinus.
 ##Subset the lynx pardinus VCF in order to keep only those variants that were also found in the genome project.
@@ -2869,8 +3115,8 @@ scp iberian_polymorphic_sites.vcf.eff /home/GRUPOS/grupolince/lynx_genomes_5x/VC
 sed -i -e 's/lp23s/lp23.s/g' iberian_polymorphic_sites.vcf.eff
 grep -v '#' iberian_polymorphic_sites.vcf.eff | awk '{printf ("%s\t%s\t%s\n", $1, $2 - 1, $2)}' > iberian_polymorphic_sites.bed
 
-$BCF view lp_perspecies.trimmed.lr_ann.vcf -Oz -o lp_perspecies.trimmed.lr_ann.vcf.gz
-$BCF index lp_perspecies.trimmed.lr_ann.vcf.gz
+#$BCF view lp_perspecies.trimmed.lr_ann.vcf -Oz -o lp_perspecies.trimmed.lr_ann.vcf.gz #these were already made in a previous step
+#$BCF index lp_perspecies.trimmed.lr_ann.vcf.gz #these were already made in a previous step
 
 $BCF filter -R iberian_polymorphic_sites.bed -Ov -o $V_PATH/annotation/lp_perspecies.trimmed.genome_project_subset.lr_ann.vcf $V_PATH/annotation/lp_perspecies.trimmed.lr_ann.vcf.gz
 
