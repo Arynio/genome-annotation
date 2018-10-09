@@ -2637,7 +2637,8 @@ bedtools merge -i repeats_and_lowcomp_ordered.bed > repeats_and_lowcomp_no_redun
 
 ```
 
-##Obtain callable universe. Perform calling of variants and invariantsombine gVCFs into VCF. Run joint genotyping of all desired gVCF files to produce a multisample VCF file.
+##Obtain callable universe.
+###Perform calling of variants and invariants without repetitive regions by combining gVCFs into VCF. Run joint genotyping of all desired gVCF files to produce a multisample VCF file.
 
 ```{r Other stuff, eval=FALSE, engine='bash'}
 
@@ -2653,6 +2654,24 @@ $(for var in *.g.vcf.gz; do echo -V ${var}" ";done) \
 -L /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/bed_file_all_the_genome_without_repeats_and_lowcomp_no_redundant_mappability.k75_lessthan90.bed \
 -allSites \
 -o $V_PATH/c_ll_lp_plus_h_ll_variants_invariants_without_repeats.vcf
+
+```
+
+###Perform calling of variants and invariants by combining gVCFs into VCF. Run joint genotyping of all desired gVCF files to produce a multisample VCF file.
+
+```{r Other stuff, eval=FALSE, engine='bash'}
+
+cd $V_PATH
+screen -S c_ll_lp_plus_h_ll_variants_invariants.log
+script c_ll_lp_plus_h_ll_variants_invariants.log
+
+cd $G_PATH
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
+-T GenotypeGVCFs \
+-R $REF \
+$(for var in *.g.vcf.gz; do echo -V ${var}" ";done) \
+-allSites \
+-o $V_PATH/c_ll_lp_plus_h_ll_variants_invariants.vcf
 
 ```
 
@@ -3100,6 +3119,43 @@ for i in ${POP[@]}
 
 ```
 
+##Get annotation statistics at the individual level.
+
+```{r Other stuff, eval=FALSE, engine='bash'}
+
+cd $V_PATH/annotation/
+screen -S snpeff_individual_summary_substitutions_with1.lr_ann.log
+script snpeff_individual_summary_substitutions_with1.lr_ann.log
+
+rm snpeff_individual_summary_substitutions_with1.lr_ann.txt
+echo -e "species\tpopulation\tsample\ttotal_V\tintergenic_V\tintronic_V\tcoding\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tmissense/synonymous_V\tmissense/synonymous_A" > snpeff_individual_summary_substitutions_with1.lr_ann.txt
+INDLIST=($(ls `find . -name '*individual_substitutions_with1.lr_ann.vcf' -print`))
+for i in "${INDLIST[@]}"
+  do
+  echo "${i}"
+  ind=$(echo "${i}" | awk -F'[/]' '{print $3}')
+  echo "${ind}"
+  SPECIES=$(echo "${ind}" | cut -c3-4)
+  POPULATION=$(echo "${ind}" | cut -c6-7)
+  SAMPLE=$(echo "${ind}" | cut -c9-12)
+  TOTAL_V=$(grep -v '#' ${i} | wc -l)
+  INTERGENIC_V=$(grep 'intergenic' ${i} | wc -l)
+  INTRONIC_V=$(grep 'intron_variant' ${i} | wc -l)
+  CODING_V=$(grep 'CDS' ${i} | wc -l)
+  SYNONYMOUS_V=$(grep 'synonymous_variant' ${i} | wc -l)
+  SYNONYMOUS_A=$(grep 'synonymous_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_V=$(grep 'missense_variant' ${i} | wc -l)
+  MISSENSE_A=$(grep 'missense_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  NONSENSE_V=$(grep -e 'lost' -e 'gained' ${i} | wc -l)
+  NONSENSE_A=$(grep -e 'lost' -e 'gained' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_SYNONYMOUS_V=$(echo "scale=3; $MISSENSE_V/$SYNONYMOUS_V" | bc)
+  MISSENSE_SYNONYMOUS_A=$(echo "scale=3; $MISSENSE_A/$SYNONYMOUS_A" | bc)
+  echo -e "$SPECIES\t$POPULATION\t$SAMPLE\t$TOTAL_V\t$INTERGENIC_V\t$INTRONIC_V\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A" >> $V_PATH/annotation/snpeff_individual_summary_substitutions_with1.lr_ann.txt
+  done
+  
+scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/snpeff_individual_summary_substitutions_with1.lr_ann.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/
+
+```
 
 #13: Genome project variants behaviour in pardinus.
 ##Subset the lynx pardinus VCF in order to keep only those variants that were also found in the genome project.
@@ -3216,7 +3272,6 @@ for i in ${POP[@]}
 ##Get annotation statistics at the individual level.
 
 ```{r Genome project variants behaviour in pardinus, eval=FALSE, engine='bash'}
-
 
 cd $V_PATH/annotation/
 screen -S snpeff_individual_summary_filtered2_with1.genome_project_subset.lr_ann.log
