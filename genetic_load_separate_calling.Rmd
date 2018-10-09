@@ -22,42 +22,85 @@ BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
 ```
 
 #1: Perform separate calling for each species. Combine all gVCFs of interest into the per species VCF.
-##For lynx pardinus:
+##A: Variants only. It won't include substitutions between species.
+###For lynx pardinus:
 
 ```{r Perform separate calling for each species, eval=FALSE, engine='bash'}
 
-#Perform calling of all c_lp samples. All gVCFs were generated before in section 1a of ll_phylogeography_VCFs.
+#Perform variant calling (it won't include substitutions between species) of all c_lp samples. All gVCFs were generated before in section 1a of ll_phylogeography_VCFs.
 cd $V_PATH
-screen -S c_lp_sm_c_lp_do.log
-script c_lp_sm_c_lp_do.log
+screen -S c_lp_sm_c_lp_do_var.log
+script c_lp_sm_c_lp_do_var.log
 
 cd $G_PATH
 java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
 -T GenotypeGVCFs \
 -R $REF \
 $(for var in c_{lp_sm*,lp_do*}.g.vcf.gz; do echo -V ${var}" ";done) \
--o $V_PATH/c_lp_sm_c_lp_do.vcf
+-o $V_PATH/c_lp_sm_c_lp_do_var.vcf
 
 ```
 
-##For lynx lynx:
+###For lynx lynx:
 
 ```{r Perform separate calling for each species, eval=FALSE, engine='bash'}
 
-#Perform calling of all c_ll samples from Kirov, Norway and Poland (Bialowieza pop). All gVCFs were generated before in section 1a of ll_phylogeography_VCFs.
+#Perform variant calling (it won't include substitutions between species) of all c_ll samples from Kirov, Norway and Poland (Bialowieza pop). All gVCFs were generated before in section 1a of ll_phylogeography_VCFs.
 
 cd $V_PATH
-screen -S c_ll_ki_c_ll_no_c_ll_po.log
-script c_ll_ki_c_ll_no_c_ll_po.log
+screen -S c_ll_ki_c_ll_no_c_ll_po_var.log
+script c_ll_ki_c_ll_no_c_ll_po_var.log
 
 cd $G_PATH
 java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
 -T GenotypeGVCFs \
 -R $REF \
 $(for var in c_{ll_ki*,ll_no*,ll_po*}.g.vcf.gz; do echo -V ${var}" ";done) \
--o $V_PATH/c_ll_ki_c_ll_no_c_ll_po.vcf
+-o $V_PATH/c_ll_ki_c_ll_no_c_ll_po_var.vcf
 
 ```
+
+##B: All positions (variants and invariants). Later on, all variants and substitutions between species will need to be retrieved.
+###For lynx pardinus:
+
+```{r Perform separate calling for each species, eval=FALSE, engine='bash'}
+
+#Perform all sites calling (later on, all variants and substitutions between species will need to be retrieved) of all c_lp samples. All gVCFs were generated before in section 1a of ll_phylogeography_VCFs. The filter 1 (removes repetitive and low mappability regions is applied).
+
+cd $V_PATH
+screen -S c_lp_sm_c_lp_do_all.log
+script c_lp_sm_c_lp_do_all.log
+
+cd $G_PATH
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
+-T GenotypeGVCFs \
+-R $REF \
+$(for var in c_{lp_sm*,lp_do*}.g.vcf.gz; do echo -V ${var}" ";done) \
+-allSites \
+-o $V_PATH/c_lp_sm_c_lp_do_all.vcf
+
+```
+
+###For lynx lynx:
+
+```{r Perform separate calling for each species, eval=FALSE, engine='bash'}
+
+#Perform all sites calling(later on, all variants and substitutions between species will need to be retrieved) of all c_ll samples from Kirov, Norway and Poland (Bialowieza pop). All gVCFs were generated before in section 1a of ll_phylogeography_VCFs. The filter 1 (removes repetitive and low mappability regions is applied).
+
+cd $V_PATH
+screen -S c_ll_ki_c_ll_no_c_ll_po_all.log
+script c_ll_ki_c_ll_no_c_ll_po_all.log
+
+cd $G_PATH
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
+-T GenotypeGVCFs \
+-R $REF \
+$(for var in c_{ll_ki*,ll_no*,ll_po*}.g.vcf.gz; do echo -V ${var}" ";done) \
+-allSites \
+-o $V_PATH/c_ll_ki_c_ll_no_c_ll_po_all.vcf
+
+```
+
 
 
 #Unused all the way to the end:
