@@ -13,7 +13,7 @@ S_PATH=/opt/snpEff #software path
 C_PATH=/home/dkleinman/datos/snpEff #config file path
 O_PATH=/home/dkleinman/datos/snpEff #output path
 I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
-V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
 G_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
 REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
 GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
@@ -23,7 +23,7 @@ BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
 
 #1: Perform separate calling for each species. Combine all gVCFs of interest into the per species VCF.
 ##A: Variants only. It won't include substitutions between species.
-###For lynx pardinus:
+###For Lynx pardinus.
 
 ```{r Perform separate calling for each species, eval=FALSE, engine='bash'}
 
@@ -41,7 +41,7 @@ $(for var in c_{lp_sm*,lp_do*}.g.vcf.gz; do echo -V ${var}" ";done) \
 
 ```
 
-###For lynx lynx:
+###For Lynx lynx.
 
 ```{r Perform separate calling for each species, eval=FALSE, engine='bash'}
 
@@ -61,7 +61,7 @@ $(for var in c_{ll_ki*,ll_no*,ll_po*}.g.vcf.gz; do echo -V ${var}" ";done) \
 ```
 
 ##B: All positions (variants and invariants). Later on, all variants and substitutions between species will need to be retrieved.
-###For lynx pardinus:
+###For Lynx pardinus.
 
 ```{r Perform separate calling for each species, eval=FALSE, engine='bash'}
 
@@ -79,9 +79,21 @@ $(for var in c_{lp_sm*,lp_do*}.g.vcf.gz; do echo -V ${var}" ";done) \
 -allSites \
 -o $V_PATH/c_lp_sm_c_lp_do_all.vcf
 
+
+screen -S c_lp_sm_c_lp_do_all_renamed
+#Fix sample names:
+cd $V_PATH
+bcftools query -l c_lp_sm_c_lp_do_all.vcf #check sample names
+#!/bin/bash
+#cat << "EOF" > lp_rename.txt #Unmark this line when running it (I marked it in R because it doesn't understand it and messes the colours of subsequent lines). It should include all incorrect names.
+h_lp_do_0007 c_lp_do_0007
+EOF
+
+bcftools reheader -s lp_rename.txt -o c_lp_sm_c_lp_do_all_renamed.vcf c_lp_sm_c_lp_do_all.vcf #copy the VCF and rename the wrong named samples in the new VCF
+
 ```
 
-###For lynx lynx:
+###For Lynx lynx.
 
 ```{r Perform separate calling for each species, eval=FALSE, engine='bash'}
 
@@ -99,16 +111,25 @@ $(for var in c_{ll_ki*,ll_no*,ll_po*}.g.vcf.gz; do echo -V ${var}" ";done) \
 -allSites \
 -o $V_PATH/c_ll_ki_c_ll_no_c_ll_po_all.vcf
 
+
+screen -S c_ll_ki_c_ll_no_c_ll_po_all_renamed
+#Fix sample names:
+cd $V_PATH
+bcftools query -l c_ll_ki_c_ll_no_c_ll_po_all.vcf #check sample names
+#!/bin/bash
+#cat << "EOF" > ll_rename.txt #Unmark this line when running it (I marked it in R because it doesn't understand it and messes the colours of subsequent lines). It should include all incorrect names.
+LL90_rgsm c_ll_ki_0090
+EOF
+
+bcftools reheader -s ll_rename.txt -o c_ll_ki_c_ll_no_c_ll_po_all_renamed.vcf c_ll_ki_c_ll_no_c_ll_po_all.vcf #copy the VCF and rename the wrong named samples in the new VCF
+
+rm ll_rename.txt
+
 ```
 
-
-
-#Unused all the way to the end:
-
-#1: Polarize contemporary VCF. Use VCFtools in order to polarize (ancestral vs. derived) the contemporary ll & lp VCF (obtained in ll_phylogeography_VCFs script). The ancestral state was inferred by Maria.
-##Option A: add Ancestral Allele annotation to the VCF, and then polarize it. This is the option that we ended up using.
-
-###Use vcftools to fill the INFO/AA field of the VCF.
+#2: Polarize contemporary VCFs. Use VCFtools in order to polarize (ancestral vs. derived) the contemporary ll & lp VCFs. The ancestral state was inferred by Maria.
+##Use vcftools to add Ancestral Allele annotation to the VCF, and then polarize it.
+###Prepare fasta.
 
 ```{r Polarize contemporary VCF, eval=FALSE, engine='bash'}
 
@@ -120,30 +141,148 @@ bgzip -c /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_000
 #Next they should be fai indexed:
 /opt/samtools-1.6/samtools faidx /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa.gz
 
+```
+
+###For Lynx pardinus.
+
+```{r Polarize contemporary VCF, eval=FALSE, engine='bash'}
+
+#All positions:
+
 #Code to annotate the AA (ancestral alleles) subfield from the INFO field in the VCF. I keep getting the following error: "Can't locate Vcf.pm in @INC". I look it up and apparently it's easy to solve: an environment variable PERL5LIB should be defined as the path to perl.
-screen -S c_ll_lp_plus_h_ll_aafilled_vcf.log
-script c_ll_lp_plus_h_ll_aafilled_vcf.log
+screen -S c_lp_sm_c_lp_do_all_aafilled.log
+script c_lp_sm_c_lp_do_all_aafilled.log
 
 export PERL5LIB=/opt/vcftools_0.1.13/perl/ #set required environmental variable
-V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
 
-cat $V_PATH/c_ll_lp_plus_h_ll_renamed.vcf | /opt/vcftools_0.1.13/perl/fill-aa -a /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa.gz | bgzip -c > c_ll_lp_plus_h_ll_aafilled.vcf.gz #I tried to run this first without bgzipping it, and it was increasingly slow. Each day it did around half the previous day. When the server crashed, I relaunched it adding the bgzip command and it finished in a little over 24h.
+cat $V_PATH/c_lp_sm_c_lp_do_all.vcf | /opt/vcftools_0.1.13/perl/fill-aa -a /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa.gz | bgzip -c > c_lp_sm_c_lp_do_all_aafilled.vcf.gz #I tried to run this first without bgzipping it, and it was increasingly slow. Each day it did around half the previous day. When the server crashed, I relaunched it adding the bgzip command and it finished in a little over 24h.
 
-gzip -d -k c_ll_lp_plus_h_ll_aafilled.vcf.gz #Get decompressed version. I ran md5sum for both the gzipped and the unzipped versions and there were no differences.
+gzip -d -c c_lp_sm_c_lp_do_all_aafilled.vcf.gz > c_lp_sm_c_lp_do_all_aafilled.vcf #Get decompressed version. I ran md5sum for both the gzipped and the unzipped versions and there were no differences.
 
-grep ';AF=1' c_ll_lp_plus_h_ll_renamed.vcf | wc -l #
+
+screen -S c_lp_sm_c_lp_do_all_aafilled_renamed
+#Fix sample names:
+cd $V_PATH
+bcftools query -l c_lp_sm_c_lp_do_all_aafilled.vcf #check sample names
+#!/bin/bash
+#cat << "EOF" > lp_rename.txt #Unmark this line when running it (I marked it in R because it doesn't understand it and messes the colours of subsequent lines). It should include all incorrect names.
+h_lp_do_0007 c_lp_do_0007
+EOF
+
+bcftools reheader -s lp_rename.txt -o c_lp_sm_c_lp_do_all_aafilled_renamed.vcf c_lp_sm_c_lp_do_all_aafilled.vcf #copy the VCF and rename the wrong named samples in the new VCF
+rm lp_rename.txt
+mv c_lp_sm_c_lp_do_all_aafilled_renamed.vcf c_lp_sm_c_lp_do_all_aafilled.vcf
+grep -v '#' c_lp_sm_c_lp_do_all_aafilled.vcf | wc -l
+
+
+---
+#Variants only:
+
+#Code to annotate the AA (ancestral alleles) subfield from the INFO field in the VCF. I keep getting the following error: "Can't locate Vcf.pm in @INC". I look it up and apparently it's easy to solve: an environment variable PERL5LIB should be defined as the path to perl.
+screen -S c_lp_sm_c_lp_do_var_aafilled.log
+script c_lp_sm_c_lp_do_var_aafilled.log
+
+export PERL5LIB=/opt/vcftools_0.1.13/perl/ #set required environmental variable
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+
+cat $V_PATH/c_lp_sm_c_lp_do_var.vcf | /opt/vcftools_0.1.13/perl/fill-aa -a /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa.gz | bgzip -c > c_lp_sm_c_lp_do_var_aafilled.vcf.gz #I tried to run this first without bgzipping it, and it was increasingly slow. Each day it did around half the previous day. When the server crashed, I relaunched it adding the bgzip command and it finished in a little over 24h.
+
+gzip -d -c c_lp_sm_c_lp_do_var_aafilled.vcf.gz > c_lp_sm_c_lp_do_var_aafilled.vcf #Get decompressed version. I ran md5sum for both the gzipped and the unzipped versions and there were no differences.
+
+
+screen -S c_lp_sm_c_lp_do_var_aafilled_renamed
+#Fix sample names:
+cd $V_PATH
+bcftools query -l c_lp_sm_c_lp_do_var_aafilled.vcf #check sample names
+#!/bin/bash
+#cat << "EOF" > lp_rename.txt #Unmark this line when running it (I marked it in R because it doesn't understand it and messes the colours of subsequent lines). It should include all incorrect names.
+h_lp_do_0007 c_lp_do_0007
+EOF
+
+bcftools reheader -s lp_rename.txt -o c_lp_sm_c_lp_do_var_aafilled_renamed.vcf c_lp_sm_c_lp_do_var_aafilled.vcf #copy the VCF and rename the wrong named samples in the new VCF
+rm lp_rename.txt
+mv c_lp_sm_c_lp_do_var_aafilled_renamed.vcf c_lp_sm_c_lp_do_var_aafilled.vcf
+grep -v '#' c_lp_sm_c_lp_do_var_aafilled.vcf | wc -l #4972251
+
 
 ```
 
-###Use VcfFilterJdk to polarize the AA-filled VCF.
+###For Lynx lynx.
+
+```{r Polarize contemporary VCF, eval=FALSE, engine='bash'}
+
+#All positions:
+
+#Code to annotate the AA (ancestral alleles) subfield from the INFO field in the VCF. I keep getting the following error: "Can't locate Vcf.pm in @INC". I look it up and apparently it's easy to solve: an environment variable PERL5LIB should be defined as the path to perl.
+screen -S c_ll_ki_c_ll_no_c_ll_po_all_aafilled.log
+script c_ll_ki_c_ll_no_c_ll_po_all_aafilled.log
+
+export PERL5LIB=/opt/vcftools_0.1.13/perl/ #set required environmental variable
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+
+cat $V_PATH/c_ll_ki_c_ll_no_c_ll_po_all.vcf | /opt/vcftools_0.1.13/perl/fill-aa -a /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa.gz | bgzip -c > c_ll_ki_c_ll_no_c_ll_po_all_aafilled.vcf.gz #I tried to run this first without bgzipping it, and it was increasingly slow. Each day it did around half the previous day. When the server crashed, I relaunched it adding the bgzip command and it finished in a little over 24h.
+
+gzip -d -c c_ll_ki_c_ll_no_c_ll_po_all_aafilled.vcf.gz > c_ll_ki_c_ll_no_c_ll_po_all_aafilled.vcf #Get decompressed version. I ran md5sum for both the gzipped and the unzipped versions and there were no differences.
+
+
+screen -S c_ll_ki_c_ll_no_c_ll_po_all_aafilled_renamed
+#Fix sample names:
+cd $V_PATH
+bcftools query -l c_ll_ki_c_ll_no_c_ll_po_all_aafilled.vcf #check sample names
+#!/bin/bash
+#cat << "EOF" > ll_rename.txt #Unmark this line when running it (I marked it in R because it doesn't understand it and messes the colours of subsequent lines). It should include all incorrect names.
+LL90_rgsm c_ll_ki_0090
+EOF
+
+bcftools reheader -s ll_rename.txt -o c_ll_ki_c_ll_no_c_ll_po_all_aafilled_renamed.vcf c_ll_ki_c_ll_no_c_ll_po_all_aafilled.vcf #copy the VCF and rename the wrong named samples in the new VCF
+rm ll_rename.txt
+mv c_ll_ki_c_ll_no_c_ll_po_all_aafilled_renamed.vcf c_ll_ki_c_ll_no_c_ll_po_all_aafilled.vcf
+grep -v '#' c_ll_ki_c_ll_no_c_ll_po_all_aafilled.vcf | wc -l
+
+---
+#Variants only:
+
+#Code to annotate the AA (ancestral alleles) subfield from the INFO field in the VCF. I keep getting the following error: "Can't locate Vcf.pm in @INC". I look it up and apparently it's easy to solve: an environment variable PERL5LIB should be defined as the path to perl.
+screen -S c_ll_ki_c_ll_no_c_ll_po_var_aafilled.log
+script c_ll_ki_c_ll_no_c_ll_po_var_aafilled.log
+
+export PERL5LIB=/opt/vcftools_0.1.13/perl/ #set required environmental variable
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+
+cat $V_PATH/c_ll_ki_c_ll_no_c_ll_po_var.vcf | /opt/vcftools_0.1.13/perl/fill-aa -a /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa.gz | bgzip -c > c_ll_ki_c_ll_no_c_ll_po_var_aafilled.vcf.gz #I tried to run this first without bgzipping it, and it was increasingly slow. Each day it did around half the previous day. When the server crashed, I relaunched it adding the bgzip command and it finished in a little over 24h.
+
+gzip -d -c c_ll_ki_c_ll_no_c_ll_po_var_aafilled.vcf.gz > c_ll_ki_c_ll_no_c_ll_po_var_aafilled.vcf #Get decompressed version. I ran md5sum for both the gzipped and the unzipped versions and there were no differences.
+
+
+screen -S c_ll_ki_c_ll_no_c_ll_po_var_aafilled_renamed
+#Fix sample names:
+cd $V_PATH
+bcftools query -l c_ll_ki_c_ll_no_c_ll_po_var_aafilled.vcf #check sample names
+#!/bin/bash
+#cat << "EOF" > ll_rename.txt #Unmark this line when running it (I marked it in R because it doesn't understand it and messes the colours of subsequent lines). It should include all incorrect names.
+LL90_rgsm c_ll_ki_0090
+EOF
+
+bcftools reheader -s ll_rename.txt -o c_ll_ki_c_ll_no_c_ll_po_var_aafilled_renamed.vcf c_ll_ki_c_ll_no_c_ll_po_var_aafilled.vcf #copy the VCF and rename the wrong named samples in the new VCF
+rm ll_rename.txt
+mv c_ll_ki_c_ll_no_c_ll_po_var_aafilled_renamed.vcf c_ll_ki_c_ll_no_c_ll_po_var_aafilled.vcf
+grep -v '#' c_ll_ki_c_ll_no_c_ll_po_var_aafilled.vcf | wc -l #12492854
+
+```
+
+##Use VcfFilterJdk to polarize the AA-filled VCF.
+###For Lynx pardinus.
 
 ```{r Polarize contemporary VCF, eval=FALSE, engine='bash'}
 
 #Polarize the AA-filled VCF based on the new INFO/AA column. Alleles will be switched whenever the ancestral allele matches the alternative one, and genotypes will be properly recoded as well. The following code was originally provided by Pierre Lindenbaum and modified by José Luis Castro.
 
+#For all positions:
+
 cd $V_PATH
-screen -S c_ll_lp_plus_h_ll_polarized.log
-script c_ll_lp_plus_h_ll_polarized.log
+screen -S c_lp_sm_c_lp_do_all_polarized.log
+script c_lp_sm_c_lp_do_all_polarized.log
 
 java -jar /opt/jvarkit/dist/vcffilterjdk.jar -e 'if(variant.getNAlleles()!=2 || !variant.hasAttribute("AA")) return true; 
 final String aa = variant.getAttributeAsString("AA",""); 
@@ -186,36 +325,170 @@ for(Genotype g: variant.getGenotypes())
 
 vb.attribute("AF",1.0d - Double.parseDouble(variant.getAttributeAsString("AF",""))); vb.attribute("AC",variant.getGenotypes().stream().flatMap(G->G.getAlleles().stream()).filter(A->A.equals(oldref)).count()); 
 vb.genotypes(genotypes); 
-return vb.make();' -o c_ll_lp_plus_h_ll_polarized.vcf c_ll_lp_plus_h_ll_aafilled.vcf
+return vb.make();' -o c_lp_sm_c_lp_do_all_polarized.vcf c_lp_sm_c_lp_do_all_aafilled.vcf
 
-grep -v '#' c_ll_lp_plus_h_ll_polarized.vcf | wc - #23999314
-grep ";AF=1" c_ll_lp_plus_h_ll_polarized.vcf | wc -l #31548
+-----
+
+#For variants only:
+
+cd $V_PATH
+screen -S c_lp_sm_c_lp_do_var_polarized.log
+script c_lp_sm_c_lp_do_var_polarized.log
+
+java -jar /opt/jvarkit/dist/vcffilterjdk.jar -e 'if(variant.getNAlleles()!=2 || !variant.hasAttribute("AA")) return true; 
+final String aa = variant.getAttributeAsString("AA",""); 
+if(!variant.getAlleles().get(1).getDisplayString().equalsIgnoreCase(aa)) return true; 
+VariantContextBuilder vb=new VariantContextBuilder(variant); 
+
+Allele oldalt = variant.getAlleles().get(1);
+Allele oldref = variant.getAlleles().get(0); 
+Allele ref= Allele.create(oldalt.getDisplayString(),true); 
+Allele alt= Allele.create(oldref.getDisplayString(),false);
+
+vb.alleles(Arrays.asList(ref,alt)); 
+
+List genotypes= new ArrayList<>(); 
+for(Genotype g: variant.getGenotypes()) 
+  { 
+  if(!g.isCalled()) 
+  { genotypes.add(g); continue;} 
+  GenotypeBuilder gb = new GenotypeBuilder(g); 
+  List alleles = new ArrayList<>(); 
+  for(Allele a:g.getAlleles()) { 
+    if(a.equals(oldalt)) { a=ref;} 
+    else if(a.equals(oldref)) { a=alt;} 
+    alleles.add(a); 
+    } 
+  if(g.hasPL()) { 
+    int pl[] = g.getPL(); 
+    int pl2[] = new int[pl.length]; 
+    for(int i=0;i< pl.length;i++) pl2[i]=pl[(pl.length-1)-i]; 
+    gb.PL(pl2); 
+    } 
+  if(g.hasAD()) 
+    { int ad[] = g.getAD(); 
+    int ad2[] = new int[ad.length]; 
+    for(int i=0;i< ad.length;i++) ad2[i]=ad[(ad.length-1)-i];
+    gb.AD(ad2); 
+  } 
+  genotypes.add(gb.alleles(alleles).make()); 
+  }
+
+vb.attribute("AF",1.0d - Double.parseDouble(variant.getAttributeAsString("AF",""))); vb.attribute("AC",variant.getGenotypes().stream().flatMap(G->G.getAlleles().stream()).filter(A->A.equals(oldref)).count()); 
+vb.genotypes(genotypes); 
+return vb.make();' -o c_lp_sm_c_lp_do_var_polarized.vcf c_lp_sm_c_lp_do_var_aafilled.vcf
 
 ```
 
-##Option B: generate new VCF with the ancestral state as the reference. Use GATK to make a calling with lynx rufus as the reference. We opted for Option A instead.
+###For Lynx lynx.
 
 ```{r Polarize contemporary VCF, eval=FALSE, engine='bash'}
 
-#Another option is to generate a new VCF using the ancestral as the reference... But this didn't work as intended. REF alleles were still those of the Iberian lynx reference genome, maybe because the gVCFs were first called against it. In the end option A was used.
+#Polarize the AA-filled VCF based on the new INFO/AA column. Alleles will be switched whenever the ancestral allele matches the alternative one, and genotypes will be properly recoded as well. The following code was originally provided by Pierre Lindenbaum and modified by José Luis Castro.
 
-#First, the reference genome should be properly indexed as follows:
-cd /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/
-java -jar /home/tmp/Software/Picard/picard-tools-1.66/CreateSequenceDictionary.jar \
- R=c_lr_zz_0001_recal1.fa \
- O=c_lr_zz_0001_recal1.dict
+#For all positions:
 
-#Then, combine all gVCFs into a single VCF using the ancestral state as the reference:
-cd $G_PATH
-java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
--T GenotypeGVCFs \
--R /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa \
-$(for var in *.g.vcf.gz; do echo -V ${var}" ";done) \
--o $V_PATH/c_ll_lp_plus_h_ll_ancestral_ref.vcf
+cd $V_PATH
+screen -S c_ll_ki_c_ll_no_c_ll_po_all_polarized.log
+script c_ll_ki_c_ll_no_c_ll_po_all_polarized.log
+
+java -jar /opt/jvarkit/dist/vcffilterjdk.jar -e 'if(variant.getNAlleles()!=2 || !variant.hasAttribute("AA")) return true; 
+final String aa = variant.getAttributeAsString("AA",""); 
+if(!variant.getAlleles().get(1).getDisplayString().equalsIgnoreCase(aa)) return true; 
+VariantContextBuilder vb=new VariantContextBuilder(variant); 
+
+Allele oldalt = variant.getAlleles().get(1);
+Allele oldref = variant.getAlleles().get(0); 
+Allele ref= Allele.create(oldalt.getDisplayString(),true); 
+Allele alt= Allele.create(oldref.getDisplayString(),false);
+
+vb.alleles(Arrays.asList(ref,alt)); 
+
+List genotypes= new ArrayList<>(); 
+for(Genotype g: variant.getGenotypes()) 
+  { 
+  if(!g.isCalled()) 
+  { genotypes.add(g); continue;} 
+  GenotypeBuilder gb = new GenotypeBuilder(g); 
+  List alleles = new ArrayList<>(); 
+  for(Allele a:g.getAlleles()) { 
+    if(a.equals(oldalt)) { a=ref;} 
+    else if(a.equals(oldref)) { a=alt;} 
+    alleles.add(a); 
+    } 
+  if(g.hasPL()) { 
+    int pl[] = g.getPL(); 
+    int pl2[] = new int[pl.length]; 
+    for(int i=0;i< pl.length;i++) pl2[i]=pl[(pl.length-1)-i]; 
+    gb.PL(pl2); 
+    } 
+  if(g.hasAD()) 
+    { int ad[] = g.getAD(); 
+    int ad2[] = new int[ad.length]; 
+    for(int i=0;i< ad.length;i++) ad2[i]=ad[(ad.length-1)-i];
+    gb.AD(ad2); 
+  } 
+  genotypes.add(gb.alleles(alleles).make()); 
+  }
+
+vb.attribute("AF",1.0d - Double.parseDouble(variant.getAttributeAsString("AF",""))); vb.attribute("AC",variant.getGenotypes().stream().flatMap(G->G.getAlleles().stream()).filter(A->A.equals(oldref)).count()); 
+vb.genotypes(genotypes); 
+return vb.make();' -o c_ll_ki_c_ll_no_c_ll_po_all_polarized.vcf c_ll_ki_c_ll_no_c_ll_po_all_aafilled.vcf
+
+-----
+
+#For variants only:
+
+cd $V_PATH
+screen -S c_ll_ki_c_ll_no_c_ll_po_var_polarized.log
+script c_ll_ki_c_ll_no_c_ll_po_var_polarized.log
+
+java -jar /opt/jvarkit/dist/vcffilterjdk.jar -e 'if(variant.getNAlleles()!=2 || !variant.hasAttribute("AA")) return true; 
+final String aa = variant.getAttributeAsString("AA",""); 
+if(!variant.getAlleles().get(1).getDisplayString().equalsIgnoreCase(aa)) return true; 
+VariantContextBuilder vb=new VariantContextBuilder(variant); 
+
+Allele oldalt = variant.getAlleles().get(1);
+Allele oldref = variant.getAlleles().get(0); 
+Allele ref= Allele.create(oldalt.getDisplayString(),true); 
+Allele alt= Allele.create(oldref.getDisplayString(),false);
+
+vb.alleles(Arrays.asList(ref,alt)); 
+
+List genotypes= new ArrayList<>(); 
+for(Genotype g: variant.getGenotypes()) 
+  { 
+  if(!g.isCalled()) 
+  { genotypes.add(g); continue;} 
+  GenotypeBuilder gb = new GenotypeBuilder(g); 
+  List alleles = new ArrayList<>(); 
+  for(Allele a:g.getAlleles()) { 
+    if(a.equals(oldalt)) { a=ref;} 
+    else if(a.equals(oldref)) { a=alt;} 
+    alleles.add(a); 
+    } 
+  if(g.hasPL()) { 
+    int pl[] = g.getPL(); 
+    int pl2[] = new int[pl.length]; 
+    for(int i=0;i< pl.length;i++) pl2[i]=pl[(pl.length-1)-i]; 
+    gb.PL(pl2); 
+    } 
+  if(g.hasAD()) 
+    { int ad[] = g.getAD(); 
+    int ad2[] = new int[ad.length]; 
+    for(int i=0;i< ad.length;i++) ad2[i]=ad[(ad.length-1)-i];
+    gb.AD(ad2); 
+  } 
+  genotypes.add(gb.alleles(alleles).make()); 
+  }
+
+vb.attribute("AF",1.0d - Double.parseDouble(variant.getAttributeAsString("AF",""))); vb.attribute("AC",variant.getGenotypes().stream().flatMap(G->G.getAlleles().stream()).filter(A->A.equals(oldref)).count()); 
+vb.genotypes(genotypes); 
+return vb.make();' -o c_ll_ki_c_ll_no_c_ll_po_var_polarized.vcf c_ll_ki_c_ll_no_c_ll_po_var_aafilled.vcf
 
 ```
 
-#2: Set up SnpEff. I'll be following this manual for all SnpEff configuration purposes: http://snpeff.sourceforge.net/SnpEff_manual.html
+#3: Set up SnpEff. I'll be following this manual for all SnpEff configuration purposes: http://snpeff.sourceforge.net/SnpEff_manual.html
 ##Search for the Lynx pardinus database. 
 Search for the Lynx pardinus assembly database in the program's pre-built database. As of June the 6th, 2017, the Lynx pardinus genome isn't included in the snpEff database. A second option would be building our own Lynx pardinus database.
 
@@ -373,7 +646,7 @@ ctrl + D #terminate the screen
 
 ```
 
-#3: Annotate using SnpEff.
+#4: Annotate using SnpEff.
 ##Create custom annotation bed file
 
 ```{r Annotate using SnpEff, eval=FALSE, engine='bash'}
@@ -385,37 +658,69 @@ cut -d$'\t' -f1,3,4,5 /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.CDS.
 
 ##Annotate the VCF with custom annotation
 
+###For Lynx pardinus. Monomorphic positions (incl. substitutions) are NOT polarized. Grab them from the joint dataset.
+
 ```{r Annotate using SnpEff, eval=FALSE, engine='bash'}
 
 cd $V_PATH/annotation/
-screen -S c_ll_lp_plus_h_ll_polarized.lr_ann.log #open a dettachable screen in case the test takes too long
-script c_ll_lp_plus_h_ll_polarized.lr_ann.log #initiate the log file
+screen -S c_lp_sm_c_lp_do_all_polarized.lr_ann.log #open a dettachable screen in case the test takes too long
+script c_lp_sm_c_lp_do_all_polarized.lr_ann.log #initiate the log file
 
 S_PATH=/opt/snpEff #software path
 C_PATH=/home/dkleinman/datos/snpEff #config file path
 O_PATH=/home/dkleinman/datos/snpEff #output path
 I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
-V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
 
 cd $O_PATH #run this code from the directory where the config is located.
-java -Xmx16g -jar $S_PATH/snpEff.jar LYRU.23 -v -s $V_PATH/annotation/c_ll_lp_plus_h_ll_polarized.lr_ann.html -csvStats $V_PATH/annotation/c_ll_lp_plus_h_ll_polarized.lr_ann.csv -interval $C_PATH/data/LYPA23C.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.UCNE.intergenic.nr.bed $V_PATH/c_ll_lp_plus_h_ll_polarized.vcf > $V_PATH/annotation/c_ll_lp_plus_h_ll_polarized.lr_ann.vcf #run this code from the directory where the config is located.
+java -Xmx16g -jar $S_PATH/snpEff.jar LYRU.23 -v -s $V_PATH/annotation/c_lp_sm_c_lp_do_all_polarized.lr_ann.html -csvStats $V_PATH/annotation/c_lp_sm_c_lp_do_all_polarized.lr_ann.csv -interval $C_PATH/data/LYPA23C.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.UCNE.intergenic.nr.bed $V_PATH/c_lp_sm_c_lp_do_all_polarized.vcf > $V_PATH/annotation/c_lp_sm_c_lp_do_all_polarized.lr_ann.vcf #run this code from the directory where the config is located.
 
-grep -v '#' c_ll_lp_plus_h_ll_polarized.lr_ann.vcf | wc -l #23999314
+grep -v '#' c_lp_sm_c_lp_do_all_polarized.lr_ann.vcf | wc -l #
 
 ```
 
-#4: Filter the annotated VCF. Subset the VCF files in order to keep only good quality biallelic SNP variants. 
+###For Lynx lynx. Monomorphic positions (incl. substitutions) are NOT polarized. Grab them from the joint dataset.
+
+```{r Annotate using SnpEff, eval=FALSE, engine='bash'}
+
+cd $V_PATH/annotation/
+screen -S c_ll_ki_c_ll_no_c_ll_po_all_polarized.lr_ann.log #open a dettachable screen in case the test takes too long
+script c_ll_ki_c_ll_no_c_ll_po_all_polarized.lr_ann.log #initiate the log file
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+
+cd $O_PATH #run this code from the directory where the config is located.
+java -Xmx16g -jar $S_PATH/snpEff.jar LYRU.23 -v -s $V_PATH/annotation/c_ll_ki_c_ll_no_c_ll_po_all_polarized.lr_ann.html -csvStats $V_PATH/annotation/c_ll_ki_c_ll_no_c_ll_po_all_polarized.lr_ann.csv -interval $C_PATH/data/LYPA23C.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.UCNE.intergenic.nr.bed $V_PATH/c_ll_ki_c_ll_no_c_ll_po_all_polarized.vcf > $V_PATH/annotation/c_ll_ki_c_ll_no_c_ll_po_all_polarized.lr_ann.vcf #run this code from the directory where the config is located.
+
+grep -v '#' c_ll_ki_c_ll_no_c_ll_po_all_polarized.lr_ann.vcf | wc -l #
+
+```
+
+
+
+
+#Unused all the way to the end:
+
+
+
+
+
+#5: Filter the annotated VCF. Subset the VCF files in order to keep only good quality biallelic SNP variants. 
 ##Remove repetitive and low mappability regions.
 
 ```{r Filter the annotated VCF, eval=FALSE, engine='bash'}
 
 #Remove repetitive regions and those with low mappability:
 cd $V_PATH/annotation
-screen -S c_ll_lp_plus_h_ll_polarized_filtered1.lr_ann.log
-script c_ll_lp_plus_h_ll_polarized_filtered1.lr_ann.log
+screen -S c_ll_ki_c_ll_no_c_ll_po_all_polarized_filtered1.lr_ann.log
+script c_ll_ki_c_ll_no_c_ll_po_all_polarized_filtered1.lr_ann.log
 
-bedtools subtract -a c_ll_lp_plus_h_ll_polarized.lr_ann.vcf -b /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/repeats_and_lowcomp_no_redundant_mappability.k75_lessthan90.bed -header > c_ll_lp_plus_h_ll_polarized_filtered1.lr_ann.vcf
-grep -v '#' c_ll_lp_plus_h_ll_polarized_filtered1.lr_ann.vcf | wc -l #9308565
+bedtools subtract -a c_ll_ki_c_ll_no_c_ll_po_all_polarized.lr_ann.vcf -b /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/repeats_and_lowcomp_no_redundant_mappability.k75_lessthan90.bed -header > c_ll_ki_c_ll_no_c_ll_po_all_polarized_filtered1.lr_ann.vcf
+grep -v '#' c_ll_ki_c_ll_no_c_ll_po_all_polarized_filtered1.lr_ann.vcf | wc -l #
 
 ```
 
@@ -425,17 +730,17 @@ grep -v '#' c_ll_lp_plus_h_ll_polarized_filtered1.lr_ann.vcf | wc -l #9308565
 
 #During this step, all INDELs as well as all multiallelic and bad quality SNPs will be dropped from the respective VCFs.
 cd $V_PATH/annotation
-screen -S c_ll_lp_plus_h_ll_polarized_filtered2.lr_ann.log
-script c_ll_lp_plus_h_ll_polarized_filtered2.lr_ann.log
+screen -S c_ll_ki_c_ll_no_c_ll_po_all_polarized_filtered2.lr_ann.log
+script c_ll_ki_c_ll_no_c_ll_po_all_polarized_filtered2.lr_ann.log
 
 java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
 -T SelectVariants \
 -selectType SNP \
 -restrictAllelesTo BIALLELIC \
 -R $REF \
--V c_ll_lp_plus_h_ll_polarized_filtered1.lr_ann.vcf \
--o c_ll_lp_plus_h_ll_polarized_filtered2.lr_ann.vcf
-grep -v '#' c_ll_lp_plus_h_ll_polarized_filtered2.lr_ann.vcf | wc -l #7598146
+-V c_ll_ki_c_ll_no_c_ll_po_all_polarized_filtered1.lr_ann.vcf \
+-o c_ll_ki_c_ll_no_c_ll_po_all_polarized_filtered2.lr_ann.vcf
+grep -v '#' c_ll_ki_c_ll_no_c_ll_po_all_polarized_filtered2.lr_ann.vcf | wc -l #
 
 ```
 
@@ -1712,7 +2017,7 @@ S_PATH=/opt/snpEff #software path
 C_PATH=/home/dkleinman/datos/snpEff #config file path
 O_PATH=/home/dkleinman/datos/snpEff #output path
 I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
-V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
 G_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
 REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
 GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
@@ -3582,7 +3887,7 @@ S_PATH=/opt/snpEff #software path
 C_PATH=/home/dkleinman/datos/snpEff #config file path
 O_PATH=/home/dkleinman/datos/snpEff #output path
 I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
-V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
 
 cd $O_PATH/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation/perpop/
 POPLIST=($(ls *trimmed.ann.vcf))
@@ -3652,7 +3957,7 @@ S_PATH=/opt/snpEff #software path
 C_PATH=/home/dkleinman/datos/snpEff #config file path
 O_PATH=/home/dkleinman/datos/snpEff #output path
 I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
-V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
 
 cd $V_PATH/trimmed_VCFs
 shopt -s extglob #the extglob shell option gives you more powerful pattern matching in the command line.
@@ -3712,7 +4017,7 @@ S_PATH=/opt/snpEff #software path
 C_PATH=/home/dkleinman/datos/snpEff #config file path
 O_PATH=/home/dkleinman/datos/snpEff #output path
 I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
-V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
 
 cd $V_PATH/individual_VCFs
 shopt -s extglob #the extglob shell option gives you more powerful pattern matching in the command line.
