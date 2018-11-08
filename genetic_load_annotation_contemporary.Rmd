@@ -15,7 +15,7 @@ S_PATH=/opt/snpEff #software path
 C_PATH=/home/dkleinman/datos/snpEff #config file path
 O_PATH=/home/dkleinman/datos/snpEff #output path
 I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
-V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
 G_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
 REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
 GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
@@ -43,7 +43,7 @@ screen -S c_ll_lp_plus_h_ll_aafilled_vcf.log
 script c_ll_lp_plus_h_ll_aafilled_vcf.log
 
 export PERL5LIB=/opt/vcftools_0.1.13/perl/ #set required environmental variable
-V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
 
 cat $V_PATH/c_ll_lp_plus_h_ll_renamed.vcf | /opt/vcftools_0.1.13/perl/fill-aa -a /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa.gz | bgzip -c > c_ll_lp_plus_h_ll_aafilled.vcf.gz #I tried to run this first without bgzipping it, and it was increasingly slow. Each day it did around half the previous day. When the server crashed, I relaunched it adding the bgzip command and it finished in a little over 24h.
 
@@ -315,7 +315,7 @@ S_PATH=/opt/snpEff #software path
 C_PATH=/home/dkleinman/datos/snpEff #config file path
 O_PATH=/home/dkleinman/datos/snpEff #output path
 I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
-V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
 
 cd $O_PATH #run this code from the directory where the config is located.
 java -Xmx16g -jar $S_PATH/snpEff.jar LYRU.23 -v -s $V_PATH/annotation/c_ll_lp_plus_h_ll_polarized.lr_ann.html -csvStats $V_PATH/annotation/c_ll_lp_plus_h_ll_polarized.lr_ann.csv -interval $C_PATH/data/LYPA23C.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.UCNE.intergenic.nr.bed $V_PATH/c_ll_lp_plus_h_ll_polarized.vcf > $V_PATH/annotation/c_ll_lp_plus_h_ll_polarized.lr_ann.vcf #run this code from the directory where the config is located.
@@ -728,7 +728,7 @@ for POP in ${POPS[@]}
 ```
 
 #7: Apply per species filters. Apply additional filters for each species' VCF that take into account depth, heterozygosity and number of genotyped individuals.
-##Apply low and high DP and 0.5 missingness filters.
+##Apply low and high DP and 0.5 missingness filters. Use filtered2 instead.
 
 ```{r Apply per species filters, eval=FALSE, engine='bash'}
 
@@ -752,7 +752,7 @@ grep -v '#' ll_perspecies.trimmed_filtered1.lr_ann.vcf | wc -l #4065488
 
 ```
 
-##Apply low and high DP and 0.325 missingness filters.
+##Apply low and high DP and 0.325 missingness filters. This is the chosen filter.
 
 ```{r Apply per species filters, eval=FALSE, engine='bash'}
 
@@ -1632,7 +1632,7 @@ S_PATH=/opt/snpEff #software path
 C_PATH=/home/dkleinman/datos/snpEff #config file path
 O_PATH=/home/dkleinman/datos/snpEff #output path
 I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
-V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
 G_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
 REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
 GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
@@ -3557,7 +3557,7 @@ S_PATH=/opt/snpEff #software path
 C_PATH=/home/dkleinman/datos/snpEff #config file path
 O_PATH=/home/dkleinman/datos/snpEff #output path
 I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
-V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
 
 cd $O_PATH/c_ll_lp_plus_h_ll_aafilled_SNPs_standard_filter_detailed_annotation/perpop/
 POPLIST=($(ls *trimmed.ann.vcf))
@@ -3627,7 +3627,7 @@ S_PATH=/opt/snpEff #software path
 C_PATH=/home/dkleinman/datos/snpEff #config file path
 O_PATH=/home/dkleinman/datos/snpEff #output path
 I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
-V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
 
 cd $V_PATH/trimmed_VCFs
 shopt -s extglob #the extglob shell option gives you more powerful pattern matching in the command line.
@@ -3687,7 +3687,7 @@ S_PATH=/opt/snpEff #software path
 C_PATH=/home/dkleinman/datos/snpEff #config file path
 O_PATH=/home/dkleinman/datos/snpEff #output path
 I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
-V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
 
 cd $V_PATH/individual_VCFs
 shopt -s extglob #the extglob shell option gives you more powerful pattern matching in the command line.
@@ -3756,3 +3756,94 @@ ctrl + D #terminate the screen
 scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/snpEff/immunocapture/immunocapture_test1.ann* /Users/Dani/ownCloud/backup/g-w_analysis/snpEff_results/immunocapture/ #execute this command out of the server to import to the pc the output files of this toy run
 
 ```
+
+##N: Speed testing home vs datos.
+
+```{r Define paths, eval=FALSE, engine='bash'}
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+G_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+#Home-Home:
+cd /home/dkleinman/datos/VCFs_Dani/speed_test
+screen -S speed_test_i_home_o_home.log
+script speed_test_i_home_o_home.log
+
+cd $G_PATH
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
+-T GenotypeGVCFs \
+-R $REF \
+$(for var in c_ll_ki*vcf.gz; do echo -V ${var}" ";done) \
+-o /home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/speed_test_i_home_o_home.vcf
+
+#Datos-Home:
+cd /home/dkleinman/datos/VCFs_Dani/speed_test
+screen -S speed_test_i_datos_o_home.log
+script speed_test_i_datos_o_home.log
+
+cd /home/dkleinman/datos/VCFs_Dani/speed_test
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
+-T GenotypeGVCFs \
+-R $REF \
+$(for var in c_ll_ki*vcf.gz; do echo -V ${var}" ";done) \
+-o $V_PATH/speed_test_i_datos_o_home.vcf
+
+#Home-Datos:
+cd /home/dkleinman/datos/VCFs_Dani/speed_test
+screen -S speed_test_i_home_o_datos.log
+script speed_test_i_home_o_datos.log
+
+cd $G_PATH
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
+-T GenotypeGVCFs \
+-R $REF \
+$(for var in c_ll_ki*vcf.gz; do echo -V ${var}" ";done) \
+-o /home/dkleinman/datos/VCFs_Dani/speed_test/speed_test_i_home_o_datos.vcf
+
+#Datos-Datos:
+cd /home/dkleinman/datos/VCFs_Dani/speed_test
+screen -S speed_test_i_datos_o_datos.log
+script speed_test_i_datos_o_datos.log
+
+cd /home/dkleinman/datos/VCFs_Dani/speed_test
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
+-T GenotypeGVCFs \
+-R $REF \
+$(for var in c_ll_ki*vcf.gz; do echo -V ${var}" ";done) \
+-o /home/dkleinman/datos/VCFs_Dani/speed_test/speed_test_i_datos_o_datos.vcf
+
+#Grupos-Grupos from server A:
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/speed_test
+screen -S speed_test_i_grupos_o_grupos_a.log
+script speed_test_i_grupos_o_grupos_a.log
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/speed_test/
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
+-T GenotypeGVCFs \
+-R $REF \
+$(for var in /GRUPOS/grupolince/lynx_genomes_5x/gVCFs/c_ll_ki*vcf.gz; do echo -V ${var}" ";done) \
+-o /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/speed_test/speed_test_i_grupos_o_grupos_a.vcf
+
+#Grupos-Grupos from server B:
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/speed_test
+screen -S speed_test_i_grupos_o_grupos_b.log
+script speed_test_i_grupos_o_grupos_b.log
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/speed_test
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
+-T GenotypeGVCFs \
+-R $REF \
+$(for var in /GRUPOS/grupolince/lynx_genomes_5x/gVCFs/c_ll_ki*vcf.gz; do echo -V ${var}" ";done) \
+-o /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/speed_test/speed_test_i_grupos_o_grupos_b.vcf
+
+```
+
+
+
