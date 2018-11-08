@@ -326,15 +326,16 @@ java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK
 cd $V_PATH
 $BCF query -l c_ll_lp_plus_h_ll.vcf #check sample names
 #!/bin/bash
-#cat << "EOF" > list_to_remove.txt #Unmark this line when running it (I marked it in R because it doesn't understand it and messes the colours of subsequent lines). It should include all incorrect names.
-LL112_rgsm c_ll_vl_0112
-LL146_rgsm c_ll_ya_0146
-LL212_rgsm c_ll_cr_0212
+cat << "EOF" > list_to_remove.txt #Unmark this line when running it (I marked it in R because it doesn't understand it and messes the colours of subsequent lines). It should include all incorrect names.
 LL90_rgsm c_ll_ki_0090
-h_lp_do_0007 c_lp_do_0007
 EOF
 
-$BCF reheader -s list_to_remove.txt -o c_ll_lp_plus_h_ll_renamed.vcf c_ll_lp_plus_h_ll.vcf #copy the VCF and rename the wrong named samples in the new VCF
+#LL112_rgsm c_ll_vl_0112
+#LL146_rgsm c_ll_ya_0146
+#LL212_rgsm c_ll_cr_0212
+#h_lp_do_0007 c_lp_do_0007
+
+bcftools reheader -s list_to_remove.txt -o c_ll_lp_plus_h_ll_renamed.vcf c_ll_lp_plus_h_ll.vcf #copy the VCF and rename the wrong named samples in the new VCF
 
 #Next I checked whether both files were identical (except for the sample names, obviously) with diff, and they were, so I deleted all_c_ll_lp.vcf
 
