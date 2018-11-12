@@ -1785,6 +1785,186 @@ for i in ${POP[@]}
 
 ```
 
+#9: Mask fixed positions. Subset the VCFs in order to remove fixed derived variants within each population.
+
+```{r Mask fixed positions, eval=FALSE, engine='bash'}
+
+#In order to test if truly variable positions behave as obtained in previous studies (genome project, Godoy), remove all variants fixed for the derived allele.
+
+cd $V_PATH/annotation/
+screen -S sep_calling_remove_AF_1_positions.log
+script sep_calling_remove_AF_1_positions.log
+
+cd $V_PATH/annotation/
+POP_VCFS=$(find $V_PATH/annotation/ -name "*perpop_var.lr_ann.vcf")
+for pop in ${POP_VCFS[@]}
+  do
+  echo "${pop}"
+  grep -v ";AF=1.00" ${pop} > ${pop/_var.lr_ann.vcf/_var-wout1.lr_ann.vcf}
+  done
+IND_VCFS=$(find $V_PATH/annotation/ -name "*individual_var.lr_ann.vcf")
+for ind in ${IND_VCFS[@]}
+  do
+  echo "${ind}"
+  grep -v ";AF=1.00" ${ind} > ${ind/_var.lr_ann.vcf/_var-wout1.lr_ann.vcf}
+  done
+
+```
+
+#10: Get annotation statistics.
+##At the individual level.
+###Heterozygotes and derived/derived homozygotes.
+
+```{r Get annotation statistics, eval=FALSE, engine='bash'}
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+G_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+cd $V_PATH/annotation/
+screen -S snpeff_individual_summary_var.lr_ann.log
+script snpeff_individual_summary_var.lr_ann.log
+
+rm snpeff_individual_summary_var.lr_ann.txt
+echo -e "species\tpopulation\tsample\ttotal_V\tintergenic_V\tintronic_V\tcoding\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tmissense/synonymous_V\tmissense/synonymous_A" > snpeff_individual_summary_var.lr_ann.txt
+INDLIST=($(ls `find . -name '*individual_var.lr_ann.vcf' -print`))
+for i in "${INDLIST[@]}"
+  do
+  echo "${i}"
+  ind=$(echo "${i}" | awk -F'[/]' '{print $3}')
+  echo "${ind}"
+  SPECIES=$(echo "${ind}" | cut -c3-4)
+  POPULATION=$(echo "${ind}" | cut -c6-7)
+  SAMPLE=$(echo "${ind}" | cut -c9-12)
+  TOTAL_V=$(grep -v '#' ${i} | wc -l)
+  INTERGENIC_V=$(grep 'intergenic' ${i} | wc -l)
+  INTRONIC_V=$(grep 'intron_variant' ${i} | wc -l)
+  CODING_V=$(grep 'CDS' ${i} | wc -l)
+  SYNONYMOUS_V=$(grep 'synonymous_variant' ${i} | wc -l)
+  SYNONYMOUS_A=$(grep 'synonymous_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_V=$(grep 'missense_variant' ${i} | wc -l)
+  MISSENSE_A=$(grep 'missense_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  NONSENSE_V=$(grep -e 'lost' -e 'gained' ${i} | wc -l)
+  NONSENSE_A=$(grep -e 'lost' -e 'gained' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_SYNONYMOUS_V=$(echo "scale=3; $MISSENSE_V/$SYNONYMOUS_V" | bc)
+  MISSENSE_SYNONYMOUS_A=$(echo "scale=3; $MISSENSE_A/$SYNONYMOUS_A" | bc)
+  echo -e "$SPECIES\t$POPULATION\t$SAMPLE\t$TOTAL_V\t$INTERGENIC_V\t$INTRONIC_V\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A" >> $V_PATH/annotation/snpeff_individual_summary_var.lr_ann.txt
+  done
+
+scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/snpeff_individual_summary_var.lr_ann.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/sep_calling
+
+```
+
+###Heterozygotes only.
+
+```{r Get annotation statistics, eval=FALSE, engine='bash'}
+
+cd $V_PATH/annotation/
+screen -S snpeff_individual_summary_var-wout1.lr_ann.log
+script snpeff_individual_summary_var-wout1.lr_ann.log
+
+rm snpeff_individual_summary_var-wout1.lr_ann.txt
+echo -e "species\tpopulation\tsample\ttotal_V\tintergenic_V\tintronic_V\tcoding\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tmissense/synonymous_V\tmissense/synonymous_A" > snpeff_individual_summary_var-wout1.lr_ann.txt
+INDLIST=($(ls `find . -name '*individual_var-wout1.lr_ann.vcf' -print`))
+for i in "${INDLIST[@]}"
+  do
+  echo "${i}"
+  ind=$(echo "${i}" | awk -F'[/]' '{print $3}')
+  echo "${ind}"
+  SPECIES=$(echo "${ind}" | cut -c3-4)
+  POPULATION=$(echo "${ind}" | cut -c6-7)
+  SAMPLE=$(echo "${ind}" | cut -c9-12)
+  TOTAL_V=$(grep -v '#' ${i} | wc -l)
+  INTERGENIC_V=$(grep 'intergenic' ${i} | wc -l)
+  INTRONIC_V=$(grep 'intron_variant' ${i} | wc -l)
+  CODING_V=$(grep 'CDS' ${i} | wc -l)
+  SYNONYMOUS_V=$(grep 'synonymous_variant' ${i} | wc -l)
+  SYNONYMOUS_A=$(grep 'synonymous_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_V=$(grep 'missense_variant' ${i} | wc -l)
+  MISSENSE_A=$(grep 'missense_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  NONSENSE_V=$(grep -e 'lost' -e 'gained' ${i} | wc -l)
+  NONSENSE_A=$(grep -e 'lost' -e 'gained' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_SYNONYMOUS_V=$(echo "scale=3; $MISSENSE_V/$SYNONYMOUS_V" | bc)
+  MISSENSE_SYNONYMOUS_A=$(echo "scale=3; $MISSENSE_A/$SYNONYMOUS_A" | bc)
+  echo -e "$SPECIES\t$POPULATION\t$SAMPLE\t$TOTAL_V\t$INTERGENIC_V\t$INTRONIC_V\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A" >> $V_PATH/annotation/snpeff_individual_summary_var-wout1.lr_ann.txt
+  done
+  
+scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/snpeff_individual_summary_var-wout1.lr_ann.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/sep_calling
+
+```
+
+##At the population level.
+###Draw annotation statistics. Unfinished!
+
+```{r Get annotation statistics}
+
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(RColorBrewer)
+
+#lr based annotation filtered 2:
+
+wd <- file.path("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/sep_calling/")
+setwd(wd)
+files <- grep(grep(list.files(file.path("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios"), pattern = "filtered2.*lr_ann", full.names=T), pattern='test_allele_counts', inv=T, value=T),pattern='between', value=T)
+files
+perpop_between_statistics <- data_frame("population"=character(0),"category"=character(0),"value"=numeric(0),"dataset"=character(0))
+for (f in c(1,2)) {
+  current_file <- read_tsv(files[f])
+  current_file <- current_file %>% mutate("I_ratio"=intronic_V/intergenic_V,"S_ratio*15"=15*synonymous_V/intergenic_V,"NS_ratio*15"=15*missense_V/intergenic_V,"LOF_ratio*2000"=2000*nonsense_V/intergenic_V,"NS/S_v"=missense_V/synonymous_V,"NS/S_a"=missense_A/synonymous_A,"LOF/S_v*50"=50*nonsense_V/synonymous_V,"LOF/S_a*50"=50*nonsense_A/synonymous_A,dataset=unlist(strsplit(files[f],"/|_|\\."))[length(unlist(strsplit(files[f],"/|_|\\.")))-3]) %>% select(2,c(16:24))
+  current_file
+  current_file_tidy <- current_file %>% gather(category,value,-population,-dataset) %>% select(1,3,4,2)
+  current_file_tidy
+  perpop_between_statistics <- rbind(perpop_between_statistics,current_file_tidy)
+}
+perpop_between_statistics$population <- as.factor(perpop_between_statistics$population)
+perpop_between_statistics$population = factor(perpop_between_statistics$population,levels(perpop_between_statistics$population)[c(2:5,1)])
+perpop_between_statistics$category <- as.factor(perpop_between_statistics$category)
+perpop_between_statistics$category = factor(perpop_between_statistics$category,levels(perpop_between_statistics$category)[c(1,8,5,2,7,6,4,3)])
+perpop_between_statistics$dataset <- as.factor(perpop_between_statistics$dataset)
+perpop_between_statistics$dataset = factor(perpop_between_statistics$dataset,levels(perpop_between_statistics$dataset)[c(1,2)])
+perpop_between_statistics
+
+ggplot_perpop_between <- ggplot(data=perpop_between_statistics, aes(x=category,y=value)) +
+  geom_point(aes(colour = population)) + 
+  scale_color_manual(values=c(brewer.pal(12,"Paired")[1], brewer.pal(12,"Paired")[2], brewer.pal(12,"Paired")[4], brewer.pal(8,"Greys")[5],brewer.pal(8,"Greys")[8])) +
+  facet_grid(. ~ dataset) +
+  ggtitle("Ratios per population (N=8) with rufus based annotation and strict missingness") +
+  ylim(0.0,1.0) +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+        rect=element_rect(size=1),
+        axis.line=element_line(colour="black"),
+        axis.title=element_text(size=16),
+        axis.text.x=element_text(angle=90,hjust=1,vjust=0.5),
+        #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+        #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+        panel.background=element_blank(),
+        panel.border=element_rect(colour="black"),
+        #panel.grid=element_blank(),
+        #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+        plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+        #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+        legend.background=element_rect(linetype="solid", colour="black", size=.5),
+        #legend.justification=c(0,0),
+        legend.key=element_rect(colour="white"),
+        #legend.key.size=unit(1.3,"cm"),
+        #legend.position=c(0.92,0.86),
+        legend.title=element_blank()
+  )
+ggplot_perpop_between
+ggsave("perpop_counts_ratios_filtered2.lr_ann.pdf", width=30, height=15, units="cm", device="pdf", path="/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios")
+
+
+```
 
 #Unused all the way to the end:
 
