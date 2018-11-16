@@ -3846,4 +3846,47 @@ $(for var in /GRUPOS/grupolince/lynx_genomes_5x/gVCFs/c_ll_ki*vcf.gz; do echo -V
 ```
 
 
+##Ø: Generate SAM from BAM files to check phred scale between datasets.
+
+```{r Define paths, eval=FALSE, engine='bash'}
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+G_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+cd /backup/grupolince/BAM_files_Lynx/BAM_indelrealigner_before_recal/LYNX_06_08_09_GENOME_PROJECT/
+
+#Reference genome (old phred, old machine):
+screen -S c_lp_sm_0221_sorted_rmdup_sorted_indelrealigner_COPY.test.log
+script c_lp_sm_0221_sorted_rmdup_sorted_indelrealigner_COPY.test.log
+
+cd /backup/grupolince/BAM_files_Lynx/BAM_indelrealigner_before_recal/LYNX_06_08_09_GENOME_PROJECT/
+scp c_lp_sm_0221_sorted_rmdup_sorted_indelrealigner.bam c_lp_sm_0221_sorted_rmdup_sorted_indelrealigner_COPY.bam
+samtools view -h -o c_lp_sm_0221_sorted_rmdup_sorted_indelrealigner_COPY.sam c_lp_sm_0221_sorted_rmdup_sorted_indelrealigner_COPY.bam
+
+#Genome project resequencing (new phred, semi-old machine):
+screen -S c_lp_sm_0138_sorted_rmdup_sorted_indelrealigner_COPY.test.log
+script c_lp_sm_0138_sorted_rmdup_sorted_indelrealigner_COPY.test.log
+
+cd /backup/grupolince/BAM_files_Lynx/BAM_indelrealigner_before_recal/LYNX_06_08_09_GENOME_PROJECT/
+scp c_lp_sm_0138_sorted_rmdup_sorted_indelrealigner.bam c_lp_sm_0138_sorted_rmdup_sorted_indelrealigner_COPY.bam
+samtools view -h -o c_lp_sm_0138_sorted_rmdup_sorted_indelrealigner_COPY.sam c_lp_sm_0138_sorted_rmdup_sorted_indelrealigner_COPY.bam
+
+#5x resequencing (new phred, new machine):
+screen -S c_lp_sm_0134_sorted_rmdup_sorted_indelrealigner_COPY.test.log
+script c_lp_sm_0134_sorted_rmdup_sorted_indelrealigner_COPY.test.log
+
+cd /backup/grupolince/BAM_files_Lynx/BAM_indelrealigner_before_recal/LYNX_06_08_09_GENOME_PROJECT/
+scp c_lp_sm_0134_sorted_rmdup_sorted_indelrealigner.bam c_lp_sm_0134_sorted_rmdup_sorted_indelrealigner_COPY.bam
+samtools view -h -o c_lp_sm_0134_sorted_rmdup_sorted_indelrealigner_COPY.sam c_lp_sm_0134_sorted_rmdup_sorted_indelrealigner_COPY.bam
+
+```
+
+
 
