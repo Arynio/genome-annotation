@@ -1064,6 +1064,8 @@ echo $MAXDEPTH
 -doCounts 1 \
 -maxDepth $MAXDEPTH
 
+scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/c_lp_depth_calculus/*n020*.depth* /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/lp_depth
+
 ```
 
 ##B
@@ -1085,7 +1087,7 @@ with (dat, sqrt(sum(as.numeric(freq)*(value-mu)^2)/(sum(as.numeric(freq))-1))) }
     
 #*******************************************************************************************
     
-my_files_depthGlobal = list.files(path = "/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/lp_depth",pattern="*.depthGlobal$")
+my_files_depthGlobal = list.files(path = "/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/lp_depth",pattern="*.depthGlobal$")[2]
     
 for (i in 1:length(my_files_depthGlobal)) {
   assign(my_files_depthGlobal[i], (scan(paste0("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/lp_depth/",my_files_depthGlobal[i],sep=""), sep = " ", dec = ".")) %>% .[!is.na(.)])
@@ -1243,7 +1245,7 @@ screen -S c_lp_sm_c_lp_do_5x_var_polarized_filtered1.lr_ann.vcf.log
 script c_lp_sm_c_lp_do_5x_var_polarized_filtered1.lr_ann.vcf.log
 
 bedtools subtract -a c_lp_sm_c_lp_do_5x_var_polarized.lr_ann.vcf -b /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/repeats_and_lowcomp_no_redundant_mappability.k75_lessthan90.bed -header > c_lp_sm_c_lp_do_5x_var_polarized_filtered1.lr_ann.vcf
-grep -v '#' c_lp_sm_c_lp_do_5x_var_polarized_filtered1.lr_ann.vcf | wc -l #
+grep -v '#' c_lp_sm_c_lp_do_5x_var_polarized_filtered1.lr_ann.vcf | wc -l #1886397
 
 ```
 
@@ -1304,7 +1306,7 @@ java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -X
 -R $REF \
 -V c_lp_sm_c_lp_do_5x_var_polarized_filtered1.lr_ann.vcf \
 -o c_lp_sm_c_lp_do_5x_var_polarized_filtered2.lr_ann.vcf
-grep -v '#' c_lp_sm_c_lp_do_5x_var_polarized_filtered2.lr_ann.vcf | wc -l #
+grep -v '#' c_lp_sm_c_lp_do_5x_var_polarized_filtered2.lr_ann.vcf | wc -l #1469071
 
 ```
 
@@ -1347,7 +1349,7 @@ screen -S c_lp_sm_c_lp_do_5x_var_polarized_filtered3.lr_ann.log
 script c_lp_sm_c_lp_do_5x_var_polarized_filtered3.lr_ann.log
 
 bcftools view -e '(INFO/AA!=REF & INFO/AA!=ALT) | INFO/AF=0.00' c_lp_sm_c_lp_do_5x_var_polarized_filtered2.lr_ann.vcf > c_lp_sm_c_lp_do_5x_var_polarized_filtered3.lr_ann.vcf
-grep -v '#' c_lp_sm_c_lp_do_5x_var_polarized_filtered3.lr_ann.vcf | wc -l #
+grep -v '#' c_lp_sm_c_lp_do_5x_var_polarized_filtered3.lr_ann.vcf | wc -l #1380105
 
 ```
 
@@ -1423,7 +1425,7 @@ java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -X
 -R $REF \
 -V c_lp_sm_c_lp_do_5x_var_polarized_filtered3.lr_ann.vcf \
 -o c_lp_sm_c_lp_do_5x_var_polarized_filtered4.lr_ann.vcf
-grep -v '#' c_lp_sm_c_lp_do_5x_var_polarized_filtered4.lr_ann.vcf | wc -l #
+grep -v '#' c_lp_sm_c_lp_do_5x_var_polarized_filtered4.lr_ann.vcf | wc -l #1212905
 
 ```
 
@@ -1473,12 +1475,12 @@ cd $V_PATH/annotation/
 screen -S c_lp_sm_c_lp_do_5x_var_polarized_filtered5.lr_ann.log
 script c_lp_sm_c_lp_do_5x_var_polarized_filtered5.lr_ann.log
 
-MIN_DP=$(cat /home/dkleinman/datos/c_lp_depth_calculus/c_lp_do-c_lp_sm_n031_mean_sd_depthGlobal_lynx_per_pop_mean_folds_0.95.csv | awk '{print $9}') #Obtained in section 5
-MAX_DP=$(cat /home/dkleinman/datos/c_lp_depth_calculus/c_lp_do-c_lp_sm_n031_mean_sd_depthGlobal_lynx_per_pop_mean_folds_0.95.csv | awk '{print $8}') #Obtained in section 5
+MIN_DP=$(cat /home/dkleinman/datos/c_lp_depth_calculus/c_lp_do-c_lp_sm_n020_mean_sd_depthGlobal_lynx_pardinus_5x_per_pop_mean_folds_0.95.csv | awk '{print $9}') #Obtained in section 5
+MAX_DP=$(cat /home/dkleinman/datos/c_lp_depth_calculus/c_lp_do-c_lp_sm_n020_mean_sd_depthGlobal_lynx_pardinus_5x_per_pop_mean_folds_0.95.csv | awk '{print $8}') #Obtained in section 5
 echo $MIN_DP
 echo $MAX_DP
-$BCF filter -e "DP < ${MIN_DP} || DP > ${MAX_DP} || F_MISSING > X"XX -Ov -o $V_PATH/annotation/c_lp_sm_c_lp_do_5x_var_polarized_filtered5.lr_ann.vcf $V_PATH/annotation/c_lp_sm_c_lp_do_5x_var_polarized_filtered4.lr_ann.vcf
-grep -v '#' c_lp_sm_c_lp_do_5x_var_polarized_filtered5.lr_ann.vcf | wc -l #
+$BCF filter -e "DP < ${MIN_DP} || DP > ${MAX_DP}" -Ov -o $V_PATH/annotation/c_lp_sm_c_lp_do_5x_var_polarized_filtered5.lr_ann.vcf $V_PATH/annotation/c_lp_sm_c_lp_do_5x_var_polarized_filtered4.lr_ann.vcf
+grep -v '#' c_lp_sm_c_lp_do_5x_var_polarized_filtered5.lr_ann.vcf | wc -l #1182577
 
 ```
 
@@ -1535,6 +1537,7 @@ cd $V_PATH/annotation/
 screen -S lp_5x_perpop_var.lr_ann.log
 script lp_5x_perpop_var.lr_ann.log
 
+cd $G_PATH
 declare POP=$(ls c_{lp_sm*,lp_do*}.g.vcf.gz | cut -c1-7 | uniq | grep "${i}")
 cd $V_PATH/annotation/
 for j in ${POP[@]}
@@ -1553,6 +1556,9 @@ for j in ${POP[@]}
   --sample_file "${j}"_pop_list_to_remove.txt
   rm "${j}"_pop_list_to_remove.txt
   done
+  
+grep -v '#' c_lp_do_5x_perpop_var.lr_ann.vcf | wc -l #742518
+grep -v '#' c_lp_sm_5x_perpop_var.lr_ann.vcf | wc -l #1058474
 
 ```
 
@@ -2210,10 +2216,12 @@ C_PATH=/home/dkleinman/datos/snpEff #config file path
 O_PATH=/home/dkleinman/datos/snpEff #output path
 I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
 V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
-G_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
 REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
 GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
 BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+#For Lynx pardinus and Lynx lynx:
 
 cd $V_PATH/annotation/
 screen -S snpeff_individual_summary_var.lr_ann.log
@@ -2246,6 +2254,41 @@ for i in "${INDLIST[@]}"
   done
 
 scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/snpeff_individual_summary_var.lr_ann.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/sep_calling
+
+
+#For Lynx pardinus 5x only:
+
+cd $V_PATH/annotation/
+screen -S snpeff_5x_individual_summary_var.lr_ann.log
+script snpeff_5x_individual_summary_var.lr_ann.log
+
+rm snpeff_5x_individual_summary_var.lr_ann.txt
+echo -e "species\tpopulation\tsample\ttotal_V\tintergenic_V\tintronic_V\tcoding\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tmissense/synonymous_V\tmissense/synonymous_A" > snpeff_5x_individual_summary_var.lr_ann.txt
+INDLIST=($(ls `find . -name '*5x_individual_var.lr_ann.vcf' -print`))
+for i in "${INDLIST[@]}"
+  do
+  echo "${i}"
+  ind=$(echo "${i}" | awk -F'[/]' '{print $3}')
+  echo "${ind}"
+  SPECIES=$(echo "${ind}" | cut -c3-4)
+  POPULATION=$(echo "${ind}" | cut -c6-7)
+  SAMPLE=$(echo "${ind}" | cut -c9-12)
+  TOTAL_V=$(grep -v '#' ${i} | wc -l)
+  INTERGENIC_V=$(grep 'intergenic' ${i} | wc -l)
+  INTRONIC_V=$(grep 'intron_variant' ${i} | wc -l)
+  CODING_V=$(grep 'CDS' ${i} | wc -l)
+  SYNONYMOUS_V=$(grep 'synonymous_variant' ${i} | wc -l)
+  SYNONYMOUS_A=$(grep 'synonymous_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_V=$(grep 'missense_variant' ${i} | wc -l)
+  MISSENSE_A=$(grep 'missense_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  NONSENSE_V=$(grep -e 'lost' -e 'gained' ${i} | wc -l)
+  NONSENSE_A=$(grep -e 'lost' -e 'gained' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_SYNONYMOUS_V=$(echo "scale=3; $MISSENSE_V/$SYNONYMOUS_V" | bc)
+  MISSENSE_SYNONYMOUS_A=$(echo "scale=3; $MISSENSE_A/$SYNONYMOUS_A" | bc)
+  echo -e "$SPECIES\t$POPULATION\t$SAMPLE\t$TOTAL_V\t$INTERGENIC_V\t$INTRONIC_V\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A" >> $V_PATH/annotation/snpeff_5x_individual_summary_var.lr_ann.txt
+  done
+
+scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/snpeff_5x_individual_summary_var.lr_ann.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/sep_calling
 
 ```
 
@@ -2395,7 +2438,7 @@ C_PATH=/home/dkleinman/datos/snpEff #config file path
 O_PATH=/home/dkleinman/datos/snpEff #output path
 I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
 V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
-G_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
 REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
 GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
 BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
