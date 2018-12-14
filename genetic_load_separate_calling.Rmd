@@ -69,6 +69,7 @@ grep -v '#' c_ll_ki_c_ll_no_c_ll_po_var.vcf | wc -l #12492854 (vs #4104697 for l
 ```{r Perform separate calling for each species, eval=FALSE, engine='bash'}
 
 #First let's create the list with the 5x samples.
+cd $G_PATH
 rm c_lp_5x_gvcf_list
 echo c_lp_do_0141_recal_round-1.g.vcf.gz >> c_lp_5x_gvcf_list
 echo c_lp_do_0144_recal_round-1.g.vcf.gz >> c_lp_5x_gvcf_list
@@ -107,6 +108,53 @@ cd $V_PATH
 grep -v '#' c_lp_sm_c_lp_do_5x_var.vcf | wc -l #4331414 (vs. 4972251 with all lp individuals)
 
 #No need to rename any samples, as all the ones included here have the proper name.
+
+```
+
+###For Lynx pardinus GP only.
+
+```{r Perform separate calling for each species, eval=FALSE, engine='bash'}
+
+#First let's create the list with the 5x samples.
+cd $G_PATH
+rm c_lp_GP_gvcf_list
+echo c_lp_do_0007_recal_round-1.g.vcf.gz >> c_lp_GP_gvcf_list
+echo c_lp_do_0153_recal_round-1.g.vcf.gz >> c_lp_GP_gvcf_list
+echo c_lp_do_0173_recal_round-1.g.vcf.gz >> c_lp_GP_gvcf_list
+echo c_lp_do_0443_recal_round-1.g.vcf.gz >> c_lp_GP_gvcf_list
+echo c_lp_sm_0138_recal_round-1.g.vcf.gz >> c_lp_GP_gvcf_list
+echo c_lp_sm_0140_recal_round-1.g.vcf.gz >> c_lp_GP_gvcf_list
+echo c_lp_sm_0185_recal_round-1.g.vcf.gz >> c_lp_GP_gvcf_list
+echo c_lp_sm_0186_recal_round-1.g.vcf.gz >> c_lp_GP_gvcf_list
+echo c_lp_sm_0221_recal_round-1.g.vcf.gz >> c_lp_GP_gvcf_list
+echo c_lp_sm_0298_recal_round-1.g.vcf.gz >> c_lp_GP_gvcf_list
+echo c_lp_sm_0359_recal_round-1.g.vcf.gz >> c_lp_GP_gvcf_list
+cat c_lp_GP_gvcf_list
+
+#Perform variant calling (it won't include substitutions between species) of all c_lp samples. All gVCFs were generated before in section 1a of ll_phylogeography_VCFs.
+cd $V_PATH
+screen -S c_lp_sm_c_lp_do_GP_var.log
+script c_lp_sm_c_lp_do_GP_var.log
+
+cd $G_PATH
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
+-T GenotypeGVCFs \
+-R $REF \
+$(for var in $(cat c_lp_GP_gvcf_list); do echo -V ${var}" ";done) \
+-o $V_PATH/c_lp_sm_c_lp_do_GP_var.temp.vcf
+
+cd $V_PATH
+bcftools query -l c_lp_sm_c_lp_do_all.vcf #check sample names
+#!/bin/bash
+#cat << "EOF" > lp_rename.txt #Unmark this line when running it (I marked it in R because it doesn't understand it and messes the colours of subsequent lines). It should include all incorrect names.
+#h_lp_do_0007 c_lp_do_0007
+#EOF
+
+bcftools reheader -s lp_rename.txt -o c_lp_sm_c_lp_do_GP_var_renamed.vcf c_lp_sm_c_lp_do_GP_var.vcf #copy the VCF and rename the wrong named samples in the new VCF
+rm c_lp_sm_c_lp_do_GP_var.vcf
+mv c_lp_sm_c_lp_do_GP_var_renamed.vcf c_lp_sm_c_lp_do_GP_var.vcf
+
+grep -v '#' c_lp_sm_c_lp_do_GP_var.vcf | wc -l #3804460
 
 ```
 
@@ -341,6 +389,25 @@ V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
 cat $V_PATH/c_lp_sm_c_lp_do_5x_var.vcf | /opt/vcftools_0.1.13/perl/fill-aa -a /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa.gz | bgzip -c > c_lp_sm_c_lp_do_5x_var_aafilled.vcf.gz #I tried to run this first without bgzipping it, and it was increasingly slow. Each day it did around half the previous day. When the server crashed, I relaunched it adding the bgzip command and it finished in a little over 24h.
 
 gzip -d -c c_lp_sm_c_lp_do_5x_var_aafilled.vcf.gz > c_lp_sm_c_lp_do_5x_var_aafilled.vcf #Get decompressed version. I ran md5sum for both the gzipped and the unzipped versions and there were no differences.
+
+```
+
+###For Lynx pardinus GP only.
+
+```{r Polarize contemporary VCF, eval=FALSE, engine='bash'}
+
+#Variants only:
+
+#Code to annotate the AA (ancestral alleles) subfield from the INFO field in the VCF. I keep getting the following error: "Can't locate Vcf.pm in @INC". I look it up and apparently it's easy to solve: an environment variable PERL5LIB should be defined as the path to perl.
+screen -S c_lp_sm_c_lp_do_GP_var_aafilled.log
+script c_lp_sm_c_lp_do_GP_var_aafilled.log
+
+export PERL5LIB=/opt/vcftools_0.1.13/perl/ #set required environmental variable
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+
+cat $V_PATH/c_lp_sm_c_lp_do_GP_var.vcf | /opt/vcftools_0.1.13/perl/fill-aa -a /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa.gz | bgzip -c > c_lp_sm_c_lp_do_GP_var_aafilled.vcf.gz #I tried to run this first without bgzipping it, and it was increasingly slow. Each day it did around half the previous day. When the server crashed, I relaunched it adding the bgzip command and it finished in a little over 24h.
+
+gzip -d -c c_lp_sm_c_lp_do_GP_var_aafilled.vcf.gz > c_lp_sm_c_lp_do_GP_var_aafilled.vcf #Get decompressed version. I ran md5sum for both the gzipped and the unzipped versions and there were no differences.
 
 ```
 
@@ -616,6 +683,61 @@ return vb.make();' -o c_lp_sm_c_lp_do_5x_var_polarized.vcf c_lp_sm_c_lp_do_5x_va
 
 ```
 
+###For Lynx pardinus GP only.
+
+```{r Polarize contemporary VCF, eval=FALSE, engine='bash'}
+
+#For variants only:
+
+cd $V_PATH
+screen -S c_lp_sm_c_lp_do_GP_var_polarized.log
+script c_lp_sm_c_lp_do_GP_var_polarized.log
+
+java -jar /opt/jvarkit/dist/vcffilterjdk.jar -e 'if(variant.getNAlleles()!=2 || !variant.hasAttribute("AA")) return true; 
+final String aa = variant.getAttributeAsString("AA",""); 
+if(!variant.getAlleles().get(1).getDisplayString().equalsIgnoreCase(aa)) return true; 
+VariantContextBuilder vb=new VariantContextBuilder(variant); 
+
+Allele oldalt = variant.getAlleles().get(1);
+Allele oldref = variant.getAlleles().get(0); 
+Allele ref= Allele.create(oldalt.getDisplayString(),true); 
+Allele alt= Allele.create(oldref.getDisplayString(),false);
+
+vb.alleles(Arrays.asList(ref,alt)); 
+
+List genotypes= new ArrayList<>(); 
+for(Genotype g: variant.getGenotypes()) 
+  { 
+  if(!g.isCalled()) 
+  { genotypes.add(g); continue;} 
+  GenotypeBuilder gb = new GenotypeBuilder(g); 
+  List alleles = new ArrayList<>(); 
+  for(Allele a:g.getAlleles()) { 
+    if(a.equals(oldalt)) { a=ref;} 
+    else if(a.equals(oldref)) { a=alt;} 
+    alleles.add(a); 
+    } 
+  if(g.hasPL()) { 
+    int pl[] = g.getPL(); 
+    int pl2[] = new int[pl.length]; 
+    for(int i=0;i< pl.length;i++) pl2[i]=pl[(pl.length-1)-i]; 
+    gb.PL(pl2); 
+    } 
+  if(g.hasAD()) 
+    { int ad[] = g.getAD(); 
+    int ad2[] = new int[ad.length]; 
+    for(int i=0;i< ad.length;i++) ad2[i]=ad[(ad.length-1)-i];
+    gb.AD(ad2); 
+  } 
+  genotypes.add(gb.alleles(alleles).make()); 
+  }
+
+vb.attribute("AF",1.0d - Double.parseDouble(variant.getAttributeAsString("AF",""))); vb.attribute("AC",variant.getGenotypes().stream().flatMap(G->G.getAlleles().stream()).filter(A->A.equals(oldref)).count()); 
+vb.genotypes(genotypes); 
+return vb.make();' -o c_lp_sm_c_lp_do_GP_var_polarized.vcf c_lp_sm_c_lp_do_GP_var_aafilled.vcf
+
+```
+
 #3: Set up SnpEff. I'll be following this manual for all SnpEff configuration purposes: http://snpeff.sourceforge.net/SnpEff_manual.html
 ##Search for the Lynx pardinus database. 
 Search for the Lynx pardinus assembly database in the program's pre-built database. As of June the 6th, 2017, the Lynx pardinus genome isn't included in the snpEff database. A second option would be building our own Lynx pardinus database.
@@ -888,6 +1010,27 @@ java -Xmx16g -jar $S_PATH/snpEff.jar LYRU.23 -v -s $V_PATH/annotation/c_lp_sm_c_
 
 ```
 
+###For Lynx pardinus GP only. Monomorphic positions (incl. substitutions) are NOT polarized. Grab them from the joint dataset.
+
+```{r Annotate using SnpEff, eval=FALSE, engine='bash'}
+
+#For variants only:
+
+cd $V_PATH/annotation/
+screen -S c_lp_sm_c_lp_do_GP_var_polarized.lr_ann.log #open a dettachable screen in case the test takes too long
+script c_lp_sm_c_lp_do_GP_var_polarized.lr_ann.log #initiate the log file
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+
+cd $O_PATH #run this code from the directory where the config is located.
+java -Xmx16g -jar $S_PATH/snpEff.jar LYRU.23 -v -s $V_PATH/annotation/c_lp_sm_c_lp_do_GP_var_polarized.lr_ann.html -csvStats $V_PATH/annotation/c_lp_sm_c_lp_do_GP_var_polarized.lr_ann.csv -interval $C_PATH/data/LYPA23C.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.UCNE.intergenic.nr.bed $V_PATH/c_lp_sm_c_lp_do_GP_var_polarized.vcf > $V_PATH/annotation/c_lp_sm_c_lp_do_GP_var_polarized.lr_ann.vcf #run this code from the directory where the config is located.
+
+```
+
 #5: Depth range calculus. Obtain depth range for each species in order to filter low/high depth positions as part of the next section's many filterings.
 ##A
 ###For Lynx pardinus.
@@ -1068,6 +1211,70 @@ scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/c_lp_depth_calculus/*
 
 ```
 
+###For Lynx pardinus GP only.
+
+```{r Depth range calculus, eval=FALSE, engine='bash'}
+
+#First let's create the list with the 5x samples.
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_intergenic_5x
+
+rm c_lp_do-c_lp_sm_n011.intergenic.bamlist
+echo /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_intergenic_5x/c_lp_do_0007_intergenic.bam >> c_lp_do-c_lp_sm_n011.intergenic.bamlist
+echo /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_intergenic_5x/c_lp_do_0153_intergenic.bam >> c_lp_do-c_lp_sm_n011.intergenic.bamlist
+echo /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_intergenic_5x/c_lp_do_0173_intergenic.bam >> c_lp_do-c_lp_sm_n011.intergenic.bamlist
+echo /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_intergenic_5x/c_lp_do_0443_intergenic.bam >> c_lp_do-c_lp_sm_n011.intergenic.bamlist
+echo /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_intergenic_5x/c_lp_sm_0138_intergenic.bam >> c_lp_do-c_lp_sm_n011.intergenic.bamlist
+echo /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_intergenic_5x/c_lp_sm_0140_intergenic.bam >> c_lp_do-c_lp_sm_n011.intergenic.bamlist
+echo /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_intergenic_5x/c_lp_sm_0185_intergenic.bam >> c_lp_do-c_lp_sm_n011.intergenic.bamlist
+echo /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_intergenic_5x/c_lp_sm_0186_intergenic.bam >> c_lp_do-c_lp_sm_n011.intergenic.bamlist
+echo /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_intergenic_5x/c_lp_sm_0221_intergenic.bam >> c_lp_do-c_lp_sm_n011.intergenic.bamlist
+echo /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_intergenic_5x/c_lp_sm_0298_intergenic.bam >> c_lp_do-c_lp_sm_n011.intergenic.bamlist
+echo /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_intergenic_5x/c_lp_sm_0359_intergenic.bam >> c_lp_do-c_lp_sm_n011.intergenic.bamlist
+mv c_lp_do-c_lp_sm_n011.intergenic.bamlist /home/dkleinman/datos/c_lp_depth_calculus/
+
+#I'll use Maria's code to calculate depth. Since these populations are big, we'll be using Elena's captured intergenic fraction of the genome:
+
+POPS=(c_lp_do-c_lp_sm)
+cd /home/dkleinman/datos/c_lp_depth_calculus/
+
+screen -S c_lp_GP_depth_calculus.log
+script c_lp_GP_depth_calculus.log
+
+POP=(c_lp_do-c_lp_sm_n011)
+REF="/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa"
+THREADS=20                    # no. of computer cores used 20 = OK, >20 = ask people first!
+REGIONFILE="/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_intergenic_capture/BAM_intergenic_capture_filtered/no_genes_Lypa_10000longest_center_final_slop20_dot.rf"
+BAMLIST=$(ls /home/dkleinman/datos/c_lp_depth_calculus/"$POP".intergenic.bamlist) #intergenic BAMs are actually here: /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_intergenic_5x/
+OUT_NAME="/home/dkleinman/datos/c_lp_depth_calculus/"$POP".intergenic.qc"
+NUMBER_IND=$(printf "%03d" `wc -l $BAMLIST | cut -f1 -d " "`)
+MAXDEPTH=$(expr $NUMBER_IND \* 1000)
+
+#Sanity checks: 
+ls $BAMLIST
+echo $OUT_NAME
+echo $NUMBER_IND
+echo $MAXDEPTH
+
+/opt/angsd/angsd/angsd \
+-P $THREADS \
+-b $BAMLIST \
+-ref $REF \
+-out $OUT_NAME \
+-uniqueOnly 1 \
+-remove_bads 1 \
+-only_proper_pairs 1 \
+-rf $REGIONFILE \
+-baq 1 \
+-C 50 \
+-doQsDist 1 \
+-doDepth 1 \
+-doCounts 1 \
+-maxDepth $MAXDEPTH
+
+scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/c_lp_depth_calculus/*n011*.depth* /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/lp_depth
+
+```
+
 ##B
 
 ```{r Depth range calculus}
@@ -1147,6 +1354,10 @@ write.table(x = depth_per_sample,file = paste("/Users/Dani/ownCloud/backup/g-w_a
 #Use this for Lynx pardinus 5x only:
 write.table(x = depth_per_sample,file = paste("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/lp_depth/mean_sd_depthGlobal_lynx_pardinus_5x_per_pop_mean_folds_",mean_folds,".csv", sep= ""),quote=FALSE, col.names = FALSE, row.names = FALSE, sep= " ")
 
+#Use this for Lynx pardinus GP only:
+write.table(x = depth_per_sample,file = paste("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/lp_depth/mean_sd_depthGlobal_lynx_pardinus_GP_per_pop_mean_folds_",mean_folds,".csv", sep= ""),quote=FALSE, col.names = FALSE, row.names = FALSE, sep= " ")
+
+
     
 ```
 
@@ -1205,6 +1416,24 @@ for POP in ${POPS[@]}
 
 ```    
 
+###For Lynx pardinus GP only.
+
+```{r Depth range calculus, eval=FALSE, engine='bash'}
+
+#First upload the summary table to the server:
+scp /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/lp_depth/mean_sd_depthGlobal_lynx_pardinus_GP_per_pop_mean_folds_0.95.csv dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/c_lp_depth_calculus/
+
+#Separate in populations:
+cd /home/dkleinman/datos/c_lp_depth_calculus/
+POPS=$(cat /home/dkleinman/datos/c_lp_depth_calculus/mean_sd_depthGlobal_lynx_pardinus_GP_per_pop_mean_folds_0.95.csv | awk '{print $1}')
+for POP in ${POPS[@]}
+  do
+  echo $POP
+  grep "${POP} " /home/dkleinman/datos/c_lp_depth_calculus/mean_sd_depthGlobal_lynx_pardinus_GP_per_pop_mean_folds_0.95.csv > "$POP"_mean_sd_depthGlobal_lynx_pardinus_GP_per_pop_mean_folds_0.95.csv
+  done
+
+```    
+
 #6: Filter the annotated VCF. Subset the VCF files in order to keep only good quality biallelic SNP variants. 
 ##Remove repetitive and low mappability regions.
 ###For Lynx pardinus.
@@ -1246,6 +1475,20 @@ script c_lp_sm_c_lp_do_5x_var_polarized_filtered1.lr_ann.vcf.log
 
 bedtools subtract -a c_lp_sm_c_lp_do_5x_var_polarized.lr_ann.vcf -b /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/repeats_and_lowcomp_no_redundant_mappability.k75_lessthan90.bed -header > c_lp_sm_c_lp_do_5x_var_polarized_filtered1.lr_ann.vcf
 grep -v '#' c_lp_sm_c_lp_do_5x_var_polarized_filtered1.lr_ann.vcf | wc -l #1886397
+
+```
+
+###For Lynx pardinus GP only.
+
+```{r Filter the annotated VCF, eval=FALSE, engine='bash'}
+
+#Remove repetitive regions and those with low mappability:
+cd $V_PATH/annotation
+screen -S c_lp_sm_c_lp_do_GP_var_polarized_filtered1.lr_ann.vcf.log
+script c_lp_sm_c_lp_do_GP_var_polarized_filtered1.lr_ann.vcf.log
+
+bedtools subtract -a c_lp_sm_c_lp_do_GP_var_polarized.lr_ann.vcf -b /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/repeats_and_lowcomp_no_redundant_mappability.k75_lessthan90.bed -header > c_lp_sm_c_lp_do_GP_var_polarized_filtered1.lr_ann.vcf
+grep -v '#' c_lp_sm_c_lp_do_GP_var_polarized_filtered1.lr_ann.vcf | wc -l #1577987
 
 ```
 
@@ -1310,6 +1553,26 @@ grep -v '#' c_lp_sm_c_lp_do_5x_var_polarized_filtered2.lr_ann.vcf | wc -l #14690
 
 ```
 
+###For Lynx pardinus GP only.
+
+```{r Filter the annotated VCF, eval=FALSE, engine='bash'}
+
+#During this step, all INDELs as well as all multiallelic and bad quality SNPs will be dropped from the respective VCFs.
+cd $V_PATH/annotation
+screen -S c_lp_sm_c_lp_do_GP_var_polarized_filtered2.lr_ann.log
+script c_lp_sm_c_lp_do_GP_var_polarized_filtered2.lr_ann.log
+
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T SelectVariants \
+-selectType SNP \
+-restrictAllelesTo BIALLELIC \
+-R $REF \
+-V c_lp_sm_c_lp_do_GP_var_polarized_filtered1.lr_ann.vcf \
+-o c_lp_sm_c_lp_do_GP_var_polarized_filtered2.lr_ann.vcf
+grep -v '#' c_lp_sm_c_lp_do_GP_var_polarized_filtered2.lr_ann.vcf | wc -l #1191407
+
+```
+
 ##Remove unpolarizable and fixed positions. Variants where AA is different from REF/ALT alleles (including AA=N) will be dropped at this step, as will all where AF=0 (i.e. low depth, reference genome sequencing errors... for polarized positions).
 ###For Lynx pardinus.
 
@@ -1350,6 +1613,20 @@ script c_lp_sm_c_lp_do_5x_var_polarized_filtered3.lr_ann.log
 
 bcftools view -e '(INFO/AA!=REF & INFO/AA!=ALT) | INFO/AF=0.00' c_lp_sm_c_lp_do_5x_var_polarized_filtered2.lr_ann.vcf > c_lp_sm_c_lp_do_5x_var_polarized_filtered3.lr_ann.vcf
 grep -v '#' c_lp_sm_c_lp_do_5x_var_polarized_filtered3.lr_ann.vcf | wc -l #1380105
+
+```
+
+###For Lynx pardinus GP only.
+
+```{r Filter the annotated VCF, eval=FALSE, engine='bash'}
+
+#Remove polarized ANC fixed variants (AF=0) or those that weren't polarizable (AA different from either REF or ALT):
+cd $V_PATH/annotation
+screen -S c_lp_sm_c_lp_do_GP_var_polarized_filtered3.lr_ann.log
+script c_lp_sm_c_lp_do_GP_var_polarized_filtered3.lr_ann.log
+
+bcftools view -e '(INFO/AA!=REF & INFO/AA!=ALT) | INFO/AF=0.00' c_lp_sm_c_lp_do_GP_var_polarized_filtered2.lr_ann.vcf > c_lp_sm_c_lp_do_GP_var_polarized_filtered3.lr_ann.vcf
+grep -v '#' c_lp_sm_c_lp_do_GP_var_polarized_filtered3.lr_ann.vcf | wc -l #1119965
 
 ```
 
@@ -1429,6 +1706,31 @@ grep -v '#' c_lp_sm_c_lp_do_5x_var_polarized_filtered4.lr_ann.vcf | wc -l #12129
 
 ```
 
+###For Lynx pardinus GP only.
+
+```{r Filter the annotated VCF, eval=FALSE, engine='bash'}
+
+#Apply GATK's recommended filters, and then some.     
+  #QD: QualByDepth (variant confidence divided by the unfiltered depth of non-reference samples). Default < 2.0.
+  #FS: FisherStrand (phred-scaled p-value using Fisher's Exact Test to detect strand bias in the reads). Default > 60.0.
+  #MQ: RMSMappingQuality (root mean square of Mapping Quality of reads across all samples). Default < 40.0.
+  #MQRankSum: MappingQualityRankSumTest (u-based z-approximation from Mann-Whitney Rank Sum Test for Mappin Qualities, i.e. reads with reference alleles vs. those with the alternate allele. Will only be applied to heterozygous calls). Default < -12.5. In theory, this would alleviate contamination problems.
+  #ReadPosRankSum: ReadPosRankSumTest (u-based z-approximation from Mann-Whitney Rank Sum Test for distance from end of the read for reads with the alternate allele. Will only be applied to heterozygous calls). Default < -8.0. In theory, this would alleviate damage problems.
+  #SOR: StrandOddsRatio (evaluates whether there's strand bias in the data). Default > 3.0.
+cd $V_PATH/annotation
+screen -S c_lp_sm_c_lp_do_GP_var_polarized_filtered4.lr_ann.log
+script c_lp_sm_c_lp_do_GP_var_polarized_filtered4.lr_ann.log
+
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T SelectVariants \
+-select "QUAL >= 30 && QD >= 2.0 && FS <= 60.0 && MQ >= 40.0 && MQRankSum >= -12.5 && ReadPosRankSum >= -8.0" \
+-R $REF \
+-V c_lp_sm_c_lp_do_GP_var_polarized_filtered3.lr_ann.vcf \
+-o c_lp_sm_c_lp_do_GP_var_polarized_filtered4.lr_ann.vcf
+grep -v '#' c_lp_sm_c_lp_do_GP_var_polarized_filtered4.lr_ann.vcf | wc -l #901666
+
+```
+
 ##Remove low and high DP and 0.325 missingness positions.
 ###For Lynx pardinus.
 
@@ -1481,6 +1783,24 @@ echo $MIN_DP
 echo $MAX_DP
 $BCF filter -e "DP < ${MIN_DP} || DP > ${MAX_DP}" -Ov -o $V_PATH/annotation/c_lp_sm_c_lp_do_5x_var_polarized_filtered5.lr_ann.vcf $V_PATH/annotation/c_lp_sm_c_lp_do_5x_var_polarized_filtered4.lr_ann.vcf
 grep -v '#' c_lp_sm_c_lp_do_5x_var_polarized_filtered5.lr_ann.vcf | wc -l #1182577
+
+```
+
+###For Lynx pardinus GP only (note: missingness filter won't be applied here since all belong to the same dataset).
+
+```{r Apply per species filters, eval=FALSE, engine='bash'}
+
+#First, for each species exclude those positions that have lower (higher) depth than the minimum (maximum) within 0.95 of the distribution, as calculated above:
+cd $V_PATH/annotation/
+screen -S c_lp_sm_c_lp_do_GP_var_polarized_filtered5.lr_ann.log
+script c_lp_sm_c_lp_do_GP_var_polarized_filtered5.lr_ann.log
+
+MIN_DP=$(cat /home/dkleinman/datos/c_lp_depth_calculus/c_lp_do-c_lp_sm_n011_mean_sd_depthGlobal_lynx_pardinus_GP_per_pop_mean_folds_0.95.csv | awk '{print $9}') #Obtained in section 5
+MAX_DP=$(cat /home/dkleinman/datos/c_lp_depth_calculus/c_lp_do-c_lp_sm_n011_mean_sd_depthGlobal_lynx_pardinus_GP_per_pop_mean_folds_0.95.csv | awk '{print $8}') #Obtained in section 5
+echo $MIN_DP
+echo $MAX_DP
+$BCF filter -e "DP < ${MIN_DP} || DP > ${MAX_DP}" -Ov -o $V_PATH/annotation/c_lp_sm_c_lp_do_GP_var_polarized_filtered5.lr_ann.vcf $V_PATH/annotation/c_lp_sm_c_lp_do_GP_var_polarized_filtered4.lr_ann.vcf
+grep -v '#' c_lp_sm_c_lp_do_GP_var_polarized_filtered5.lr_ann.vcf | wc -l #855528
 
 ```
 
@@ -1559,6 +1879,39 @@ for j in ${POP[@]}
   
 grep -v '#' c_lp_do_5x_perpop_var.lr_ann.vcf | wc -l #742518
 grep -v '#' c_lp_sm_5x_perpop_var.lr_ann.vcf | wc -l #1058474
+
+```
+
+###For Lynx pardinus GP only.
+
+```{r Obtain per population VCFs, eval=FALSE, engine='bash'}
+
+cd $V_PATH/annotation/
+screen -S lp_GP_perpop_var.lr_ann.log
+script lp_GP_perpop_var.lr_ann.log
+
+cd $G_PATH
+declare POP=$(ls c_{lp_sm*,lp_do*}.g.vcf.gz | cut -c1-7 | uniq | grep "${i}")
+cd $V_PATH/annotation/
+for j in ${POP[@]}
+  do
+  echo "${j}"
+  rm "${j}"_pop_list_to_remove.txt
+  $BCF query -l $V_PATH/annotation/c_lp_sm_c_lp_do_GP_var_polarized_filtered5.lr_ann.vcf | grep "${j}" > "${j}"_pop_list_to_remove.txt
+  cat "${j}"_pop_list_to_remove.txt
+  mkdir "${j}"_GP_perpop_sep_calling
+  java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+  -T SelectVariants \
+  -R $REF \
+  -V $V_PATH/annotation/c_lp_sm_c_lp_do_GP_var_polarized_filtered5.lr_ann.vcf \
+  -o $V_PATH/annotation/"${j}"_GP_perpop_sep_calling/"${j}"_GP_perpop_var.lr_ann.vcf \
+  -env \
+  --sample_file "${j}"_pop_list_to_remove.txt
+  rm "${j}"_pop_list_to_remove.txt
+  done
+  
+grep -v '#' c_lp_do_GP_perpop_var.lr_ann.vcf | wc -l #525837
+grep -v '#' c_lp_sm_GP_perpop_var.lr_ann.vcf | wc -l #784627
 
 ```
 
@@ -2162,7 +2515,7 @@ for i in ${POP[@]}
   do
   echo "${i}"
   mkdir $V_PATH/annotation/"${i}"_5x_individuals_sep_calling
-  declare INDIVIDUALS=$(cat $G_PATH/c_lp_5x_gvcf_list | cut -c1-12 | uniq)
+  declare INDIVIDUALS=$(cat $G_PATH/c_lp_5x_gvcf_list | cut -c1-12 | uniq | grep "${i}")
   for j in ${INDIVIDUALS[@]}
     do
     echo "${j}"
@@ -2172,6 +2525,39 @@ for i in ${POP[@]}
     -R $REF \
     -V $V_PATH/annotation/"${i}"_5x_perpop_sep_calling/"${i}"_5x_perpop_var.lr_ann.vcf \
     -o $V_PATH/annotation/"${i}"_5x_individuals_sep_calling/"${j}"_5x_individual_var.lr_ann.vcf \
+    -env \
+    -sn $ID
+    done
+  done
+
+```
+
+##For Lynx pardinus GP only.
+
+```{r Split the population VCFs into per individual VCFs, eval=FALSE, engine='bash'}
+
+#Generate individual VCFs from the per species VCFs:
+cd $V_PATH/annotation
+screen -S lp_GP_individuals_var.lr_ann.log
+script lp_GP_individuals_var.lr_ann.log
+
+#For each individual in the sm, do, ki, po & no populations, subset its variants from the respective population VCF:
+cd $G_PATH
+declare POP=$(ls c_{lp_sm*,lp_do*}.g.vcf.gz | cut -c1-7 | uniq)
+for i in ${POP[@]}
+  do
+  echo "${i}"
+  mkdir $V_PATH/annotation/"${i}"_GP_individuals_sep_calling
+  declare INDIVIDUALS=$(cat $G_PATH/c_lp_GP_gvcf_list | cut -c1-12 | uniq | grep "${i}")
+  for j in ${INDIVIDUALS[@]}
+    do
+    echo "${j}"
+    ID=$(echo "${j}")
+    java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+    -T SelectVariants \
+    -R $REF \
+    -V $V_PATH/annotation/"${i}"_GP_perpop_sep_calling/"${i}"_GP_perpop_var.lr_ann.vcf \
+    -o $V_PATH/annotation/"${i}"_GP_individuals_sep_calling/"${j}"_GP_individual_var.lr_ann.vcf \
     -env \
     -sn $ID
     done
