@@ -1,0 +1,486 @@
+---
+title: "whole_genome_contamination_tests"
+author: "Dani"
+date: "10 de diciembre de 2018"
+output: html_document
+---
+
+#Here we'll be comparing the set of LP-LL substitutions with different sets of SNPs (LP 5x, LP GP, LL...).
+
+#0: Define paths.
+
+```{r Define paths, eval=FALSE, engine='bash'}
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+```
+
+#1: Obtain comparison bed files.
+##General files.
+
+```{r Obtain comparison bed files, eval=FALSE, engine='bash'}
+
+cd $V_PATH/annotation
+
+#LP-LL substitutions will be extracted from the ".positions_class_callable_universe" files, obtained with script "substitutions_lynx_genus_VCFs":
+grep -v '#' /home/dkleinman/datos/VCFs_Dani/c_ll_ki_0090_plus_c_lp_sm_0298_recal_round-1_25x_SNPs.positions_class_callable_universe | grep 'Substitution' | awk '{printf ("%s\t%s\t%s\t%s\n", $1, $2 - 1, $2, $1"_"$2 - 1"_"$2)}' > c_ll_ki_0090_plus_c_lp_sm_0298_recal_round-1_25x_subst_coord.bed
+
+#LP total SNPs will be extracted from the filtered VCF (separate calling), obtained with the script "genetic_load_separate_calling":
+grep -v '#' $V_PATH/annotation/c_lp_sm_c_lp_do_var_polarized_filtered5.lr_ann.vcf | awk '{printf ("%s\t%s\t%s\t%s\t%s\n", $1, $2 - 1, $2, $1"_"$2 - 1"_"$2, $8)}' > c_lp_sm_c_lp_do_snp_coord.bed
+
+#LP 5x SNPs will be extracted from the filtered VCF (separate calling), obtained with the script "genetic_load_separate_calling":
+grep -v '#' $V_PATH/annotation/c_lp_sm_c_lp_do_5x_var_polarized_filtered5.lr_ann.vcf | awk '{printf ("%s\t%s\t%s\t%s\t%s\n", $1, $2 - 1, $2, $1"_"$2 - 1"_"$2, $8)}' > c_lp_sm_c_lp_do_5x_snp_coord.bed
+
+#LP GP SNPs will be extracted from the filtered VCF (separate calling), obtained with the script "genetic_load_separate_calling":
+grep -v '#' $V_PATH/annotation/c_lp_sm_c_lp_do_GP_var_polarized_filtered5.lr_ann.vcf | awk '{printf ("%s\t%s\t%s\t%s\t%s\n", $1, $2 - 1, $2, $1"_"$2 - 1"_"$2, $8)}' > c_lp_sm_c_lp_do_GP_snp_coord.bed
+
+#LL SNPs will be extracted from the filtered VCF (separate calling), obtained with the script "genetic_load_separate_calling":
+grep -v '#' $V_PATH/annotation/c_ll_ki_c_ll_no_c_ll_po_var_polarized_filtered5.lr_ann.vcf | awk '{printf ("%s\t%s\t%s\t%s\t%s\n", $1, $2 - 1, $2, $1"_"$2 - 1"_"$2, $8)}' > c_ll_ki_c_ll_no_c_ll_po_snp_coord.bed
+
+
+scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/*subst_coord.bed /Users/Dani/ownCloud/backup/contamination/lp_5x_contamination_tests/w-g/
+scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/*snp_coord.bed /Users/Dani/ownCloud/backup/contamination/lp_5x_contamination_tests/w-g/
+
+```
+
+##Synonymous files.
+
+```{r Obtain comparison bed files, eval=FALSE, engine='bash'}
+
+cd $V_PATH/annotation
+
+#LP-LL substitutions will be extracted from the ".positions_class_callable_universe" files, obtained with script "substitutions_lynx_genus_VCFs":
+grep -v '#' /home/dkleinman/datos/VCFs_Dani/c_ll_ki_0090_plus_c_lp_sm_0298_recal_round-1_25x_SNPs.positions_class_callable_universe | grep 'Substitution' | awk '{printf ("%s\t%s\t%s\t%s\n", $1, $2 - 1, $2, $1"_"$2 - 1"_"$2)}' > c_ll_ki_0090_plus_c_lp_sm_0298_recal_round-1_25x_subst_coord.bed
+
+#LP syn SNPs:
+grep 'synonymous' c_lp_sm_c_lp_do_snp_coord.bed > c_lp_sm_c_lp_do_syn_coord.bed
+
+#LP 5x syn SNPs:
+grep 'synonymous' c_lp_sm_c_lp_do_5x_snp_coord.bed > c_lp_sm_c_lp_do_5x_syn_coord.bed
+
+#LP GP syn SNPs:
+grep 'synonymous' c_lp_sm_c_lp_do_GP_snp_coord.bed > c_lp_sm_c_lp_do_GP_syn_coord.bed
+
+#LL syn SNPs:
+grep 'synonymous' c_ll_ki_c_ll_no_c_ll_po_snp_coord.bed > c_ll_ki_c_ll_no_c_ll_po_syn_coord.bed
+
+scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/*syn_coord.bed /Users/Dani/ownCloud/backup/contamination/lp_5x_contamination_tests/w-g/
+
+```
+
+#2: Obtain venn diagrams.
+##All positions.
+
+```{r Get annotation statistics}
+
+library(readr)
+library(dplyr)
+library(VennDiagram)
+
+work_dir <- file.path("/Users/Dani/ownCloud/backup/contamination/lp_5x_contamination_tests/w-g/")
+subst_coord <- read_tsv(paste0(work_dir,"c_ll_ki_0090_plus_c_lp_sm_0298_recal_round-1_25x_subst_coord.bed"),col_names=c("scaffold","start","end","name"))
+lp_snps_coord <- read_tsv(paste0(work_dir,"c_lp_sm_c_lp_do_snp_coord.bed"),col_names=c("scaffold","start","end","name","info"))
+lp5x_snps_coord <- read_tsv(paste0(work_dir,"c_lp_sm_c_lp_do_5x_snp_coord.bed"),col_names=c("scaffold","start","end","name","info"))
+lpGP_snps_coord <- read_tsv(paste0(work_dir,"c_lp_sm_c_lp_do_GP_snp_coord.bed"),col_names=c("scaffold","start","end","name","info"))
+ll_snps_coord <- read_tsv(paste0(work_dir,"c_ll_ki_c_ll_no_c_ll_po_snp_coord.bed"),col_names=c("scaffold","start","end","name","info"))
+
+
+#lpGP_snps-vs-lp5x_snps
+setwd(work_dir)
+venn.plot <- venn.diagram(
+  x = list(
+    "lpGP_snps" = lpGP_snps_coord$name,
+    "lp5x_snps" = lp5x_snps_coord$name
+  ),
+  filename = "lpGP_snps-vs-lp5x_snps",
+  imagetype = "png",
+  euler.d = T,
+  scaled = T,
+  fill = c("grey", "black"),
+  alpha = c(0.5, 0.5),
+  cex = 2,
+  cat.cex = 1.5,
+  cat.pos = c(190,170),
+  cat.dist = c(0.06,0.06)#,
+  #ext.text = T
+)
+
+#subst-vs-lp_snps
+setwd(work_dir)
+venn.plot <- venn.diagram(
+  x = list(
+    "lp-ll_subst" = subst_coord$name,
+    "lp_snps" = lp_snps_coord$name
+  ),
+  filename = "subst-vs-lp_snps",
+  imagetype = "png",
+  euler.d = T,
+  scaled = T,
+  fill = c("grey", "black"),
+  alpha = c(0.5, 0.5),
+  cex = 2,
+  cat.cex = 1.5,
+  cat.pos = c(190,170),
+  cat.dist = c(0.06,0.06)#,
+  #ext.text = T
+)
+
+#subst-vs-lp5x_snps
+setwd(work_dir)
+venn.plot <- venn.diagram(
+  x = list(
+    "lp-ll_subst" = subst_coord$name,
+    "lp5x_snps" = lp5x_snps_coord$name
+  ),
+  filename = "subst-vs-lp5x_snps",
+  imagetype = "png",
+  euler.d = T,
+  scaled = T,
+  fill = c("grey", "black"),
+  alpha = c(0.5, 0.5),
+  cex = 2,
+  cat.cex = 1.5,
+  cat.pos = c(190,170),
+  cat.dist = c(0.06,0.06)#,
+  #ext.text = T
+)
+
+#subst-vs-lpGP_snps
+setwd(work_dir)
+venn.plot <- venn.diagram(
+  x = list(
+    "lp-ll_subst" = subst_coord$name,
+    "lpGP_snps" = lpGP_snps_coord$name
+  ),
+  filename = "subst-vs-lpGP_snps",
+  imagetype = "png",
+  euler.d = T,
+  scaled = T,
+  fill = c("grey", "black"),
+  alpha = c(0.5, 0.5),
+  cex = 2,
+  cat.cex = 1.5,
+  cat.pos = c(190,170),
+  cat.dist = c(0.06,0.06)#,
+  #ext.text = T
+)
+
+#subst-vs-lpGP_snps-vs-lp5x_snps
+setwd(work_dir)
+venn.plot <- venn.diagram(
+  x = list(
+    "lp-ll_subst" = subst_coord$name,
+    "lpGP_snps" = lpGP_snps_coord$name,
+    "lp5x_snps" = lp5x_snps_coord$name
+  ),
+  filename = "subst-vs-lpGP_snps-vs-lp5x_snps",
+  imagetype = "png",
+  euler.d = T,
+  scaled = T,
+  fill = c("grey", "black", "darkgrey"),
+  alpha = c(0.5, 0.5, 0.5),
+  cex = 2,
+  cat.cex = 1.5#,
+  #cat.pos = c(190,170),
+  #cat.dist = c(0.06,0.06)#,
+  #ext.text = T
+)
+
+#subst-vs-ll_snps
+setwd(work_dir)
+venn.plot <- venn.diagram(
+  x = list(
+    "lp-ll_subst" = subst_coord$name,
+    "ll_snps" = ll_snps_coord$name
+  ),
+  filename = "subst-vs-ll_snps",
+  imagetype = "png",
+  euler.d = T,
+  scaled = T,
+  fill = c("grey", "black"),
+  alpha = c(0.5, 0.5),
+  cex = 2,
+  cat.cex = 1.5,
+  cat.pos = c(190,170),
+  cat.dist = c(0.06,0.06)#,
+  #ext.text = T
+)
+
+#subst-vs-lp_snps-vs-ll_snps
+setwd(work_dir)
+venn.plot <- venn.diagram(
+  x = list(
+    "lp-ll_subst" = subst_coord$name,
+    "lp_snps" = lp_snps_coord$name,
+    "ll_snps" = ll_snps_coord$name
+  ),
+  filename = "subst-vs-lp_snps-vs-ll_snps",
+  imagetype = "png",
+  euler.d = T,
+  scaled = T,
+  fill = c("grey", "black", "darkgrey"),
+  alpha = c(0.5, 0.5, 0.5),
+  cex = 2,
+  cat.cex = 1.5#,
+  #cat.pos = c(190,170),
+  #cat.dist = c(0.06,0.06)#,
+  #ext.text = T
+)
+
+#subst-vs-lpGP_snps-vs-ll_snps
+setwd(work_dir)
+venn.plot <- venn.diagram(
+  x = list(
+    "lp-ll_subst" = subst_coord$name,
+    "lpGP_snps" = lpGP_snps_coord$name,
+    "ll_snps" = ll_snps_coord$name
+  ),
+  filename = "subst-vs-lpGP_snps-vs-ll_snps",
+  imagetype = "png",
+  euler.d = T,
+  scaled = T,
+  fill = c("grey", "black", "darkgrey"),
+  alpha = c(0.5, 0.5, 0.5),
+  cex = 2,
+  cat.cex = 1.5#,
+  #cat.pos = c(190,170),
+  #cat.dist = c(0.06,0.06)#,
+  #ext.text = T
+)
+
+#subst-vs-lp5x_snps-vs-ll_snps
+setwd(work_dir)
+venn.plot <- venn.diagram(
+  x = list(
+    "lp-ll_subst" = subst_coord$name,
+    "lp5x_snps" = lp5x_snps_coord$name,
+    "ll_snps" = ll_snps_coord$name
+  ),
+  filename = "subst-vs-lp5x_snps-vs-ll_snps",
+  imagetype = "png",
+  euler.d = T,
+  scaled = T,
+  fill = c("grey", "black", "darkgrey"),
+  alpha = c(0.5, 0.5, 0.5),
+  cex = 2,
+  cat.cex = 1.5#,
+  #cat.pos = c(190,170),
+  #cat.dist = c(0.06,0.06)#,
+  #ext.text = T
+)
+
+
+```
+
+
+##Synonymous positions.
+
+```{r Get annotation statistics}
+
+library(readr)
+library(dplyr)
+library(VennDiagram)
+
+work_dir <- file.path("/Users/Dani/ownCloud/backup/contamination/lp_5x_contamination_tests/w-g/")
+#subst_coord <- read_tsv(paste0(work_dir,"c_ll_ki_0090_plus_c_lp_sm_0298_recal_round-1_25x_subst_coord.bed"),col_names=c("scaffold","start","end","name"))
+lp_syn_coord <- read_tsv(paste0(work_dir,"c_lp_sm_c_lp_do_syn_coord.bed"),col_names=c("scaffold","start","end","name","info"))
+lp5x_syn_coord <- read_tsv(paste0(work_dir,"c_lp_sm_c_lp_do_5x_syn_coord.bed"),col_names=c("scaffold","start","end","name","info"))
+lpGP_syn_coord <- read_tsv(paste0(work_dir,"c_lp_sm_c_lp_do_GP_syn_coord.bed"),col_names=c("scaffold","start","end","name","info"))
+ll_syn_coord <- read_tsv(paste0(work_dir,"c_ll_ki_c_ll_no_c_ll_po_syn_coord.bed"),col_names=c("scaffold","start","end","name","info"))
+
+
+#syn_lpGP_snps-vs-lp5x_snps
+setwd(work_dir)
+venn.plot <- venn.diagram(
+  x = list(
+    "lpGP_snps" = lpGP_syn_coord$name,
+    "lp5x_snps" = lp5x_syn_coord$name
+  ),
+  filename = "syn_lpGP_snps-vs-lp5x_snps",
+  imagetype = "png",
+  euler.d = T,
+  scaled = T,
+  fill = c("grey", "black"),
+  alpha = c(0.5, 0.5),
+  cex = 2,
+  cat.cex = 1.5,
+  cat.pos = c(190,170),
+  cat.dist = c(0.06,0.06)#,
+  #ext.text = T
+)
+
+#syn_subst-vs-lp_snps
+setwd(work_dir)
+venn.plot <- venn.diagram(
+  x = list(
+    "lp-ll_subst" = subst_coord$name,
+    "lp_snps" = lp_syn_coord$name
+  ),
+  filename = "syn_subst-vs-lp_snps",
+  imagetype = "png",
+  euler.d = T,
+  scaled = T,
+  fill = c("grey", "black"),
+  alpha = c(0.5, 0.5),
+  cex = 2,
+  cat.cex = 1.5,
+  cat.pos = c(190,170),
+  cat.dist = c(0.06,0.06)#,
+  #ext.text = T
+)
+
+#syn_subst-vs-lp5x_snps
+setwd(work_dir)
+venn.plot <- venn.diagram(
+  x = list(
+    "lp-ll_subst" = subst_coord$name,
+    "lp5x_snps" = lp5x_syn_coord$name
+  ),
+  filename = "syn_subst-vs-lp5x_snps",
+  imagetype = "png",
+  euler.d = T,
+  scaled = T,
+  fill = c("grey", "black"),
+  alpha = c(0.5, 0.5),
+  cex = 2,
+  cat.cex = 1.5,
+  cat.pos = c(190,170),
+  cat.dist = c(0.06,0.06)#,
+  #ext.text = T
+)
+
+#syn_subst-vs-lpGP_snps
+setwd(work_dir)
+venn.plot <- venn.diagram(
+  x = list(
+    "lp-ll_subst" = subst_coord$name,
+    "lpGP_snps" = lpGP_syn_coord$name
+  ),
+  filename = "syn_subst-vs-lpGP_snps",
+  imagetype = "png",
+  euler.d = T,
+  scaled = T,
+  fill = c("grey", "black"),
+  alpha = c(0.5, 0.5),
+  cex = 2,
+  cat.cex = 1.5,
+  cat.pos = c(190,170),
+  cat.dist = c(0.06,0.06)#,
+  #ext.text = T
+)
+
+#syn_subst-vs-lpGP_snps-vs-lp5x_snps
+setwd(work_dir)
+venn.plot <- venn.diagram(
+  x = list(
+    "lp-ll_subst" = subst_coord$name,
+    "lpGP_snps" = lpGP_syn_coord$name,
+    "lp5x_snps" = lp5x_syn_coord$name
+  ),
+  filename = "syn_subst-vs-lpGP_snps-vs-lp5x_snps",
+  imagetype = "png",
+  euler.d = T,
+  scaled = T,
+  fill = c("grey", "black", "darkgrey"),
+  alpha = c(0.5, 0.5, 0.5),
+  cex = 2,
+  cat.cex = 1.5#,
+  #cat.pos = c(190,170),
+  #cat.dist = c(0.06,0.06)#,
+  #ext.text = T
+)
+
+#syn_subst-vs-ll_snps
+setwd(work_dir)
+venn.plot <- venn.diagram(
+  x = list(
+    "lp-ll_subst" = subst_coord$name,
+    "ll_snps" = ll_syn_coord$name
+  ),
+  filename = "syn_subst-vs-ll_snps",
+  imagetype = "png",
+  euler.d = T,
+  scaled = T,
+  fill = c("grey", "black"),
+  alpha = c(0.5, 0.5),
+  cex = 2,
+  cat.cex = 1.5,
+  cat.pos = c(190,170),
+  cat.dist = c(0.06,0.06)#,
+  #ext.text = T
+)
+
+#syn_subst-vs-lp_snps-vs-ll_snps
+setwd(work_dir)
+venn.plot <- venn.diagram(
+  x = list(
+    "lp-ll_subst" = subst_coord$name,
+    "lp_snps" = lp_syn_coord$name,
+    "ll_snps" = ll_syn_coord$name
+  ),
+  filename = "syn_subst-vs-lp_snps-vs-ll_snps",
+  imagetype = "png",
+  euler.d = T,
+  scaled = T,
+  fill = c("grey", "black", "darkgrey"),
+  alpha = c(0.5, 0.5, 0.5),
+  cex = 2,
+  cat.cex = 1.5#,
+  #cat.pos = c(190,170),
+  #cat.dist = c(0.06,0.06)#,
+  #ext.text = T
+)
+
+#syn_subst-vs-lpGP_snps-vs-ll_snps
+setwd(work_dir)
+venn.plot <- venn.diagram(
+  x = list(
+    "lp-ll_subst" = subst_coord$name,
+    "lpGP_snps" = lpGP_syn_coord$name,
+    "ll_snps" = ll_syn_coord$name
+  ),
+  filename = "syn_subst-vs-lpGP_snps-vs-ll_snps",
+  imagetype = "png",
+  euler.d = T,
+  scaled = T,
+  fill = c("grey", "black", "darkgrey"),
+  alpha = c(0.5, 0.5, 0.5),
+  cex = 2,
+  cat.cex = 1.5#,
+  #cat.pos = c(190,170),
+  #cat.dist = c(0.06,0.06)#,
+  #ext.text = T
+)
+
+#syn_subst-vs-lp5x_snps-vs-ll_snps
+setwd(work_dir)
+venn.plot <- venn.diagram(
+  x = list(
+    "lp-ll_subst" = subst_coord$name,
+    "lp5x_snps" = lp5x_syn_coord$name,
+    "ll_snps" = ll_syn_coord$name
+  ),
+  filename = "syn_subst-vs-lp5x_snps-vs-ll_snps",
+  imagetype = "png",
+  euler.d = T,
+  scaled = T,
+  fill = c("grey", "black", "darkgrey"),
+  alpha = c(0.5, 0.5, 0.5),
+  cex = 2,
+  cat.cex = 1.5#,
+  #cat.pos = c(190,170),
+  #cat.dist = c(0.06,0.06)#,
+  #ext.text = T
+)
+
+
+```
+
