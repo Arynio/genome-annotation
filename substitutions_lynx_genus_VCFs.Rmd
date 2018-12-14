@@ -12,7 +12,7 @@ output: html_document
 
 B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAMs path
 G_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
-V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+V_PATH=/home/dkleinman/datos/VCFs_Dani #VCFs path
 REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
 GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
 BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
@@ -262,7 +262,9 @@ cat c_lr_zz_0001_c_ll_ki_0090_joined_variants.txt | awk '{if($2 == $4) print $0"
 
 ```
 
-#4a: Obtain joint VCF for eurasian and rufus. Extract data for the two species in order to catalogue substitutions.
+#4: Get substitutions for any pair of species.
+##Lynx lynx - Lynx rufus.
+###Obtain joint VCF for eurasian and rufus. Extract data for the two species in order to catalogue substitutions.
 
 ```{r Obtain joint VCF for eurasian and rufus, eval=FALSE, engine='bash'}
 
@@ -274,7 +276,7 @@ grep -v '#' c_ll_ki_0090_plus_c_lr_zz_0001_recal_round-1_25x.vcf | wc -l #241276
 
 ```
 
-#4b: Extract SNPs from the VCF. Subset the VCF files in order to keep only SNP variants.
+###Extract SNPs from the VCF. Subset the VCF files in order to keep only SNP variants.
 
 ```{r Extract SNPs from the VCF, eval=FALSE, engine='bash'}
 
@@ -291,7 +293,7 @@ grep -v '#' c_ll_ki_0090_plus_c_lr_zz_0001_recal_round-1_25x_SNPs.vcf | wc -l #2
 
 ```
 
-#5: Get substitutions between ll and lr. Build allele counts file with all positions in ll and lr, and mark all substitutions.
+###Get substitutions between ll and lr. Build allele counts file with all positions in ll and lr, and mark all substitutions.
 
 ```{r Get substitutions between ll and lr, eval=FALSE, engine='bash'}
 
@@ -325,5 +327,75 @@ else
 #Exclude all rows with missing data, INDELs and various alleles.
 cd $V_PATH
 grep -Ev 'NA|Multiallelic|INDEL' c_ll_ki_0090_plus_c_lr_zz_0001_recal_round-1_25x_SNPs.positions_class > c_ll_ki_0090_plus_c_lr_zz_0001_recal_round-1_25x_SNPs.positions_class_callable_universe
+
+```
+
+##Lynx lynx - Lynx pardinus.
+###Obtain joint VCF for eurasian and pardinus. Extract data for the two species in order to catalogue substitutions.
+
+```{r Obtain joint VCF for eurasian and rufus, eval=FALSE, engine='bash'}
+
+#Obtain VCF for the eurasian and pardinus:
+cd $V_PATH
+$BCF view -s c_ll_ki_0090,c_lp_sm_0298 -Ov -o $V_PATH/c_ll_ki_0090_plus_c_lp_sm_0298_recal_round-1_25x.vcf $V_PATH/c_lp_ll_lc_lr_all_sites_renamed.vcf
+
+grep -v '#' c_ll_ki_0090_plus_c_lp_sm_0298_recal_round-1_25x.vcf | wc -l #2412763898
+
+```
+
+###Extract SNPs from the VCF. Subset the VCF files in order to keep only SNP variants.
+
+```{r Extract SNPs from the VCF, eval=FALSE, engine='bash'}
+
+#During this step, all INDELs will be dropped from the VCF (not entirely true... INDELs where one variant is monoallelic will remain).
+cd $V_PATH
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+  -T SelectVariants \
+  --selectTypeToExclude INDEL \
+  -R $REF \
+  -V c_ll_ki_0090_plus_c_lp_sm_0298_recal_round-1_25x.vcf \
+  -o c_ll_ki_0090_plus_c_lp_sm_0298_recal_round-1_25x_SNPs.vcf
+
+grep -v '#' c_ll_ki_0090_plus_c_lp_sm_0298_recal_round-1_25x_SNPs.vcf | wc -l #2407070749
+
+```
+
+###Get substitutions between ll and lr. Build allele counts file with all positions in ll and lr, and mark all substitutions.
+
+```{r Get substitutions between ll and lr, eval=FALSE, engine='bash'}
+
+#Extract appropriate columns from the VCF:
+cd $V_PATH
+grep -v '#' c_ll_ki_0090_plus_c_lp_sm_0298_recal_round-1_25x_SNPs.vcf | cut -f1,2,4,5,10,11 | awk '{printf ("%s\t%s\t%s\t%s\t%.3s\t%.3s\n", $1, $2, $3, $4, $5, $6)}' > c_ll_ki_0090_plus_c_lp_sm_0298_recal_round-1_25x_SNPs.positions
+
+#Classify the positions into the following categories: NA (whenever there is missing data), multiallelic (whenever there's a comma separating two or more alternative alleles), INDEL (when any allele covers more than one position), invariable (when the reference allele is fixed in both ll and lr), substitution (when alleles are alternatively fixed in ll and lr), common substitution with respect to the ancestor (when the alternative allele is fixed in both ll and lr), SNP (the remaining cases).
+cd $V_PATH
+rm c_ll_ki_0090_plus_c_lp_sm_0298_recal_round-1_25x_SNPs.positions_class
+NAMES="Scaffold Position Reference Alternative c_ll_ki_0090 c_lp_sm_0298 Class"
+echo $NAMES > c_ll_ki_0090_plus_c_lp_sm_0298_recal_round-1_25x_SNPs.positions_class
+awk '{
+if ($5 == "./." || $6 == "./.")
+	print $0 "\t NA";
+else if ($4 ~ /,/) 
+	print $0 "\t Multiallelic";
+else if ((length($3) > 1) || (length($4) > 1) || $4 ~ /*/)
+	print $0 "\t INDEL";
+else if ($5 == "0/0" && $6 == "0/0")
+  print $0 "\t Invariable";
+else if (($5 == "0/0" && $6 == "1/1") || ($5 == "1/1" && $6 == "0/0"))
+	print $0 "\t Substitution";
+else if ($5 == "1/1" && $6 == "1/1")
+  print $0 "\t Comm_substitution"
+else
+  print $0 "\t SNP"
+}' c_ll_ki_0090_plus_c_lp_sm_0298_recal_round-1_25x_SNPs.positions >> c_ll_ki_0090_plus_c_lp_sm_0298_recal_round-1_25x_SNPs.positions_class
+
+
+#Exclude all rows with missing data, INDELs and various alleles.
+cd $V_PATH
+grep -Ev 'NA|Multiallelic|INDEL' c_ll_ki_0090_plus_c_lp_sm_0298_recal_round-1_25x_SNPs.positions_class > c_ll_ki_0090_plus_c_lp_sm_0298_recal_round-1_25x_SNPs.positions_class_callable_universe
+
+grep 'Substitution' c_ll_ki_0090_plus_c_lp_sm_0298_recal_round-1_25x_SNPs.positions_class_callable_universe | wc -l #4410056
+
 
 ```
