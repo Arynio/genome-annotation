@@ -481,6 +481,232 @@ venn.plot <- venn.diagram(
   #ext.text = T
 )
 
+```
+
+#3: Obtain the per-dataset list of private variants.
+##General files.
+```{r Obtain the per-dataset list of private variants, eval=FALSE, engine='bash'}
+
+cd $V_PATH/annotation
+
+#5x total variants:
+grep -v '#' $V_PATH/annotation/c_lp_sm_c_lp_do_5x_var_polarized_filtered5.lr_ann.vcf | awk -F';' '{print $1,$3}' OFS="\t" | awk -F'=' '{print $1,$3}' OFS="\t" | awk '{printf ("%s\t%s\t%s\t%s\t%s\t%s\n", $1, $2 - 1, $2, $1"_"$2 - 1"_"$2, $9, "5x")}' > c_lp_sm_c_lp_do_5x_snp_coord.freq
+grep -v '#' c_lp_sm_c_lp_do_5x_snp_coord.freq | wc -l #1182577
+
+#GP total variants:
+grep -v '#' $V_PATH/annotation/c_lp_sm_c_lp_do_GP_var_polarized_filtered5.lr_ann.vcf | awk -F';' '{print $1,$3}' OFS="\t" | awk -F'=' '{print $1,$3}' OFS="\t" | awk '{printf ("%s\t%s\t%s\t%s\t%s\t%s\n", $1, $2 - 1, $2, $1"_"$2 - 1"_"$2, $9, "GP")}' > c_lp_sm_c_lp_do_GP_snp_coord.freq
+grep -v '#' c_lp_sm_c_lp_do_GP_snp_coord.freq | wc -l #855528
+
+#5x private variants:
+bedtools subtract -a c_lp_sm_c_lp_do_5x_snp_coord.freq -b c_lp_sm_c_lp_do_GP_snp_coord.freq | awk '{printf ("%s\t%s\t%s\t%s\t%s\t%s\n", $1, $2, $3, $4, $5, "5x_private")}' > c_lp_sm_c_lp_do_5x_private-snp_coord.freq
+grep -v '#' c_lp_sm_c_lp_do_5x_private-snp_coord.freq | wc -l #461885
+
+#GP private variants:
+bedtools subtract -a c_lp_sm_c_lp_do_GP_snp_coord.freq -b c_lp_sm_c_lp_do_5x_snp_coord.freq | awk '{printf ("%s\t%s\t%s\t%s\t%s\t%s\n", $1, $2, $3, $4, $5, "GP_private")}' > c_lp_sm_c_lp_do_GP_private-snp_coord.freq
+grep -v '#' c_lp_sm_c_lp_do_GP_private-snp_coord.freq | wc -l #134836
+
+
+scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/*snp_coord.freq /Users/Dani/ownCloud/backup/contamination/lp_5x_contamination_tests/w-g/
 
 ```
 
+##Synonymous files.
+```{r Obtain the per-dataset list of private variants, eval=FALSE, engine='bash'}
+
+cd $V_PATH/annotation
+
+#5x total variants:
+grep -v '#' $V_PATH/annotation/c_lp_sm_c_lp_do_5x_var_polarized_filtered5.lr_ann.vcf | grep 'synonymous' | awk -F';' '{print $1,$3}' OFS="\t" | awk -F'=' '{print $1,$3}' OFS="\t" | awk '{printf ("%s\t%s\t%s\t%s\t%s\t%s\n", $1, $2 - 1, $2, $1"_"$2 - 1"_"$2, $9, "5x")}' > c_lp_sm_c_lp_do_5x_syn_coord.freq
+grep -v '#' c_lp_sm_c_lp_do_5x_syn_coord.freq | wc -l #80160
+
+#GP total variants:
+grep -v '#' $V_PATH/annotation/c_lp_sm_c_lp_do_GP_var_polarized_filtered5.lr_ann.vcf | grep 'synonymous' | awk -F';' '{print $1,$3}' OFS="\t" | awk -F'=' '{print $1,$3}' OFS="\t" | awk '{printf ("%s\t%s\t%s\t%s\t%s\t%s\n", $1, $2 - 1, $2, $1"_"$2 - 1"_"$2, $9, "GP")}' > c_lp_sm_c_lp_do_GP_syn_coord.freq
+grep -v '#' c_lp_sm_c_lp_do_GP_syn_coord.freq | wc -l #6162
+
+#5x private variants:
+bedtools subtract -a c_lp_sm_c_lp_do_5x_syn_coord.freq -b c_lp_sm_c_lp_do_GP_syn_coord.freq | awk '{printf ("%s\t%s\t%s\t%s\t%s\t%s\n", $1, $2, $3, $4, $5, "5x_private")}' > c_lp_sm_c_lp_do_5x_private-syn_coord.freq
+grep -v '#' c_lp_sm_c_lp_do_5x_private-syn_coord.freq | wc -l #75427
+
+#GP private variants:
+bedtools subtract -a c_lp_sm_c_lp_do_GP_syn_coord.freq -b c_lp_sm_c_lp_do_5x_syn_coord.freq | awk '{printf ("%s\t%s\t%s\t%s\t%s\t%s\n", $1, $2, $3, $4, $5, "GP_private")}' > c_lp_sm_c_lp_do_GP_private-syn_coord.freq
+grep -v '#' c_lp_sm_c_lp_do_GP_private-syn_coord.freq | wc -l #1429
+
+
+scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/*syn_coord.freq /Users/Dani/ownCloud/backup/contamination/lp_5x_contamination_tests/w-g/
+
+```
+
+#4: Draw AF distributions.
+##All positions.
+```{r Other stuff}
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+
+#First draw the AF distribution for each population:
+
+freq_files <- list.files("/Users/Dani/ownCloud/backup/contamination/lp_5x_contamination_tests/w-g",pattern="*snp_coord.freq",full.names=T)
+freq_files
+freq_list = list()
+freq_all = data_frame("SNP"=character(0),"AF"=numeric(0),"pop"=character(0))
+for (file in freq_files) {
+  freq_item <- paste(strsplit(file,"_")[[1]][c(10:11)],collapse="_")
+  freq_list[[freq_item]] <- as.data.frame(read_tsv(file,col_types=c("---cdc"),col_names=c("SNP","AF","pop")))
+  freq_all <- rbind(freq_all,freq_list[[freq_item]])
+}
+freq_list
+str(freq_all)
+freq_all$pop <- as.factor(freq_all$pop)
+freq_all
+
+
+GP_af_distr_ggplot <- ggplot(data=filter(freq_all,pop=="GP"|pop=="GP_private"), aes(x=AF)) +
+  geom_histogram(aes(AF),breaks=seq(0,1,1/22),center=0) + #bins=22,center=0) +
+  facet_grid(pop ~ ., scales="free") +
+  #ggtitle(paste0("AF distribution (variants across lp + ll) for ",pop)) +
+  #ylab("density") +
+  #xlab("heritability") +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+      rect=element_rect(size=1),
+      axis.line=element_line(colour="black"),
+      axis.title=element_text(size=16),
+      #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+      #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+      #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+      panel.background=element_blank(),
+      panel.border=element_rect(colour="black"),
+      #panel.grid=element_blank(),
+      #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+      plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+      #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+      legend.background=element_rect(linetype="solid", colour="black", size=.5),
+      #legend.justification=c(0,0),
+      legend.key=element_rect(colour="white"),
+      #legend.key.size=unit(1.3,"cm"),
+      legend.position=c(0.92,0.86),
+      legend.title=element_blank()
+  )
+  GP_af_distr_ggplot
+ggsave("GP_AF_distribution_all_variants.lr_ann.pdf", width=30, height=25, units="cm", device="pdf", path="/Users/Dani/ownCloud/backup/contamination/lp_5x_contamination_tests/w-g")
+  
+Fx_af_distr_ggplot <- ggplot(data=filter(freq_all,pop=="5x"|pop=="5x_private"), aes(x=AF)) +
+  geom_histogram(aes(AF),breaks=seq(0,1,1/40),center=0) + #bins=40,center=0) +
+  facet_grid(pop ~ ., scales="free") +
+  #ggtitle(paste0("AF distribution (variants across lp + ll) for ",pop)) +
+  #ylab("density") +
+  #xlab("heritability") +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+      rect=element_rect(size=1),
+      axis.line=element_line(colour="black"),
+      axis.title=element_text(size=16),
+      #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+      #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+      #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+      panel.background=element_blank(),
+      panel.border=element_rect(colour="black"),
+      #panel.grid=element_blank(),
+      #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+      plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+      #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+      legend.background=element_rect(linetype="solid", colour="black", size=.5),
+      #legend.justification=c(0,0),
+      legend.key=element_rect(colour="white"),
+      #legend.key.size=unit(1.3,"cm"),
+      legend.position=c(0.92,0.86),
+      legend.title=element_blank()
+  )
+  Fx_af_distr_ggplot
+ggsave("5x_AF_distribution_all_variants.lr_ann.pdf", width=30, height=25, units="cm", device="pdf", path="/Users/Dani/ownCloud/backup/contamination/lp_5x_contamination_tests/w-g")
+
+
+```
+
+##Synonymous positions.
+```{r Other stuff}
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+
+#First draw the AF distribution for each population:
+
+freq_files <- list.files("/Users/Dani/ownCloud/backup/contamination/lp_5x_contamination_tests/w-g",pattern="*syn_coord.freq",full.names=T)
+freq_files
+freq_list = list()
+freq_all = data_frame("SNP"=character(0),"AF"=numeric(0),"pop"=character(0))
+for (file in freq_files) {
+  freq_item <- paste(strsplit(file,"_")[[1]][c(10:11)],collapse="_")
+  freq_list[[freq_item]] <- as.data.frame(read_tsv(file,col_types=c("---cdc"),col_names=c("SNP","AF","pop")))
+  freq_all <- rbind(freq_all,freq_list[[freq_item]])
+}
+freq_list
+str(freq_all)
+freq_all$pop <- as.factor(freq_all$pop)
+freq_all
+
+
+GP_af_distr_ggplot <- ggplot(data=filter(freq_all,pop=="GP"|pop=="GP_private"), aes(x=AF)) +
+  geom_histogram(aes(AF),breaks=seq(0,1,1/22),center=0) + #bins=22,center=0) +
+  facet_grid(pop ~ ., scales="free") +
+  #ggtitle(paste0("AF distribution (variants across lp + ll) for ",pop)) +
+  #ylab("density") +
+  #xlab("heritability") +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+      rect=element_rect(size=1),
+      axis.line=element_line(colour="black"),
+      axis.title=element_text(size=16),
+      #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+      #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+      #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+      panel.background=element_blank(),
+      panel.border=element_rect(colour="black"),
+      #panel.grid=element_blank(),
+      #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+      plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+      #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+      legend.background=element_rect(linetype="solid", colour="black", size=.5),
+      #legend.justification=c(0,0),
+      legend.key=element_rect(colour="white"),
+      #legend.key.size=unit(1.3,"cm"),
+      legend.position=c(0.92,0.86),
+      legend.title=element_blank()
+  )
+  GP_af_distr_ggplot
+ggsave("GP_AF_distribution_syn_variants.lr_ann.pdf", width=30, height=25, units="cm", device="pdf", path="/Users/Dani/ownCloud/backup/contamination/lp_5x_contamination_tests/w-g")
+  
+Fx_af_distr_ggplot <- ggplot(data=filter(freq_all,pop=="5x"|pop=="5x_private"), aes(x=AF)) +
+  geom_histogram(aes(AF),breaks=seq(0,1,1/40),center=0) + #bins=40,center=0) +
+  facet_grid(pop ~ ., scales="free") +
+  #ggtitle(paste0("AF distribution (variants across lp + ll) for ",pop)) +
+  #ylab("density") +
+  #xlab("heritability") +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+      rect=element_rect(size=1),
+      axis.line=element_line(colour="black"),
+      axis.title=element_text(size=16),
+      #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+      #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+      #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+      panel.background=element_blank(),
+      panel.border=element_rect(colour="black"),
+      #panel.grid=element_blank(),
+      #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+      plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+      #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+      legend.background=element_rect(linetype="solid", colour="black", size=.5),
+      #legend.justification=c(0,0),
+      legend.key=element_rect(colour="white"),
+      #legend.key.size=unit(1.3,"cm"),
+      legend.position=c(0.92,0.86),
+      legend.title=element_blank()
+  )
+  Fx_af_distr_ggplot
+ggsave("5x_AF_distribution_syn_variants.lr_ann.pdf", width=30, height=25, units="cm", device="pdf", path="/Users/Dani/ownCloud/backup/contamination/lp_5x_contamination_tests/w-g")
+
+
+```
