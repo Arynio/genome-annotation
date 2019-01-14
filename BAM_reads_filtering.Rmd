@@ -1,0 +1,90 @@
+---
+title: "BAM_reads_filtering"
+author: "Dani"
+date: "14 de enero de 2019"
+output: html_document
+---
+
+#0: Define paths.
+
+```{r Define paths, eval=FALSE, engine='bash'}
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+```
+
+#1: Obtain distribution of edit distance.
+
+```{r Obtain distribution of edit distance, eval=FALSE, engine='bash'}
+
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/edit_distance_distr
+screen -S c_lp_do_edit_distance_distr.log
+script c_lp_do_edit_distance_distr.log
+
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
+declare SAMPLES=$(ls c_lp_do*.bam | cut -c9-12 | sort | uniq)
+for i in ${SAMPLES[@]}
+  do
+  echo "${i}"
+  samtools view c_lp_do_"${i}"_recal_round-1.bam | grep -o '\bNM:i:\w' |  awk -v var="${i}" -F ":" '{printf ("%s\t%s\n", $3, var)}' > edit_distance_distr/c_lp_do_"${i}"_NM_distr.txt
+  done
+
+```
+
+#2: Subset BAM files to gene reads.
+##Obtain bed file with gene coordinates +- 100 bp.
+
+```{r Subset BAM files to gene reads, eval=FALSE, engine='bash'}
+
+#Keep only genes annotation from Maria's file and then convert to bed file.
+cd /GRUPOS/grupolince/Lyp_annotation_Apr14_final
+awk '$3 == "gene" {print $0;}' LYPA23C.GENE.mRNA.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.UCNE.intergenic.nr.gff3 | cut -d$'\t' -f1,3,4,5 | awk '{printf ("%s\t%s\t%s\t%s\n", $1, $3, $4, $2)}' > LYPA23C.GENE.nr.bed
+
+```
+
+##Subset the BAM files.
+
+```{r Subset BAM files to gene reads, eval=FALSE, engine='bash'}
+
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_genes_5x
+screen -S c_lp_do_genes_BAMs.log
+script c_lp_do_genes_BAMs.log
+
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
+declare SAMPLES=$(ls c_lp_do*.bam | cut -c9-12 | sort | uniq)
+for i in ${SAMPLES[@]}
+  do
+  echo "${i}"
+  samtools view -b -h -L /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.GENE.nr.bed c_lp_do_"${i}"_recal_round-1.bam > BAM_genes_5x/c_lp_do_"${i}"_recal_round-1.genes.bam
+  done
+
+```
+
+##Filter reads with high NM.
+
+```{r Subset BAM files to gene reads, eval=FALSE, engine='bash'}
+
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_genes_5x
+screen -S c_lp_do_genes_nm_BAMs.log
+script c_lp_do_genes_nm_BAMs.log
+
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_genes_5x
+declare SAMPLES=$(ls c_lp_do*.genes.bam | cut -c9-12 | sort | uniq)
+cd /opt/bamtools/lib
+for i in ${SAMPLES[@]}
+  do
+  echo "${i}"
+  bamtools filter -tag "NM:<4" -in /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_genes_5x/c_lp_do_"${i}"_recal_round-1.genes.bam -out /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_genes_5x/c_lp_do_"${i}"_recal_round-1.genes-nm.bam
+  done
+
+```
+
+
