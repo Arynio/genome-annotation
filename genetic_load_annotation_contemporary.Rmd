@@ -16,7 +16,7 @@ C_PATH=/home/dkleinman/datos/snpEff #config file path
 O_PATH=/home/dkleinman/datos/snpEff #output path
 I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
 V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
-G_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
 REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
 GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
 BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
@@ -776,6 +776,36 @@ grep -v '#' ll_perspecies.trimmed_filtered2.lr_ann.vcf | wc -l #4058311
 
 ```
 
+##Apply low and high DP and 0.2 missingness filters.
+
+```{r Apply per species filters, eval=FALSE, engine='bash'}
+
+#First, for each species exclude those positions that have more than 32.5% missing genotypes (i.e. missing at least in all individuals within the 5x dataset, or within the smaller 25x dataset), as well as those that have lower (higher) depth than the minimum (maximum) within 0.95 of the distribution, as calculated above:
+cd $V_PATH/annotation/
+screen -S perspecies_filtered3.lr_ann.log
+script perspecies_filtered3.lr_ann.log
+
+declare SPECIES=$(ls *_perspecies.trimmed.lr_ann.vcf | cut -c1-2 | uniq)
+for i in ${SPECIES[@]}
+  do
+  echo "${i}"
+  if [ "${i}" == "ll" ]; then
+    N='80'
+  else
+    N='31'
+  fi
+  echo $N
+  MIN_DP=$(cat /home/dkleinman/datos/c_lp_depth_calculus/c_"${i}"*$N*.csv | awk '{print $9}') #Obtained in section 6
+  MAX_DP=$(cat /home/dkleinman/datos/c_lp_depth_calculus/c_"${i}"*$N*.csv | awk '{print $8}') #Obtained in section 6
+  echo $MIN_DP
+  echo $MAX_DP
+  $BCF filter -e "DP < ${MIN_DP} || DP > ${MAX_DP} || F_MISSING > 0.2" -Ov -o $V_PATH/annotation/"${i}"_perspecies.trimmed_filtered3.lr_ann.vcf $V_PATH/annotation/"${i}"_perspecies.trimmed.lr_ann.vcf
+  done
+grep -v '#' lp_perspecies.trimmed_filtered3.lr_ann.vcf | wc -l #1686227
+grep -v '#' ll_perspecies.trimmed_filtered3.lr_ann.vcf | wc -l #4036258
+
+```
+
 
 ##Compute heterozygosity ratio using a custom script. Unused in final version.
 
@@ -916,6 +946,47 @@ grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_ll_po
 grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_ll_ki_perpop/c_ll_ki_perpop_filtered2_with1.lr_ann.vcf | wc -l #2314621
 grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_lp_do_perpop/c_lp_do_perpop_filtered2_with1.lr_ann.vcf | wc -l #1328679
 grep -v '#' /home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_lp_sm_perpop/c_lp_sm_perpop_filtered2_with1.lr_ann.vcf | wc -l #1689201
+
+
+#Filtered3: Split the annotated filtered3 VCF into per population VCFs, and then keep only those positions that are variable or fixed for the derived allele within each population (with -env flag).
+
+cd $V_PATH/annotation/
+screen -S perpop_filtered3.lr_ann.log
+script perpop_filtered3.lr_ann.log
+
+cd $G_PATH
+declare SPECIES=$(ls {*_lp_*,*_ll_*}.g.vcf.gz | cut -c3-4 | sort | uniq)
+cd $V_PATH/annotation/
+for i in ${SPECIES[@]}
+  do
+  echo "${i}"
+  cd $G_PATH
+  declare POP=$(ls c_{lp_sm*,lp_do*,ll_ki*,ll_po*,ll_no*}.g.vcf.gz | cut -c1-7 | uniq | grep "${i}")
+  cd $V_PATH/annotation/
+  for j in ${POP[@]}
+    do
+    echo "${j}"
+    rm pop_list_to_remove.txt
+    $BCF query -l $V_PATH/annotation/"${i}"_perspecies.trimmed_filtered3.lr_ann.vcf | grep "${j}" > pop_list_to_remove.txt
+    cat pop_list_to_remove.txt
+    mkdir "${j}"_perpop
+    java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+    -T SelectVariants \
+    -R $REF \
+    -V $V_PATH/annotation/"${i}"_perspecies.trimmed_filtered3.lr_ann.vcf \
+    -o $V_PATH/annotation/"${j}"_perpop/"${j}"_perpop_filtered3_with1.lr_ann.vcf \
+    -env \
+    --sample_file pop_list_to_remove.txt
+    rm pop_list_to_remove.txt
+    done
+  done
+
+grep -v '#' /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_ll_no_perpop/c_ll_no_perpop_filtered3_with1.lr_ann.vcf | wc -l #1809091
+grep -v '#' /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_ll_po_perpop/c_ll_po_perpop_filtered3_with1.lr_ann.vcf | wc -l #1861524
+grep -v '#' /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_ll_ki_perpop/c_ll_ki_perpop_filtered3_with1.lr_ann.vcf | wc -l #2291797
+grep -v '#' /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_lp_do_perpop/c_lp_do_perpop_filtered3_with1.lr_ann.vcf | wc -l #1245151
+grep -v '#' /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_lp_sm_perpop/c_lp_sm_perpop_filtered3_with1.lr_ann.vcf | wc -l #1576151
+
 
 #For lp, repeat the process with the unfiltered lp VCF to check if the missingness threshold is affecting differently each dataset (project genome vs 5x).
 
@@ -1567,6 +1638,34 @@ for i in ${POP[@]}
   done
 
 
+#Generate individual VCFs from the per species filtered3 VCFs:
+cd $V_PATH/annotation
+screen -S individuals_filtered3.lr_ann.log
+script individuals_filtered3.lr_ann.log
+
+#For each individual in the sm, do, ki, po & no populations, subset its variants from the respective population VCF:
+cd $G_PATH
+declare POP=$(ls c_{lp_sm*,lp_do*,ll_ki*,ll_po*,ll_no*}.g.vcf.gz | cut -c1-7 | uniq)
+for i in ${POP[@]}
+  do
+  echo "${i}"
+  #mkdir $V_PATH/annotation/"${i}"_individuals
+  declare INDIVIDUALS=$(ls "${i}"*.g.vcf.gz | cut -c1-12 | uniq)
+  for j in ${INDIVIDUALS[@]}
+    do
+    echo "${j}"
+    ID=$(echo "${j}")
+    java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+    -T SelectVariants \
+    -R $REF \
+    -V $V_PATH/annotation/"${i}"_perpop/"${i}"_perpop_filtered3_with1.lr_ann.vcf \
+    -o $V_PATH/annotation/"${i}"_individuals/"${j}"_individual_filtered3_with1.lr_ann.vcf \
+    -env \
+    -sn $ID
+    done
+  done
+
+
 #Generate individual VCFs from the lp unfiltered VCFs:
 cd $V_PATH/annotation
 screen -S individuals_unfiltered.lr_ann.log
@@ -1633,7 +1732,7 @@ C_PATH=/home/dkleinman/datos/snpEff #config file path
 O_PATH=/home/dkleinman/datos/snpEff #output path
 I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
 V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
-G_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
 REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
 GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
 BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
@@ -1833,6 +1932,38 @@ for i in "${INDLIST[@]}"
   MISSENSE_SYNONYMOUS_V=$(echo "scale=3; $MISSENSE_V/$SYNONYMOUS_V" | bc)
   MISSENSE_SYNONYMOUS_A=$(echo "scale=3; $MISSENSE_A/$SYNONYMOUS_A" | bc)
   echo -e "$SPECIES\t$POPULATION\t$SAMPLE\t$TOTAL_V\t$INTERGENIC_V\t$INTRONIC_V\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A" >> $V_PATH/annotation/snpeff_individual_summary_filtered2_with1.lr_ann.txt
+  done
+
+#Filtered3:
+
+cd $V_PATH/annotation/
+screen -S snpeff_individual_summary_filtered3_with1.lr_ann.log
+script snpeff_individual_summary_filtered3_with1.lr_ann.log
+
+rm snpeff_individual_summary_filtered3_with1.lr_ann.txt
+echo -e "species\tpopulation\tsample\ttotal_V\tintergenic_V\tintronic_V\tcoding\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tmissense/synonymous_V\tmissense/synonymous_A" > snpeff_individual_summary_filtered3_with1.lr_ann.txt
+INDLIST=($(ls `find . -name '*individual_filtered3_with1.lr_ann.vcf' -print`))
+for i in "${INDLIST[@]}"
+  do
+  echo "${i}"
+  ind=$(echo "${i}" | awk -F'[/]' '{print $3}')
+  echo "${ind}"
+  SPECIES=$(echo "${ind}" | cut -c3-4)
+  POPULATION=$(echo "${ind}" | cut -c6-7)
+  SAMPLE=$(echo "${ind}" | cut -c9-12)
+  TOTAL_V=$(grep -v '#' ${i} | wc -l)
+  INTERGENIC_V=$(grep 'intergenic' ${i} | wc -l)
+  INTRONIC_V=$(grep 'intron_variant' ${i} | wc -l)
+  CODING_V=$(grep 'CDS' ${i} | wc -l)
+  SYNONYMOUS_V=$(grep 'synonymous_variant' ${i} | wc -l)
+  SYNONYMOUS_A=$(grep 'synonymous_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_V=$(grep 'missense_variant' ${i} | wc -l)
+  MISSENSE_A=$(grep 'missense_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  NONSENSE_V=$(grep -e 'lost' -e 'gained' ${i} | wc -l)
+  NONSENSE_A=$(grep -e 'lost' -e 'gained' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_SYNONYMOUS_V=$(echo "scale=3; $MISSENSE_V/$SYNONYMOUS_V" | bc)
+  MISSENSE_SYNONYMOUS_A=$(echo "scale=3; $MISSENSE_A/$SYNONYMOUS_A" | bc)
+  echo -e "$SPECIES\t$POPULATION\t$SAMPLE\t$TOTAL_V\t$INTERGENIC_V\t$INTRONIC_V\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A" >> $V_PATH/annotation/snpeff_individual_summary_filtered3_with1.lr_ann.txt
   done
 
 #Uniltered:
