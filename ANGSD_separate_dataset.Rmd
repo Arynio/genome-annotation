@@ -1,0 +1,147 @@
+---
+title: "ANGSD_separate_dataset"
+output: html_document
+Author: "Maria Lucena Perez"
+---
+
+
+Vamos a hacer calculo de diversidad usando ANGSD en sitios génicos para el data set de lince ibérico de resecuenciación 5x frente a los del proyecto genoma. 
+
+Los archivos que voy a usar son los siguientes:
+
+· Genes-only coordinates file: /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.GENE.nr.rf
+· GP samples list (not bamlist): /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/c_lp_GP_samples
+· 5x samples list (not bamlist): /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/c_lp_5x_samples
+· Genes-only BAMs: /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_genes_5x (format: c_lp_xx_nnnn_recal_round-1.genes.bam)
+· Genes-only NM≤4 BAMs: /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_genes_5x (format: c_lp_xx_nnnn_recal_round-1.genes-nm.bam)
+
+Vamos a trabajar en la siguiente carpeta: /GRUPOS/grupolince/lynx_genomes_5x/ANGSD_separate_datasets
+
+# Depth calculation
+
+```{bash}
+cd /GRUPOS/grupolince/lynx_genomes_5x/ANGSD_separate_datasets
+mkdir /GRUPOS/grupolince/lynx_genomes_5x/ANGSD_separate_datasets/depth_calculation
+cd /GRUPOS/grupolince/lynx_genomes_5x/ANGSD_separate_datasets/depth_calculation
+```
+
+Hacemos calculo de depth, usamos el intergénico de Elena para que no se tarde tanto tiempo. Vamos a usar solo Sierra Morena.
+
+## Generate bamfiles:
+
+Primero el de genoma (GP):
+
+Genes-only BAM
+
+```{bash}
+
+ls -d -1 /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_genes_5x/**  |  grep -f /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/c_lp_GP_samples | grep "genes.bam$" | grep "sm" | wc -l
+7
+
+ls -d -1 /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_genes_5x/**  |  grep -f /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/c_lp_GP_samples | grep "genes.bam$" | grep "sm" > c_lp_sm_n007.genes.bamlist
+
+```
+
+Genes-only NM≤4 BAMs
+
+
+```{bash}
+ls -d -1 /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_genes_5x/**  |  grep -f /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/c_lp_GP_samples | grep "genes-nm.bam$" | grep "sm" | wc -l
+
+ls -d -1 /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_genes_5x/**  |  grep -f /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/c_lp_GP_samples | grep "genes-nm.bam$" | grep "sm" > c_lp_sm_n007.genes-nm.bamlist
+
+```
+
+
+Ahora el de las 5x:
+
+Genes-only BAM
+
+```{bash}
+
+ls -d -1 /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_genes_5x/**  |  grep -f /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/c_lp_5x_samples  | grep "genes.bam$" | grep "sm" | wc -l
+# 12
+
+ls -d -1 /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_genes_5x/**  |  grep -f /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/c_lp_5x_samples | grep "genes.bam$" | grep "sm" > c_lp_sm_n012.genes.bamlist
+
+```
+
+Genes-only NM≤4 BAMs
+
+
+```{bash}
+
+ls -d -1 /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_genes_5x/**  |  grep -f /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/c_lp_5x_samples | grep "genes-nm.bam$" | grep "sm" | wc -l 
+# 12
+
+ls -d -1 /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_genes_5x/**  |  grep -f /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/c_lp_5x_samples | grep "genes-nm.bam$" | grep "sm" > c_lp_sm_n012.genes-nm.bamlist
+
+```
+
+
+## Index bamfiles
+
+Me doy cuenta que algunos BAM no tienen bai, así que eso es lo primero que hago.
+
+```{bash}
+
+for bam_file in $(ls /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_genes_5x/*genes.bam)
+do 
+echo $bam_file
+samtools index $bam_file
+done
+
+```
+
+## Do depth 
+
+```{r, engine=bash, eval=FALSE}
+
+screen -S depth_calculation_sm_genes-qc
+script depth_calculation_sm_genes-qc.log
+
+# POP=(c_lp_sm_n007.genes)
+# POP=(c_lp_sm_n007.genes-nm)
+# POP=(c_lp_sm_n012.genes)
+POP=(c_lp_sm_n012.genes-nm)
+
+REF="/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa"
+THREADS=20                    # no. of computer cores used 20 = OK, >20 = ask people first!
+REGIONFILE="/GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.GENE.nr.rf"
+
+# BAMLIST=$(ls /home/mlucena/ANGSD_analysis/whole_genome_analysis/"$POP".bamlist)
+
+BAMLIST=$(ls "$POP".bamlist)
+OUT_NAME="/GRUPOS/grupolince/lynx_genomes_5x/ANGSD_separate_datasets/depth_calculation/"$POP""
+NUMBER_IND=$(printf "%03d" `wc -l $BAMLIST | cut -f1 -d " "`)
+MAXDEPTH=$(expr $NUMBER_IND \* 1000)
+
+# Sanity checks: 
+ls $BAMLIST
+echo $OUT_NAME
+echo $NUMBER_IND
+echo $MAXDEPTH
+
+/opt/angsd/angsd/angsd \
+-P $THREADS \
+-b $BAMLIST \
+-ref $REF \
+-out $OUT_NAME \
+-uniqueOnly 1 \
+-remove_bads 1 \
+-only_proper_pairs 1 \
+-rf $REGIONFILE \
+-baq 1 \
+-C 50 \
+-doQsDist 1 \
+-doDepth 1 \
+-doCounts 1 \
+-maxDepth $MAXDEPTH  
+
+```
+
+
+
+
+
+
