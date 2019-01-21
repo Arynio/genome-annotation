@@ -140,6 +140,295 @@ echo $MAXDEPTH
 
 ```
 
+### MaxDepth R 
+  
+Cuando acabo me llevo los archivos generados de GlobalDepth a mi ordenador para aplicarles el script de R y calcular la cobertura mínima y máxima en cada caso.
+
+```{r, engine=bash, eval=FALSE}
+
+scp mlucena@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/ANGSD_separate_datasets/depth_calculation/*.depth* /Users/marialucenaperez/Dropbox/PhD/contemporary/ANGSD/depth_calculus/contemporary_contamination_test/
+  
+```
+
+RScript:
+
+```{r}
+
+library(dplyr)
+library(plyr)
+library(ggplot2)
+library(gridExtra)
+library(knitr)
+
+
+
+wd <- "/Users/marialucenaperez/Dropbox/PhD/contemporary/ANGSD/depth_calculus/contemporary_contamination_test/"
+## Functions
+get_mean <- function(dat) { with(dat, sum(as.numeric(freq)*value)/sum(as.numeric(freq))) }
+get_sd <- function(dat) { mu <- get_mean (dat) 
+with (dat, sqrt(sum(as.numeric(freq)*(value-mu)^2)/(sum(as.numeric(freq))-1))) } 
+
+#*******************************************************************************************
+
+my_files_depthGlobal = list.files(path = "/Users/marialucenaperez/Dropbox/PhD/contemporary/ANGSD/depth_calculus/contemporary_contamination_test",pattern="*.depthGlobal$") 
+
+for (i in 1:length(my_files_depthGlobal)) { assign(my_files_depthGlobal[i], (scan(paste0(wd,my_files_depthGlobal[i],sep=""), sep = " ", dec = ".")) %>% .[!is.na(.)])}
+
+mean_folds = 0.95
+
+depth_per_sample <- data.frame()
+
+#Compute globaldepth for all populations found
+#*******************************************************************************************
+  
+for (i in 1:length(my_files_depthGlobal)) 
+  {
+  
+DF = read.table(paste0(wd,my_files_depthGlobal[i],sep=""),head=F, stringsAsFactors=F, check.names=FALSE)
+
+freq_table_DF <- data.frame (value = 1:length (DF), freq = t(DF))
+freq_table_truncated_DF <- filter(freq_table_DF, value < (nrow(freq_table_DF)))
+
+# Mean depth:
+
+my_mean_DF <-  get_mean (freq_table_DF)
+my_mean_truncated_DF <- get_mean (freq_table_truncated_DF)
+my_sd_DF <-  get_sd (freq_table_DF)
+my_sd_truncated_DF <- get_sd (freq_table_truncated_DF)
+
+# Max and min depth:
+
+maxDepth_DF = my_mean_DF + (mean_folds * my_mean_DF)
+minDepth_DF  = my_mean_DF - (mean_folds * my_mean_DF)
+maxDepth_truncated_DF = my_mean_truncated_DF + (mean_folds * my_sd_truncated_DF)
+minDepth_truncated_DF  = my_mean_truncated_DF - (mean_folds * my_sd_truncated_DF)
+
+
+# Esto funciona para una población
+#Per sample
+# epoch=unlist(strsplit(my_files_depthGlobal[i],"_"))[1]
+# specie=unlist(strsplit(my_files_depthGlobal[i],"_"))[2]
+# population2=unlist(strsplit(my_files_depthGlobal[i],"_"))[3]
+# # population=unlist(strsplit(population2,"[.]"))[1]
+# 
+# depth_per_sample <- rbind(depth_per_sample, 
+#   data.frame( epoch=epoch,  sp=specie, pop = population,
+#   mean = my_mean_DF, sd = my_sd_DF, 
+#   mean_truncated =  my_mean_truncated_DF, sd_truncated = my_sd_truncated_DF,
+#   maxDepth = maxDepth_DF, minDepth = minDepth_DF,
+#   maxDepth_truncated = maxDepth_truncated_DF, minDepth_truncated = minDepth_truncated_DF)) 
+
+# Para una o más poblaciones:
+population=unlist(strsplit(my_files_depthGlobal[i],".depthGlobal"))[1]
+
+depth_per_sample <- rbind(depth_per_sample, 
+data.frame( pop = population,
+mean = my_mean_DF, sd = my_sd_DF, 
+mean_truncated =  my_mean_truncated_DF, sd_truncated = my_sd_truncated_DF,
+maxDepth = maxDepth_DF, minDepth = minDepth_DF,
+maxDepth_truncated = maxDepth_truncated_DF, minDepth_truncated = minDepth_truncated_DF)) 
+
+
+# Plotting:
+
+ggplot(freq_table_truncated_DF, aes(x = value, y = freq)) + 
+  geom_bar(stat = "identity", color = "black") +
+  scale_x_continuous(breaks = 0:250*10, limits = c(0, maxDepth_truncated_DF*1.5))+
+  scale_y_continuous(expand=c(0,0))+
+  ggtitle (paste(my_files_depthGlobal[i],"_", mean_folds, "_",maxDepth_truncated_DF, "_",maxDepth_DF) ) +
+  geom_vline(xintercept=maxDepth_DF,
+             linetype="dashed", size=0.5)+ 
+  geom_vline(xintercept=minDepth_DF,
+             linetype="dashed", size=0.5)+ 
+  geom_vline(xintercept=maxDepth_truncated_DF, colour ="grey",
+             linetype="dashed", size=0.5)+ 
+  geom_vline(xintercept=minDepth_truncated_DF,colour ="grey",
+             linetype="dashed", size=0.5)+ 
+  theme_classic()+ 
+  theme(text = element_text(size=10))
+
+plot_name=paste0(wd,my_files_depthGlobal[i],"_",mean_folds,".pdf",sep="")
+ggsave(filename = plot_name)
+
+}
+
+# When finished write the table
+
+write.table(x = depth_per_sample,file = paste(wd,"mean_sd_depthGlobal_lynx_per_pop_mean_folds_",mean_folds,".csv", sep= ""),quote=FALSE, col.names = FALSE, row.names = FALSE, sep= " ")
+
+```
+
+
+
+```{r, engine=bash, eval=FALSE}
+
+scp /Users/marialucenaperez/Dropbox/PhD/contemporary/ANGSD/depth_calculus/contemporary_contamination_test/mean_sd_depthGlobal_lynx_per_pop_mean_folds_0.95.csv mlucena@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/ANGSD_separate_datasets/depth_calculation
+
+  
+# Separate in populations:
+  
+ssh mlucena@genomics-b.ebd.csic.es
+
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/ANGSD_separate_datasets/depth_calculation
+POPS=$(cat /GRUPOS/grupolince/lynx_genomes_5x/ANGSD_separate_datasets/depth_calculation/mean_sd_depthGlobal_lynx_per_pop_mean_folds_0.95.csv | awk '{print $1}')
+  
+
+for POP in ${POPS[@]}
+do
+echo $POP
+grep "${POP} " /GRUPOS/grupolince/lynx_genomes_5x/ANGSD_separate_datasets/depth_calculation/mean_sd_depthGlobal_lynx_per_pop_mean_folds_0.95.csv   > "$POP"_mean_sd_depthGlobal_lynx_per_pop_mean_folds_0.95.csv
+done
+
+  
+  
+```
+
+
+
+Ok, now I have the max and min depth values, ergo, I am running the diveristy SFS scritp. 
+
+# SAF
+
+## General parameters
+```{bash}
+
+ANGSD="/opt/angsd/angsd"
+NGSTOOLS="/opt/angsd/angsd/misc"
+REF="/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23_without_repetitive_transposable_low_complexity.fa"
+
+###  Ojo para correr esto en el futuro: hay que tener en cuenta que este no tiene filtrado los sitios repetitivos y low complexity y que si nos interesa quitarlos habría que recortarlo luego, o usar una referencia libre de estos sitios. 
+ANC="/home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa"
+###  
+
+FILTER1=" -uniqueOnly 1 -remove_bads 1 -only_proper_pairs 1 -baq 1 -C 50 "
+FILTER2=" -minMapQ 30 -minQ 20 -doCounts 1 "
+RUTA=/GRUPOS/grupolince/lynx_genomes_5x/ANGSD_separate_datasets
+
+#for POP in  ${POPS[@]}
+#do
+
+# POP=c_lp_sm_n007.genes
+# POP=c_lp_sm_n007.genes-nm
+# POP=c_lp_sm_n012.genes
+POP=c_lp_sm_n012.genes-nm
+
+
+read POP mean sd mean_truncated sd_truncated maxDepth minDepth maxDepth_truncated minDepth_truncated < $RUTA/depth_calculation/"${POP}"_mean_sd_depthGlobal_lynx_per_pop_mean_folds_0.95.csv
+
+#N_IND=$(echo ${POP: -3} )
+N_IND=12
+MIN_IND=$(expr $N_IND / 2)
+
+# Sanity checks:
+
+echo $POP
+echo $N_IND
+echo $MIN_IND
+echo $maxDepth_truncated
+echo $minDepth_truncated
+
+```
+
+## Unfolded SAF 
+
+```{r, engine=bash, eval=FALSE}
+
+
+##########################
+#  SAF (likelihood):     
+##########################
+
+echo "-------$POP----------SAF (likelihood)-----------------------------------------"
+
+$ANGSD/angsd -P $THREADS -b $RUTA/depth_calculation/"$POP".bamlist -ref $REF -anc $ANC \
+-out "$POP".unfolded-lr \
+$FILTER1 \
+$FILTER2 \
+-GL 1 -doSaf 1  \
+-minInd  $MIN_IND -setMaxDepth $maxDepth_truncated -setMinDepth $minDepth_truncated
+
+
+```
+
+## POR AQUI! --> SFS 
+
+```{r, engine=bash, eval=FALSE}
+
+##########################
+#  SFS                   #(I dont require the -rf file as the saf already only contains the -rf sites
+##########################
+echo "-------$POP----------SFS------------------------------------------------------"
+
+$NGSTOOLS/realSFS "$POP".unfolded-lr.saf.idx  -P $THREADS > "$POP".unfolded-lr.sfs
+
+
+```
+
+##  SAF (postprob) 
+
+```{r, engine=bash, eval=FALSE}
+
+
+echo "-------$POP----------SAF (postprob)-----------------------------------------"
+
+$ANGSD/angsd -P $THREADS -b $RUTA/whole_genome_analysis/"$POP".bamlist -ref $REF -anc $ANC \
+-out "$POP".unfolded-lr.postprob \
+$FILTER1 \
+$FILTER2 \
+-GL 1 -doSaf 1  \
+-minInd  $MIN_IND -setMaxDepth $maxDepth_truncated -setMinDepth $minDepth_truncated \
+-doThetas 1 -pest "$POP".unfolded-lr.sfs 
+
+done
+
+```
+
+
+
+
+##  Make bed theta        
+
+La población de sierra morena se volvió a lanzar desde aquí en abril/mayo de 2018 porque me di cuenta de que los archivos que había creado se habína corrompido por el camino. Antes de esto (archivos saf, sfs, etc) sí están bien. 
+
+```{r, engine=bash, eval=FALSE}
+
+echo "-------$POP----------Make bed theta -----------------------------------------"
+
+$NGSTOOLS/thetaStat print $POP.unfolded-lr.postprob.thetas.idx > $POP.printed.stats
+
+# Transform the coordinates to use 0Based bedtools
+
+awk 'NR>1 {print  $1" "$2-1" "$2}' $POP.printed.stats > $POP.0basedcoordinates.borrar # --> 1, 2, 3
+# log transformation of watterson and pairwise:
+awk 'NR>1 {print  "e("$3")"}' $POP.printed.stats | bc -l > "$POP".watterson.borrar # --> 4
+awk 'NR>1 {print  "e("$4")"}' $POP.printed.stats | bc -l > "$POP".pairwise.borrar # --> 5
+                                                                                  # --> PAIRWISE - WATTERSON
+awk 'NR>1 {print  "e("$5")"}' $POP.printed.stats | bc -l > "$POP".thetaFL.borrar # --> 6
+awk 'NR>1 {print  "e("$6")"}' $POP.printed.stats | bc -l > "$POP".thetaH.borrar # --> 7
+awk 'NR>1 {print  "e("$7")"}' $POP.printed.stats | bc -l > "$POP".thetaL.borrar # --> 8
+
+# Create a header for the "$POP".transformedThetas file
+
+echo "scaffold position1 position2 watterson pairwise pairwise-watterson thetaFL thetaH thetaL" > "$POP".transformedThetas
+
+# ¿Tengo las mismas posiciones?
+
+wc -l $POP*borrar
+
+
+
+paste $POP.0basedcoordinates.borrar "$POP".watterson.borrar "$POP".pairwise.borrar "$POP".thetaFL.borrar "$POP".thetaH.borrar "$POP".thetaL.borrar | \
+awk -v OFS='\t'  '{print $1, $2, $3, $4, $5, $5-4, $6, $7, $8}' >> "$POP".transformedThetas
+
+rm "$POP".*.borrar
+mv $POP.printed.stats /backup/mlucena/intermediate_files_ANGSD/whole_genome_analysis/
+scp *.transformedThetas /backup/mlucena/intermediate_files_ANGSD/whole_genome_analysis/
+
+# done
+
+```
+
 
 
 
