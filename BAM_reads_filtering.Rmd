@@ -69,7 +69,7 @@ for i in ${SAMPLES[@]}
 
 ```
 
-#2: Obtain distribution of edit distance.
+#2: Obtain distribution of edit distance (DON only).
 ##W-g BAMs.
 ###Extract edit distance from BAMs.
 
@@ -148,7 +148,7 @@ rm(edit_distance_distribution)
 ```
 
 ##Genes-only BAMs.
-###Extract edit distance and quality qfrom BAMs.
+###Extract edit distance from BAMs.
 
 ```{r Obtain distribution of edit distance, eval=FALSE, engine='bash'}
 
@@ -168,7 +168,6 @@ for i in ${SAMPLES[@]}
 scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/edit_distance_distr/c_lp_do_*_NM_distr.genes.txt /Users/Dani/ownCloud/backup/contamination/edit_distance_tests
 
 ```
-
 
 ###Draw edit distance distributions.
 
@@ -325,6 +324,105 @@ for i in ${SAMPLES[@]}
 
 ```
 
+##Compare MQ distributions (DON only).
+###Obtain MQ distribution (NM files).
+
+```{r Perform NM-based BAM filterings, eval=FALSE, engine='bash'}
+
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/edit_distance_distr
+screen -S c_lp_do_MQ_distr.genes-nm.log
+script c_lp_do_MQ_distr.genes-nm.log
+
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_genes_5x
+declare SAMPLES=$(ls c_lp_do_*_recal_round-1.genes-nm.bam | cut -c9-12 | sort | uniq)
+for i in ${SAMPLES[@]}
+  do
+  echo "${i}"
+  samtools view c_lp_do_"${i}"_recal_round-1.genes-nm.bam | cut -f5 > ./../edit_distance_distr/c_lp_do_"${i}"_MQ_distr.genes-nm.txt
+  done
+  
+scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/edit_distance_distr/c_lp_do_*_MQ_distr.genes-nm.txt /Users/Dani/ownCloud/backup/contamination/MQ_tests
+
+```
+
+###Obtain MQ distribution (HM files).
+
+```{r Perform NM-based BAM filterings, eval=FALSE, engine='bash'}
+
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/edit_distance_distr
+screen -S c_lp_do_MQ_distr.genes-hm.log
+script c_lp_do_MQ_distr.genes-hm.log
+
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_genes_5x
+declare SAMPLES=$(ls c_lp_do_*_recal_round-1.genes-hm.bam | cut -c9-12 | sort | uniq)
+for i in ${SAMPLES[@]}
+  do
+  echo "${i}"
+  samtools view c_lp_do_"${i}"_recal_round-1.genes-hm.bam | cut -f5 > ./../edit_distance_distr/c_lp_do_"${i}"_MQ_distr.genes-hm.txt
+  done
+  
+scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/edit_distance_distr/c_lp_do_*_MQ_distr.genes-hm.txt /Users/Dani/ownCloud/backup/contamination/MQ_tests
+
+```
+
+###Draw MQ distributions.
+
+```{r Other stuff}
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+
+#First draw the NM distribution for each individual:
+hm_files <- list.files("/Users/Dani/ownCloud/backup/contamination/MQ_tests/", pattern="*distr.genes-hm.txt")
+nm_files <- list.files("/Users/Dani/ownCloud/backup/contamination/MQ_tests/", pattern="*distr.genes-nm.txt")
+samples <- substr(hm_files,1,12)
+samples
+for (i in samples) {
+  nm_distribution <- read_tsv(paste0("/Users/Dani/ownCloud/backup/contamination/MQ_tests/",i,"_MQ_distr.genes-nm.txt"),col_names=c("MQ"))
+  head(nm_distribution)
+  nm_summary <- nm_distribution %>% group_by(MQ) %>% tally() %>% mutate(filter=as.factor("nm"),MQ60=as.factor("yes"))
+  hm_distribution <- read_tsv(paste0("/Users/Dani/ownCloud/backup/contamination/MQ_tests/",i,"_MQ_distr.genes-hm.txt"),col_names=c("MQ"))
+  head(hm_distribution)
+  hm_summary <- hm_distribution %>% group_by(MQ) %>% tally() %>% mutate(filter=as.factor("hm"),MQ60=as.factor("yes"))
+  MQ60_yes <- rbind(nm_summary,hm_summary)
+  MQ60_no <- MQ60_yes %>% filter(MQ!=60)
+  MQ60_no$MQ60 <- c("no")
+  plot_data <- rbind(MQ60_yes,MQ60_no)
+  plot_data
+  plot_data$filter = factor(plot_data$filter,levels(plot_data$filter)[c(1,2)])
+  plot_data$MQ60 = factor(plot_data$MQ60,levels(plot_data$MQ60)[c(1,2)])
+  MQ_distr_ggplot <- ggplot(data=plot_data, aes(MQ,n)) +
+  geom_col() +
+  facet_grid(interaction(filter,MQ60) ~ ., scales="free") +
+  ggtitle(paste0("MQ distribution for ",i)) +
+  ylab("count") +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+        rect=element_rect(size=1),
+        axis.line=element_line(colour="black"),
+        axis.title=element_text(size=16),
+        #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+        #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+        #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+        panel.background=element_blank(),
+        panel.border=element_rect(colour="black"),
+        #panel.grid=element_blank(),
+        #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+        plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+        #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+        legend.background=element_rect(linetype="solid", colour="black", size=.5),
+        #legend.justification=c(0,0),
+        legend.key=element_rect(colour="white"),
+        #legend.key.size=unit(1.3,"cm"),
+        legend.position=c(0.92,0.86),
+        legend.title=element_blank()
+  )
+  MQ_distr_ggplot
+  ggsave(paste0("c_lp_do_",i,"_MQ_distribution.genes.pdf"), width=30, height=20, units="cm", device="pdf", path="/Users/Dani/ownCloud/backup/contamination/MQ_tests")
+}
+
+```
 
 #4: Perform variant calling for each species. Combine all BAMs of interest into the per species VCF. These won't include substitutions between species.
 ##A: Genes-subset only. 
@@ -344,6 +442,740 @@ java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK
 $(for var in c_lp*recal_round-1.genes-nm.bam; do echo -I ${var}" ";done) \
 -o $V_PATH/c_lp_sm_c_lp_do_nm_genes.vcf
 
-grep -v '#' c_lp_sm_c_lp_do_nm_genes.vcf | wc -l 
+grep -v '#' $V_PATH/c_lp_sm_c_lp_do_nm_genes.vcf | wc -l #1341848
+
+
+#Rename the samples with wrong names.
+cd $V_PATH
+screen -S c_lp_sm_c_lp_do_nm_genes_renamed.log
+script c_lp_sm_c_lp_do_nm_genes_renamed.log
+
+bcftools query -l c_lp_sm_c_lp_do_nm_genes.vcf #check sample names
+#!/bin/bash
+#cat << "EOF" > lp_rename.txt #Unmark this line when running it (I marked it in R because it doesn't understand it and messes the colours of subsequent lines). It should include all incorrect names.
+h_lp_do_0007 c_lp_do_0007
+EOF
+cat lp_rename.txt
+bcftools reheader -s lp_rename.txt -o c_lp_sm_c_lp_do_nm_genes_renamed.vcf c_lp_sm_c_lp_do_nm_genes.vcf #copy the VCF and rename the wrong named samples in the new VCF
+rm lp_rename.txt
+mv c_lp_sm_c_lp_do_nm_genes_renamed.vcf c_lp_sm_c_lp_do_nm_genes.vcf
+
+grep -v '#' c_lp_sm_c_lp_do_nm_genes.vcf | wc -l #1341848
+
+```
+
+#5: Polarize contemporary VCFs. Use VCFtools in order to polarize (ancestral vs. derived) the contemporary ll & lp VCFs. The ancestral state was inferred by Maria.
+
+##Prepare ancestral genome fasta.
+
+```{r Polarize contemporary VCF, eval=FALSE, engine='bash'}
+
+#This is the command to use in order to add to a VCF information on the ancestral/derived alleles: /opt/vcftools_0.1.13/perl/fill-aa. There's documentation inside that command that I'll follow here.
+
+#First, the ancestral alleles file should be bgzipped (according to the documentation, they should be gzipped, but later on when trying to run faidx I got an error stating that files should be gzipped in order to build a fai index):
+bgzip -c /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa > /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa.gz
+
+#Next they should be fai indexed:
+/opt/samtools-1.6/samtools faidx /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa.gz
+
+```
+
+##Use vcftools to add Ancestral Allele annotation to the VCF.
+###For Lynx pardinus.
+
+```{r Polarize contemporary VCF, eval=FALSE, engine='bash'}
+
+#Code to annotate the AA (ancestral alleles) subfield from the INFO field in the VCF. I keep getting the following error: "Can't locate Vcf.pm in @INC". I look it up and apparently it's easy to solve: an environment variable PERL5LIB should be defined as the path to perl.
+cd $V_PATH
+screen -S c_lp_sm_c_lp_do_nm_genes_aafilled.log
+script c_lp_sm_c_lp_do_nm_genes_aafilled.log
+
+export PERL5LIB=/opt/vcftools_0.1.13/perl/ #set required environmental variable
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+
+cat $V_PATH/c_lp_sm_c_lp_do_nm_genes.vcf | /opt/vcftools_0.1.13/perl/fill-aa -a /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa.gz | bgzip -c > c_lp_sm_c_lp_do_nm_genes_aafilled.vcf.gz #I tried to run this first without bgzipping it, and it was increasingly slow. Each day it did around half the previous day. When the server crashed, I relaunched it adding the bgzip command and it finished in a little over 24h.
+
+gzip -d -c c_lp_sm_c_lp_do_nm_genes_aafilled.vcf.gz > c_lp_sm_c_lp_do_nm_genes_aafilled.vcf #Get decompressed version. I ran md5sum for both the gzipped and the unzipped versions and there were no differences.
+
+grep -v '#' c_lp_sm_c_lp_do_nm_genes_aafilled.vcf | wc -l #1341848
+
+```
+
+##Use VcfFilterJdk to polarize the AA-filled VCF.
+###For Lynx pardinus.
+
+```{r Polarize contemporary VCF, eval=FALSE, engine='bash'}
+
+#Polarize the AA-filled VCF based on the new INFO/AA column. Alleles will be switched whenever the ancestral allele matches the alternative one, and genotypes will be properly recoded as well. The following code was originally provided by Pierre Lindenbaum and modified by José Luis Castro.
+
+cd $V_PATH
+screen -S c_lp_sm_c_lp_do_nm_genes_polarized.log
+script c_lp_sm_c_lp_do_nm_genes_polarized.log
+
+java -jar /opt/jvarkit/dist/vcffilterjdk.jar -e 'if(variant.getNAlleles()!=2 || !variant.hasAttribute("AA")) return true; 
+final String aa = variant.getAttributeAsString("AA",""); 
+if(!variant.getAlleles().get(1).getDisplayString().equalsIgnoreCase(aa)) return true; 
+VariantContextBuilder vb=new VariantContextBuilder(variant); 
+
+Allele oldalt = variant.getAlleles().get(1);
+Allele oldref = variant.getAlleles().get(0); 
+Allele ref= Allele.create(oldalt.getDisplayString(),true); 
+Allele alt= Allele.create(oldref.getDisplayString(),false);
+
+vb.alleles(Arrays.asList(ref,alt)); 
+
+List genotypes= new ArrayList<>(); 
+for(Genotype g: variant.getGenotypes()) 
+  { 
+  if(!g.isCalled()) 
+  { genotypes.add(g); continue;} 
+  GenotypeBuilder gb = new GenotypeBuilder(g); 
+  List alleles = new ArrayList<>(); 
+  for(Allele a:g.getAlleles()) { 
+    if(a.equals(oldalt)) { a=ref;} 
+    else if(a.equals(oldref)) { a=alt;} 
+    alleles.add(a); 
+    } 
+  if(g.hasPL()) { 
+    int pl[] = g.getPL(); 
+    int pl2[] = new int[pl.length]; 
+    for(int i=0;i< pl.length;i++) pl2[i]=pl[(pl.length-1)-i]; 
+    gb.PL(pl2); 
+    } 
+  if(g.hasAD()) 
+    { int ad[] = g.getAD(); 
+    int ad2[] = new int[ad.length]; 
+    for(int i=0;i< ad.length;i++) ad2[i]=ad[(ad.length-1)-i];
+    gb.AD(ad2); 
+  } 
+  genotypes.add(gb.alleles(alleles).make()); 
+  }
+
+vb.attribute("AF",1.0d - Double.parseDouble(variant.getAttributeAsString("AF",""))); vb.attribute("AC",variant.getGenotypes().stream().flatMap(G->G.getAlleles().stream()).filter(A->A.equals(oldref)).count()); 
+vb.genotypes(genotypes); 
+return vb.make();' -o c_lp_sm_c_lp_do_nm_genes_polarized.vcf c_lp_sm_c_lp_do_nm_genes_aafilled.vcf
+
+grep -v '#' c_lp_sm_c_lp_do_nm_genes_polarized.vcf | wc -l #1341848
+
+```
+
+#6: Set up SnpEff. I'll be following this manual for all SnpEff configuration purposes: http://snpeff.sourceforge.net/SnpEff_manual.html
+##Search for the Lynx pardinus database. 
+Search for the Lynx pardinus assembly database in the program's pre-built database. As of June the 6th, 2017, the Lynx pardinus genome isn't included in the snpEff database. A second option would be building our own Lynx pardinus database.
+
+```{r Set up SnpEff, eval=FALSE, engine='bash'}
+
+java -jar /opt/snpEff/snpEff.jar databases | grep -i pardinus
+
+```
+
+##Build the Lynx pardinus genome database.
+In the end we opt to build our own database since we don't know when they will get themselves to add it. This step should be omitted if the desired database was found in the previous step. In the end it's best to use the Lynx rufus genome as reference if the VCF is polarized based on Lynx rufus, else the polarized SNPs are wrongly annotated.
+
+###Add entry to the config file
+
+```{r Set up SnpEff, eval=FALSE, engine='bash'}
+
+#Originally the config was just in the software folder and I didn't have writing permission. If this is the only config file available, writing permission is required, and when annotating later on, the file should be called using the -c command followed by the path to the file.
+#However, in my case I believe the tech group created a copy of the file in my folder after I sent them an e-mail, and this is the one that I was able to edit.
+
+cd /home/dkleinman/
+mv snpEff.config $C_PATH #I move the config file that appeared in my folder to a subfolder that I created for snpEff
+vi snpEff.config  #initiate the editing process
+
+#Following the manual, I added the following two lines (use :o to start editing -watch out for the current line- and :wq to save and exit):
+
+# Lynx_pardinus
+LYPA.23.genome : Iberian lynx #from now on, LYPA.23 is the code for the Lynx pardinus reference genome (in snpEff)
+
+# Lynx_pardinus, detailed annotation (obsolete)
+LYPA.23b.genome : Iberian lynx #LYPA.23b is the code for the highly detailed annotation of the Lynx pardinus reference genome (in snpEff)
+
+#In the end it's best to use the Lynx rufus genome as reference if the VCF is polarized based on Lynx rufus, else the polarized SNPs are wrongly annotated.
+
+```
+
+###Create directory and move files
+
+```{r Set up SnpEff, eval=FALSE, engine='bash'}
+
+#First for the regular annotation:
+mkdir $S_PATH/data/LYPA.23 #create a directory inside the software's dependencies whose name matches the code
+cd $S_PATH/data/LYPA.23
+
+scp /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.all.fix.nr.gff3 $S_PATH/data/LYPA.23/ #copy the annotation file (can be gff or gtf) to the newly created directory. This gff file includes CDS, introns, exons and genes, so it's very basic. A more complex version that Maria created which includes lncRNAs, etc., will be considered as custom annotation.
+mv LYPA23C.all.fix.nr.gff3 genes.gff #rename the file as the tutorial indicates
+
+mkdir $S_PATH/data/genomes #create a directory inside the software's dependencies called genomes
+cd $S_PATH/data/genomes
+scp /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa $S_PATH/data/genomes #copy the reference genome fasta to the new genomes directory
+mv lp23.fa LYPA.23.fa #rename the file so that it matches the code
+
+
+#In the end this won't be used. The detailed (custom) annotation will be intersected using a bed and the -interval command.
+#Second, for the detailed annotation:
+mkdir $C_PATH/data/LYPA.23b #create a directory inside the software's dependencies whose name matches the code
+cd $C_PATH/data/LYPA.23b
+
+scp /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.UCNE.intergenic.nr.gff3 $C_PATH/data/LYPA.23b/ #copy the annotation file (can be gff or gtf) to the newly created directory. This gff file is very detailed and includes CDS, introns, exons, genes, and many more.
+mv LYPA23C.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.UCNE.intergenic.nr.gff3 genes.gff #rename the file as the tutorial indicates
+
+cd $C_PATH/data/genomes
+scp LYPA.23.fa LYPA.23b.fa #copy the reference genome and rename it so that it also matches the detailed annotation entry
+
+```
+
+###Build the database
+
+```{r Set up SnpEff, eval=FALSE, engine='bash'}
+
+cd $C_PATH
+screen -S build_snpEff_db #open a dettachable screen in case the database building takes too long
+script build_snpEff_db.txt #initiate the log file
+
+S_PATH=/opt/snpEff #redefine the variable, since we're inside a script
+C_PATH=/home/dkleinman/datos/snpEff #redefine the variable, since we're inside a script
+
+cd $S_PATH
+java -jar snpEff.jar build -gff3 -v LYPA.23 -c $C_PATH/snpEff.config -dataDir $C_PATH/data #build the database. Use the -gff3 command for gff files and -gtf22 for gtf files. Use -v for verbose (expanded information on the processes and the warnings/errors that may appear). Use -c to indicate the path to my own config file. Then use -dataDir to override the data directory from the config file (by default the software thinks that the data folder with the genome and the genes files is located where config is, so it's necessary to give it the correct path).
+
+ctrl + D #terminate the script
+ctrl + D #terminate the screen
+
+#The following is obsolete since I fixed the original code.
+scp -r $S_PATH/data $C_PATH #afterwards I realize anyone can access the data folder so I copy it to my own folder and then I remove the stuff I created inside the original data folder
+cd $S_PATH/data
+rm -r LYPA.23/
+rm -r genomes/
+
+```
+
+### Tutorial annotation
+Annotate one of the examples that comes with the software
+
+```{r Tutorial annotation, eval=FALSE, engine='bash'}
+
+java -Xmx16g -jar $S_PATH/snpEff.jar GRCh37.75 -s $O_PATH/toys/test.chr22.ann $S_PATH/examples/test.chr22.vcf > $O_PATH/toys/test.chr22.ann.vcf
+
+```
+
+##Build the Lynx rufus genome database.
+In the end we opt to build our own database since we don't know when they will get themselves to add it. This step should be omitted if the desired database was found in the previous step. Annotating against the Lynx rufus genome is the correct option if the VCF has been polarized based on that genome.
+
+###Add entry to the config file
+
+```{r Set up SnpEff, eval=FALSE, engine='bash'}
+
+#Originally the config was just in the software folder and I didn't have writing permission. If this is the only config file available, writing permission is required, and when annotating later on, the file should be called using the -c command followed by the path to the file.
+#However, in my case I believe the tech group created a copy of the file in my folder after I sent them an e-mail, and this is the one that I was able to edit.
+
+cd /home/dkleinman/
+mv snpEff.config $C_PATH #I move the config file that appeared in my folder to a subfolder that I created for snpEff
+vi snpEff.config  #initiate the editing process
+
+#Following the manual, I added the following two lines (use :o to start editing -watch out for the current line- and :wq to save and exit):
+
+# Lynx_rufus
+LYRU.23.genome : Bobcat #from now on, LYRU.23 is the code for the Lynx rufus c_lr_zz_0001_recal1.fa genome (in snpEff)
+
+```
+
+###Create directory and move files
+
+```{r Set up SnpEff, eval=FALSE, engine='bash'}
+
+#First for the regular annotation:
+mkdir $C_PATH/data/LYRU.23 #create a directory inside the software's dependencies whose name matches the code
+cd $C_PATH/data/LYRU.23
+
+scp /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.all.fix.nr.gff3 $C_PATH/data/LYRU.23/ #copy the annotation file (can be gff or gtf) to the newly created directory. This gff file includes CDS, introns, exons and genes, so it's very basic. A more complex version that Maria created which includes lncRNAs, etc., will be considered as custom annotation.
+mv LYPA23C.all.fix.nr.gff3 genes.gff #rename the file as the tutorial indicates
+
+mkdir $C_PATH/data/genomes #create a directory inside the software's dependencies called genomes
+cd $C_PATH/data/genomes
+scp /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa $C_PATH/data/genomes #copy the reference genome fasta to the new genomes directory
+mv c_lr_zz_0001_recal1.fa LYRU.23.fa #rename the file so that it matches the code
+
+```
+
+###Build the database
+
+```{r Set up SnpEff, eval=FALSE, engine='bash'}
+
+cd $C_PATH
+screen -S build_LYRU_snpEff_db #open a dettachable screen in case the database building takes too long
+script build_LYRU_snpEff_db.txt #initiate the log file
+
+S_PATH=/opt/snpEff #redefine the variable, since we're inside a script
+C_PATH=/home/dkleinman/datos/snpEff #redefine the variable, since we're inside a script
+
+cd $S_PATH
+java -jar snpEff.jar build -gff3 -v LYRU.23 -c $C_PATH/snpEff.config -dataDir $C_PATH/data #build the database. Use the -gff3 command for gff files and -gtf22 for gtf files. Use -v for verbose (expanded information on the processes and the warnings/errors that may appear). Use -c to indicate the path to my own config file. Then use -dataDir to override the data directory from the config file (by default the software thinks that the data folder with the genome and the genes files is located where config is, so it's necessary to give it the correct path).
+
+ctrl + D #terminate the script
+ctrl + D #terminate the screen
+
+```
+
+#7: Annotate using SnpEff.
+##Create custom annotation bed file
+
+```{r Annotate using SnpEff, eval=FALSE, engine='bash'}
+
+#Create bed file with custom annotations based on the gff3 that María compiled.
+cut -d$'\t' -f1,3,4,5 /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.UCNE.intergenic.nr.gff3 | awk '{printf ("%s\t%s\t%s\t%s\n", $1, $3, $4, $2)}' > /home/dkleinman/datos/snpEff/data/LYPA23C.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.UCNE.intergenic.nr.bed
+
+```
+
+##Annotate the VCF with custom annotation
+
+###For Lynx pardinus. Monomorphic positions (incl. substitutions) are NOT polarized. Grab substitutions from the joint dataset.
+
+```{r Annotate using SnpEff, eval=FALSE, engine='bash'}
+
+#For all positions:
+
+cd $V_PATH/annotation/
+screen -S c_lp_sm_c_lp_do_nm_genes_polarized.lr_ann.log #open a dettachable screen in case the test takes too long
+script c_lp_sm_c_lp_do_nm_genes_polarized.lr_ann.log #initiate the log file
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+
+cd $O_PATH #run this code from the directory where the config is located.
+java -Xmx16g -jar $S_PATH/snpEff.jar LYRU.23 -v -s $V_PATH/annotation/c_lp_sm_c_lp_do_nm_genes_polarized.lr_ann.html -csvStats $V_PATH/annotation/c_lp_sm_c_lp_do_nm_genes_polarized.lr_ann.csv -interval $C_PATH/data/LYPA23C.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.UCNE.intergenic.nr.bed $V_PATH/c_lp_sm_c_lp_do_nm_genes_polarized.vcf > $V_PATH/annotation/c_lp_sm_c_lp_do_nm_genes_polarized.lr_ann.vcf #run this code from the directory where the config is located.
+
+cd $V_PATH/annotation/
+grep -v '#' c_lp_sm_c_lp_do_nm_genes_polarized.lr_ann.vcf | wc -l #1341848
+
+```
+
+#8: Depth range calculus. Obtain depth range for each species in order to filter low/high depth positions as part of the next section's many filterings.
+##A
+###For Lynx pardinus.
+
+```{r Depth range calculus, eval=FALSE, engine='bash'}
+
+#I'll use Maria's code to calculate depth. Since these populations are big, we'll be using Elena's captured intergenic fraction of the genome:
+
+POPS=(c_lp_do-c_lp_sm)
+cd /home/dkleinman/datos/c_lp_depth_calculus/
+
+screen -S c_lp_depth_calculus.log
+script c_lp_depth_calculus.log
+POP=(c_lp_do-c_lp_sm_n031)
+REF="/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa"
+THREADS=20                    # no. of computer cores used 20 = OK, >20 = ask people first!
+REGIONFILE="/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_intergenic_capture/BAM_intergenic_capture_filtered/no_genes_Lypa_10000longest_center_final_slop20_dot.rf"
+BAMLIST=$(ls /home/dkleinman/datos/c_lp_depth_calculus/"$POP".intergenic.bamlist) #intergenic BAMs are actually here: /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_intergenic_5x/
+OUT_NAME="/home/dkleinman/datos/c_lp_depth_calculus/"$POP".intergenic.qc"
+NUMBER_IND=$(printf "%03d" `wc -l $BAMLIST | cut -f1 -d " "`)
+MAXDEPTH=$(expr $NUMBER_IND \* 1000)
+    
+#Sanity checks: 
+ls $BAMLIST
+echo $OUT_NAME
+echo $NUMBER_IND
+echo $MAXDEPTH
+    
+/opt/angsd/angsd/angsd \
+-P $THREADS \
+-b $BAMLIST \
+-ref $REF \
+-out $OUT_NAME \
+-uniqueOnly 1 \
+-remove_bads 1 \
+-only_proper_pairs 1 \
+-rf $REGIONFILE \
+-baq 1 \
+-C 50 \
+-doQsDist 1 \
+-doDepth 1 \
+-doCounts 1 \
+-maxDepth $MAXDEPTH
+
+```
+
+###For Lynx lynx.
+
+```{r Depth range calculus, eval=FALSE, engine='bash'}
+
+#I'll use Maria's code to calculate depth. Since these populations are big, we'll be using Elena's captured intergenic fraction of the genome:
+POPS=(c_ll_no-c_ll_po-c_ll_ki)
+
+cd /home/dkleinman/datos/c_lp_depth_calculus/
+rm /home/dkleinman/datos/c_lp_depth_calculus/c_ll_no-c_ll_po-c_ll_ki_n029.intergenic.bamlist
+
+#cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_intergenic_5x
+#find `pwd` -name "c_ll_ki*intergenic.bam" >> /home/dkleinman/datos/c_lp_depth_calculus/c_ll_no-c_ll_po-c_ll_ki_n029.intergenic.bamlist
+
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_intergenic_5x/
+#find `pwd` -name "c_ll_ki*intergenic.bam" 
+find `pwd` -name "c_ll_ki*intergenic.bam" -o -name "c_ll_po*intergenic.bam" -o -name "c_ll_no*intergenic.bam" >> /home/dkleinman/datos/c_lp_depth_calculus/c_ll_no-c_ll_po-c_ll_ki_n029.intergenic.bamlist
+
+cat /home/dkleinman/datos/c_lp_depth_calculus/c_ll_no-c_ll_po-c_ll_ki_n029.intergenic.bamlist
+
+POPS=(c_ll_no-c_ll_po-c_ll_ki)
+cd /home/dkleinman/datos/c_lp_depth_calculus/
+
+screen -S c_ll_depth_calculus.log
+script c_ll_depth_calculus.log
+POP=(c_ll_no-c_ll_po-c_ll_ki_n029)
+REF="/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa"
+THREADS=20                    # no. of computer cores used 20 = OK, >20 = ask people first!
+REGIONFILE="/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_intergenic_capture/BAM_intergenic_capture_filtered/no_genes_Lypa_10000longest_center_final_slop20_dot.rf"
+BAMLIST=$(ls /home/dkleinman/datos/c_lp_depth_calculus/"$POP".intergenic.bamlist) #intergenic BAMs are actually here: /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_intergenic_5x/
+OUT_NAME="/home/dkleinman/datos/c_lp_depth_calculus/"$POP".intergenic.qc"
+NUMBER_IND=$(printf "%03d" `wc -l $BAMLIST | cut -f1 -d " "`)
+MAXDEPTH=$(expr $NUMBER_IND \* 1000)
+    
+#Sanity checks: 
+ls $BAMLIST
+cat $BAMLIST
+echo $OUT_NAME
+echo $NUMBER_IND
+echo $MAXDEPTH
+
+/opt/angsd/angsd/angsd \
+-P $THREADS \
+-b $BAMLIST \
+-ref $REF \
+-out $OUT_NAME \
+-uniqueOnly 1 \
+-remove_bads 1 \
+-only_proper_pairs 1 \
+-rf $REGIONFILE \
+-baq 1 \
+-C 50 \
+-doQsDist 1 \
+-doDepth 1 \
+-doCounts 1 \
+-maxDepth $MAXDEPTH
+
+#Once the files are ready, download them to continue working in R:
+scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/c_lp_depth_calculus/*n029*.depth* /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/lp_depth
+
+```
+
+##B
+
+```{r Depth range calculus}
+
+#Now we use R to plot the depth distribution and to obtain a summary table:
+
+library(dplyr)
+library(plyr)
+library(ggplot2)
+library(gridExtra)
+library(knitr)
+    
+##Functions:
+get_mean <- function(dat) { with(dat, sum(as.numeric(freq)*value)/sum(as.numeric(freq))) }
+get_sd <- function(dat) { mu <- get_mean (dat) 
+with (dat, sqrt(sum(as.numeric(freq)*(value-mu)^2)/(sum(as.numeric(freq))-1))) } 
+    
+#*******************************************************************************************
+    
+my_files_depthGlobal = list.files(path = "/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/lp_depth",pattern="*.depthGlobal$")[2]
+    
+for (i in 1:length(my_files_depthGlobal)) {
+  assign(my_files_depthGlobal[i], (scan(paste0("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/lp_depth/",my_files_depthGlobal[i],sep=""), sep = " ", dec = ".")) %>% .[!is.na(.)])
+  }
+mean_folds = 0.95
+depth_per_sample <- data.frame()
+    
+#Compute globaldepth for all populations found
+#*******************************************************************************************
+    
+for (i in 1:length(my_files_depthGlobal)) {
+  DF = read.table(paste0("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/lp_depth/",my_files_depthGlobal[i],sep=""),head=F, stringsAsFactors=F, check.names=FALSE)
+  freq_table_DF <- data.frame (value = 1:length (DF), freq = t(DF))
+  freq_table_truncated_DF <- filter(freq_table_DF, value < (nrow(freq_table_DF)))
+  #Mean depth:
+  my_mean_DF <-  get_mean (freq_table_DF)
+  my_mean_truncated_DF <- get_mean (freq_table_truncated_DF)
+  my_sd_DF <-  get_sd (freq_table_DF)
+  my_sd_truncated_DF <- get_sd (freq_table_truncated_DF)
+  #Max and min depth:
+  maxDepth_DF = my_mean_DF + (mean_folds * my_mean_DF)
+  minDepth_DF  = my_mean_DF - (mean_folds * my_mean_DF)
+  maxDepth_truncated_DF = my_mean_truncated_DF + (mean_folds * my_sd_truncated_DF)
+  minDepth_truncated_DF  = my_mean_truncated_DF - (mean_folds * my_sd_truncated_DF)
+  #Para una o más poblaciones:
+  population=unlist(strsplit(my_files_depthGlobal[i],"[.]"))[1]
+  depth_per_sample <- rbind(depth_per_sample, 
+                            data.frame(pop = population,
+                                       mean = my_mean_DF, sd = my_sd_DF, 
+                                       mean_truncated =  my_mean_truncated_DF, sd_truncated = my_sd_truncated_DF,
+                                       maxDepth = maxDepth_DF, minDepth = minDepth_DF,
+                                       maxDepth_truncated = maxDepth_truncated_DF, minDepth_truncated = minDepth_truncated_DF)) 
+  #Plotting:
+  ggplot(freq_table_truncated_DF, aes(x = value, y = freq)) + 
+    geom_bar(stat = "identity", color = "black") +
+    scale_x_continuous(breaks = 0:250*10, limits = c(0, maxDepth_truncated_DF*1.5)) +
+    scale_y_continuous(expand=c(0,0)) +
+    ggtitle (paste(my_files_depthGlobal[i],"_", mean_folds, "_",maxDepth_truncated_DF, "_",maxDepth_DF) ) +
+    geom_vline(xintercept=maxDepth_DF,linetype="dashed", size=0.5) + 
+    geom_vline(xintercept=minDepth_DF,linetype="dashed", size=0.5) + 
+    geom_vline(xintercept=maxDepth_truncated_DF, colour ="grey",linetype="dashed", size=0.5) + 
+    geom_vline(xintercept=minDepth_truncated_DF,colour ="grey",linetype="dashed", size=0.5) + 
+    theme_classic() + 
+    theme(text = element_text(size=10))
+  plot_name=paste0("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/lp_depth/",my_files_depthGlobal[i],"_",mean_folds,".pdf",sep="")
+  ggsave(filename = plot_name)
+}
+
+#When finished write the table
+
+#Use this for Lynx pardinus:
+write.table(x = depth_per_sample,file = paste("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/lp_depth/mean_sd_depthGlobal_lynx_pardinus_per_pop_mean_folds_",mean_folds,".csv", sep= ""),quote=FALSE, col.names = FALSE, row.names = FALSE, sep= " ")
+
+#Use this for Lynx lynx:
+write.table(x = depth_per_sample,file = paste("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/lp_depth/mean_sd_depthGlobal_lynx_lynx_per_pop_mean_folds_",mean_folds,".csv", sep= ""),quote=FALSE, col.names = FALSE, row.names = FALSE, sep= " ")
+
+#Use this for Lynx pardinus 5x only:
+write.table(x = depth_per_sample,file = paste("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/lp_depth/mean_sd_depthGlobal_lynx_pardinus_5x_per_pop_mean_folds_",mean_folds,".csv", sep= ""),quote=FALSE, col.names = FALSE, row.names = FALSE, sep= " ")
+
+#Use this for Lynx pardinus GP only:
+write.table(x = depth_per_sample,file = paste("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/lp_depth/mean_sd_depthGlobal_lynx_pardinus_GP_per_pop_mean_folds_",mean_folds,".csv", sep= ""),quote=FALSE, col.names = FALSE, row.names = FALSE, sep= " ")
+
+
+    
+```
+
+##C
+###For Lynx pardinus.
+
+```{r Depth range calculus, eval=FALSE, engine='bash'}
+
+#First upload the summary table to the server:
+scp /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/lp_depth/mean_sd_depthGlobal_lynx_pardinus_per_pop_mean_folds_0.95.csv dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/c_lp_depth_calculus/
+
+#Separate in populations:
+cd /home/dkleinman/datos/c_lp_depth_calculus/
+POPS=$(cat /home/dkleinman/datos/c_lp_depth_calculus/mean_sd_depthGlobal_lynx_pardinus_per_pop_mean_folds_0.95.csv | awk '{print $1}')
+for POP in ${POPS[@]}
+  do
+  echo $POP
+  grep "${POP} " /home/dkleinman/datos/c_lp_depth_calculus/mean_sd_depthGlobal_lynx_pardinus_per_pop_mean_folds_0.95.csv > "$POP"_mean_sd_depthGlobal_lynx_pardinus_per_pop_mean_folds_0.95.csv
+  done
+
+```    
+
+###For Lynx lynx.
+
+```{r Depth range calculus, eval=FALSE, engine='bash'}
+
+#First upload the summary table to the server:
+scp /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/lp_depth/mean_sd_depthGlobal_lynx_lynx_per_pop_mean_folds_0.95.csv dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/c_lp_depth_calculus/
+
+#Separate in populations:
+cd /home/dkleinman/datos/c_lp_depth_calculus/
+POPS=$(cat /home/dkleinman/datos/c_lp_depth_calculus/mean_sd_depthGlobal_lynx_lynx_per_pop_mean_folds_0.95.csv | awk '{print $1}')
+for POP in ${POPS[@]}
+  do
+  echo $POP
+  grep "${POP} " /home/dkleinman/datos/c_lp_depth_calculus/mean_sd_depthGlobal_lynx_lynx_per_pop_mean_folds_0.95.csv > "$POP"_mean_sd_depthGlobal_lynx_lynx_per_pop_mean_folds_0.95.csv
+  done
+    
+```
+
+#8: Filter the annotated VCF. Subset the VCF files in order to keep only good quality biallelic SNP variants.
+##For Lynx pardinus.
+
+```{r Filter the annotated VCF, eval=FALSE, engine='bash'}
+
+cd $V_PATH/annotation
+screen -S c_lp_sm_c_lp_do_nm_genes_polarized_filtered.lr_ann.log
+script c_lp_sm_c_lp_do_nm_genes_polarized_filtered.lr_ann.log
+
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome (first eight scaffolds only)
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+
+#Remove repetitive regions and those with low mappability:
+bedtools subtract -a c_lp_sm_c_lp_do_nm_genes_polarized.lr_ann.vcf -b /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/repeats_and_lowcomp_no_redundant_mappability.k75_lessthan90.bed -header > c_lp_sm_c_lp_do_nm_genes_polarized_filtered1.lr_ann.vcf
+
+grep -v '#' c_lp_sm_c_lp_do_nm_genes_polarized_filtered1.lr_ann.vcf | wc -l #645623
+
+
+#During this step, all INDELs as well as all multiallelic and bad quality SNPs will be dropped from the respective VCFs.
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T SelectVariants \
+-selectType SNP \
+-restrictAllelesTo BIALLELIC \
+-R $REF \
+-V c_lp_sm_c_lp_do_nm_genes_polarized_filtered1.lr_ann.vcf \
+-o c_lp_sm_c_lp_do_nm_genes_polarized_filtered2.lr_ann.vcf
+
+grep -v '#' c_lp_sm_c_lp_do_nm_genes_polarized_filtered2.lr_ann.vcf | wc -l #497025
+
+
+#Remove polarized ANC fixed variants (AF=0) or those that weren't polarizable (AA different from either REF or ALT):
+$BCF view -e '(INFO/AA!=REF & INFO/AA!=ALT) | INFO/AF=0.00' c_lp_sm_c_lp_do_nm_genes_polarized_filtered2.lr_ann.vcf > c_lp_sm_c_lp_do_nm_genes_polarized_filtered3.lr_ann.vcf
+
+grep -v '#' c_lp_sm_c_lp_do_nm_genes_polarized_filtered3.lr_ann.vcf | wc -l #475783
+
+#Apply GATK's recommended filters, and then some.     
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T SelectVariants \
+-select "QUAL >= 30 && QD >= 2.0 && FS <= 60.0 && MQ >= 40.0 && MQRankSum >= -12.5 && ReadPosRankSum >= -8.0" \
+-R $REF \
+-V c_lp_sm_c_lp_do_nm_genes_polarized_filtered3.lr_ann.vcf \
+-o c_lp_sm_c_lp_do_nm_genes_polarized_filtered4.lr_ann.vcf
+
+grep -v '#' c_lp_sm_c_lp_do_nm_genes_polarized_filtered4.lr_ann.vcf | wc -l #446094
+
+#First, for each species exclude those positions that have more than 20% missing genotypes, as well as those that have lower (higher) depth than the minimum (maximum) within 0.95 of the distribution, as calculated in the previous section:
+MIN_DP=$(cat /home/dkleinman/datos/c_lp_depth_calculus/c_lp_do-c_lp_sm_n031_mean_sd_depthGlobal_lynx_pardinus_per_pop_mean_folds_0.95.csv | awk '{print $9}') #Obtained in section 5
+MAX_DP=$(cat /home/dkleinman/datos/c_lp_depth_calculus/c_lp_do-c_lp_sm_n031_mean_sd_depthGlobal_lynx_pardinus_per_pop_mean_folds_0.95.csv | awk '{print $8}') #Obtained in section 5
+echo $MIN_DP
+echo $MAX_DP
+$BCF filter -e "DP < ${MIN_DP} || DP > ${MAX_DP} || F_MISSING > 0.2" -Ov -o c_lp_sm_c_lp_do_nm_genes_polarized_filtered5.lr_ann.vcf c_lp_sm_c_lp_do_nm_genes_polarized_filtered4.lr_ann.vcf
+
+grep -v '#' c_lp_sm_c_lp_do_nm_genes_polarized_filtered5.lr_ann.vcf | wc -l #402692
+
+```
+
+#9: Obtain per population VCFs.
+##Split the VCF into per population VCFs. Generate a VCF for each population.
+###For Lynx pardinus and Lynx lynx.
+
+```{r Obtain per population VCFs, eval=FALSE, engine='bash'}
+
+cd $V_PATH/annotation/
+screen -S perpop_nm_genes.lr_ann.log
+script perpop_nm_genes.lr_ann.log
+
+cd $B_PATH/BAM_genes_5x
+declare SPECIES=$(ls {*_lp_*,*_ll_*}_recal_round-1.genes-nm.bam | cut -c3-4 | sort | uniq)
+cd $V_PATH/annotation/
+for i in ${SPECIES[@]}
+  do
+  echo "${i}"
+  cd $B_PATH/BAM_genes_5x
+  declare POP=$(ls c_{lp_sm*,lp_do*,ll_ki*,ll_po*,ll_no*}_recal_round-1.genes-nm.bam | cut -c1-7 | uniq | grep "${i}")
+  cd $V_PATH/annotation/
+  for j in ${POP[@]}
+    do
+    echo "${j}"
+    rm "${j}"_pop_list_to_remove.txt
+    $BCF query -l $V_PATH/annotation/c_"${i}"*nm_genes_polarized_filtered5.lr_ann.vcf | grep "${j}" > "${j}"_pop_list_to_remove.txt
+    cat "${j}"_pop_list_to_remove.txt
+    mkdir "${j}"_perpop_nm_genes
+    java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+    -T SelectVariants \
+    -R $REF \
+    -V $V_PATH/annotation/c_"${i}"*nm_genes_polarized_filtered5.lr_ann.vcf \
+    -o $V_PATH/annotation/"${j}"_perpop_nm_genes/"${j}"_perpop_nm_genes.lr_ann.vcf \
+    -env \
+    --sample_file "${j}"_pop_list_to_remove.txt
+    rm "${j}"_pop_list_to_remove.txt
+    grep -v '#' $V_PATH/annotation/"${j}"_perpop_nm_genes/"${j}"_perpop_nm_genes.lr_ann.vcf | wc -l #
+    done
+  done
+
+cd $V_PATH/annotation/
+grep -v '#' c_ll_no_perpop_nm_genes/c_ll_no_perpop_nm_genes.lr_ann.vcf | wc -l #
+grep -v '#' c_ll_po_perpop_nm_genes/c_ll_po_perpop_nm_genes.lr_ann.vcf | wc -l #
+grep -v '#' c_ll_ki_perpop_nm_genes/c_ll_ki_perpop_nm_genes.lr_ann.vcf | wc -l #
+grep -v '#' c_lp_do_perpop_nm_genes/c_lp_do_perpop_nm_genes.lr_ann.vcf | wc -l #259960
+grep -v '#' c_lp_sm_perpop_nm_genes/c_lp_sm_perpop_nm_genes.lr_ann.vcf | wc -l #374157
+
+```
+
+#10: Split the population VCFs into per individual VCFs. Generate a VCF for each individual.
+##For Lynx pardinus and Lynx lynx.
+
+```{r Split the population VCFs into per individual VCFs, eval=FALSE, engine='bash'}
+
+#Generate individual VCFs from the per species VCFs:
+cd $V_PATH/annotation
+screen -S individuals_nm_genes.lr_ann.log
+script individuals_nm_genes.lr_ann.log
+
+#For each individual in the sm, do, ki, po & no populations, subset its variants from the respective population VCF:
+cd $B_PATH/BAM_genes_5x
+declare POP=$(ls c_{lp_sm*,lp_do*,ll_ki*,ll_po*,ll_no*}_recal_round-1.genes-nm.bam | cut -c1-7 | uniq | grep "${i}")
+for i in ${POP[@]}
+  do
+  echo "${i}"
+  mkdir $V_PATH/annotation/"${i}"_individuals_nm_genes
+  declare INDIVIDUALS=$(ls "${i}"*_recal_round-1.genes-nm.bam | cut -c1-12 | uniq)
+  for j in ${INDIVIDUALS[@]}
+    do
+    echo "${j}"
+    ID=$(echo "${j}")
+    java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+    -T SelectVariants \
+    -R $REF \
+    -V $V_PATH/annotation/"${i}"_perpop_nm_genes/"${i}"_perpop_nm_genes.lr_ann.vcf \
+    -o $V_PATH/annotation/"${i}"_individuals_nm_genes/"${j}"_individual_nm_genes.lr_ann.vcf \
+    -env \
+    -sn $ID
+    done
+  done
+
+```
+
+#11: Get annotation statistics.
+##At the individual level.
+###Heterozygotes and derived/derived homozygotes.
+
+```{r Get annotation statistics, eval=FALSE, engine='bash'}
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAM files path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+
+#For Lynx pardinus and Lynx lynx:
+
+cd $V_PATH/annotation/
+screen -S snpeff_individual_summary_nm_genes.lr_ann.log
+script snpeff_individual_summary_nm_genes.lr_ann.log
+
+rm snpeff_individual_summary_nm_genes.lr_ann.txt
+echo -e "species\tpopulation\tsample\ttotal_V\tintergenic_V\tintronic_V\tcoding_V\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tUCNE_V\tmissense/synonymous_V\tmissense/synonymous_A\tsynonymous/intronic_V\tmissense/intronic_V" > snpeff_individual_summary_nm_genes.lr_ann.txt
+INDLIST=($(ls `find . -name '*individual_nm_genes.lr_ann.vcf' -print`))
+for i in "${INDLIST[@]}"
+  do
+  echo "${i}"
+  ind=$(echo "${i}" | awk -F'[/]' '{print $3}')
+  echo "${ind}"
+  SPECIES=$(echo "${ind}" | cut -c3-4)
+  POPULATION=$(echo "${ind}" | cut -c6-7)
+  SAMPLE=$(echo "${ind}" | cut -c9-12)
+  TOTAL_V=$(grep -v '#' ${i} | wc -l)
+  INTERGENIC_V=$(grep 'intergenic' ${i} | wc -l)
+  INTRONIC_V=$(grep 'intron_variant' ${i} | wc -l)
+  CODING_V=$(grep 'CDS' ${i} | wc -l)
+  SYNONYMOUS_V=$(grep 'synonymous_variant' ${i} | wc -l)
+  SYNONYMOUS_A=$(grep 'synonymous_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_V=$(grep 'missense_variant' ${i} | wc -l)
+  MISSENSE_A=$(grep 'missense_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  NONSENSE_V=$(grep -e 'lost' -e 'gained' ${i} | wc -l)
+  NONSENSE_A=$(grep -e 'lost' -e 'gained' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  UCNE_V=$(grep 'UCNE' ${i} | wc -l)
+  MISSENSE_SYNONYMOUS_V=$(echo "scale=3; $MISSENSE_V/$SYNONYMOUS_V" | bc)
+  MISSENSE_SYNONYMOUS_A=$(echo "scale=3; $MISSENSE_A/$SYNONYMOUS_A" | bc)
+  SYNONYMOUS_INTRONIC_V=$(echo "scale=3; $SYNONYMOUS_V/$INTRONIC_V" | bc)
+  MISSENSE_INTRONIC_V=$(echo "scale=3; $MISSENSE_V/$INTRONIC_V" | bc)
+  echo -e "$SPECIES\t$POPULATION\t$SAMPLE\t$TOTAL_V\t$INTERGENIC_V\t$INTRONIC_V\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$UCNE_V\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A\t$SYNONYMOUS_INTRONIC_V\t$MISSENSE_INTRONIC_V" >> $V_PATH/annotation/snpeff_individual_summary_nm_genes.lr_ann.txt
+  done
+
+scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/annotation/snpeff_individual_summary_nm_genes.lr_ann.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/sep_calling
 
 ```
