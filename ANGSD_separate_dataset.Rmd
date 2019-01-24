@@ -351,7 +351,7 @@ $FILTER2 \
 
 ```
 
-## POR AQUI! --> SFS 
+## SFS 
 
 ```{r, engine=bash, eval=FALSE}
 
@@ -372,7 +372,7 @@ $NGSTOOLS/realSFS "$POP".unfolded-lr.saf.idx  -P $THREADS > "$POP".unfolded-lr.s
 
 echo "-------$POP----------SAF (postprob)-----------------------------------------"
 
-$ANGSD/angsd -P $THREADS -b $RUTA/whole_genome_analysis/"$POP".bamlist -ref $REF -anc $ANC \
+$ANGSD/angsd -P $THREADS -b $RUTA/depth_calculation/"$POP".bamlist -ref $REF -anc $ANC \
 -out "$POP".unfolded-lr.postprob \
 $FILTER1 \
 $FILTER2 \
@@ -380,18 +380,15 @@ $FILTER2 \
 -minInd  $MIN_IND -setMaxDepth $maxDepth_truncated -setMinDepth $minDepth_truncated \
 -doThetas 1 -pest "$POP".unfolded-lr.sfs 
 
-done
+# done
 
 ```
-
-
-
 
 ##  Make bed theta        
 
 La población de sierra morena se volvió a lanzar desde aquí en abril/mayo de 2018 porque me di cuenta de que los archivos que había creado se habína corrompido por el camino. Antes de esto (archivos saf, sfs, etc) sí están bien. 
 
-```{r, engine=bash, eval=FALSE}
+```{bash}
 
 echo "-------$POP----------Make bed theta -----------------------------------------"
 
@@ -404,33 +401,130 @@ awk 'NR>1 {print  $1" "$2-1" "$2}' $POP.printed.stats > $POP.0basedcoordinates.b
 awk 'NR>1 {print  "e("$3")"}' $POP.printed.stats | bc -l > "$POP".watterson.borrar # --> 4
 awk 'NR>1 {print  "e("$4")"}' $POP.printed.stats | bc -l > "$POP".pairwise.borrar # --> 5
                                                                                   # --> PAIRWISE - WATTERSON
-awk 'NR>1 {print  "e("$5")"}' $POP.printed.stats | bc -l > "$POP".thetaFL.borrar # --> 6
-awk 'NR>1 {print  "e("$6")"}' $POP.printed.stats | bc -l > "$POP".thetaH.borrar # --> 7
-awk 'NR>1 {print  "e("$7")"}' $POP.printed.stats | bc -l > "$POP".thetaL.borrar # --> 8
+#awk 'NR>1 {print  "e("$5")"}' $POP.printed.stats | bc -l > "$POP".thetaFL.borrar # --> 6
+#awk 'NR>1 {print  "e("$6")"}' $POP.printed.stats | bc -l > "$POP".thetaH.borrar # --> 7
+#awk 'NR>1 {print  "e("$7")"}' $POP.printed.stats | bc -l > "$POP".thetaL.borrar # --> 8
 
 # Create a header for the "$POP".transformedThetas file
 
-echo "scaffold position1 position2 watterson pairwise pairwise-watterson thetaFL thetaH thetaL" > "$POP".transformedThetas
+# echo "scaffold position1 position2 watterson pairwise pairwise-watterson" > "$POP".transformedThetas
 
-# ¿Tengo las mismas posiciones?
+# Sanity: ¿tengo las mismas posiciones?
 
 wc -l $POP*borrar
 
+# 421902841 c_lp_sm_n007.genes.0basedcoordinates.borrar
+# 421902841 c_lp_sm_n007.genes.pairwise.borrar
+# 421902841 c_lp_sm_n007.genes.watterson.borrar
+
+# 414360056 c_lp_sm_n007.genes-nm.0basedcoordinates.borrar
+# 414360056 c_lp_sm_n007.genes-nm.pairwise.borrar
+# 414360056 c_lp_sm_n007.genes-nm.watterson.borrar
 
 
-paste $POP.0basedcoordinates.borrar "$POP".watterson.borrar "$POP".pairwise.borrar "$POP".thetaFL.borrar "$POP".thetaH.borrar "$POP".thetaL.borrar | \
-awk -v OFS='\t'  '{print $1, $2, $3, $4, $5, $5-4, $6, $7, $8}' >> "$POP".transformedThetas
+
+paste $POP.0basedcoordinates.borrar "$POP".watterson.borrar "$POP".pairwise.borrar  | \
+awk -v OFS='\t'  '{print $1, $2, $3, $4, $5, $5-4}' >> "$POP".transformedThetas.bed
 
 rm "$POP".*.borrar
-mv $POP.printed.stats /backup/mlucena/intermediate_files_ANGSD/whole_genome_analysis/
-scp *.transformedThetas /backup/mlucena/intermediate_files_ANGSD/whole_genome_analysis/
+# mv $POP.printed.stats /backup/mlucena/intermediate_files_ANGSD/whole_genome_analysis/
+# scp *.transformedThetas /backup/mlucena/intermediate_files_ANGSD/whole_genome_analysis/
 
 # done
 
 ```
 
+# Copio los bed files de las sinonimas y no sinonimas del proyeto genoma y de 5 x
 
 
+```{bash}
+scp /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_lp_sm_c_lp_do_syn_coord.bed /GRUPOS/grupolince/lynx_genomes_5x/ANGSD_separate_datasets/
+scp /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_lp_sm_c_lp_do_5x_syn_coord.bed /GRUPOS/grupolince/lynx_genomes_5x/ANGSD_separate_datasets/
+scp /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_lp_sm_c_lp_do_GP_syn_coord.bed //GRUPOS/grupolince/lynx_genomes_5x/ANGSD_separate_datasets
 
+# Luego borrar!!
+
+```
+
+# Cruzo con mis datos de diversidad
+
+```{bash}
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/ANGSD_separate_datasets/
+
+# Archivos que tengo:
+
+# c_lp_sm_n007.genes-nm.transformedThetas
+# c_lp_sm_n007.genes.transformedThetas
+
+# c_lp_sm_n012.genes-nm.transformedThetas
+# c_lp_sm_n012.genes.transformedThetas
+
+
+# Como tengo los bed de Dani que tienen valores de SNPS, los filtro para que solo tengas las columnas de posición y sea más limpio. 
+
+awk -v OFS='\t' '{print $1, $2, $3}' c_lp_sm_c_lp_do_5x_syn_coord.bed > c_lp_sm_c_lp_do_5x_syn_coord.bed_clean
+mv c_lp_sm_c_lp_do_5x_syn_coord.bed_clean c_lp_sm_c_lp_do_5x_syn_coord.bed
+awk -v OFS='\t' '{print $1, $2, $3}' c_lp_sm_c_lp_do_GP_syn_coord.bed > c_lp_sm_c_lp_do_GP_syn_coord.bed_clean
+mv c_lp_sm_c_lp_do_GP_syn_coord.bed_clean c_lp_sm_c_lp_do_GP_syn_coord.bed
+awk -v OFS='\t' '{print $1, $2, $3}' c_lp_sm_c_lp_do_syn_coord.bed > c_lp_sm_c_lp_do_syn_coord.bed_clean
+mv c_lp_sm_c_lp_do_syn_coord.bed_clean c_lp_sm_c_lp_do_syn_coord.bed
+
+
+# c_lp_sm_n007.genes-nm
+
+bedtools intersect -wo -a c_lp_sm_n007.genes-nm.transformedThetas.bed -b c_lp_sm_c_lp_do_5x_syn_coord.bed > c_lp_sm_n007.genes-nm.5x_syn_coord.bed # Lanzado
+bedtools intersect -wo -a c_lp_sm_n007.genes-nm.transformedThetas.bed -b c_lp_sm_c_lp_do_GP_syn_coord.bed >  c_lp_sm_n007.genes-nm.GP_syn_coord.bed # Lanzado
+
+
+# c_lp_sm_n007.genes
+
+bedtools intersect -wo -a c_lp_sm_n007.genes.transformedThetas.bed -b c_lp_sm_c_lp_do_5x_syn_coord.bed > c_lp_sm_n007.genes.5x_syn_coord.bed # Lanzado
+bedtools intersect -wo -a c_lp_sm_n007.genes.transformedThetas.bed -b c_lp_sm_c_lp_do_GP_syn_coord.bed > c_lp_sm_n007.genes.GP_syn_coord.bed # Lanzado
+
+
+# c_lp_sm_n012.genes-nm.transformedThetas
+
+bedtools intersect -wo -a c_lp_sm_n012.genes-nm.transformedThetas.bed -b c_lp_sm_c_lp_do_5x_syn_coord.bed > c_lp_sm_n012.genes-nm.5x_syn_coord.bed # Lanzado
+bedtools intersect -wo -a c_lp_sm_n012.genes-nm.transformedThetas.bed -b c_lp_sm_c_lp_do_GP_syn_coord.bed > c_lp_sm_n012.genes-nm.GP_syn_coord.bed # Lanzado
+
+
+# c_lp_sm_n012.genes.transformedThetas
+
+bedtools intersect -wo -a c_lp_sm_n012.genes.transformedThetas.bed -b c_lp_sm_c_lp_do_5x_syn_coord.bed > c_lp_sm_n012.genes.5x_syn_coord.bed 
+bedtools intersect -wo -a c_lp_sm_n012.genes.transformedThetas.bed -b c_lp_sm_c_lp_do_GP_syn_coord.bed > c_lp_sm_n012.genes.GP_syn_coord.bed 
+
+
+# Average
+
+POPs=(c_lp_sm_n007.genes c_lp_sm_n007.genes-nm c_lp_sm_n012.genes c_lp_sm_n012.genes-nm)
+
+rm populations
+rm 5x_syn 
+rm GP_syn
+
+for POP in "${POPs[@]}"
+do
+echo $POP >> populations
+sites_5x=$(wc -l "${POP}".5x_syn_coord.bed | cut -d" " -f1)
+sites_GP=$(wc -l "${POP}".GP_syn_coord.bed | cut -d" " -f1)
+awk -v OFS='\t' -v sites="$sites_5x" '{sum_water+=$4;sum_pair+=$5 } END {print sum_water/sites, sum_pair/sites, sites}' "${POP}".5x_syn_coord.bed >> 5x_syn 
+awk -v OFS='\t' -v sites="$sites_GP" '{sum_water+=$4;sum_pair+=$5 } END {print sum_water/sites, sum_pair/sites, sites}' "${POP}".GP_syn_coord.bed >> GP_syn 
+done
+
+
+echo -e "population\tsyn_5x_watterson\tsyn_5x_pi\tsyn_5x_sites\tsyn_GP_watterson\tsyn_GP_pi\tsyn_GP_sites" > title
+paste populations 5x_syn GP_syn > results_diversity_ANGSD_separate_dataset
+
+cat  title results_diversity_ANGSD_separate_dataset > results_diversity_ANGSD_separate_dataset.tsv
+
+rm title
+rm results_diversity_ANGSD_separate_dataset
+rm populations
+rm 5x_syn 
+rm GP_syn
+
+
+```
 
 
