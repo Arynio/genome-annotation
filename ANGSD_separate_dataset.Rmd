@@ -17,6 +17,30 @@ Los archivos que voy a usar son los siguientes:
 
 Vamos a trabajar en la siguiente carpeta: /GRUPOS/grupolince/lynx_genomes_5x/ANGSD_separate_datasets
 
+# Coverage of nm bam files
+
+```{bash}
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_genes_5x/
+SAMPLELIST=($(ls *nm.bam | uniq ))
+rm coverage_nm4_samples.tsv
+echo -e "sample_name\tcoverage_based_samtools\tstdev_based_samtools" > global_coverage.tsv
+for sample in "${SAMPLELIST[@]}"
+do
+echo $sample
+DEPTH=$(samtools depth $sample | awk '{sum+=$3; sumsq+=$3*$3} END { print sum/2413209059; print sqrt(sumsq/2413209059 - (sum/2413209059)**2)}')
+paste \
+<(echo $sample ) \
+<(echo $DEPTH ) |\
+sed 's/ /\t/g'| sed 's/\t\+/\t/g' >>  coverage_nm4_samples.tsv
+done
+
+# 2413209059 --> es el tamaño del genoma, porque te da la cobertura pero no te dice cobertura por base que es lo que te interesa. 
+
+
+```
+
+
+
 # Depth calculation
 
 ```{bash}
