@@ -324,6 +324,63 @@ for i in ${SAMPLES[@]}
 
 ```
 
+####KIR:
+
+```{r Perform NM-based BAM filterings, eval=FALSE, engine='bash'}
+
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
+screen -S c_ll_ki_nm_BAMs.log
+script c_ll_ki_nm_BAMs.log
+
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
+declare SAMPLES=$(ls c_ll_ki_*_recal_round-1.bam | cut -c9-12 | sort | uniq)
+for i in ${SAMPLES[@]}
+  do
+  echo "${i}"
+  bamtools filter -tag "NM:<=4" -in c_ll_ki_"${i}"_recal_round-1.bam -out c_ll_ki_"${i}"_recal_round-1.nm.bam
+  samtools index c_ll_ki_"${i}"_recal_round-1.nm.bam
+  done
+
+```
+
+####NOR:
+
+```{r Perform NM-based BAM filterings, eval=FALSE, engine='bash'}
+
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
+screen -S c_ll_no_nm_BAMs.log
+script c_ll_no_nm_BAMs.log
+
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
+declare SAMPLES=$(ls c_ll_no_*_recal_round-1.bam | cut -c9-12 | sort | uniq)
+for i in ${SAMPLES[@]}
+  do
+  echo "${i}"
+  bamtools filter -tag "NM:<=4" -in c_ll_no_"${i}"_recal_round-1.bam -out c_ll_no_"${i}"_recal_round-1.nm.bam
+  samtools index c_ll_no_"${i}"_recal_round-1.nm.bam
+  done
+
+```
+
+####POL:
+
+```{r Perform NM-based BAM filterings, eval=FALSE, engine='bash'}
+
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
+screen -S c_ll_po_nm_BAMs.log
+script c_ll_po_nm_BAMs.log
+
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
+declare SAMPLES=$(ls c_ll_po_*_recal_round-1.bam | cut -c9-12 | sort | uniq)
+for i in ${SAMPLES[@]}
+  do
+  echo "${i}"
+  bamtools filter -tag "NM:<=4" -in c_ll_po_"${i}"_recal_round-1.bam -out c_ll_po_"${i}"_recal_round-1.nm.bam
+  samtools index c_ll_po_"${i}"_recal_round-1.nm.bam
+  done
+
+```
+
 ##Compare MQ distributions (DON only).
 ###Obtain MQ distribution (NM files).
 
