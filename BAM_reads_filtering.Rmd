@@ -521,6 +521,75 @@ grep -v '#' c_lp_sm_c_lp_do_nm_genes.vcf | wc -l #1341848
 
 ```
 
+##B: Whole-genome. 
+###For Lynx pardinus.
+
+```{r Perform variant calling for each species, eval=FALSE, engine='bash'}
+
+#Perform direct variant calling (without gVCFs) on the NM≤4 filtered Lynx pardinus BAMs.
+cd $V_PATH
+screen -S c_lp_sm_c_lp_do_nm.log
+script c_lp_sm_c_lp_do_nm.log
+
+cd $B_PATH
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
+-T HaplotypeCaller \
+-R $REF \
+$(for var in c_lp*recal_round-1.nm.bam; do echo -I ${var}" ";done) \
+-o $V_PATH/c_lp_sm_c_lp_do_nm.vcf
+
+grep -v '#' $V_PATH/c_lp_sm_c_lp_do_nm.vcf | wc -l #1341848
+
+#Rename the samples with wrong names.
+cd $V_PATH
+bcftools query -l c_lp_sm_c_lp_do_nm.vcf #check sample names
+#!/bin/bash
+#cat << "EOF" > lp_rename.txt #Unmark this line when running it (I marked it in R because it doesn't understand it and messes the colours of subsequent lines). It should include all incorrect names.
+h_lp_do_0007 c_lp_do_0007
+EOF
+cat lp_rename.txt
+bcftools reheader -s lp_rename.txt -o c_lp_sm_c_lp_do_nm_renamed.vcf c_lp_sm_c_lp_do_nm.vcf #copy the VCF and rename the wrong named samples in the new VCF
+rm lp_rename.txt
+mv c_lp_sm_c_lp_do_nm_renamed.vcf c_lp_sm_c_lp_do_nm.vcf
+
+grep -v '#' c_lp_sm_c_lp_do_nm.vcf | wc -l #
+
+```
+
+###For Lynx lynx.
+
+```{r Perform variant calling for each species, eval=FALSE, engine='bash'}
+
+#Perform direct variant calling (without gVCFs) on the NM≤4 filtered Lynx lynx BAMs.
+cd $V_PATH
+screen -S c_ll_ki_c_ll_no_c_ll_po_nm.log
+script c_ll_ki_c_ll_no_c_ll_po_nm.log
+
+cd $B_PATH
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
+-T HaplotypeCaller \
+-R $REF \
+$(for var in c_{ll_ki*,ll_no*,ll_po*}recal_round-1.nm.bam; do echo -I ${var}" ";done) \
+-o $V_PATH/c_ll_ki_c_ll_no_c_ll_po_nm.vcf
+
+grep -v '#' $V_PATH/c_ll_ki_c_ll_no_c_ll_po_nm.vcf | wc -l #
+
+#Rename the samples with wrong names.
+cd $V_PATH
+bcftools query -l c_ll_ki_c_ll_no_c_ll_po_nm.vcf #check sample names
+#!/bin/bash
+#cat << "EOF" > ll_rename.txt #Unmark this line when running it (I marked it in R because it doesn't understand it and messes the colours of subsequent lines). It should include all incorrect names.
+LL90_rgsm c_ll_ki_0090
+EOF
+cat ll_rename.txt
+bcftools reheader -s ll_rename.txt -o c_ll_ki_c_ll_no_c_ll_po_nm_renamed.vcf c_ll_ki_c_ll_no_c_ll_po_nm.vcf #copy the VCF and rename the wrong named samples in the new VCF
+rm ll_rename.txt
+mv c_ll_ki_c_ll_no_c_ll_po_nm_renamed.vcf c_ll_ki_c_ll_no_c_ll_po_nm.vcf
+
+grep -v '#' c_ll_ki_c_ll_no_c_ll_po_nm.vcf | wc -l #
+
+```
+
 #5: Polarize contemporary VCFs. Use VCFtools in order to polarize (ancestral vs. derived) the contemporary ll & lp VCFs. The ancestral state was inferred by Maria.
 
 ##Prepare ancestral genome fasta.
