@@ -1,0 +1,64 @@
+---
+title: "PCAs_from_VCFs"
+author: "Dani"
+date: "26 de enero de 2019"
+output: html_document
+---
+
+#0: Define paths.
+
+```{r Define paths, eval=FALSE, engine='bash'}
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAM files path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+```
+
+#1: Build PCA from VCF.
+
+```{r Build PCA from VCF}
+
+library(SNPRelate)
+library(dplyr)
+lp_genes_vcf <- "/Users/dani/ownCloud/backup/g-w_analysis/PCA_VCF/c_lp_sm_c_lp_do_nm_genes.vcf"
+lp_genes_vcf
+snpgdsVCF2GDS(lp_genes_vcf, "/Users/dani/ownCloud/backup/g-w_analysis/PCA_VCF/c_lp_sm_c_lp_do_nm_genes.gds", method="biallelic.only")
+lp_genes_genofile <- snpgdsOpen("/Users/dani/ownCloud/backup/g-w_analysis/PCA_VCF/c_lp_sm_c_lp_do_nm_genes.gds")
+
+#Try different LD thresholds for sensitivity analysis
+set.seed(1000)
+lp_genes_snpset <- snpgdsLDpruning(lp_genes_genofile, ld.threshold=1, autosome.only=F)
+snpset.id <- unlist(lp_genes_snpset)
+
+lp_genes_pca <- snpgdsPCA(lp_genes_genofile, snp.id=snpset.id, autosome.only=F, num.thread=4)
+pc.percent <- lp_genes_pca$varprop*100
+head(round(pc.percent, 2))
+
+# Get sample id
+sample.id <- read.gdsn(index.gdsn(lp_genes_genofile, "sample.id"))
+pop_code <- substr(sample.id,6,7)
+
+#Make a data.frame
+tab <- data.frame(sample.id = lp_genes_pca$sample.id,
+    pop = factor(pop_code)[match(lp_genes_pca$sample.id, sample.id)],
+    EV1 = lp_genes_pca$eigenvect[,1],    # the first eigenvector
+    EV2 = lp_genes_pca$eigenvect[,2],    # the second eigenvector
+    EV3 = lp_genes_pca$eigenvect[,3],    # the second eigenvector
+    EV4 = lp_genes_pca$eigenvect[,4],    # the second eigenvector
+    stringsAsFactors = FALSE)
+head(tab)
+
+#Draw
+plot(tab$EV2, tab$EV1, col=as.integer(tab$pop), xlab="eigenvector 2", ylab="eigenvector 1")
+legend("bottomright", legend=levels(tab$pop), pch="o", col=1:nlevels(tab$pop))
+
+```
+
