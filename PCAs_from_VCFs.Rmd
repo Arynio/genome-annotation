@@ -28,27 +28,31 @@ BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
 
 library(SNPRelate)
 library(dplyr)
-lp_genes_vcf <- "/Users/dani/ownCloud/backup/g-w_analysis/PCA_VCF/c_lp_sm_c_lp_do_nm_genes.vcf"
+
+lp_genes_vcf <- "/Users/dani/ownCloud/backup/g-w_analysis/PCA_VCF/c_lp_sm_c_lp_do_var_polarized_filtered5.lr_ann.vcf"
 lp_genes_vcf
-snpgdsVCF2GDS(lp_genes_vcf, "/Users/dani/ownCloud/backup/g-w_analysis/PCA_VCF/c_lp_sm_c_lp_do_nm_genes.gds", method="biallelic.only")
-lp_genes_genofile <- snpgdsOpen("/Users/dani/ownCloud/backup/g-w_analysis/PCA_VCF/c_lp_sm_c_lp_do_nm_genes.gds")
+snpgdsVCF2GDS(lp_genes_vcf, "/Users/dani/ownCloud/backup/g-w_analysis/PCA_VCF/c_lp_sm_c_lp_do_var_polarized_filtered5.lr_ann.gds", method="biallelic.only")
+lp_genes_genofile <- snpgdsOpen("/Users/dani/ownCloud/backup/g-w_analysis/PCA_VCF/c_lp_sm_c_lp_do_var_polarized_filtered5.lr_ann.gds")
 
 #Try different LD thresholds for sensitivity analysis
 set.seed(1000)
-lp_genes_snpset <- snpgdsLDpruning(lp_genes_genofile, ld.threshold=1, autosome.only=F)
+lp_genes_snpset <- snpgdsLDpruning(lp_genes_genofile, ld.threshold=1, autosome.only=F, num.thread=4)
 snpset.id <- unlist(lp_genes_snpset)
 
 lp_genes_pca <- snpgdsPCA(lp_genes_genofile, snp.id=snpset.id, autosome.only=F, num.thread=4)
 pc.percent <- lp_genes_pca$varprop*100
 head(round(pc.percent, 2))
 
-# Get sample id
+#Get sample id
 sample.id <- read.gdsn(index.gdsn(lp_genes_genofile, "sample.id"))
 pop_code <- substr(sample.id,6,7)
+GP_samples <- c("c_lp_do_0007","c_lp_do_0153","c_lp_do_0173","c_lp_do_0443","c_lp_sm_0138","c_lp_sm_0140","c_lp_sm_0185","c_lp_sm_0186","c_lp_sm_0298","c_lp_sm_0359")
+dataset_code <- ifelse(lp_genes_pca$sample.id %in% GP_samples,"GP",ifelse(lp_genes_pca$sample.id=="c_lp_sm_0221","Candiles","5x"))
+full_pop_code <- paste(pop_code,dataset_code,sep="_")
 
 #Make a data.frame
 tab <- data.frame(sample.id = lp_genes_pca$sample.id,
-    pop = factor(pop_code)[match(lp_genes_pca$sample.id, sample.id)],
+    pop = factor(full_pop_code)[match(lp_genes_pca$sample.id, sample.id)],
     EV1 = lp_genes_pca$eigenvect[,1],    # the first eigenvector
     EV2 = lp_genes_pca$eigenvect[,2],    # the second eigenvector
     EV3 = lp_genes_pca$eigenvect[,3],    # the second eigenvector
@@ -57,8 +61,10 @@ tab <- data.frame(sample.id = lp_genes_pca$sample.id,
 head(tab)
 
 #Draw
-plot(tab$EV2, tab$EV1, col=as.integer(tab$pop), xlab="eigenvector 2", ylab="eigenvector 1")
+pdf("/Users/dani/ownCloud/backup/g-w_analysis/PCA_VCF/c_lp_sm_c_lp_do_var_polarized_filtered5.lr_ann.pdf",width=6,height=6,paper='special') 
+plot(tab$EV2, tab$EV1, col=as.integer(tab$pop), xlab=round(pc.percent[2], 2), ylab=round(pc.percent[1], 2))
 legend("bottomright", legend=levels(tab$pop), pch="o", col=1:nlevels(tab$pop))
+dev.off()
 
 ```
 
