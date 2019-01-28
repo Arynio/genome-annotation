@@ -24,7 +24,7 @@ Vamos a trabajar en la siguiente carpeta: /GRUPOS/grupolince/lynx_genomes_5x/ANG
 cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_genes_5x/
 SAMPLELIST=($(ls *nm.bam | sort | uniq))
 rm coverage_nm4_samples.tsv
-echo -e "sample_name\tcoverage_based_samtools\tstdev_based_samtools" > global_coverage.tsv
+echo -e "sample_name\tcoverage_based_samtools\tstdev_based_samtools" > coverage_nm4_samples.tsv
 for sample in "${SAMPLELIST[@]}"
 do
 echo $sample
