@@ -229,7 +229,8 @@ plot_bis
 
 #3: Perform NM-based BAM filterings.
 
-##Filter in reads with high NM.
+##Explore the contamination.
+###Filter in reads with NM ≥ 12.
 
 ```{r Perform NM-based BAM filterings, eval=FALSE, engine='bash'}
 
@@ -245,6 +246,44 @@ for i in ${SAMPLES[@]}
   echo "${i}"
   bamtools filter -tag "NM:>12" -in /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_genes_5x/c_lp_do_"${i}"_recal_round-1.genes.bam -out /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_genes_5x/c_lp_do_"${i}"_recal_round-1.genes-hm.bam
   samtools index c_lp_do_"${i}"_recal_round-1.genes-hm.bam
+  done
+
+```
+
+###Convert reads to FASTA.
+
+```{r Perform NM-based BAM filterings, eval=FALSE, engine='bash'}
+
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_genes_5x
+screen -S c_lp_do_genes_hm_FASTAs.log
+script c_lp_do_genes_hm_FASTAs.log
+
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_genes_5x
+declare SAMPLES=$(ls c_lp_do*genes-hm.bam | cut -c9-12 | sort | uniq)
+for i in ${SAMPLES[@]}
+  do
+  echo "${i}"
+  samtools fasta c_lp_do_"${i}"_recal_round-1.genes-hm.bam > c_lp_do_"${i}"_recal_round-1.genes-hm.fa
+  done
+
+```
+
+###Filter in reads with NM ≥ 5 and convert to fasta.
+
+```{r Perform NM-based BAM filterings, eval=FALSE, engine='bash'}
+
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_genes_5x
+screen -S c_lp_do_genes_hm5_BAMs.log
+script c_lp_do_genes_hm5_BAMs.log
+
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_genes_5x
+declare SAMPLES=$(ls *.genes.bam | cut -c1-12 | sort | uniq)
+for i in ${SAMPLES[@]}
+  do
+  echo "${i}"
+  bamtools filter -tag "NM:>5" -in "${i}"_recal_round-1.genes.bam -out "${i}"_recal_round-1.genes-hm5.bam
+  samtools index "${i}"_recal_round-1.genes-hm5.bam
+  samtools fasta "${i}"_recal_round-1.genes-hm5.bam > "${i}"_recal_round-1.genes-hm5.fa
   done
 
 ```
