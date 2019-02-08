@@ -220,10 +220,54 @@ for (file in sample_files) {
 }
 rm(edit_distance_distribution)
 
-reads_totales <- sum(plot_data$n)
-plot_bis <- mutate(plot_data,prop=as.numeric(100*n/reads_totales))
-plot_bis$cum_prop <- cumsum(plot_bis$prop)
-plot_bis
+#Draw proportion of reads at different NMs:
+sample_files <- list.files("/Users/Dani/ownCloud/backup/contamination/edit_distance_tests/", pattern="*distr.genes.txt")
+all_together <- data_frame()
+for (file in sample_files) {
+  edit_distance_distribution <- read_tsv(paste0("/Users/Dani/ownCloud/backup/contamination/edit_distance_tests/",file),col_names=c("NM"))
+  edit_distance_distribution
+  sample <- strsplit(file,"_")[[1]][4]
+  print(sample)
+  plot_data <- edit_distance_distribution %>% group_by(NM) %>% tally()
+  plot_data
+  reads_totales <- sum(plot_data$n)
+  plot_bis <- mutate(plot_data,prop=as.numeric(100*n/reads_totales))
+  plot_bis$cum_prop <- cumsum(plot_bis$prop)
+  plot_bis$sample <- c(sample)
+  plot_bis$dataset <- ifelse(plot_bis$sample=="0007" | plot_bis$sample=="0153" | plot_bis$sample=="0173" | plot_bis$sample=="0443", "GP", "5x")
+  plot_bis
+  all_together <- rbind(all_together,plot_bis[c(1:11),])
+  all_together
+}
+
+NM_freq_ggplot <- ggplot(data=all_together, aes(NM,prop,colour=dataset)) +
+#geom_histogram(aes(NM),binwidth=1) +
+geom_point() +
+ggtitle("Proportion of reads at different NM") +
+ylab("percentage") +
+theme_bw() +
+theme(text=element_text(size=12,face="bold"),
+      rect=element_rect(size=1),
+      axis.line=element_line(colour="black"),
+      axis.title=element_text(size=16),
+      #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+      #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+      #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+      panel.background=element_blank(),
+      panel.border=element_rect(colour="black"),
+      #panel.grid=element_blank(),
+      #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+      plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+      #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+      legend.background=element_rect(linetype="solid", colour="black", size=.5),
+      #legend.justification=c(0,0),
+      legend.key=element_rect(colour="white"),
+      #legend.key.size=unit(1.3,"cm"),
+      legend.position=c(0.92,0.86),
+      legend.title=element_blank()
+)
+NM_freq_ggplot
+ggsave("proportion_of_reads_at_different_NM.genes.pdf", width=15, height=10, units="cm", device="pdf", path="/Users/Dani/ownCloud/backup/contamination/edit_distance_tests")
 
 ```
 
@@ -288,22 +332,22 @@ for i in ${SAMPLES[@]}
 
 ```
 
-##Filter out reads with high NM. Based on the previously obtained distribution of NM, we decide to filter out reads with NM>4.
+##Filter out reads with with NM>2, NM>3, NM>4 and NM>8.
 ###Genes-only BAMs.
 ####DON:
 ```{r Perform NM-based BAM filterings, eval=FALSE, engine='bash'}
 
 cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_genes_5x
-screen -S c_lp_do_genes_nm_BAMs.log
-script c_lp_do_genes_nm_BAMs.log
+screen -S c_lp_do_genes_nm2_BAMs.log
+script c_lp_do_genes_nm2_BAMs.log
 
 cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_genes_5x
 declare SAMPLES=$(ls c_lp_do_*_recal_round-1.genes.bam | cut -c9-12 | sort | uniq)
 for i in ${SAMPLES[@]}
   do
   echo "${i}"
-  bamtools filter -tag "NM:<=4" -in c_lp_do_"${i}"_recal_round-1.genes.bam -out c_lp_do_"${i}"_recal_round-1.genes-nm.bam
-  samtools index c_lp_do_"${i}"_recal_round-1.genes-nm.bam
+  bamtools filter -tag "NM:<=2" -in c_lp_do_"${i}"_recal_round-1.genes.bam -out c_lp_do_"${i}"_recal_round-1.genes-nm2.bam
+  samtools index c_lp_do_"${i}"_recal_round-1.genes-nm2.bam
   done
 
 ```
@@ -312,72 +356,126 @@ for i in ${SAMPLES[@]}
 ```{r Perform NM-based BAM filterings, eval=FALSE, engine='bash'}
 
 cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_genes_5x
-screen -S c_lp_sm_genes_nm_BAMs.log
-script c_lp_sm_genes_nm_BAMs.log
+screen -S c_lp_sm_genes_nm2_BAMs.log
+script c_lp_sm_genes_nm2_BAMs.log
 
 cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_genes_5x
 declare SAMPLES=$(ls c_lp_sm_*_recal_round-1.genes.bam | cut -c9-12 | sort | uniq)
 for i in ${SAMPLES[@]}
   do
   echo "${i}"
-  bamtools filter -tag "NM:<=4" -in c_lp_sm_"${i}"_recal_round-1.genes.bam -out c_lp_sm_"${i}"_recal_round-1.genes-nm.bam
-  samtools index c_lp_sm_"${i}"_recal_round-1.genes-nm.bam
+  bamtools filter -tag "NM:<=2" -in c_lp_sm_"${i}"_recal_round-1.genes.bam -out c_lp_sm_"${i}"_recal_round-1.genes-nm2.bam
+  samtools index c_lp_sm_"${i}"_recal_round-1.genes-nm2.bam
   done
 
 ```
 
 ###W-g BAMs.
-####DON:
+####DON 5x:
 ```{r Perform NM-based BAM filterings, eval=FALSE, engine='bash'}
 
-cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
-screen -S c_lp_do_nm_BAMs.log
-script c_lp_do_nm_BAMs.log
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+screen -S c_lp_do_nm2_BAMs.log
+script c_lp_do_nm2_BAMs.log
 
 cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
 declare SAMPLES=$(ls c_lp_do_*_recal_round-1.bam | cut -c9-12 | sort | uniq)
 for i in ${SAMPLES[@]}
   do
   echo "${i}"
-  bamtools filter -tag "NM:<=4" -in c_lp_do_"${i}"_recal_round-1.bam -out c_lp_do_"${i}"_recal_round-1.nm.bam
-  samtools index c_lp_do_"${i}"_recal_round-1.nm.bam
+  bamtools filter -tag "NM:<=2" -in c_lp_do_"${i}"_recal_round-1.bam -out BAM_nm_filtered/c_lp_do_"${i}"_recal_round-1.nm2.bam
+  samtools index BAM_nm_filtered/c_lp_do_"${i}"_recal_round-1.nm2.bam
   done
 
 ```
 
-####SMO:
+####DON 25x:
 ```{r Perform NM-based BAM filterings, eval=FALSE, engine='bash'}
 
-cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
-screen -S c_lp_sm_nm_BAMs.log
-script c_lp_sm_nm_BAMs.log
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+screen -S c_lp_do_nm2_BAMs_25x.log
+script c_lp_do_nm2_BAMs_25x.log
+
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/genome_project_samples_25x
+declare SAMPLES=$(ls c_lp_do_*_recal_round-1_25x.bam | cut -c9-12 | sort | uniq)
+for i in ${SAMPLES[@]}
+  do
+  echo "${i}"
+  bamtools filter -tag "NM:<=2" -in c_lp_do_"${i}"_recal_round-1_25x.bam -out ./../BAM_nm_filtered/c_lp_do_"${i}"_recal_round-1_25x.nm2.bam
+  samtools index ./../BAM_nm_filtered/c_lp_do_"${i}"_recal_round-1_25x.nm2.bam
+  done
+
+```
+
+####SMO 5x:
+```{r Perform NM-based BAM filterings, eval=FALSE, engine='bash'}
+
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+screen -S c_lp_sm_nm2_BAMs.log
+script c_lp_sm_nm2_BAMs.log
 
 cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
 declare SAMPLES=$(ls c_lp_sm_*_recal_round-1.bam | cut -c9-12 | sort | uniq)
 for i in ${SAMPLES[@]}
   do
   echo "${i}"
-  bamtools filter -tag "NM:<=4" -in c_lp_sm_"${i}"_recal_round-1.bam -out c_lp_sm_"${i}"_recal_round-1.nm.bam
-  samtools index c_lp_sm_"${i}"_recal_round-1.nm.bam
+  bamtools filter -tag "NM:<=2" -in c_lp_sm_"${i}"_recal_round-1.bam -out BAM_nm_filtered/c_lp_sm_"${i}"_recal_round-1.nm2.bam
+  samtools index BAM_nm_filtered/c_lp_sm_"${i}"_recal_round-1.nm2.bam
   done
 
 ```
 
-####KIR:
+####SMO 25x:
+```{r Perform NM-based BAM filterings, eval=FALSE, engine='bash'}
+
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+screen -S c_lp_sm_nm2_BAMs_25x.log
+script c_lp_sm_nm2_BAMs_25x.log
+
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/genome_project_samples_25x
+declare SAMPLES=$(ls c_lp_sm_*_recal_round-1_25x.bam | cut -c9-12 | sort | uniq)
+for i in ${SAMPLES[@]}
+  do
+  echo "${i}"
+  bamtools filter -tag "NM:<=2" -in c_lp_sm_"${i}"_recal_round-1_25x.bam -out ./../BAM_nm_filtered/c_lp_sm_"${i}"_recal_round-1_25x.nm2.bam
+  samtools index ./../BAM_nm_filtered/c_lp_sm_"${i}"_recal_round-1_25x.nm2.bam
+  done
+
+```
+
+####KIR 5x:
 
 ```{r Perform NM-based BAM filterings, eval=FALSE, engine='bash'}
 
-cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
-screen -S c_ll_ki_nm_BAMs.log
-script c_ll_ki_nm_BAMs.log
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+screen -S c_ll_ki_nm3_BAMs.log
+script c_ll_ki_nm3_BAMs.log
 
 cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
 declare SAMPLES=$(ls c_ll_ki_*_recal_round-1.bam | cut -c9-12 | sort | uniq)
 for i in ${SAMPLES[@]}
   do
   echo "${i}"
-  bamtools filter -tag "NM:<=4" -in c_ll_ki_"${i}"_recal_round-1.bam -out c_ll_ki_"${i}"_recal_round-1.nm.bam
-  samtools index c_ll_ki_"${i}"_recal_round-1.nm.bam
+  bamtools filter -tag "NM:<=3" -in c_ll_ki_"${i}"_recal_round-1.bam -out BAM_nm_filtered/c_ll_ki_"${i}"_recal_round-1.nm3.bam
+  samtools index BAM_nm_filtered/c_ll_ki_"${i}"_recal_round-1.nm3.bam
+  done
+
+```
+
+####KIR 25x:
+```{r Perform NM-based BAM filterings, eval=FALSE, engine='bash'}
+
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+screen -S c_ll_ki_nm3_BAMs_25x.log
+script c_ll_ki_nm3_BAMs_25x.log
+
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/MACROGEN_samples_25x
+declare SAMPLES=$(ls c_ll_ki_*_recal_round-1_25x.bam | cut -c9-12 | sort | uniq)
+for i in ${SAMPLES[@]}
+  do
+  echo "${i}"
+  bamtools filter -tag "NM:<=3" -in c_ll_ki_"${i}"_recal_round-1_25x.bam -out ./../BAM_nm_filtered/c_ll_ki_"${i}"_recal_round-1_25x.nm3.bam
+  samtools index ./../BAM_nm_filtered/c_ll_ki_"${i}"_recal_round-1_25x.nm3.bam
   done
 
 ```
@@ -386,17 +484,17 @@ for i in ${SAMPLES[@]}
 
 ```{r Perform NM-based BAM filterings, eval=FALSE, engine='bash'}
 
-cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
-screen -S c_ll_no_nm_BAMs.log
-script c_ll_no_nm_BAMs.log
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+screen -S c_ll_no_nm3_BAMs.log
+script c_ll_no_nm3_BAMs.log
 
 cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
 declare SAMPLES=$(ls c_ll_no_*_recal_round-1.bam | cut -c9-12 | sort | uniq)
 for i in ${SAMPLES[@]}
   do
   echo "${i}"
-  bamtools filter -tag "NM:<=4" -in c_ll_no_"${i}"_recal_round-1.bam -out c_ll_no_"${i}"_recal_round-1.nm.bam
-  samtools index c_ll_no_"${i}"_recal_round-1.nm.bam
+  bamtools filter -tag "NM:<=3" -in c_ll_no_"${i}"_recal_round-1.bam -out BAM_nm_filtered/c_ll_no_"${i}"_recal_round-1.nm3.bam
+  samtools index BAM_nm_filtered/c_ll_no_"${i}"_recal_round-1.nm3.bam
   done
 
 ```
@@ -405,17 +503,17 @@ for i in ${SAMPLES[@]}
 
 ```{r Perform NM-based BAM filterings, eval=FALSE, engine='bash'}
 
-cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
-screen -S c_ll_po_nm_BAMs.log
-script c_ll_po_nm_BAMs.log
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+screen -S c_ll_po_nm3_BAMs.log
+script c_ll_po_nm3_BAMs.log
 
 cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
 declare SAMPLES=$(ls c_ll_po_*_recal_round-1.bam | cut -c9-12 | sort | uniq)
 for i in ${SAMPLES[@]}
   do
   echo "${i}"
-  bamtools filter -tag "NM:<=4" -in c_ll_po_"${i}"_recal_round-1.bam -out c_ll_po_"${i}"_recal_round-1.nm.bam
-  samtools index c_ll_po_"${i}"_recal_round-1.nm.bam
+  bamtools filter -tag "NM:<=3" -in c_ll_po_"${i}"_recal_round-1.bam -out BAM_nm_filtered/c_ll_po_"${i}"_recal_round-1.nm3.bam
+  samtools index BAM_nm_filtered/c_ll_po_"${i}"_recal_round-1.nm3.bam
   done
 
 ```
@@ -526,37 +624,33 @@ for (i in samples) {
 
 ```{r Perform variant calling, eval=FALSE, engine='bash'}
 
-#Perform direct variant calling (without gVCFs) on the NM≤4 filtered Lynx pardinus BAMs.
+#Perform direct variant calling (without gVCFs) on the nm≤2 filtered Lynx pardinus BAMs.
 cd $V_PATH
-screen -S c_lp_sm_c_lp_do_nm_genes.log
-script c_lp_sm_c_lp_do_nm_genes.log
+screen -S c_lp_sm_c_lp_do_genes.log
+script c_lp_sm_c_lp_do_genes.log
 
 cd $B_PATH/BAM_genes_5x
 java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
 -T HaplotypeCaller \
 -R $REF \
-$(for var in c_lp*recal_round-1.genes-nm.bam; do echo -I ${var}" ";done) \
--o $V_PATH/c_lp_sm_c_lp_do_nm_genes.vcf
+$(for var in c_lp*recal_round-1.genes.bam; do echo -I ${var}" ";done) \
+-o $V_PATH/c_lp_sm_c_lp_do_genes.vcf
 
-grep -v '#' $V_PATH/c_lp_sm_c_lp_do_nm_genes.vcf | wc -l #1341848
-
+grep -v '#' $V_PATH/c_lp_sm_c_lp_do_genes.vcf | wc -l #
 
 #Rename the samples with wrong names.
 cd $V_PATH
-screen -S c_lp_sm_c_lp_do_nm_genes_renamed.log
-script c_lp_sm_c_lp_do_nm_genes_renamed.log
-
-bcftools query -l c_lp_sm_c_lp_do_nm_genes.vcf #check sample names
+bcftools query -l c_lp_sm_c_lp_do_genes.vcf #check sample names
 #!/bin/bash
-#cat << "EOF" > lp_rename.txt #Unmark this line when running it (I marked it in R because it doesn't understand it and messes the colours of subsequent lines). It should include all incorrect names.
+#cat << "EOF" > lp_rename.txt #Unm2ark this line when running it (I marked it in R because it doesn't understand it and messes the colours of subsequent lines). It should include all incorrect names.
 h_lp_do_0007 c_lp_do_0007
 EOF
 cat lp_rename.txt
-bcftools reheader -s lp_rename.txt -o c_lp_sm_c_lp_do_nm_genes_renamed.vcf c_lp_sm_c_lp_do_nm_genes.vcf #copy the VCF and rename the wrong named samples in the new VCF
+bcftools reheader -s lp_rename.txt -o c_lp_sm_c_lp_do_genes_renamed.vcf c_lp_sm_c_lp_do_genes.vcf #copy the VCF and rename the wrong named samples in the new VCF
 rm lp_rename.txt
-mv c_lp_sm_c_lp_do_nm_genes_renamed.vcf c_lp_sm_c_lp_do_nm_genes.vcf
+mv c_lp_sm_c_lp_do_genes_renamed.vcf c_lp_sm_c_lp_do_genes.vcf
 
-grep -v '#' c_lp_sm_c_lp_do_nm_genes.vcf | wc -l #1341848
+grep -v '#' c_lp_sm_c_lp_do_genes.vcf | wc -l #
 
 ```
 
@@ -567,31 +661,31 @@ grep -v '#' c_lp_sm_c_lp_do_nm_genes.vcf | wc -l #1341848
 
 #Perform direct variant calling (without gVCFs) on the NM≤4 filtered Lynx pardinus BAMs.
 cd $V_PATH
-screen -S c_lp_sm_c_lp_do_nm.log
-script c_lp_sm_c_lp_do_nm.log
+screen -S c_lp_sm_c_lp_do_nm4.log
+script c_lp_sm_c_lp_do_nm4.log
 
 cd $B_PATH
 java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
 -T HaplotypeCaller \
 -R $REF \
-$(for var in c_lp*recal_round-1.nm.bam; do echo -I ${var}" ";done) \
--o $V_PATH/c_lp_sm_c_lp_do_nm.vcf
+$(for var in c_lp*recal_round-1.nm4.bam; do echo -I ${var}" ";done) \
+-o $V_PATH/c_lp_sm_c_lp_do_nm4.vcf
 
-grep -v '#' $V_PATH/c_lp_sm_c_lp_do_nm.vcf | wc -l #1341848
+grep -v '#' $V_PATH/c_lp_sm_c_lp_do_nm4.vcf | wc -l #4189966
 
 #Rename the samples with wrong names.
 cd $V_PATH
-bcftools query -l c_lp_sm_c_lp_do_nm.vcf #check sample names
+bcftools query -l c_lp_sm_c_lp_do_nm4.vcf #check sample names
 #!/bin/bash
 #cat << "EOF" > lp_rename.txt #Unmark this line when running it (I marked it in R because it doesn't understand it and messes the colours of subsequent lines). It should include all incorrect names.
 h_lp_do_0007 c_lp_do_0007
 EOF
 cat lp_rename.txt
-bcftools reheader -s lp_rename.txt -o c_lp_sm_c_lp_do_nm_renamed.vcf c_lp_sm_c_lp_do_nm.vcf #copy the VCF and rename the wrong named samples in the new VCF
+bcftools reheader -s lp_rename.txt -o c_lp_sm_c_lp_do_nm4_renamed.vcf c_lp_sm_c_lp_do_nm4.vcf #copy the VCF and rename the wrong named samples in the new VCF
 rm lp_rename.txt
-mv c_lp_sm_c_lp_do_nm_renamed.vcf c_lp_sm_c_lp_do_nm.vcf
+mv c_lp_sm_c_lp_do_nm4_renamed.vcf c_lp_sm_c_lp_do_nm4.vcf
 
-grep -v '#' c_lp_sm_c_lp_do_nm.vcf | wc -l #
+grep -v '#' c_lp_sm_c_lp_do_nm4.vcf | wc -l #4189966
 
 ```
 
@@ -601,31 +695,31 @@ grep -v '#' c_lp_sm_c_lp_do_nm.vcf | wc -l #
 
 #Perform direct variant calling (without gVCFs) on the NM≤4 filtered Lynx lynx BAMs.
 cd $V_PATH
-screen -S c_ll_ki_c_ll_no_c_ll_po_nm.log
-script c_ll_ki_c_ll_no_c_ll_po_nm.log
+screen -S c_ll_ki_c_ll_no_c_ll_po_nm4.log
+script c_ll_ki_c_ll_no_c_ll_po_nm4.log
 
 cd $B_PATH
 java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
 -T HaplotypeCaller \
 -R $REF \
-$(for var in c_{ll_ki*,ll_no*,ll_po*}recal_round-1.nm.bam; do echo -I ${var}" ";done) \
--o $V_PATH/c_ll_ki_c_ll_no_c_ll_po_nm.vcf
+$(for var in c_{ll_ki*,ll_no*,ll_po*}recal_round-1.nm4.bam; do echo -I ${var}" ";done) \
+-o $V_PATH/c_ll_ki_c_ll_no_c_ll_po_nm4.vcf
 
-grep -v '#' $V_PATH/c_ll_ki_c_ll_no_c_ll_po_nm.vcf | wc -l #
+grep -v '#' $V_PATH/c_ll_ki_c_ll_no_c_ll_po_nm4.vcf | wc -l #10866667
 
 #Rename the samples with wrong names.
 cd $V_PATH
-bcftools query -l c_ll_ki_c_ll_no_c_ll_po_nm.vcf #check sample names
+bcftools query -l c_ll_ki_c_ll_no_c_ll_po_nm4.vcf #check sample names
 #!/bin/bash
 #cat << "EOF" > ll_rename.txt #Unmark this line when running it (I marked it in R because it doesn't understand it and messes the colours of subsequent lines). It should include all incorrect names.
 LL90_rgsm c_ll_ki_0090
 EOF
 cat ll_rename.txt
-bcftools reheader -s ll_rename.txt -o c_ll_ki_c_ll_no_c_ll_po_nm_renamed.vcf c_ll_ki_c_ll_no_c_ll_po_nm.vcf #copy the VCF and rename the wrong named samples in the new VCF
+bcftools reheader -s ll_rename.txt -o c_ll_ki_c_ll_no_c_ll_po_nm4_renamed.vcf c_ll_ki_c_ll_no_c_ll_po_nm4.vcf #copy the VCF and rename the wrong named samples in the new VCF
 rm ll_rename.txt
-mv c_ll_ki_c_ll_no_c_ll_po_nm_renamed.vcf c_ll_ki_c_ll_no_c_ll_po_nm.vcf
+mv c_ll_ki_c_ll_no_c_ll_po_nm4_renamed.vcf c_ll_ki_c_ll_no_c_ll_po_nm4.vcf
 
-grep -v '#' c_ll_ki_c_ll_no_c_ll_po_nm.vcf | wc -l #
+grep -v '#' c_ll_ki_c_ll_no_c_ll_po_nm4.vcf | wc -l #10866667
 
 ```
 
@@ -687,17 +781,37 @@ bgzip -c /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_000
 
 #Code to annotate the AA (ancestral alleles) subfield from the INFO field in the VCF. I keep getting the following error: "Can't locate Vcf.pm in @INC". I look it up and apparently it's easy to solve: an environment variable PERL5LIB should be defined as the path to perl.
 cd $V_PATH
-screen -S c_lp_sm_c_lp_do_nm_genes_aafilled.log
-script c_lp_sm_c_lp_do_nm_genes_aafilled.log
+screen -S c_lp_sm_c_lp_do_nm4_aafilled.log
+script c_lp_sm_c_lp_do_nm4_aafilled.log
 
 export PERL5LIB=/opt/vcftools_0.1.13/perl/ #set required environmental variable
 V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
 
-cat $V_PATH/c_lp_sm_c_lp_do_nm_genes.vcf | /opt/vcftools_0.1.13/perl/fill-aa -a /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa.gz | bgzip -c > c_lp_sm_c_lp_do_nm_genes_aafilled.vcf.gz #I tried to run this first without bgzipping it, and it was increasingly slow. Each day it did around half the previous day. When the server crashed, I relaunched it adding the bgzip command and it finished in a little over 24h.
+cat $V_PATH/c_lp_sm_c_lp_do_nm4.vcf | /opt/vcftools_0.1.13/perl/fill-aa -a /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa.gz | bgzip -c > c_lp_sm_c_lp_do_nm4_aafilled.vcf.gz #I tried to run this first without bgzipping it, and it was increasingly slow. Each day it did around half the previous day. When the server crashed, I relaunched it adding the bgzip command and it finished in a little over 24h.
 
-gzip -d -c c_lp_sm_c_lp_do_nm_genes_aafilled.vcf.gz > c_lp_sm_c_lp_do_nm_genes_aafilled.vcf #Get decompressed version. I ran md5sum for both the gzipped and the unzipped versions and there were no differences.
+gzip -d -c c_lp_sm_c_lp_do_nm4_aafilled.vcf.gz > c_lp_sm_c_lp_do_nm4_aafilled.vcf #Get decompressed version. I ran md5sum for both the gzipped and the unzipped versions and there were no differences.
 
-grep -v '#' c_lp_sm_c_lp_do_nm_genes_aafilled.vcf | wc -l #1341848
+grep -v '#' c_lp_sm_c_lp_do_nm4_aafilled.vcf | wc -l #
+
+```
+
+###For Lynx lynx.
+
+```{r Polarize contemporary VCF, eval=FALSE, engine='bash'}
+
+#Code to annotate the AA (ancestral alleles) subfield from the INFO field in the VCF. I keep getting the following error: "Can't locate Vcf.pm in @INC". I look it up and apparently it's easy to solve: an environment variable PERL5LIB should be defined as the path to perl.
+cd $V_PATH
+screen -S c_ll_ki_c_ll_no_c_ll_po_nm4_aafilled.log
+script c_ll_ki_c_ll_no_c_ll_po_nm4_aafilled.log
+
+export PERL5LIB=/opt/vcftools_0.1.13/perl/ #set required environmental variable
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+
+cat $V_PATH/c_ll_ki_c_ll_no_c_ll_po_nm4.vcf | /opt/vcftools_0.1.13/perl/fill-aa -a /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa.gz | bgzip -c > c_ll_ki_c_ll_no_c_ll_po_nm4_aafilled.vcf.gz #I tried to run this first without bgzipping it, and it was increasingly slow. Each day it did around half the previous day. When the server crashed, I relaunched it adding the bgzip command and it finished in a little over 24h.
+
+gzip -d -c c_ll_ki_c_ll_no_c_ll_po_nm4_aafilled.vcf.gz > c_ll_ki_c_ll_no_c_ll_po_nm4_aafilled.vcf #Get decompressed version. I ran md5sum for both the gzipped and the unzipped versions and there were no differences.
+
+grep -v '#' c_ll_ki_c_ll_no_c_ll_po_nm4_aafilled.vcf | wc -l #
 
 ```
 
@@ -709,8 +823,8 @@ grep -v '#' c_lp_sm_c_lp_do_nm_genes_aafilled.vcf | wc -l #1341848
 #Polarize the AA-filled VCF based on the new INFO/AA column. Alleles will be switched whenever the ancestral allele matches the alternative one, and genotypes will be properly recoded as well. The following code was originally provided by Pierre Lindenbaum and modified by José Luis Castro.
 
 cd $V_PATH
-screen -S c_lp_sm_c_lp_do_nm_genes_polarized.log
-script c_lp_sm_c_lp_do_nm_genes_polarized.log
+screen -S c_lp_sm_c_lp_do_nm2_genes_polarized.log
+script c_lp_sm_c_lp_do_nm2_genes_polarized.log
 
 java -jar /opt/jvarkit/dist/vcffilterjdk.jar -e 'if(variant.getNAlleles()!=2 || !variant.hasAttribute("AA")) return true; 
 final String aa = variant.getAttributeAsString("AA",""); 
@@ -753,9 +867,9 @@ for(Genotype g: variant.getGenotypes())
 
 vb.attribute("AF",1.0d - Double.parseDouble(variant.getAttributeAsString("AF",""))); vb.attribute("AC",variant.getGenotypes().stream().flatMap(G->G.getAlleles().stream()).filter(A->A.equals(oldref)).count()); 
 vb.genotypes(genotypes); 
-return vb.make();' -o c_lp_sm_c_lp_do_nm_genes_polarized.vcf c_lp_sm_c_lp_do_nm_genes_aafilled.vcf
+return vb.make();' -o c_lp_sm_c_lp_do_nm2_genes_polarized.vcf c_lp_sm_c_lp_do_nm2_genes_aafilled.vcf
 
-grep -v '#' c_lp_sm_c_lp_do_nm_genes_polarized.vcf | wc -l #1341848
+grep -v '#' c_lp_sm_c_lp_do_nm2_genes_polarized.vcf | wc -l #1341848
 
 ```
 
@@ -936,8 +1050,8 @@ cut -d$'\t' -f1,3,4,5 /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.CDS.
 #For all positions:
 
 cd $V_PATH/annotation/
-screen -S c_lp_sm_c_lp_do_nm_genes_polarized.lr_ann.log #open a dettachable screen in case the test takes too long
-script c_lp_sm_c_lp_do_nm_genes_polarized.lr_ann.log #initiate the log file
+screen -S c_lp_sm_c_lp_do_nm2_genes_polarized.lr_ann.log #open a dettachable screen in case the test takes too long
+script c_lp_sm_c_lp_do_nm2_genes_polarized.lr_ann.log #initiate the log file
 
 S_PATH=/opt/snpEff #software path
 C_PATH=/home/dkleinman/datos/snpEff #config file path
@@ -946,10 +1060,10 @@ I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
 V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
 
 cd $O_PATH #run this code from the directory where the config is located.
-java -Xmx16g -jar $S_PATH/snpEff.jar LYRU.23 -v -s $V_PATH/annotation/c_lp_sm_c_lp_do_nm_genes_polarized.lr_ann.html -csvStats $V_PATH/annotation/c_lp_sm_c_lp_do_nm_genes_polarized.lr_ann.csv -interval $C_PATH/data/LYPA23C.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.UCNE.intergenic.nr.bed $V_PATH/c_lp_sm_c_lp_do_nm_genes_polarized.vcf > $V_PATH/annotation/c_lp_sm_c_lp_do_nm_genes_polarized.lr_ann.vcf #run this code from the directory where the config is located.
+java -Xmx16g -jar $S_PATH/snpEff.jar LYRU.23 -v -s $V_PATH/annotation/c_lp_sm_c_lp_do_nm2_genes_polarized.lr_ann.html -csvStats $V_PATH/annotation/c_lp_sm_c_lp_do_nm2_genes_polarized.lr_ann.csv -interval $C_PATH/data/LYPA23C.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.UCNE.intergenic.nr.bed $V_PATH/c_lp_sm_c_lp_do_nm2_genes_polarized.vcf > $V_PATH/annotation/c_lp_sm_c_lp_do_nm2_genes_polarized.lr_ann.vcf #run this code from the directory where the config is located.
 
 cd $V_PATH/annotation/
-grep -v '#' c_lp_sm_c_lp_do_nm_genes_polarized.lr_ann.vcf | wc -l #1341848
+grep -v '#' c_lp_sm_c_lp_do_nm2_genes_polarized.lr_ann.vcf | wc -l #1341848
 
 ```
 
@@ -1183,14 +1297,14 @@ for POP in ${POPS[@]}
     
 ```
 
-#8: Filter the annotated VCF. Subset the VCF files in order to keep only good quality biallelic SNP variants.
+#9: Filter the annotated VCF. Subset the VCF files in order to keep only good quality biallelic SNP variants.
 ##For Lynx pardinus.
 
 ```{r Filter the annotated VCF, eval=FALSE, engine='bash'}
 
 cd $V_PATH/annotation
-screen -S c_lp_sm_c_lp_do_nm_genes_polarized_filtered.lr_ann.log
-script c_lp_sm_c_lp_do_nm_genes_polarized_filtered.lr_ann.log
+screen -S c_lp_sm_c_lp_do_nm2_genes_polarized_filtered.lr_ann.log
+script c_lp_sm_c_lp_do_nm2_genes_polarized_filtered.lr_ann.log
 
 V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
 REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome (first eight scaffolds only)
@@ -1199,9 +1313,9 @@ BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
 
 
 #Remove repetitive regions and those with low mappability:
-bedtools subtract -a c_lp_sm_c_lp_do_nm_genes_polarized.lr_ann.vcf -b /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/repeats_and_lowcomp_no_redundant_mappability.k75_lessthan90.bed -header > c_lp_sm_c_lp_do_nm_genes_polarized_filtered1.lr_ann.vcf
+bedtools subtract -a c_lp_sm_c_lp_do_nm2_genes_polarized.lr_ann.vcf -b /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/repeats_and_lowcomp_no_redundant_mappability.k75_lessthan90.bed -header > c_lp_sm_c_lp_do_nm2_genes_polarized_filtered1.lr_ann.vcf
 
-grep -v '#' c_lp_sm_c_lp_do_nm_genes_polarized_filtered1.lr_ann.vcf | wc -l #645623
+grep -v '#' c_lp_sm_c_lp_do_nm2_genes_polarized_filtered1.lr_ann.vcf | wc -l #645623
 
 
 #During this step, all INDELs as well as all multiallelic and bad quality SNPs will be dropped from the respective VCFs.
@@ -1210,73 +1324,73 @@ java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -X
 -selectType SNP \
 -restrictAllelesTo BIALLELIC \
 -R $REF \
--V c_lp_sm_c_lp_do_nm_genes_polarized_filtered1.lr_ann.vcf \
--o c_lp_sm_c_lp_do_nm_genes_polarized_filtered2.lr_ann.vcf
+-V c_lp_sm_c_lp_do_nm2_genes_polarized_filtered1.lr_ann.vcf \
+-o c_lp_sm_c_lp_do_nm2_genes_polarized_filtered2.lr_ann.vcf
 
-grep -v '#' c_lp_sm_c_lp_do_nm_genes_polarized_filtered2.lr_ann.vcf | wc -l #497025
+grep -v '#' c_lp_sm_c_lp_do_nm2_genes_polarized_filtered2.lr_ann.vcf | wc -l #497025
 
 
 #Remove polarized ANC fixed variants (AF=0) or those that weren't polarizable (AA different from either REF or ALT):
-$BCF view -e '(INFO/AA!=REF & INFO/AA!=ALT) | INFO/AF=0.00' c_lp_sm_c_lp_do_nm_genes_polarized_filtered2.lr_ann.vcf > c_lp_sm_c_lp_do_nm_genes_polarized_filtered3.lr_ann.vcf
+$BCF view -e '(INFO/AA!=REF & INFO/AA!=ALT) | INFO/AF=0.00' c_lp_sm_c_lp_do_nm2_genes_polarized_filtered2.lr_ann.vcf > c_lp_sm_c_lp_do_nm2_genes_polarized_filtered3.lr_ann.vcf
 
-grep -v '#' c_lp_sm_c_lp_do_nm_genes_polarized_filtered3.lr_ann.vcf | wc -l #475783
+grep -v '#' c_lp_sm_c_lp_do_nm2_genes_polarized_filtered3.lr_ann.vcf | wc -l #475783
 
 #Apply GATK's recommended filters, and then some.     
 java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
 -T SelectVariants \
 -select "QUAL >= 30 && QD >= 2.0 && FS <= 60.0 && MQ >= 40.0 && MQRankSum >= -12.5 && ReadPosRankSum >= -8.0" \
 -R $REF \
--V c_lp_sm_c_lp_do_nm_genes_polarized_filtered3.lr_ann.vcf \
--o c_lp_sm_c_lp_do_nm_genes_polarized_filtered4.lr_ann.vcf
+-V c_lp_sm_c_lp_do_nm2_genes_polarized_filtered3.lr_ann.vcf \
+-o c_lp_sm_c_lp_do_nm2_genes_polarized_filtered4.lr_ann.vcf
 
-grep -v '#' c_lp_sm_c_lp_do_nm_genes_polarized_filtered4.lr_ann.vcf | wc -l #446094
+grep -v '#' c_lp_sm_c_lp_do_nm2_genes_polarized_filtered4.lr_ann.vcf | wc -l #446094
 
 #First, for each species exclude those positions that have more than 20% missing genotypes, as well as those that have lower (higher) depth than the minimum (maximum) within 0.95 of the distribution, as calculated in the previous section:
 MIN_DP=$(cat /home/dkleinman/datos/c_lp_depth_calculus/c_lp_do-c_lp_sm_n031_mean_sd_depthGlobal_lynx_pardinus_per_pop_mean_folds_0.95.csv | awk '{print $9}') #Obtained in section 5
 MAX_DP=$(cat /home/dkleinman/datos/c_lp_depth_calculus/c_lp_do-c_lp_sm_n031_mean_sd_depthGlobal_lynx_pardinus_per_pop_mean_folds_0.95.csv | awk '{print $8}') #Obtained in section 5
 echo $MIN_DP
 echo $MAX_DP
-$BCF filter -e "DP < ${MIN_DP} || DP > ${MAX_DP} || F_MISSING > 0.2" -Ov -o c_lp_sm_c_lp_do_nm_genes_polarized_filtered5.lr_ann.vcf c_lp_sm_c_lp_do_nm_genes_polarized_filtered4.lr_ann.vcf
+$BCF filter -e "DP < ${MIN_DP} || DP > ${MAX_DP} || F_MISSING > 0.2" -Ov -o c_lp_sm_c_lp_do_nm2_genes_polarized_filtered5.lr_ann.vcf c_lp_sm_c_lp_do_nm2_genes_polarized_filtered4.lr_ann.vcf
 
-grep -v '#' c_lp_sm_c_lp_do_nm_genes_polarized_filtered5.lr_ann.vcf | wc -l #402692
+grep -v '#' c_lp_sm_c_lp_do_nm2_genes_polarized_filtered5.lr_ann.vcf | wc -l #402692
 
 ```
 
-#9: Obtain per population VCFs.
+#10: Obtain per population VCFs.
 ##Split the VCF into per population VCFs. Generate a VCF for each population.
 ###For Lynx pardinus and Lynx lynx.
 
 ```{r Obtain per population VCFs, eval=FALSE, engine='bash'}
 
 cd $V_PATH/annotation/
-screen -S perpop_nm_genes.lr_ann.log
-script perpop_nm_genes.lr_ann.log
+screen -S perpop_nm2_genes.lr_ann.log
+script perpop_nm2_genes.lr_ann.log
 
 cd $B_PATH/BAM_genes_5x
-declare SPECIES=$(ls {*_lp_*,*_ll_*}_recal_round-1.genes-nm.bam | cut -c3-4 | sort | uniq)
+declare SPECIES=$(ls {*_lp_*,*_ll_*}_recal_round-1.genes-nm2.bam | cut -c3-4 | sort | uniq)
 cd $V_PATH/annotation/
 for i in ${SPECIES[@]}
   do
   echo "${i}"
   cd $B_PATH/BAM_genes_5x
-  declare POP=$(ls c_{lp_sm*,lp_do*,ll_ki*,ll_po*,ll_no*}_recal_round-1.genes-nm.bam | cut -c1-7 | uniq | grep "${i}")
+  declare POP=$(ls c_{lp_sm*,lp_do*,ll_ki*,ll_po*,ll_no*}_recal_round-1.genes-nm2.bam | cut -c1-7 | uniq | grep "${i}")
   cd $V_PATH/annotation/
   for j in ${POP[@]}
     do
     echo "${j}"
     rm "${j}"_pop_list_to_remove.txt
-    $BCF query -l $V_PATH/annotation/c_"${i}"*nm_genes_polarized_filtered5.lr_ann.vcf | grep "${j}" > "${j}"_pop_list_to_remove.txt
+    $BCF query -l $V_PATH/annotation/c_"${i}"*_nm2_genes_polarized_filtered5.lr_ann.vcf | grep "${j}" > "${j}"_pop_list_to_remove.txt
     cat "${j}"_pop_list_to_remove.txt
-    mkdir "${j}"_perpop_nm_genes
+    mkdir "${j}"_perpop_nm2_genes
     java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
     -T SelectVariants \
     -R $REF \
-    -V $V_PATH/annotation/c_"${i}"*nm_genes_polarized_filtered5.lr_ann.vcf \
-    -o $V_PATH/annotation/"${j}"_perpop_nm_genes/"${j}"_perpop_nm_genes.lr_ann.vcf \
+    -V $V_PATH/annotation/c_"${i}"*_nm2_genes_polarized_filtered5.lr_ann.vcf \
+    -o $V_PATH/annotation/"${j}"_perpop_nm2_genes/"${j}"_perpop_nm2_genes.lr_ann.vcf \
     -env \
     --sample_file "${j}"_pop_list_to_remove.txt
     rm "${j}"_pop_list_to_remove.txt
-    grep -v '#' $V_PATH/annotation/"${j}"_perpop_nm_genes/"${j}"_perpop_nm_genes.lr_ann.vcf | wc -l #
+    grep -v '#' $V_PATH/annotation/"${j}"_perpop_nm2_genes/"${j}"_perpop_nm2_genes.lr_ann.vcf | wc -l #
     done
   done
 
@@ -1289,24 +1403,35 @@ grep -v '#' c_lp_sm_perpop_nm_genes/c_lp_sm_perpop_nm_genes.lr_ann.vcf | wc -l #
 
 ```
 
-#10: Split the population VCFs into per individual VCFs. Generate a VCF for each individual.
+#11: Split the population VCFs into per individual VCFs. Generate a VCF for each individual.
 ##For Lynx pardinus and Lynx lynx.
 
 ```{r Split the population VCFs into per individual VCFs, eval=FALSE, engine='bash'}
 
 #Generate individual VCFs from the per species VCFs:
 cd $V_PATH/annotation
-screen -S individuals_nm_genes.lr_ann.log
-script individuals_nm_genes.lr_ann.log
+screen -S individuals_genes.lr_ann.log
+script individuals_genes.lr_ann.log
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAM files path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
 
 #For each individual in the sm, do, ki, po & no populations, subset its variants from the respective population VCF:
 cd $B_PATH/BAM_genes_5x
-declare POP=$(ls c_{lp_sm*,lp_do*,ll_ki*,ll_po*,ll_no*}_recal_round-1.genes-nm.bam | cut -c1-7 | uniq | grep "${i}")
+declare POP=$(ls c_{lp_sm*,lp_do*,ll_ki*,ll_po*,ll_no*}_recal_round-1.genes.bam | cut -c1-7 | uniq | grep "${i}")
 for i in ${POP[@]}
   do
   echo "${i}"
-  mkdir $V_PATH/annotation/"${i}"_individuals_nm_genes
-  declare INDIVIDUALS=$(ls "${i}"*_recal_round-1.genes-nm.bam | cut -c1-12 | uniq)
+  mkdir $V_PATH/annotation/"${i}"_individuals_genes
+  declare INDIVIDUALS=$(ls "${i}"*_recal_round-1.genes.bam | cut -c1-12 | uniq)
   for j in ${INDIVIDUALS[@]}
     do
     echo "${j}"
@@ -1314,8 +1439,8 @@ for i in ${POP[@]}
     java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
     -T SelectVariants \
     -R $REF \
-    -V $V_PATH/annotation/"${i}"_perpop_nm_genes/"${i}"_perpop_nm_genes.lr_ann.vcf \
-    -o $V_PATH/annotation/"${i}"_individuals_nm_genes/"${j}"_individual_nm_genes.lr_ann.vcf \
+    -V $V_PATH/annotation/"${i}"_perpop_genes/"${i}"_perpop_genes.lr_ann.vcf \
+    -o $V_PATH/annotation/"${i}"_individuals_genes/"${j}"_individual_genes.lr_ann.vcf \
     -env \
     -sn $ID
     done
@@ -1323,7 +1448,7 @@ for i in ${POP[@]}
 
 ```
 
-#11: Get annotation statistics.
+#12: Get annotation statistics.
 ##At the individual level.
 ###Heterozygotes and derived/derived homozygotes.
 
@@ -1344,19 +1469,20 @@ BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
 #For Lynx pardinus and Lynx lynx:
 
 cd $V_PATH/annotation/
-screen -S snpeff_individual_summary_nm_genes.lr_ann.log
-script snpeff_individual_summary_nm_genes.lr_ann.log
+screen -S snpeff_individual_summary_nm4_genes.lr_ann.log
+script snpeff_individual_summary_nm4_genes.lr_ann.log
 
-rm snpeff_individual_summary_nm_genes.lr_ann.txt
-echo -e "species\tpopulation\tsample\ttotal_V\tintergenic_V\tintronic_V\tcoding_V\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tUCNE_V\tmissense/synonymous_V\tmissense/synonymous_A\tsynonymous/intronic_V\tmissense/intronic_V" > snpeff_individual_summary_nm_genes.lr_ann.txt
-INDLIST=($(ls `find . -name '*individual_nm_genes.lr_ann.vcf' -print`))
+rm snpeff_individual_summary_nm4_genes.lr_ann.txt
+echo -e "species\tpopulation\tdataset\tsample\ttotal_V\tintergenic_V\tintronic_V\tcoding_V\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tUCNE_V\tmissense/synonymous_V\tmissense/synonymous_A\tsynonymous/intronic_V\tmissense/intronic_V" > snpeff_individual_summary_nm4_genes.lr_ann.txt
+INDLIST=($(ls `find . -name '*individual_nm4_genes.lr_ann.vcf' -print`))
 for i in "${INDLIST[@]}"
   do
   echo "${i}"
-  ind=$(echo "${i}" | awk -F'[/]' '{print $3}')
+  ind=$(echo "${i}" | awk -F'[/]' '{print $3}' | cut -c1-12)
   echo "${ind}"
   SPECIES=$(echo "${ind}" | cut -c3-4)
   POPULATION=$(echo "${ind}" | cut -c6-7)
+  DATASET=$(if grep -Fxq $ind /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/c_lp_GP_samples; then echo "GP"; else echo "5x"; fi)
   SAMPLE=$(echo "${ind}" | cut -c9-12)
   TOTAL_V=$(grep -v '#' ${i} | wc -l)
   INTERGENIC_V=$(grep 'intergenic' ${i} | wc -l)
@@ -1373,9 +1499,146 @@ for i in "${INDLIST[@]}"
   MISSENSE_SYNONYMOUS_A=$(echo "scale=3; $MISSENSE_A/$SYNONYMOUS_A" | bc)
   SYNONYMOUS_INTRONIC_V=$(echo "scale=3; $SYNONYMOUS_V/$INTRONIC_V" | bc)
   MISSENSE_INTRONIC_V=$(echo "scale=3; $MISSENSE_V/$INTRONIC_V" | bc)
-  echo -e "$SPECIES\t$POPULATION\t$SAMPLE\t$TOTAL_V\t$INTERGENIC_V\t$INTRONIC_V\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$UCNE_V\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A\t$SYNONYMOUS_INTRONIC_V\t$MISSENSE_INTRONIC_V" >> $V_PATH/annotation/snpeff_individual_summary_nm_genes.lr_ann.txt
+  echo -e "$SPECIES\t$POPULATION\t$DATASET\t$SAMPLE\t$TOTAL_V\t$INTERGENIC_V\t$INTRONIC_V\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$UCNE_V\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A\t$SYNONYMOUS_INTRONIC_V\t$MISSENSE_INTRONIC_V" >> snpeff_individual_summary_nm4_genes.lr_ann.txt
   done
 
-scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/annotation/snpeff_individual_summary_nm_genes.lr_ann.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/sep_calling
+scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/annotation/snpeff_individual_summary_*genes.lr_ann.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/sep_calling
+
+```
+
+#13: Compare NM filtering results.
+
+```{r Other stuff}
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+
+#First draw the NM distribution for each individual:
+sample_files <- list.files("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/sep_calling/", pattern="*.genes.lr_ann.txt")
+snpeff_filters_summary <- data_frame()
+for (file in sample_files) {
+  snpeff_individual_summary <- read_tsv(paste0("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/sep_calling/",file))
+  snpeff_individual_summary <- mutate(snpeff_individual_summary, filter=ifelse(strsplit(file,"_")[[1]][4]=="genes.lr","no_filter",strsplit(file,"_")[[1]][4]))
+  snpeff_filters_summary <- rbind(snpeff_filters_summary,snpeff_individual_summary)
+}
+snpeff_filters_summary
+
+syn_int_ggplot <- ggplot(data=snpeff_filters_summary, aes(dataset,`synonymous/intronic_V`,colour=population)) +
+  facet_grid(. ~ filter) +
+  geom_point(position="jitter") +
+  #ggtitle("Proportion of reads at different NM") +
+  ylab("SYN/INTR") +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+        rect=element_rect(size=1),
+        axis.line=element_line(colour="black"),
+        axis.title=element_text(size=16),
+        #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+        #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+        #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+        panel.background=element_blank(),
+        panel.border=element_rect(colour="black"),
+        #panel.grid=element_blank(),
+        #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+        plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+        #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+        legend.background=element_rect(linetype="solid", colour="black", size=.5),
+        #legend.justification=c(0,0),
+        legend.key=element_rect(colour="white"),
+        #legend.key.size=unit(1.3,"cm"),
+        legend.position=c(0.08,0.86),
+        legend.title=element_blank()
+  )
+  syn_int_ggplot
+ggsave("SYN_vs_INTR_nm_filters.pdf", width=30, height=20, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/sep_calling/")
+
+nsyn_int_ggplot <- ggplot(data=snpeff_filters_summary, aes(dataset,`missense/intronic_V`,colour=population)) +
+  facet_grid(. ~ filter) +
+  geom_point(position="jitter") +
+  #ggtitle("Proportion of reads at different NM") +
+  ylab("NSYN/INTR") +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+        rect=element_rect(size=1),
+        axis.line=element_line(colour="black"),
+        axis.title=element_text(size=16),
+        #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+        #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+        #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+        panel.background=element_blank(),
+        panel.border=element_rect(colour="black"),
+        #panel.grid=element_blank(),
+        #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+        plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+        #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+        legend.background=element_rect(linetype="solid", colour="black", size=.5),
+        #legend.justification=c(0,0),
+        legend.key=element_rect(colour="white"),
+        #legend.key.size=unit(1.3,"cm"),
+        legend.position=c(0.08,0.86),
+        legend.title=element_blank()
+  )
+  nsyn_int_ggplot
+ggsave("NSYN_vs_INTR_nm_filters.pdf", width=30, height=20, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/sep_calling/")
+
+nsyn_syn_ggplot <- ggplot(data=snpeff_filters_summary, aes(dataset,`missense/synonymous_V`,colour=population)) +
+  facet_grid(. ~ filter) +
+  geom_point(position="jitter") +
+  #ggtitle("Proportion of reads at different NM") +
+  ylab("NSYN/SYN") +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+        rect=element_rect(size=1),
+        axis.line=element_line(colour="black"),
+        axis.title=element_text(size=16),
+        #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+        #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+        #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+        panel.background=element_blank(),
+        panel.border=element_rect(colour="black"),
+        #panel.grid=element_blank(),
+        #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+        plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+        #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+        legend.background=element_rect(linetype="solid", colour="black", size=.5),
+        #legend.justification=c(0,0),
+        legend.key=element_rect(colour="white"),
+        #legend.key.size=unit(1.3,"cm"),
+        legend.position=c(0.08,0.16),
+        legend.title=element_blank()
+  )
+  nsyn_syn_ggplot
+ggsave("NSYN_vs_SYN_nm_filters.pdf", width=30, height=20, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/sep_calling/")
+
+INTR_ggplot <- ggplot(data=snpeff_filters_summary, aes(dataset,intronic_V,colour=population)) +
+  facet_grid(. ~ filter) +
+  geom_point(position="jitter") +
+  #ggtitle("Proportion of reads at different NM") +
+  ylab("INTR") +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+        rect=element_rect(size=1),
+        axis.line=element_line(colour="black"),
+        axis.title=element_text(size=16),
+        #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+        #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+        #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+        panel.background=element_blank(),
+        panel.border=element_rect(colour="black"),
+        #panel.grid=element_blank(),
+        #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+        plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+        #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+        legend.background=element_rect(linetype="solid", colour="black", size=.5),
+        #legend.justification=c(0,0),
+        legend.key=element_rect(colour="white"),
+        #legend.key.size=unit(1.3,"cm"),
+        legend.position=c(0.08,0.86),
+        legend.title=element_blank()
+  )
+  INTR_ggplot
+ggsave("INTR_nm_filters.pdf", width=30, height=20, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/sep_calling/")
+
 
 ```
