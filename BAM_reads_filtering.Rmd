@@ -15,7 +15,7 @@ O_PATH=/home/dkleinman/datos/snpEff #output path
 I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
 V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
 G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
-B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAM files path
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered #BAM files path
 REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
 GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
 BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
@@ -655,71 +655,141 @@ grep -v '#' c_lp_sm_c_lp_do_genes.vcf | wc -l #
 ```
 
 ##B: Whole-genome. 
-###For Lynx pardinus.
+###For Lynx pardinus, all samples at the same cov (~6x).
 
 ```{r Perform variant calling, eval=FALSE, engine='bash'}
 
-#Perform direct variant calling (without gVCFs) on the NM≤4 filtered Lynx pardinus BAMs.
+#Perform direct variant calling (without gVCFs) on the NM≤2 filtered Lynx pardinus BAMs.
 cd $V_PATH
-screen -S c_lp_sm_c_lp_do_nm4.log
-script c_lp_sm_c_lp_do_nm4.log
+screen -S c_lp_sm_c_lp_do_nm2_samecov.log
+script c_lp_sm_c_lp_do_nm2_samecov.log
 
 cd $B_PATH
 java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
 -T HaplotypeCaller \
 -R $REF \
-$(for var in c_lp*recal_round-1.nm4.bam; do echo -I ${var}" ";done) \
--o $V_PATH/c_lp_sm_c_lp_do_nm4.vcf
+$(for var in c_lp*recal_round-1.nm2.bam; do echo -I ${var}" ";done) \
+-o $V_PATH/c_lp_sm_c_lp_do_nm2_samecov.vcf
 
-grep -v '#' $V_PATH/c_lp_sm_c_lp_do_nm4.vcf | wc -l #4189966
+grep -v '#' $V_PATH/c_lp_sm_c_lp_do_nm2_samecov.vcf | wc -l #
 
 #Rename the samples with wrong names.
 cd $V_PATH
-bcftools query -l c_lp_sm_c_lp_do_nm4.vcf #check sample names
+bcftools query -l c_lp_sm_c_lp_do_nm2_samecov.vcf #check sample names
 #!/bin/bash
 #cat << "EOF" > lp_rename.txt #Unmark this line when running it (I marked it in R because it doesn't understand it and messes the colours of subsequent lines). It should include all incorrect names.
 h_lp_do_0007 c_lp_do_0007
 EOF
 cat lp_rename.txt
-bcftools reheader -s lp_rename.txt -o c_lp_sm_c_lp_do_nm4_renamed.vcf c_lp_sm_c_lp_do_nm4.vcf #copy the VCF and rename the wrong named samples in the new VCF
+bcftools reheader -s lp_rename.txt -o c_lp_sm_c_lp_do_nm2_samecov_renamed.vcf c_lp_sm_c_lp_do_nm2_samecov.vcf #copy the VCF and rename the wrong named samples in the new VCF
 rm lp_rename.txt
-mv c_lp_sm_c_lp_do_nm4_renamed.vcf c_lp_sm_c_lp_do_nm4.vcf
+mv c_lp_sm_c_lp_do_nm2_samecov_renamed.vcf c_lp_sm_c_lp_do_nm2_samecov.vcf
 
-grep -v '#' c_lp_sm_c_lp_do_nm4.vcf | wc -l #4189966
+grep -v '#' c_lp_sm_c_lp_do_nm2_samecov.vcf | wc -l #
 
 ```
 
-###For Lynx lynx.
+###For Lynx pardinus, all samples at their original cov (~6-25x).
 
 ```{r Perform variant calling, eval=FALSE, engine='bash'}
 
-#Perform direct variant calling (without gVCFs) on the NM≤4 filtered Lynx lynx BAMs.
+#Perform direct variant calling (without gVCFs) on the NM≤2 filtered Lynx pardinus BAMs.
 cd $V_PATH
-screen -S c_ll_ki_c_ll_no_c_ll_po_nm4.log
-script c_ll_ki_c_ll_no_c_ll_po_nm4.log
+screen -S c_lp_sm_c_lp_do_nm2_origcov.log
+script c_lp_sm_c_lp_do_nm2_origcov.log
+
+cd $B_PATH
+SAMPLES=$(ls c_lp*recal_round-1.nm2.bam | cut -c1-12 | sort | uniq)
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
+-T HaplotypeCaller \
+-R $REF \
+$(for var in $SAMPLES; do if [ -e ${var}_recal_round-1_25x.nm2.bam ]; then echo -I ${var}_recal_round-1_25x.nm2.bam" "; else echo -I ${var}_recal_round-1.nm2.bam" "; fi; done) \
+-o $V_PATH/c_lp_sm_c_lp_do_nm2_origcov.vcf
+
+grep -v '#' $V_PATH/c_lp_sm_c_lp_do_nm2_origcov.vcf | wc -l #
+
+#Rename the samples with wrong names.
+cd $V_PATH
+bcftools query -l c_lp_sm_c_lp_do_nm2_origcov.vcf #check sample names
+#!/bin/bash
+#cat << "EOF" > lp_rename.txt #Unmark this line when running it (I marked it in R because it doesn't understand it and messes the colours of subsequent lines). It should include all incorrect names.
+h_lp_do_0007 c_lp_do_0007
+EOF
+cat lp_rename.txt
+bcftools reheader -s lp_rename.txt -o c_lp_sm_c_lp_do_nm2_origcov_renamed.vcf c_lp_sm_c_lp_do_nm2_origcov.vcf #copy the VCF and rename the wrong named samples in the new VCF
+rm lp_rename.txt
+mv c_lp_sm_c_lp_do_nm2_origcov_renamed.vcf c_lp_sm_c_lp_do_nm2_origcov.vcf
+
+grep -v '#' c_lp_sm_c_lp_do_nm2_origcov.vcf | wc -l #
+
+```
+
+###For Lynx lynx, all samples at the same cov (~6x).
+
+```{r Perform variant calling, eval=FALSE, engine='bash'}
+
+#Perform direct variant calling (without gVCFs) on the NM≤3 filtered Lynx lynx BAMs.
+cd $V_PATH
+screen -S c_ll_ki_c_ll_no_c_ll_po_nm3_samecov.log
+script c_ll_ki_c_ll_no_c_ll_po_nm3_samecov.log
 
 cd $B_PATH
 java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
 -T HaplotypeCaller \
 -R $REF \
-$(for var in c_{ll_ki*,ll_no*,ll_po*}recal_round-1.nm4.bam; do echo -I ${var}" ";done) \
--o $V_PATH/c_ll_ki_c_ll_no_c_ll_po_nm4.vcf
+$(for var in c_{ll_ki*,ll_no*,ll_po*}recal_round-1.nm3.bam; do echo -I ${var}" ";done) \
+-o $V_PATH/c_ll_ki_c_ll_no_c_ll_po_nm3_samecov.vcf
 
-grep -v '#' $V_PATH/c_ll_ki_c_ll_no_c_ll_po_nm4.vcf | wc -l #10866667
+grep -v '#' $V_PATH/c_ll_ki_c_ll_no_c_ll_po_nm3_samecov.vcf | wc -l #
 
 #Rename the samples with wrong names.
 cd $V_PATH
-bcftools query -l c_ll_ki_c_ll_no_c_ll_po_nm4.vcf #check sample names
+bcftools query -l c_ll_ki_c_ll_no_c_ll_po_nm3_samecov.vcf #check sample names
 #!/bin/bash
 #cat << "EOF" > ll_rename.txt #Unmark this line when running it (I marked it in R because it doesn't understand it and messes the colours of subsequent lines). It should include all incorrect names.
 LL90_rgsm c_ll_ki_0090
 EOF
 cat ll_rename.txt
-bcftools reheader -s ll_rename.txt -o c_ll_ki_c_ll_no_c_ll_po_nm4_renamed.vcf c_ll_ki_c_ll_no_c_ll_po_nm4.vcf #copy the VCF and rename the wrong named samples in the new VCF
+bcftools reheader -s ll_rename.txt -o c_ll_ki_c_ll_no_c_ll_po_nm3_samecov_renamed.vcf c_ll_ki_c_ll_no_c_ll_po_nm3_samecov.vcf #copy the VCF and rename the wrong named samples in the new VCF
 rm ll_rename.txt
-mv c_ll_ki_c_ll_no_c_ll_po_nm4_renamed.vcf c_ll_ki_c_ll_no_c_ll_po_nm4.vcf
+mv c_ll_ki_c_ll_no_c_ll_po_nm3_samecov_renamed.vcf c_ll_ki_c_ll_no_c_ll_po_nm3_samecov.vcf
 
-grep -v '#' c_ll_ki_c_ll_no_c_ll_po_nm4.vcf | wc -l #10866667
+grep -v '#' c_ll_ki_c_ll_no_c_ll_po_nm3_samecov.vcf | wc -l #
+
+```
+
+###For Lynx lynxs, all samples at their original cov (~6-25x).
+
+```{r Perform variant calling, eval=FALSE, engine='bash'}
+
+#Perform direct variant calling (without gVCFs) on the NM≤2 filtered Lynx pardinus BAMs.
+cd $V_PATH
+screen -S c_ll_ki_c_ll_no_c_ll_po_nm3_origcov.log
+script c_ll_ki_c_ll_no_c_ll_po_nm3_origcov.log
+
+cd $B_PATH
+SAMPLES=$(ls c_ll*recal_round-1.nm3.bam | cut -c1-12 | sort | uniq)
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
+-T HaplotypeCaller \
+-R $REF \
+$(for var in $SAMPLES; do if [ -e ${var}_recal_round-1_25x.nm3.bam ]; then echo -I ${var}_recal_round-1_25x.nm3.bam" "; else echo -I ${var}_recal_round-1.nm3.bam" "; fi; done) \
+-o $V_PATH/c_ll_ki_c_ll_no_c_ll_po_nm3_origcov.vcf
+
+grep -v '#' $V_PATH/c_ll_ki_c_ll_no_c_ll_po_nm3_origcov.vcf | wc -l #
+
+#Rename the samples with wrong names.
+cd $V_PATH
+bcftools query -l c_ll_ki_c_ll_no_c_ll_po_nm3_origcov.vcf #check sample names
+#!/bin/bash
+#cat << "EOF" > ll_rename.txt #Unmark this line when running it (I marked it in R because it doesn't understand it and messes the colours of subsequent lines). It should include all incorrect names.
+LL90_rgsm c_ll_ki_0090
+EOF
+cat ll_rename.txt
+bcftools reheader -s ll_rename.txt -o c_ll_ki_c_ll_no_c_ll_po_nm3_origcov_renamed.vcf c_ll_ki_c_ll_no_c_ll_po_nm3_origcov.vcf #copy the VCF and rename the wrong named samples in the new VCF
+rm ll_rename.txt
+mv c_ll_ki_c_ll_no_c_ll_po_nm3_origcov_renamed.vcf c_ll_ki_c_ll_no_c_ll_po_nm3_origcov.vcf
+
+grep -v '#' c_ll_ki_c_ll_no_c_ll_po_nm3_origcov.vcf | wc -l #
 
 ```
 
