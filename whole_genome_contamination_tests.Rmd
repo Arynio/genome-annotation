@@ -483,7 +483,7 @@ venn.plot <- venn.diagram(
 
 ```
 
-#3: Obtain the per-dataset list of private variants.
+#3: Obtain the per-dataset list of total and private variants.
 ##General files.
 ```{r Obtain the per-dataset list of private variants, eval=FALSE, engine='bash'}
 
@@ -560,9 +560,13 @@ str(freq_all)
 freq_all$pop <- as.factor(freq_all$pop)
 freq_all
 
+test <- read_tsv(freq_files[3],col_types=c("---cdc"),col_names=c("SNP","AF","pop"))
+result <- test %>% group_by(AF) %>% tally()
+
+
 
 GP_af_distr_ggplot <- ggplot(data=filter(freq_all,pop=="GP"|pop=="GP_private"), aes(x=AF)) +
-  geom_histogram(aes(AF),breaks=seq(0,1,1/22),center=0) + #bins=22,center=0) +
+  geom_histogram(aes(AF),binwidth=1/22) + #bins=22,center=0) +
   facet_grid(pop ~ ., scales="free") +
   #ggtitle(paste0("AF distribution (variants across lp + ll) for ",pop)) +
   #ylab("density") +
@@ -592,7 +596,7 @@ GP_af_distr_ggplot <- ggplot(data=filter(freq_all,pop=="GP"|pop=="GP_private"), 
 ggsave("GP_AF_distribution_all_variants.lr_ann.pdf", width=30, height=25, units="cm", device="pdf", path="/Users/Dani/ownCloud/backup/contamination/lp_5x_contamination_tests/w-g")
   
 Fx_af_distr_ggplot <- ggplot(data=filter(freq_all,pop=="5x"|pop=="5x_private"), aes(x=AF)) +
-  geom_histogram(aes(AF),breaks=seq(0,1,1/40),center=0) + #bins=40,center=0) +
+  geom_histogram(aes(AF),binwidth=1/39) + #bins=40,center=0) +
   facet_grid(pop ~ ., scales="free") +
   #ggtitle(paste0("AF distribution (variants across lp + ll) for ",pop)) +
   #ylab("density") +
@@ -649,7 +653,7 @@ freq_all
 
 
 GP_af_distr_ggplot <- ggplot(data=filter(freq_all,pop=="GP"|pop=="GP_private"), aes(x=AF)) +
-  geom_histogram(aes(AF),breaks=seq(0,1,1/22),center=0) + #bins=22,center=0) +
+  geom_histogram(aes(AF),binwidth=1/22) + #bins=22,center=0) +
   facet_grid(pop ~ ., scales="free") +
   #ggtitle(paste0("AF distribution (variants across lp + ll) for ",pop)) +
   #ylab("density") +
@@ -679,7 +683,7 @@ GP_af_distr_ggplot <- ggplot(data=filter(freq_all,pop=="GP"|pop=="GP_private"), 
 ggsave("GP_AF_distribution_syn_variants.lr_ann.pdf", width=30, height=25, units="cm", device="pdf", path="/Users/Dani/ownCloud/backup/contamination/lp_5x_contamination_tests/w-g")
   
 Fx_af_distr_ggplot <- ggplot(data=filter(freq_all,pop=="5x"|pop=="5x_private"), aes(x=AF)) +
-  geom_histogram(aes(AF),breaks=seq(0,1,1/40),center=0) + #bins=40,center=0) +
+  geom_histogram(aes(AF),binwidth=1/39) + #bins=40,center=0) +
   facet_grid(pop ~ ., scales="free") +
   #ggtitle(paste0("AF distribution (variants across lp + ll) for ",pop)) +
   #ylab("density") +
