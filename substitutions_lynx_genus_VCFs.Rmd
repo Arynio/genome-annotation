@@ -11,7 +11,7 @@ output: html_document
 ```{r Define paths, eval=FALSE, engine='bash'}
 
 B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAMs path
-G_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
 V_PATH=/home/dkleinman/datos/VCFs_Dani #VCFs path
 REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
 GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
@@ -329,6 +329,75 @@ cd $V_PATH
 grep -Ev 'NA|Multiallelic|INDEL' c_ll_ki_0090_plus_c_lr_zz_0001_recal_round-1_25x_SNPs.positions_class > c_ll_ki_0090_plus_c_lr_zz_0001_recal_round-1_25x_SNPs.positions_class_callable_universe
 
 ```
+
+##Lynx pardinus - Lynx rufus.
+###Obtain joint VCF for pardinus and rufus. Extract data for the two species in order to catalogue substitutions.
+
+```{r Obtain joint VCF for eurasian and rufus, eval=FALSE, engine='bash'}
+
+#Obtain VCF for the eurasian and the rufus:
+cd $V_PATH
+screen -S c_lp_sm_0298_plus_c_lr_zz_0001_VCF.log
+script c_lp_sm_0298_plus_c_lr_zz_0001_VCF.log
+
+$BCF view -s c_lp_sm_0298,c_lr_zz_0001 -Ov -o $V_PATH/c_lp_sm_0298_plus_c_lr_zz_0001_recal_round-1_25x.vcf $V_PATH/c_lp_ll_lc_lr_all_sites_renamed.vcf
+
+grep -v '#' c_lp_sm_0298_plus_c_lr_zz_0001_recal_round-1_25x.vcf | wc -l #2412763898
+
+```
+
+###Extract SNPs from the VCF. Subset the VCF files in order to keep only SNP variants.
+
+```{r Extract SNPs from the VCF, eval=FALSE, engine='bash'}
+
+#During this step, all INDELs will be dropped from the VCF (not entirely true... INDELs where one variant is monoallelic will remain).
+cd $V_PATH
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+  -T SelectVariants \
+  --selectTypeToExclude INDEL \
+  -R $REF \
+  -V c_lp_sm_0298_plus_c_lr_zz_0001_recal_round-1_25x.vcf \
+  -o c_lp_sm_0298_plus_c_lr_zz_0001_recal_round-1_25x_SNPs.vcf
+
+grep -v '#' c_lp_sm_0298_plus_c_lr_zz_0001_recal_round-1_25x_SNPs.vcf | wc -l #2407070749
+
+```
+
+###Get substitutions between lp and lr. Build allele counts file with all positions in lp and lr, and mark all substitutions.
+
+```{r Get substitutions between ll and lr, eval=FALSE, engine='bash'}
+
+#Extract appropriate columns from the VCF:
+cd $V_PATH
+grep -v '#' c_lp_sm_0298_plus_c_lr_zz_0001_recal_round-1_25x_SNPs.vcf | cut -f1,2,4,5,10,11 | awk '{printf ("%s\t%s\t%s\t%s\t%.3s\t%.3s\n", $1, $2, $3, $4, $5, $6)}' > c_lp_sm_0298_plus_c_lr_zz_0001_recal_round-1_25x_SNPs.positions
+
+#Classify the positions into the following categories: NA (whenever there is missing data), multiallelic (whenever there's a comma separating two or more alternative alleles), INDEL (when any allele covers more than one position), invariable (when the reference allele is fixed in both lp and lr), substitution (when alleles are alternatively fixed in lp and lr), substitution with respect to Iberian lynx (when the alternative allele is fixed in both ll and lr), SNP (the remaining cases).
+cd $V_PATH
+rm c_lp_sm_0298_plus_c_lr_zz_0001_recal_round-1_25x_SNPs.positions_class
+NAMES="Scaffold Position Reference Alternative c_ll_ki_0090 c_lr_zz_0001 Class"
+echo $NAMES > c_lp_sm_0298_plus_c_lr_zz_0001_recal_round-1_25x_SNPs.positions_class
+awk '{
+if ($5 == "./." || $6 == "./.")
+	print $0 "\t NA";
+else if ($4 ~ /,/) 
+	print $0 "\t Multiallelic";
+else if ((length($3) > 1) || (length($4) > 1) || $4 ~ /*/)
+	print $0 "\t INDEL";
+else if (($5 == "0/0" && $6 == "0/0") || ($5 == "1/1" && $6 == "1/1"))
+  print $0 "\t Invariable";
+else if (($5 == "0/0" && $6 == "1/1") || ($5 == "1/1" && $6 == "0/0"))
+	print $0 "\t Substitution";
+else
+  print $0 "\t SNP"
+}' c_ll_ki_0090_plus_c_lr_zz_0001_recal_round-1_25x_SNPs.positions >> c_ll_ki_0090_plus_c_lr_zz_0001_recal_round-1_25x_SNPs.positions_class
+
+
+#Exclude all rows with missing data, INDELs and various alleles.
+cd $V_PATH
+grep -Ev 'NA|Multiallelic|INDEL' c_ll_ki_0090_plus_c_lr_zz_0001_recal_round-1_25x_SNPs.positions_class > c_ll_ki_0090_plus_c_lr_zz_0001_recal_round-1_25x_SNPs.positions_class_callable_universe
+
+```
+
 
 ##Lynx lynx - Lynx pardinus.
 ###Obtain joint VCF for eurasian and pardinus. Extract data for the two species in order to catalogue substitutions.
