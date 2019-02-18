@@ -352,6 +352,9 @@ grep -v '#' c_lp_sm_0298_plus_c_lr_zz_0001_recal_round-1_25x.vcf | wc -l #241276
 
 #During this step, all INDELs will be dropped from the VCF (not entirely true... INDELs where one variant is monoallelic will remain).
 cd $V_PATH
+screen -S c_lp_sm_0298_plus_c_lr_zz_0001_VCF_SNPs.log
+script c_lp_sm_0298_plus_c_lr_zz_0001_VCF_SNPs.log
+
 java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
   -T SelectVariants \
   --selectTypeToExclude INDEL \
@@ -369,12 +372,15 @@ grep -v '#' c_lp_sm_0298_plus_c_lr_zz_0001_recal_round-1_25x_SNPs.vcf | wc -l #2
 
 #Extract appropriate columns from the VCF:
 cd $V_PATH
+screen -S c_lp_sm_0298_plus_c_lr_zz_0001_recal_round-1_25x_SNPs.positions_class.log
+script c_lp_sm_0298_plus_c_lr_zz_0001_recal_round-1_25x_SNPs.positions_class.log
+
 grep -v '#' c_lp_sm_0298_plus_c_lr_zz_0001_recal_round-1_25x_SNPs.vcf | cut -f1,2,4,5,10,11 | awk '{printf ("%s\t%s\t%s\t%s\t%.3s\t%.3s\n", $1, $2, $3, $4, $5, $6)}' > c_lp_sm_0298_plus_c_lr_zz_0001_recal_round-1_25x_SNPs.positions
 
 #Classify the positions into the following categories: NA (whenever there is missing data), multiallelic (whenever there's a comma separating two or more alternative alleles), INDEL (when any allele covers more than one position), invariable (when the reference allele is fixed in both lp and lr), substitution (when alleles are alternatively fixed in lp and lr), substitution with respect to Iberian lynx (when the alternative allele is fixed in both ll and lr), SNP (the remaining cases).
 cd $V_PATH
 rm c_lp_sm_0298_plus_c_lr_zz_0001_recal_round-1_25x_SNPs.positions_class
-NAMES="Scaffold Position Reference Alternative c_ll_ki_0090 c_lr_zz_0001 Class"
+NAMES="Scaffold Position Reference Alternative c_lp_sm_0298 c_lr_zz_0001 Class"
 echo $NAMES > c_lp_sm_0298_plus_c_lr_zz_0001_recal_round-1_25x_SNPs.positions_class
 awk '{
 if ($5 == "./." || $6 == "./.")
@@ -389,12 +395,12 @@ else if (($5 == "0/0" && $6 == "1/1") || ($5 == "1/1" && $6 == "0/0"))
 	print $0 "\t Substitution";
 else
   print $0 "\t SNP"
-}' c_ll_ki_0090_plus_c_lr_zz_0001_recal_round-1_25x_SNPs.positions >> c_ll_ki_0090_plus_c_lr_zz_0001_recal_round-1_25x_SNPs.positions_class
+}' c_lp_sm_0298_plus_c_lr_zz_0001_recal_round-1_25x_SNPs.positions >> c_lp_sm_0298_plus_c_lr_zz_0001_recal_round-1_25x_SNPs.positions_class
 
 
 #Exclude all rows with missing data, INDELs and various alleles.
 cd $V_PATH
-grep -Ev 'NA|Multiallelic|INDEL' c_ll_ki_0090_plus_c_lr_zz_0001_recal_round-1_25x_SNPs.positions_class > c_ll_ki_0090_plus_c_lr_zz_0001_recal_round-1_25x_SNPs.positions_class_callable_universe
+grep -Ev 'NA|Multiallelic|INDEL' c_lp_sm_0298_plus_c_lr_zz_0001_recal_round-1_25x_SNPs.positions_class > c_lp_sm_0298_plus_c_lr_zz_0001_recal_round-1_25x_SNPs.positions_class_callable_universe
 
 ```
 
