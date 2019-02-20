@@ -1,11 +1,14 @@
 ---
-title: "14.GO_enrichment"
+title: "GO_KO_enrichment"
+author: "Dani"
+date: "18 de febrero de 2019"
 output: html_document
 ---
 
+Notas de María:
 Este es el script donde realizo el GO term enrichment analysis y el pathway enrichment analysis. 
 
-Lo primero que hago es pedirle a Godoy una lista donde cada gen tenga asociado su GO-term. El me pasa una carpeta donde hay varios archivos.
+Lo primero que hago es pedirle a Godoy una lista donde cada gen tenga asociado su GO-term. Él me pasa una carpeta donde hay varios archivos.
 
 GO2LYNPC.txt
 GO2LYPA.LYPA23C.APPRIS.fatigo.genes.txt
@@ -16,57 +19,113 @@ lp23.allgenes.fatigo.txt
 lp23.allgenes.goterms
 lp23.allgenes.id
 
-En el archivo docx, se explica los pasos que siguió Godoy para hacer el enrichment. Lo que deduzco es que las que se llaman lp23* son listas antiguas, y despues están las GO2LYPA que sólo contienen las isoformas principales. 
+En el archivo docx, se explican los pasos que siguió Godoy para hacer el enrichment. Lo que deduzco es que las que se llaman lp23* son listas antiguas, y despues están las GO2LYPA que sólo contienen las isoformas principales. 
 
-Lo distintos archivos son:
+Los distintos archivos son:
 
 GO2LYNPC.txt --> Tiene el nombre del gen, el GO_term, el GO_name y el GO_type; parece que incluye todas las isoformas.
-GO2LYPA.LYPA23C.APPRIS.fatigo.genes.txt --> Creo q es el que tengo que usar. Nombre de gen, GO_ACC, GO_name y el GO_type.
-GO2LYPA.LYPA23C.APPRIS.fatigo.txt --> Igual pero con proteinas.
+GO2LYPA.LYPA23C.APPRIS.fatigo.genes.txt --> Creo que es el que tengo que usar. Nombre de gen, GO_ACC, GO_name y el GO_type.
+GO2LYPA.LYPA23C.APPRIS.fatigo.txt --> Igual pero con proteínas.
 GO_enrichment.docx --> Archivo docx donde se explica el procedimiento.
-genes2transcript2go.list.txt --> Creo que es la carpeta que tiene el nombre de gen, isoforma principal y proteina y despues GO term y sus características.
+genes2transcript2go.list.txt --> Creo que es la carpeta que tiene el nombre de gen, isoforma principal y proteína y despues GO term y sus características.
 
-Los lp23 son antiguos sin la isoforma principal.
+Los que comienzan por lp23 son antiguos sin la isoforma principal.
 
-Lo primero que voy a hacer es cargar nuestros archivos
 
-```{r}
+#0: Define paths.
+
+```{r Define paths, eval=FALSE, engine='bash'}
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered #BAM files path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+```
+
+#1: Obtain gene list of interest.
+##Example
+
+```{r Obtain gene list of interest, eval=FALSE, engine='bash'}
+
+#Extract genes with NS variants from an example population:
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_lp_sm_perpop
+grep 'missense' c_lp_sm_perpop_with1.lr_ann.vcf | cut -f8 | cut -d'|' -f4 > c_lp_sm_perpop_with1.lr_ann.NSYN.genlist
+
+#From outside the server:
+scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_lp_sm_perpop/c_lp_sm_perpop_with1.lr_ann.NSYN.genlist /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/GO_analysis/results
+
+```
+
+#2: Perform GO terms enrichment.
+##Retrieve GO terms annotation from the Iberian lynx project.
+```{r Perform GO terms enrichment}
+
 library(topGO)
-library (dplyr)
-library (plyr)
+library(dplyr)
+library(plyr)
 library(tidyr)
-wd <- "/Users/marialucenaperez/Owncloud/publico/PhD/WG_diversity/Lypa23c_GO_terms_KO_terms_annotation/"
-wd_output <- "/Users/marialucenaperez/Owncloud/publico/PhD/WG_diversity/ANGSD/sfs/"
+
+wd <- "/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/GO_analysis/Lypa23c_GO_terms_annotation/"
 tabla_all_genes_GO_term_complete_info <- read.table (paste0(wd, "GO2LYPA.LYPA23C.APPRIS.fatigo.genes.txt"), sep="\t", header = T) %>% select (., GENE_NAME, GO_ACC) %>% mutate (GO_ACC=as.character(GO_ACC))
-# Convert  data frame in a list of list based on a Key value
-# geneID2GO <- readMappings(file = system.file("examples/geneid2go.map", package = "topGO"))
+#Convert  data frame in a list of list based on a Key value
+#geneID2GO <- readMappings(file = system.file("examples/geneid2go.map", package = "topGO"))
 list_of_list_all_genes_GO_term <- dlply(tabla_all_genes_GO_term_complete_info, .(GENE_NAME), function(x)x$GO_ACC)
 list_of_list_all_genes_GO_term_chr <- lapply(list_of_list_all_genes_GO_term, function(x) as.character(unlist(x)))
 str(head(list_of_list_all_genes_GO_term_chr))
-# Guardo los nombres de los genes en cuestión. 
+#Guardo los nombres de los genes en cuestión. 
 geneNames <- names(list_of_list_all_genes_GO_term_chr)
-###############
-# Tabla de genes de interes
-protein_of_interest_duplicates_dataframe <- read.table("/Users/marialucenaperez/Owncloud/publico/PhD/WG_diversity/ANGSD/sfs/list_for_venn_lynx_lynx_lynx_pardinus_ratio_above_1_CDS.txt", header=T) %>%  separate(genes_in_common_lynx_lynx_lynx_pardinus, c("genes"), "_") 
-# Elimino los dos últimos caracteres que son el nombre de la proteina.
-gene_of_interest_duplicates_list_pre <- substr(protein_of_interest_duplicates_dataframe$genes,1,nchar(protein_of_interest_duplicates_dataframe$genes)-2)
-# Lo convierto en lista
-gene_of_interest_duplicates_list <- as.list(as.data.frame(gene_of_interest_duplicates_list_pre))
-# Hago una lista con 0 y 1 con los genes que tengo que filtrar
-geneList <- factor(as.integer(geneNames %in% gene_of_interest_duplicates_list))
-# Asigno esa lista a cada gen (pongo header)
-names(geneList) <- as.factor(geneNames)
-str(geneList)
-GOdata <- new("topGOdata", ontology = "BP", description = "Analysis of CDS with a ratio above 1", allGenes = geneList,
-               annot = annFUN.gene2GO, gene2GO = list_of_list_all_genes_GO_term_chr)
-description (GOdata)
-termStat(GOdata)
-test.stat <- new("weight01Count", testStatistic = GOFisherTest, name = "Fisher test")
-resultFisher <- getSigGroups(GOdata, test.stat)
-head(score(resultFisher))
-hist(score(resultFisher))
-geneData(resultFisher)
-allRes <- GenTable(GOdata, weighted01=resultFisher, orderBy="weight01", ranksOf="weight01", topNodes=20 )
+
+```
+
+##Perform GO terms enrichment analysis for each population and feature of interest.
+
+```{r Perform GO terms enrichment}
+
+library(topGO)
+library(dplyr)
+library(plyr)
+library(tidyr)
+library(readr)
+
+wd <- "/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/GO_analysis/Lypa23c_GO_terms_annotation/"
+wd_input <- "/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/GO_analysis/input/"
+wd_output <- "/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/GO_analysis/output/"
+
+pop_genlists <- list.files(wd_input, pattern="c_lp_sm_perpop_with1.lr_ann.*")
+ontologies <- c("BP","MF","CC")
+for (genlist in pop_genlists) {
+  description <- paste0(paste(strsplit(genlist,"_")[[1]][1:3],collapse="_"),"_",strsplit(genlist,"\\.")[[1]][3])
+  print(description)
+  #Guardo la tabla de genes de interés en formato vector.
+  genes_duplicate_list <- unlist(read.table(paste0(wd_input,genlist),stringsAsFactors=F),use.names=F)
+  #Hago un vector con 0 y 1 con los genes que tengo que filtrar.
+  geneList <- factor(as.integer(geneNames %in% genes_duplicate_list))
+  #Asigno esa lista a cada gen (pongo header)
+  names(geneList) <- as.factor(geneNames)
+  #str(geneList)
+  for (ontology in ontologies) {
+    print(ontology)
+    GOdata <- new("topGOdata", ontology = ontology, description = description, allGenes = geneList, annot = annFUN.gene2GO, gene2GO = list_of_list_all_genes_GO_term_chr)
+    description(GOdata)
+    termStat(GOdata)
+    test.stat <- new("weight01Count", testStatistic = GOFisherTest, name = "Fisher test")
+    resultFisher <- getSigGroups(GOdata, test.stat)
+    head(score(resultFisher))
+    hist(score(resultFisher))
+    geneData(resultFisher)
+    allRes <- GenTable(GOdata, weighted01=resultFisher, orderBy="weight01", ranksOf="weight01", topNodes=100)
+    write_tsv(allRes,paste0(wd_output,description,".",ontology,".go_res"))
+  }
+}
+
+
 ```
 
 
