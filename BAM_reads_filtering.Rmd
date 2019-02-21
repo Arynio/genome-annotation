@@ -1941,7 +1941,6 @@ for j in ${POP[@]}
 ```
 
 #11: Split the population VCFs into per individual VCFs. Generate a VCF for each individual.
-##For Lynx pardinus and Lynx lynx.
 
 ```{r Split the population VCFs into per individual VCFs, eval=FALSE, engine='bash'}
 
@@ -1980,7 +1979,7 @@ for i in ${POP[@]}
     -T SelectVariants \
     -R $REF \
     -V "${i}"_"${NM_COV}"_perpop/"${i}"_"${NM_COV}"_perpop.lr_ann.vcf \
-    -o "${i}"_"${NM_COV}"_individuals/"${i}"_"${NM_COV}"_individual.lr_ann.vcf \
+    -o "${i}"_"${NM_COV}"_individuals/"${j}"_"${NM_COV}"_individual.lr_ann.vcf \
     -env \
     -sn $ID
     done
@@ -1990,9 +1989,15 @@ for i in ${POP[@]}
 
 #12: Get annotation statistics.
 ##At the individual level.
-###Heterozygotes and derived/derived homozygotes.
 
 ```{r Get annotation statistics, eval=FALSE, engine='bash'}
+
+cd $V_PATH/annotation/
+CALLING=(c_lp_sm_c_lp_do_nm2_samecov)
+screen -S "${CALLING}_ann_individual_summary.lr_ann.log"
+CALLING=(c_lp_sm_c_lp_do_nm2_samecov)
+script "${CALLING}_ann_individual_summary.lr_ann.log"
+CALLING=(c_lp_sm_c_lp_do_nm2_samecov)
 
 S_PATH=/opt/snpEff #software path
 C_PATH=/home/dkleinman/datos/snpEff #config file path
@@ -2005,16 +2010,14 @@ REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path
 GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
 BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
 
+SPECIES=$(echo "${CALLING}" | cut -d'_' -f1,2)
+NM_COV=$(echo "${CALLING}" | rev | cut -d'_' -f1,2 | rev)
 
-#For Lynx pardinus and Lynx lynx:
 
 cd $V_PATH/annotation/
-screen -S snpeff_individual_summary_nm4_genes.lr_ann.log
-script snpeff_individual_summary_nm4_genes.lr_ann.log
-
-rm snpeff_individual_summary_nm4_genes.lr_ann.txt
-echo -e "species\tpopulation\tdataset\tsample\ttotal_V\tintergenic_V\tintronic_V\tcoding_V\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tUCNE_V\tmissense/synonymous_V\tmissense/synonymous_A\tsynonymous/intronic_V\tmissense/intronic_V" > snpeff_individual_summary_nm4_genes.lr_ann.txt
-INDLIST=($(ls `find . -name '*individual_nm4_genes.lr_ann.vcf' -print`))
+rm "${CALLING}_ann_individual_summary.lr_ann.txt"
+echo -e "species\tpopulation\tdataset\tsample\ttotal_V\tintergenic_V\tintronic_V\tcoding_V\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tUCNE_V\tmissense/synonymous_V\tmissense/synonymous_A\tsynonymous/intronic_V\tmissense/intronic_V" > "${CALLING}_ann_individual_summary.lr_ann.txt"
+INDLIST=($(ls `find . -name ${SPECIES}*${NM_COV}'_individual.lr_ann.vcf' -print`))
 for i in "${INDLIST[@]}"
   do
   echo "${i}"
@@ -2022,7 +2025,7 @@ for i in "${INDLIST[@]}"
   echo "${ind}"
   SPECIES=$(echo "${ind}" | cut -c3-4)
   POPULATION=$(echo "${ind}" | cut -c6-7)
-  DATASET=$(if grep -Fxq $ind /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/c_lp_GP_samples; then echo "GP"; else echo "5x"; fi)
+  DATASET=$(if [ $ind = "c_lp_sm_0221" ]; then echo "REF"; elif grep -Fxq $ind /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/c_lp_5x_samples; then echo "5x"; else echo "GP"; fi)
   SAMPLE=$(echo "${ind}" | cut -c9-12)
   TOTAL_V=$(grep -v '#' ${i} | wc -l)
   INTERGENIC_V=$(grep 'intergenic' ${i} | wc -l)
@@ -2039,26 +2042,28 @@ for i in "${INDLIST[@]}"
   MISSENSE_SYNONYMOUS_A=$(echo "scale=3; $MISSENSE_A/$SYNONYMOUS_A" | bc)
   SYNONYMOUS_INTRONIC_V=$(echo "scale=3; $SYNONYMOUS_V/$INTRONIC_V" | bc)
   MISSENSE_INTRONIC_V=$(echo "scale=3; $MISSENSE_V/$INTRONIC_V" | bc)
-  echo -e "$SPECIES\t$POPULATION\t$DATASET\t$SAMPLE\t$TOTAL_V\t$INTERGENIC_V\t$INTRONIC_V\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$UCNE_V\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A\t$SYNONYMOUS_INTRONIC_V\t$MISSENSE_INTRONIC_V" >> snpeff_individual_summary_nm4_genes.lr_ann.txt
+  echo -e "$SPECIES\t$POPULATION\t$DATASET\t$SAMPLE\t$TOTAL_V\t$INTERGENIC_V\t$INTRONIC_V\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$UCNE_V\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A\t$SYNONYMOUS_INTRONIC_V\t$MISSENSE_INTRONIC_V" >> "${CALLING}_ann_individual_summary.lr_ann.txt"
   done
 
-scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/annotation/snpeff_individual_summary_*genes.lr_ann.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/sep_calling
+#From outside the server:
+scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/annotation/*_ann_individual_summary.lr_ann.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/
 
 ```
 
-#13: Compare NM filtering results.
+#13: Plot variant count results.
+##Compare NM filtering results.
 
-```{r Other stuff}
+```{r Plot variant count results}
 
 library(readr)
 library(dplyr)
 library(ggplot2)
 
 #First draw the NM distribution for each individual:
-sample_files <- list.files("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/sep_calling/", pattern="*.genes.lr_ann.txt")
+sample_files <- list.files("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/old/sep_calling/", pattern="*.genes.lr_ann.txt")
 snpeff_filters_summary <- data_frame()
 for (file in sample_files) {
-  snpeff_individual_summary <- read_tsv(paste0("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/sep_calling/",file))
+  snpeff_individual_summary <- read_tsv(paste0("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/old/sep_calling/",file))
   snpeff_individual_summary <- mutate(snpeff_individual_summary, filter=ifelse(strsplit(file,"_")[[1]][4]=="genes.lr","no_filter",strsplit(file,"_")[[1]][4]))
   snpeff_filters_summary <- rbind(snpeff_filters_summary,snpeff_individual_summary)
 }
@@ -2179,6 +2184,142 @@ INTR_ggplot <- ggplot(data=snpeff_filters_summary, aes(dataset,intronic_V,colour
   )
   INTR_ggplot
 ggsave("INTR_nm_filters.pdf", width=30, height=20, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/sep_calling/")
+
+```
+
+##Visualise definitive results.
+
+```{r Plot variant count results}
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+
+#First draw the NM distribution for each individual:
+sample_files <- list.files("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/", pattern="*_ann_individual_summary.lr_ann.txt")
+snpeff_filters_summary <- data_frame()
+for (file in sample_files) {
+  snpeff_individual_summary <- read_tsv(paste0("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/",file))
+  snpeff_individual_summary <- mutate(snpeff_individual_summary, filter=strsplit(file,"_")[[1]][length(strsplit(file,"_")[[1]])-4])
+  snpeff_filters_summary <- rbind(snpeff_filters_summary,snpeff_individual_summary)
+}
+snpeff_filters_summary
+
+syn_int_ggplot <- ggplot(data=snpeff_filters_summary, aes(dataset,`synonymous/intronic_V`,colour=population)) +
+  #facet_grid(. ~ filter) +
+  geom_point(position="jitter") +
+  #ggtitle("Proportion of reads at different NM") +
+  ylab("SYN/INTR") +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+        rect=element_rect(size=1),
+        axis.line=element_line(colour="black"),
+        axis.title=element_text(size=16),
+        #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+        #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+        #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+        panel.background=element_blank(),
+        panel.border=element_rect(colour="black"),
+        #panel.grid=element_blank(),
+        #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+        plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+        #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+        legend.background=element_rect(linetype="solid", colour="black", size=.5),
+        #legend.justification=c(0,0),
+        legend.key=element_rect(colour="white"),
+        #legend.key.size=unit(1.3,"cm"),
+        legend.position=c(0.92,0.86),
+        legend.title=element_blank()
+  )
+  syn_int_ggplot
+ggsave("SYN_vs_INTR_cov_filters.pdf", width=20, height=15, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
+
+nsyn_int_ggplot <- ggplot(data=snpeff_filters_summary, aes(dataset,`missense/intronic_V`,colour=population)) +
+  #facet_grid(. ~ filter) +
+  geom_point(position="jitter") +
+  #ggtitle("Proportion of reads at different NM") +
+  ylab("NSYN/INTR") +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+        rect=element_rect(size=1),
+        axis.line=element_line(colour="black"),
+        axis.title=element_text(size=16),
+        #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+        #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+        #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+        panel.background=element_blank(),
+        panel.border=element_rect(colour="black"),
+        #panel.grid=element_blank(),
+        #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+        plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+        #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+        legend.background=element_rect(linetype="solid", colour="black", size=.5),
+        #legend.justification=c(0,0),
+        legend.key=element_rect(colour="white"),
+        #legend.key.size=unit(1.3,"cm"),
+        legend.position=c(0.92,0.86),
+        legend.title=element_blank()
+  )
+  nsyn_int_ggplot
+ggsave("NSYN_vs_INTR_cov_filters.pdf", width=20, height=15, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
+
+nsyn_syn_ggplot <- ggplot(data=snpeff_filters_summary, aes(dataset,`missense/synonymous_V`,colour=population)) +
+  #facet_grid(. ~ filter) +
+  geom_point(position="jitter") +
+  #ggtitle("Proportion of reads at different NM") +
+  ylab("NSYN/SYN") +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+        rect=element_rect(size=1),
+        axis.line=element_line(colour="black"),
+        axis.title=element_text(size=16),
+        #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+        #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+        #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+        panel.background=element_blank(),
+        panel.border=element_rect(colour="black"),
+        #panel.grid=element_blank(),
+        #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+        plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+        #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+        legend.background=element_rect(linetype="solid", colour="black", size=.5),
+        #legend.justification=c(0,0),
+        legend.key=element_rect(colour="white"),
+        #legend.key.size=unit(1.3,"cm"),
+        legend.position=c(0.92,0.86),
+        legend.title=element_blank()
+  )
+  nsyn_syn_ggplot
+ggsave("NSYN_vs_SYN_cov_filters.pdf", width=20, height=15, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
+
+INTR_ggplot <- ggplot(data=snpeff_filters_summary, aes(dataset,intronic_V,colour=population)) +
+  #facet_grid(. ~ filter) +
+  geom_point(position="jitter") +
+  #ggtitle("Proportion of reads at different NM") +
+  ylab("INTR") +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+        rect=element_rect(size=1),
+        axis.line=element_line(colour="black"),
+        axis.title=element_text(size=16),
+        #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+        #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+        #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+        panel.background=element_blank(),
+        panel.border=element_rect(colour="black"),
+        #panel.grid=element_blank(),
+        #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+        plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+        #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+        legend.background=element_rect(linetype="solid", colour="black", size=.5),
+        #legend.justification=c(0,0),
+        legend.key=element_rect(colour="white"),
+        #legend.key.size=unit(1.3,"cm"),
+        legend.position=c(0.92,0.86),
+        legend.title=element_blank()
+  )
+  INTR_ggplot
+ggsave("INTR_cov_filters.pdf", width=20, height=15, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
 
 
 ```
