@@ -754,7 +754,7 @@ bcftools reheader -s ll_rename.txt -o c_ll_ki_c_ll_no_c_ll_po_nm3_samecov_rename
 rm ll_rename.txt
 mv c_ll_ki_c_ll_no_c_ll_po_nm3_samecov_renamed.vcf c_ll_ki_c_ll_no_c_ll_po_nm3_samecov.vcf
 
-grep -v '#' c_ll_ki_c_ll_no_c_ll_po_nm3_samecov.vcf | wc -l #
+grep -v '#' c_ll_ki_c_ll_no_c_ll_po_nm3_samecov.vcf | wc -l #10477196
 
 ```
 
@@ -828,7 +828,7 @@ grep -v '#' c_ll_ki_c_ll_no_c_ll_po_nm3_origcov.vcf | wc -l #
 
 ```
 
-###For both together, all samples at the same cov (~6x).
+###For both together, all samples at the same cov (~6x) to track substitutions, as monomorphic positions (incl. substitutions) are NOT included/polarized in the separate callings.
 
 ```{r Perform variant calling, eval=FALSE, engine='bash'}
 
@@ -838,13 +838,15 @@ screen -S c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov.log
 script c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov.log
 
 cd $B_PATH
+SAMPLES=$(ls c_l*_recal_round-1.nm*.bam | cut -c1-12 | sort | uniq)
 java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
 -T HaplotypeCaller \
 -R $REF \
-$(for var in c_*recal_round-1.nm*.bam; do echo -I ${var}" ";done) \
--o $V_PATH/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov.vcf
+$(for var in $SAMPLES; do echo -I ${var}_recal_round-1.nm*.bam" "; done) \
+-XL /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/repeats_and_lowcomp_no_redundant_mappability.k75_lessthan90.bed \
+-o c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov.vcf
 
-grep -v '#' $V_PATH/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov.vcf | wc -l #
+grep -v '#' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov.vcf | wc -l #
 
 #Rename the samples with wrong names.
 cd $V_PATH
@@ -860,6 +862,43 @@ rm lp_ll_rename.txt
 mv c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov_renamed.vcf c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov.vcf
 
 grep -v '#' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov.vcf | wc -l #
+
+```
+
+###For both together, all samples at their original cov (~6-25x) to track substitutions, as monomorphic positions (incl. substitutions) are NOT included/polarized in the separate callings.
+
+```{r Perform variant calling, eval=FALSE, engine='bash'}
+
+#Perform direct variant calling (without gVCFs) on the NM≤2 filtered Lynx pardinus BAMs and the NM≤3 filtered Lynx lynx BAMs.
+cd $V_PATH
+screen -S c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.log
+script c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.log
+
+cd $B_PATH
+SAMPLES=$(ls c_l*.nm*.bam | cut -c1-12 | sort | uniq)
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
+-T HaplotypeCaller \
+-R $REF \
+$(for var in $SAMPLES; do if [ -e ${var}_recal_round-1_25x.nm*.bam ]; then echo -I ${var}_recal_round-1_25x.nm*.bam" "; else echo -I ${var}_recal_round-1.nm*.bam" "; fi; done) \
+-XL /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/repeats_and_lowcomp_no_redundant_mappability.k75_lessthan90.bed \
+-o c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.vcf
+
+grep -v '#' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.vcf | wc -l #
+
+#Rename the samples with wrong names.
+cd $V_PATH
+bcftools query -l c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.vcf #check sample names
+#!/bin/bash
+#cat << "EOF" > lp_ll_rename.txt #Unmark this line when running it (I marked it in R because it doesn't understand it and messes the colours of subsequent lines). It should include all incorrect names.
+h_lp_do_0007 c_lp_do_0007
+LL90_rgsm c_ll_ki_0090
+EOF
+cat lp_ll_rename.txt
+bcftools reheader -s lp_ll_rename.txt -o c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_renamed.vcf c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.vcf #copy the VCF and rename the wrong named samples in the new VCF
+rm lp_ll_rename.txt
+mv c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_renamed.vcf c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.vcf
+
+grep -v '#' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.vcf | wc -l #
 
 ```
 
@@ -886,12 +925,12 @@ bgzip -c /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_000
 #Code to annotate the AA (ancestral alleles) subfield from the INFO field in the VCF. I keep getting the following error: "Can't locate Vcf.pm in @INC". I look it up and apparently it's easy to solve: an environment variable PERL5LIB should be defined as the path to perl.
 
 cd $V_PATH
-CALLING=(c_lp_sm_c_lp_do_nm2_samecov)
+CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_samecov)
 screen -S "${CALLING}_aafilled.log"
-CALLING=(c_lp_sm_c_lp_do_nm2_samecov)
+CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_samecov)
 script "${CALLING}_aafilled.log"
 
-CALLING=(c_lp_sm_c_lp_do_nm2_samecov)
+CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_samecov)
 export PERL5LIB=/opt/vcftools_0.1.13/perl/ #set required environmental variable
 V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
 
@@ -899,7 +938,9 @@ cat "${CALLING}.vcf" | /opt/vcftools_0.1.13/perl/fill-aa -a /home/GRUPOS/grupoli
 
 gzip -d -c "${CALLING}_aafilled.vcf.gz" > "${CALLING}_aafilled.vcf" #Get decompressed version. I ran md5sum for both the gzipped and the unzipped versions and there were no differences.
 
-grep -v '#' "${CALLING}_aafilled.vcf" | wc -l #3651792
+grep -v '#' "${CALLING}_aafilled.vcf" | wc -l 
+#c_lp_sm_c_lp_do_nm2_samecov 3651792
+#c_ll_ki_c_ll_no_c_ll_po_nm3_samecov
 
 ```
 
@@ -1133,7 +1174,6 @@ cut -d$'\t' -f1,3,4,5 /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.CDS.
 ```
 
 ##Annotate the VCF with custom annotation
-###Separate per-species calling. Monomorphic positions (incl. substitutions) are NOT polarized. Grab substitutions from the joint dataset.
 
 ```{r Annotate using SnpEff, eval=FALSE, engine='bash'}
 
@@ -1157,28 +1197,6 @@ java -Xmx16g -jar $S_PATH/snpEff.jar LYRU.23 -v -s $V_PATH/annotation/"${CALLING
 
 cd $V_PATH/annotation/
 grep -v '#' "${CALLING}_polarized.lr_ann.vcf" | wc -l #3651792
-
-```
-
-###Joint calling. Substitutions should be retrieved from this joint dataset.
-
-```{r Annotate using SnpEff, eval=FALSE, engine='bash'}
-
-cd $V_PATH/annotation/
-screen -S c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov_polarized.lr_ann.log #open a dettachable screen in case the test takes too long
-script c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov_polarized.lr_ann.log #initiate the log file
-
-S_PATH=/opt/snpEff #software path
-C_PATH=/home/dkleinman/datos/snpEff #config file path
-O_PATH=/home/dkleinman/datos/snpEff #output path
-I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
-V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
-
-cd $O_PATH #run this code from the directory where the config is located.
-java -Xmx16g -jar $S_PATH/snpEff.jar LYRU.23 -v -s $V_PATH/annotation/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov_polarized.lr_ann.html -csvStats $V_PATH/annotation/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov_polarized.lr_ann.csv -interval $C_PATH/data/LYPA23C.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.UCNE.intergenic.nr.bed $V_PATH/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov_polarized.vcf > $V_PATH/annotation/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov_polarized.lr_ann.vcf #run this code from the directory where the config is located.
-
-cd $V_PATH/annotation/
-grep -v '#' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov_polarized.lr_ann.vcf | wc -l #
 
 ```
 
