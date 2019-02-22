@@ -185,6 +185,6 @@ for (genlist in pop_genlists) {
   write_tsv(as.data.frame(genes_of_interest_KO$V2),paste0(wd_output,description,".ko_res"),col_names=F)
   }
 
-#Take the output file to https://reactome.org/PathwayBrowser/#TOOL=AT and perform the analysis checking both boxes (human protein comparison and interactome). Then download and rename the pdf with the report.
+#Take the output file to https://reactome.org/PathwayBrowser/#TOOL=AT and perform the analysis checking both boxes (project to human, include interactome). Then download and rename the pdf with the report.
 
 ```
