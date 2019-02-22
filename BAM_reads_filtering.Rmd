@@ -880,116 +880,42 @@ bgzip -c /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_000
 ```
 
 ##Use vcftools to add Ancestral Allele annotation to the VCF.
-###For Lynx pardinus, all samples at the same cov (~6x).
 
 ```{r Polarize contemporary VCF, eval=FALSE, engine='bash'}
 
 #Code to annotate the AA (ancestral alleles) subfield from the INFO field in the VCF. I keep getting the following error: "Can't locate Vcf.pm in @INC". I look it up and apparently it's easy to solve: an environment variable PERL5LIB should be defined as the path to perl.
-cd $V_PATH
-screen -S c_lp_sm_c_lp_do_nm2_samecov_aafilled.log
-script c_lp_sm_c_lp_do_nm2_samecov_aafilled.log
 
+cd $V_PATH
+CALLING=(c_lp_sm_c_lp_do_nm2_samecov)
+screen -S "${CALLING}_aafilled.log"
+CALLING=(c_lp_sm_c_lp_do_nm2_samecov)
+script "${CALLING}_aafilled.log"
+
+CALLING=(c_lp_sm_c_lp_do_nm2_samecov)
 export PERL5LIB=/opt/vcftools_0.1.13/perl/ #set required environmental variable
 V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
 
-cat $V_PATH/c_lp_sm_c_lp_do_nm2_samecov.vcf | /opt/vcftools_0.1.13/perl/fill-aa -a /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa.gz | bgzip -c > c_lp_sm_c_lp_do_nm2_samecov_aafilled.vcf.gz #I tried to run this first without bgzipping it, and it was increasingly slow. Each day it did around half the previous day. When the server crashed, I relaunched it adding the bgzip command and it finished in a little over 24h.
+cat "${CALLING}.vcf" | /opt/vcftools_0.1.13/perl/fill-aa -a /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa.gz | bgzip -c > "${CALLING}_aafilled.vcf.gz" #I tried to run this first without bgzipping it, and it was increasingly slow. Each day it did around half the previous day. When the server crashed, I relaunched it adding the bgzip command and it finished in a little over 24h.
 
-gzip -d -c c_lp_sm_c_lp_do_nm2_samecov_aafilled.vcf.gz > c_lp_sm_c_lp_do_nm2_samecov_aafilled.vcf #Get decompressed version. I ran md5sum for both the gzipped and the unzipped versions and there were no differences.
+gzip -d -c "${CALLING}_aafilled.vcf.gz" > "${CALLING}_aafilled.vcf" #Get decompressed version. I ran md5sum for both the gzipped and the unzipped versions and there were no differences.
 
-grep -v '#' c_lp_sm_c_lp_do_nm2_samecov_aafilled.vcf | wc -l #3651792
-
-```
-
-###For Lynx pardinus, all samples at their original cov (~6-25x).
-
-```{r Polarize contemporary VCF, eval=FALSE, engine='bash'}
-
-#Code to annotate the AA (ancestral alleles) subfield from the INFO field in the VCF. I keep getting the following error: "Can't locate Vcf.pm in @INC". I look it up and apparently it's easy to solve: an environment variable PERL5LIB should be defined as the path to perl.
-cd $V_PATH
-screen -S c_lp_sm_c_lp_do_nm2_origcov_aafilled.log
-script c_lp_sm_c_lp_do_nm2_origcov_aafilled.log
-
-export PERL5LIB=/opt/vcftools_0.1.13/perl/ #set required environmental variable
-V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
-
-cat $V_PATH/c_lp_sm_c_lp_do_nm2_origcov.vcf | /opt/vcftools_0.1.13/perl/fill-aa -a /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa.gz | bgzip -c > c_lp_sm_c_lp_do_nm2_origcov_aafilled.vcf.gz #I tried to run this first without bgzipping it, and it was increasingly slow. Each day it did around half the previous day. When the server crashed, I relaunched it adding the bgzip command and it finished in a little over 24h.
-
-gzip -d -c c_lp_sm_c_lp_do_nm2_origcov_aafilled.vcf.gz > c_lp_sm_c_lp_do_nm2_origcov_aafilled.vcf #Get decompressed version. I ran md5sum for both the gzipped and the unzipped versions and there were no differences.
-
-grep -v '#' c_lp_sm_c_lp_do_nm2_origcov_aafilled.vcf | wc -l #
-
-```
-
-###For Lynx lynx, all samples at the same cov (~6x).
-
-```{r Polarize contemporary VCF, eval=FALSE, engine='bash'}
-
-#Code to annotate the AA (ancestral alleles) subfield from the INFO field in the VCF. I keep getting the following error: "Can't locate Vcf.pm in @INC". I look it up and apparently it's easy to solve: an environment variable PERL5LIB should be defined as the path to perl.
-cd $V_PATH
-screen -S c_ll_ki_c_ll_no_c_ll_po_nm3_samecov_aafilled.log
-script c_ll_ki_c_ll_no_c_ll_po_nm3_samecov_aafilled.log
-
-export PERL5LIB=/opt/vcftools_0.1.13/perl/ #set required environmental variable
-V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
-
-cat $V_PATH/c_ll_ki_c_ll_no_c_ll_po_nm3_samecov.vcf | /opt/vcftools_0.1.13/perl/fill-aa -a /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa.gz | bgzip -c > c_ll_ki_c_ll_no_c_ll_po_nm3_samecov_aafilled.vcf.gz #I tried to run this first without bgzipping it, and it was increasingly slow. Each day it did around half the previous day. When the server crashed, I relaunched it adding the bgzip command and it finished in a little over 24h.
-
-gzip -d -c c_ll_ki_c_ll_no_c_ll_po_nm3_samecov_aafilled.vcf.gz > c_ll_ki_c_ll_no_c_ll_po_nm3_samecov_aafilled.vcf #Get decompressed version. I ran md5sum for both the gzipped and the unzipped versions and there were no differences.
-
-grep -v '#' c_ll_ki_c_ll_no_c_ll_po_nm3_samecov_aafilled.vcf | wc -l #
-
-```
-
-###For Lynx lynx, all samples at their original cov (~6-25x).
-
-```{r Polarize contemporary VCF, eval=FALSE, engine='bash'}
-
-#Code to annotate the AA (ancestral alleles) subfield from the INFO field in the VCF. I keep getting the following error: "Can't locate Vcf.pm in @INC". I look it up and apparently it's easy to solve: an environment variable PERL5LIB should be defined as the path to perl.
-cd $V_PATH
-screen -S c_ll_ki_c_ll_no_c_ll_po_nm3_origcov_aafilled.log
-script c_ll_ki_c_ll_no_c_ll_po_nm3_origcov_aafilled.log
-
-export PERL5LIB=/opt/vcftools_0.1.13/perl/ #set required environmental variable
-V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
-
-cat $V_PATH/c_ll_ki_c_ll_no_c_ll_po_nm3_origcov.vcf | /opt/vcftools_0.1.13/perl/fill-aa -a /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa.gz | bgzip -c > c_ll_ki_c_ll_no_c_ll_po_nm3_origcov_aafilled.vcf.gz #I tried to run this first without bgzipping it, and it was increasingly slow. Each day it did around half the previous day. When the server crashed, I relaunched it adding the bgzip command and it finished in a little over 24h.
-
-gzip -d -c c_ll_ki_c_ll_no_c_ll_po_nm3_origcov_aafilled.vcf.gz > c_ll_ki_c_ll_no_c_ll_po_nm3_origcov_aafilled.vcf #Get decompressed version. I ran md5sum for both the gzipped and the unzipped versions and there were no differences.
-
-grep -v '#' c_ll_ki_c_ll_no_c_ll_po_nm3_origcov_aafilled.vcf | wc -l #
-
-```
-
-###For both together, all samples at the same cov (~6x).
-
-```{r Polarize contemporary VCF, eval=FALSE, engine='bash'}
-
-#Code to annotate the AA (ancestral alleles) subfield from the INFO field in the VCF. I keep getting the following error: "Can't locate Vcf.pm in @INC". I look it up and apparently it's easy to solve: an environment variable PERL5LIB should be defined as the path to perl.
-cd $V_PATH
-screen -S c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov_aafilled.log
-script c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov_aafilled.log
-
-export PERL5LIB=/opt/vcftools_0.1.13/perl/ #set required environmental variable
-V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
-
-cat $V_PATH/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov.vcf | /opt/vcftools_0.1.13/perl/fill-aa -a /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa.gz | bgzip -c > c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov_aafilled.vcf.gz #I tried to run this first without bgzipping it, and it was increasingly slow. Each day it did around half the previous day. When the server crashed, I relaunched it adding the bgzip command and it finished in a little over 24h.
-
-gzip -d -c c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov_aafilled.vcf.gz > c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov_aafilled.vcf #Get decompressed version. I ran md5sum for both the gzipped and the unzipped versions and there were no differences.
-
-grep -v '#' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov_aafilled.vcf | wc -l #
+grep -v '#' "${CALLING}_aafilled.vcf" | wc -l #3651792
 
 ```
 
 ##Use VcfFilterJdk to polarize the AA-filled VCF.
-###For Lynx pardinus, all samples at the same cov (~6x).
 
 ```{r Polarize contemporary VCF, eval=FALSE, engine='bash'}
 
 #Polarize the AA-filled VCF based on the new INFO/AA column. Alleles will be switched whenever the ancestral allele matches the alternative one, and genotypes will be properly recoded as well. The following code was originally provided by Pierre Lindenbaum and modified by José Luis Castro.
 
 cd $V_PATH
-screen -S c_lp_sm_c_lp_do_nm2_samecov_polarized.log
-script c_lp_sm_c_lp_do_nm2_samecov_polarized.log
+CALLING=(c_lp_sm_c_lp_do_nm2_samecov)
+screen -S "${CALLING}_polarized.log"
+CALLING=(c_lp_sm_c_lp_do_nm2_samecov)
+script "${CALLING}_polarized.log"
+
+CALLING=(c_lp_sm_c_lp_do_nm2_samecov)
 
 java -jar /opt/jvarkit/dist/vcffilterjdk.jar -e 'if(variant.getNAlleles()!=2 || !variant.hasAttribute("AA")) return true; 
 final String aa = variant.getAttributeAsString("AA",""); 
@@ -1032,237 +958,9 @@ for(Genotype g: variant.getGenotypes())
 
 vb.attribute("AF",1.0d - Double.parseDouble(variant.getAttributeAsString("AF",""))); vb.attribute("AC",variant.getGenotypes().stream().flatMap(G->G.getAlleles().stream()).filter(A->A.equals(oldref)).count()); 
 vb.genotypes(genotypes); 
-return vb.make();' -o c_lp_sm_c_lp_do_nm2_samecov_polarized.vcf c_lp_sm_c_lp_do_nm2_samecov_aafilled.vcf
+return vb.make();' -o "${CALLING}_polarized.vcf" "${CALLING}_aafilled.vcf"
 
-grep -v '#' c_lp_sm_c_lp_do_nm2_samecov_polarized.vcf | wc -l #3651792
-
-```
-
-###For Lynx pardinus, all samples at their original cov (~6-25x).
-
-```{r Polarize contemporary VCF, eval=FALSE, engine='bash'}
-
-#Polarize the AA-filled VCF based on the new INFO/AA column. Alleles will be switched whenever the ancestral allele matches the alternative one, and genotypes will be properly recoded as well. The following code was originally provided by Pierre Lindenbaum and modified by José Luis Castro.
-
-cd $V_PATH
-screen -S c_lp_sm_c_lp_do_nm2_origcov_polarized.log
-script c_lp_sm_c_lp_do_nm2_origcov_polarized.log
-
-java -jar /opt/jvarkit/dist/vcffilterjdk.jar -e 'if(variant.getNAlleles()!=2 || !variant.hasAttribute("AA")) return true; 
-final String aa = variant.getAttributeAsString("AA",""); 
-if(!variant.getAlleles().get(1).getDisplayString().equalsIgnoreCase(aa)) return true; 
-VariantContextBuilder vb=new VariantContextBuilder(variant); 
-
-Allele oldalt = variant.getAlleles().get(1);
-Allele oldref = variant.getAlleles().get(0); 
-Allele ref= Allele.create(oldalt.getDisplayString(),true); 
-Allele alt= Allele.create(oldref.getDisplayString(),false);
-
-vb.alleles(Arrays.asList(ref,alt)); 
-
-List genotypes= new ArrayList<>(); 
-for(Genotype g: variant.getGenotypes()) 
-  { 
-  if(!g.isCalled()) 
-  { genotypes.add(g); continue;} 
-  GenotypeBuilder gb = new GenotypeBuilder(g); 
-  List alleles = new ArrayList<>(); 
-  for(Allele a:g.getAlleles()) { 
-    if(a.equals(oldalt)) { a=ref;} 
-    else if(a.equals(oldref)) { a=alt;} 
-    alleles.add(a); 
-    } 
-  if(g.hasPL()) { 
-    int pl[] = g.getPL(); 
-    int pl2[] = new int[pl.length]; 
-    for(int i=0;i< pl.length;i++) pl2[i]=pl[(pl.length-1)-i]; 
-    gb.PL(pl2); 
-    } 
-  if(g.hasAD()) 
-    { int ad[] = g.getAD(); 
-    int ad2[] = new int[ad.length]; 
-    for(int i=0;i< ad.length;i++) ad2[i]=ad[(ad.length-1)-i];
-    gb.AD(ad2); 
-  } 
-  genotypes.add(gb.alleles(alleles).make()); 
-  }
-
-vb.attribute("AF",1.0d - Double.parseDouble(variant.getAttributeAsString("AF",""))); vb.attribute("AC",variant.getGenotypes().stream().flatMap(G->G.getAlleles().stream()).filter(A->A.equals(oldref)).count()); 
-vb.genotypes(genotypes); 
-return vb.make();' -o c_lp_sm_c_lp_do_nm2_origcov_polarized.vcf c_lp_sm_c_lp_do_nm2_origcov_aafilled.vcf
-
-grep -v '#' c_lp_sm_c_lp_do_nm2_origcov_polarized.vcf | wc -l #
-
-```
-
-###For Lynx lynx, all samples at the same cov (~6x).
-
-```{r Polarize contemporary VCF, eval=FALSE, engine='bash'}
-
-#Polarize the AA-filled VCF based on the new INFO/AA column. Alleles will be switched whenever the ancestral allele matches the alternative one, and genotypes will be properly recoded as well. The following code was originally provided by Pierre Lindenbaum and modified by José Luis Castro.
-
-cd $V_PATH
-screen -S c_ll_ki_c_ll_no_c_ll_po_nm3_samecov_polarized.log
-script c_ll_ki_c_ll_no_c_ll_po_nm3_samecov_polarized.log
-
-java -jar /opt/jvarkit/dist/vcffilterjdk.jar -e 'if(variant.getNAlleles()!=2 || !variant.hasAttribute("AA")) return true; 
-final String aa = variant.getAttributeAsString("AA",""); 
-if(!variant.getAlleles().get(1).getDisplayString().equalsIgnoreCase(aa)) return true; 
-VariantContextBuilder vb=new VariantContextBuilder(variant); 
-
-Allele oldalt = variant.getAlleles().get(1);
-Allele oldref = variant.getAlleles().get(0); 
-Allele ref= Allele.create(oldalt.getDisplayString(),true); 
-Allele alt= Allele.create(oldref.getDisplayString(),false);
-
-vb.alleles(Arrays.asList(ref,alt)); 
-
-List genotypes= new ArrayList<>(); 
-for(Genotype g: variant.getGenotypes()) 
-  { 
-  if(!g.isCalled()) 
-  { genotypes.add(g); continue;} 
-  GenotypeBuilder gb = new GenotypeBuilder(g); 
-  List alleles = new ArrayList<>(); 
-  for(Allele a:g.getAlleles()) { 
-    if(a.equals(oldalt)) { a=ref;} 
-    else if(a.equals(oldref)) { a=alt;} 
-    alleles.add(a); 
-    } 
-  if(g.hasPL()) { 
-    int pl[] = g.getPL(); 
-    int pl2[] = new int[pl.length]; 
-    for(int i=0;i< pl.length;i++) pl2[i]=pl[(pl.length-1)-i]; 
-    gb.PL(pl2); 
-    } 
-  if(g.hasAD()) 
-    { int ad[] = g.getAD(); 
-    int ad2[] = new int[ad.length]; 
-    for(int i=0;i< ad.length;i++) ad2[i]=ad[(ad.length-1)-i];
-    gb.AD(ad2); 
-  } 
-  genotypes.add(gb.alleles(alleles).make()); 
-  }
-
-vb.attribute("AF",1.0d - Double.parseDouble(variant.getAttributeAsString("AF",""))); vb.attribute("AC",variant.getGenotypes().stream().flatMap(G->G.getAlleles().stream()).filter(A->A.equals(oldref)).count()); 
-vb.genotypes(genotypes); 
-return vb.make();' -o c_ll_ki_c_ll_no_c_ll_po_nm3_samecov_polarized.vcf c_ll_ki_c_ll_no_c_ll_po_nm3_samecov_aafilled.vcf
-
-grep -v '#' c_ll_ki_c_ll_no_c_ll_po_nm3_samecov_polarized.vcf | wc -l #
-
-```
-
-###For Lynx lynx, all samples at their original cov (~6-25x).
-
-```{r Polarize contemporary VCF, eval=FALSE, engine='bash'}
-
-#Polarize the AA-filled VCF based on the new INFO/AA column. Alleles will be switched whenever the ancestral allele matches the alternative one, and genotypes will be properly recoded as well. The following code was originally provided by Pierre Lindenbaum and modified by José Luis Castro.
-
-cd $V_PATH
-screen -S c_ll_ki_c_ll_no_c_ll_po_nm3_origcov_polarized.log
-script c_ll_ki_c_ll_no_c_ll_po_nm3_origcov_polarized.log
-
-java -jar /opt/jvarkit/dist/vcffilterjdk.jar -e 'if(variant.getNAlleles()!=2 || !variant.hasAttribute("AA")) return true; 
-final String aa = variant.getAttributeAsString("AA",""); 
-if(!variant.getAlleles().get(1).getDisplayString().equalsIgnoreCase(aa)) return true; 
-VariantContextBuilder vb=new VariantContextBuilder(variant); 
-
-Allele oldalt = variant.getAlleles().get(1);
-Allele oldref = variant.getAlleles().get(0); 
-Allele ref= Allele.create(oldalt.getDisplayString(),true); 
-Allele alt= Allele.create(oldref.getDisplayString(),false);
-
-vb.alleles(Arrays.asList(ref,alt)); 
-
-List genotypes= new ArrayList<>(); 
-for(Genotype g: variant.getGenotypes()) 
-  { 
-  if(!g.isCalled()) 
-  { genotypes.add(g); continue;} 
-  GenotypeBuilder gb = new GenotypeBuilder(g); 
-  List alleles = new ArrayList<>(); 
-  for(Allele a:g.getAlleles()) { 
-    if(a.equals(oldalt)) { a=ref;} 
-    else if(a.equals(oldref)) { a=alt;} 
-    alleles.add(a); 
-    } 
-  if(g.hasPL()) { 
-    int pl[] = g.getPL(); 
-    int pl2[] = new int[pl.length]; 
-    for(int i=0;i< pl.length;i++) pl2[i]=pl[(pl.length-1)-i]; 
-    gb.PL(pl2); 
-    } 
-  if(g.hasAD()) 
-    { int ad[] = g.getAD(); 
-    int ad2[] = new int[ad.length]; 
-    for(int i=0;i< ad.length;i++) ad2[i]=ad[(ad.length-1)-i];
-    gb.AD(ad2); 
-  } 
-  genotypes.add(gb.alleles(alleles).make()); 
-  }
-
-vb.attribute("AF",1.0d - Double.parseDouble(variant.getAttributeAsString("AF",""))); vb.attribute("AC",variant.getGenotypes().stream().flatMap(G->G.getAlleles().stream()).filter(A->A.equals(oldref)).count()); 
-vb.genotypes(genotypes); 
-return vb.make();' -o c_ll_ki_c_ll_no_c_ll_po_nm3_origcov_polarized.vcf c_ll_ki_c_ll_no_c_ll_po_nm3_origcov_aafilled.vcf
-
-grep -v '#' c_ll_ki_c_ll_no_c_ll_po_nm3_origcov_polarized.vcf | wc -l #
-
-```
-
-###For both together, all samples at the same cov (~6x).
-
-```{r Polarize contemporary VCF, eval=FALSE, engine='bash'}
-
-#Polarize the AA-filled VCF based on the new INFO/AA column. Alleles will be switched whenever the ancestral allele matches the alternative one, and genotypes will be properly recoded as well. The following code was originally provided by Pierre Lindenbaum and modified by José Luis Castro.
-
-cd $V_PATH
-screen -S c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov_polarized.log
-script c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov_polarized.log
-
-java -jar /opt/jvarkit/dist/vcffilterjdk.jar -e 'if(variant.getNAlleles()!=2 || !variant.hasAttribute("AA")) return true; 
-final String aa = variant.getAttributeAsString("AA",""); 
-if(!variant.getAlleles().get(1).getDisplayString().equalsIgnoreCase(aa)) return true; 
-VariantContextBuilder vb=new VariantContextBuilder(variant); 
-
-Allele oldalt = variant.getAlleles().get(1);
-Allele oldref = variant.getAlleles().get(0); 
-Allele ref= Allele.create(oldalt.getDisplayString(),true); 
-Allele alt= Allele.create(oldref.getDisplayString(),false);
-
-vb.alleles(Arrays.asList(ref,alt)); 
-
-List genotypes= new ArrayList<>(); 
-for(Genotype g: variant.getGenotypes()) 
-  { 
-  if(!g.isCalled()) 
-  { genotypes.add(g); continue;} 
-  GenotypeBuilder gb = new GenotypeBuilder(g); 
-  List alleles = new ArrayList<>(); 
-  for(Allele a:g.getAlleles()) { 
-    if(a.equals(oldalt)) { a=ref;} 
-    else if(a.equals(oldref)) { a=alt;} 
-    alleles.add(a); 
-    } 
-  if(g.hasPL()) { 
-    int pl[] = g.getPL(); 
-    int pl2[] = new int[pl.length]; 
-    for(int i=0;i< pl.length;i++) pl2[i]=pl[(pl.length-1)-i]; 
-    gb.PL(pl2); 
-    } 
-  if(g.hasAD()) 
-    { int ad[] = g.getAD(); 
-    int ad2[] = new int[ad.length]; 
-    for(int i=0;i< ad.length;i++) ad2[i]=ad[(ad.length-1)-i];
-    gb.AD(ad2); 
-  } 
-  genotypes.add(gb.alleles(alleles).make()); 
-  }
-
-vb.attribute("AF",1.0d - Double.parseDouble(variant.getAttributeAsString("AF",""))); vb.attribute("AC",variant.getGenotypes().stream().flatMap(G->G.getAlleles().stream()).filter(A->A.equals(oldref)).count()); 
-vb.genotypes(genotypes); 
-return vb.make();' -o c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov_polarized.vcf c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov_aafilled.vcf
-
-grep -v '#' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov_polarized.vcf | wc -l #
+grep -v '#' "${CALLING}_polarized.vcf" | wc -l #3651792
 
 ```
 
@@ -1435,13 +1133,18 @@ cut -d$'\t' -f1,3,4,5 /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.CDS.
 ```
 
 ##Annotate the VCF with custom annotation
-###For Lynx pardinus, all samples at the same cov (~6x). Monomorphic positions (incl. substitutions) are NOT polarized. Grab substitutions from the joint dataset.
+###Separate per-species calling. Monomorphic positions (incl. substitutions) are NOT polarized. Grab substitutions from the joint dataset.
 
 ```{r Annotate using SnpEff, eval=FALSE, engine='bash'}
 
 cd $V_PATH/annotation/
-screen -S c_lp_sm_c_lp_do_nm2_samecov_polarized.lr_ann.log #open a dettachable screen in case the test takes too long
-script c_lp_sm_c_lp_do_nm2_samecov_polarized.lr_ann.log #initiate the log file
+CALLING=(c_lp_sm_c_lp_do_nm2_samecov)
+screen -S "${CALLING}_polarized.lr_ann.log"
+CALLING=(c_lp_sm_c_lp_do_nm2_samecov)
+script "${CALLING}_polarized.lr_ann.log"
+
+CALLING=(c_lp_sm_c_lp_do_nm2_samecov)
+
 
 S_PATH=/opt/snpEff #software path
 C_PATH=/home/dkleinman/datos/snpEff #config file path
@@ -1450,80 +1153,14 @@ I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
 V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
 
 cd $O_PATH #run this code from the directory where the config is located.
-java -Xmx16g -jar $S_PATH/snpEff.jar LYRU.23 -v -s $V_PATH/annotation/c_lp_sm_c_lp_do_nm2_samecov_polarized.lr_ann.html -csvStats $V_PATH/annotation/c_lp_sm_c_lp_do_nm2_samecov_polarized.lr_ann.csv -interval $C_PATH/data/LYPA23C.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.UCNE.intergenic.nr.bed $V_PATH/c_lp_sm_c_lp_do_nm2_samecov_polarized.vcf > $V_PATH/annotation/c_lp_sm_c_lp_do_nm2_samecov_polarized.lr_ann.vcf #run this code from the directory where the config is located.
+java -Xmx16g -jar $S_PATH/snpEff.jar LYRU.23 -v -s $V_PATH/annotation/"${CALLING}_polarized.lr_ann.html" -csvStats $V_PATH/annotation/"${CALLING}_polarized.lr_ann.csv" -interval $C_PATH/data/LYPA23C.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.UCNE.intergenic.nr.bed $V_PATH/"${CALLING}_polarized.vcf" > $V_PATH/annotation/"${CALLING}_polarized.lr_ann.vcf" #run this code from the directory where the config is located.
 
 cd $V_PATH/annotation/
-grep -v '#' c_lp_sm_c_lp_do_nm2_samecov_polarized.lr_ann.vcf | wc -l #3651792
+grep -v '#' "${CALLING}_polarized.lr_ann.vcf" | wc -l #3651792
 
 ```
 
-###For Lynx pardinus, all samples at their original cov (~6-25x). Monomorphic positions (incl. substitutions) are NOT polarized. Grab substitutions from the joint dataset.
-
-```{r Annotate using SnpEff, eval=FALSE, engine='bash'}
-
-cd $V_PATH/annotation/
-screen -S c_lp_sm_c_lp_do_nm2_origcov_polarized.lr_ann.log #open a dettachable screen in case the test takes too long
-script c_lp_sm_c_lp_do_nm2_origcov_polarized.lr_ann.log #initiate the log file
-
-S_PATH=/opt/snpEff #software path
-C_PATH=/home/dkleinman/datos/snpEff #config file path
-O_PATH=/home/dkleinman/datos/snpEff #output path
-I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
-V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
-
-cd $O_PATH #run this code from the directory where the config is located.
-java -Xmx16g -jar $S_PATH/snpEff.jar LYRU.23 -v -s $V_PATH/annotation/c_lp_sm_c_lp_do_nm2_origcov_polarized.lr_ann.html -csvStats $V_PATH/annotation/c_lp_sm_c_lp_do_nm2_origcov_polarized.lr_ann.csv -interval $C_PATH/data/LYPA23C.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.UCNE.intergenic.nr.bed $V_PATH/c_lp_sm_c_lp_do_nm2_origcov_polarized.vcf > $V_PATH/annotation/c_lp_sm_c_lp_do_nm2_origcov_polarized.lr_ann.vcf #run this code from the directory where the config is located.
-
-cd $V_PATH/annotation/
-grep -v '#' c_lp_sm_c_lp_do_nm2_origcov_polarized.lr_ann.vcf | wc -l #
-
-```
-
-###For Lynx lynx, all samples at the same cov (~6x). Monomorphic positions (incl. substitutions) are NOT polarized. Grab substitutions from the joint dataset.
-
-```{r Annotate using SnpEff, eval=FALSE, engine='bash'}
-
-cd $V_PATH/annotation/
-screen -S c_ll_ki_c_ll_no_c_ll_po_nm3_samecov_polarized.lr_ann.log #open a dettachable screen in case the test takes too long
-script c_ll_ki_c_ll_no_c_ll_po_nm3_samecov_polarized.lr_ann.log #initiate the log file
-
-S_PATH=/opt/snpEff #software path
-C_PATH=/home/dkleinman/datos/snpEff #config file path
-O_PATH=/home/dkleinman/datos/snpEff #output path
-I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
-V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
-
-cd $O_PATH #run this code from the directory where the config is located.
-java -Xmx16g -jar $S_PATH/snpEff.jar LYRU.23 -v -s $V_PATH/annotation/c_ll_ki_c_ll_no_c_ll_po_nm3_samecov_polarized.lr_ann.html -csvStats $V_PATH/annotation/c_ll_ki_c_ll_no_c_ll_po_nm3_samecov_polarized.lr_ann.csv -interval $C_PATH/data/LYPA23C.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.UCNE.intergenic.nr.bed $V_PATH/c_ll_ki_c_ll_no_c_ll_po_nm3_samecov_polarized.vcf > $V_PATH/annotation/c_ll_ki_c_ll_no_c_ll_po_nm3_samecov_polarized.lr_ann.vcf #run this code from the directory where the config is located.
-
-cd $V_PATH/annotation/
-grep -v '#' c_ll_ki_c_ll_no_c_ll_po_nm3_samecov_polarized.lr_ann.vcf | wc -l #
-
-```
-
-###For Lynx lynx, all samples at their original cov (~6-25x). Monomorphic positions (incl. substitutions) are NOT polarized. Grab substitutions from the joint dataset.
-
-```{r Annotate using SnpEff, eval=FALSE, engine='bash'}
-
-cd $V_PATH/annotation/
-screen -S c_ll_ki_c_ll_no_c_ll_po_nm3_origcov_polarized.lr_ann.log #open a dettachable screen in case the test takes too long
-script c_ll_ki_c_ll_no_c_ll_po_nm3_origcov_polarized.lr_ann.log #initiate the log file
-
-S_PATH=/opt/snpEff #software path
-C_PATH=/home/dkleinman/datos/snpEff #config file path
-O_PATH=/home/dkleinman/datos/snpEff #output path
-I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
-V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
-
-cd $O_PATH #run this code from the directory where the config is located.
-java -Xmx16g -jar $S_PATH/snpEff.jar LYRU.23 -v -s $V_PATH/annotation/c_ll_ki_c_ll_no_c_ll_po_nm3_origcov_polarized.lr_ann.html -csvStats $V_PATH/annotation/c_ll_ki_c_ll_no_c_ll_po_nm3_origcov_polarized.lr_ann.csv -interval $C_PATH/data/LYPA23C.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.UCNE.intergenic.nr.bed $V_PATH/c_ll_ki_c_ll_no_c_ll_po_nm3_origcov_polarized.vcf > $V_PATH/annotation/c_ll_ki_c_ll_no_c_ll_po_nm3_origcov_polarized.lr_ann.vcf #run this code from the directory where the config is located.
-
-cd $V_PATH/annotation/
-grep -v '#' c_ll_ki_c_ll_no_c_ll_po_nm3_origcov_polarized.lr_ann.vcf | wc -l #
-
-```
-
-###For both together, all samples at the same cov (~6x). Substitutions should be retrieved from this joint dataset.
+###Joint calling. Substitutions should be retrieved from this joint dataset.
 
 ```{r Annotate using SnpEff, eval=FALSE, engine='bash'}
 
