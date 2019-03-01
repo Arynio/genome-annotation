@@ -282,3 +282,56 @@ N_SITES=$(cat variable_coordinates.list | wc -l)
 $NGSF --geno $I_PATH/beagle_gl/c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060.genolike.beagle.gz --lkl --pos variable_coordinates.list --n_ind 60 --n_sites $N_SITES --out c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060_ngsF-HMM
 
 ```
+
+# IBD file to bed
+
+We will try to use a script from the webpage (https://github.com/fgvieira/ngsF-HMM/blob/master/scripts/convert_ibd.pl)
+
+Copio y pego el script en el servidor.
+Si lo corro en B me da un problema por perl, pero en A corre perfectamente
+
+Los archivos que necesita son:
+
+       --ind_file        File with individual information (IND_ID on first column)
+       --pos_file        TSV file with position information (CHR,POS)
+       --ibd_pos_file    File with regions as IBD state per position (one indiv per line, one 0/1 per site)
+       --ibd_bed_file    BED file with the coordinates of the IBD regions (CHR,START,END,IND_ID).
+                        If IND_ID is blank or '*', interval is assumed on all individuals
+
+```{bash}
+cd /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/
+
+# ind_file        File with individual information (IND_ID on first column)
+# Creo este archivo usando la bamlist.
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/beagle_gl
+
+cat c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060.bamlist | sed 's/\/home\/GRUPOS\/grupolince\/lynx_genomes_5x\/BAM_files_final\///g' | sed 's/_recal_round-1.bam//g' > ../c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060.ind
+
+sed '$!{:a;N;s/\n/\t/;ta}' c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060.ind > c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060_modif.ind
+
+
+# pos_file        TSV file with position information (CHR,POS)
+# Es el archivo con la información de cromosoma y longitud, la tenemos en la carpeta del genoma.
+/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/Length_scaffolds_lp23_tab_separated 
+
+# ibd_pos_file
+# El archivo que nos genera el programa de IBD.
+/GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/ngsF-HMM/c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060_ngsF-HMM.ibd
+
+tail -n+2 /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/ngsF-HMM/c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060_ngsF-HMM.ibd | head -n60 > /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/ngsF-HMM/c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060_ngsF-HMM_modif.ibd
+
+# El archivo que usamos
+
+/GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/ngsF-HMM/c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060_ngsF-HMM_modif.ibd
+```
+
+## Lo lanzo
+parece que da problemas con ind_file así que pruebo sin el
+```{bash}
+
+screen -S ibd_to_bed
+
+./convert_ibd.pl --pos_file /GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/Length_scaffolds_lp23_tab_separated  --ibd_pos_file /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/ngsF-HMM/c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060_ngsF-HMM_modif.ibd
+```
+
