@@ -808,23 +808,24 @@ java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK
 -T HaplotypeCaller \
 -R $REF \
 $(for var in $SAMPLES; do if [ -e ${var}*25x.nm3.bam ]; then echo -I ${var}*25x.nm3.bam" "; else echo -I ${var}*.nm3.bam" "; fi; done) \
+-XL /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/repeats_and_lowcomp_no_redundant_mappability.k75_lessthan90.bed \
 -o $V_PATH/c_ll_ki_c_ll_no_c_ll_po_h_ll_pv_nm3_origcov.vcf
 
 grep -v '#' $V_PATH/c_ll_ki_c_ll_no_c_ll_po_h_ll_pv_nm3_origcov.vcf | wc -l #
 
 #Rename the samples with wrong names.
 cd $V_PATH
-bcftools query -l c_ll_ki_c_ll_no_c_ll_po_nm3_origcov.vcf #check sample names
+bcftools query -l c_ll_ki_c_ll_no_c_ll_po_h_ll_pv_nm3_origcov.vcf #check sample names
 #!/bin/bash
 #cat << "EOF" > ll_rename.txt #Unmark this line when running it (I marked it in R because it doesn't understand it and messes the colours of subsequent lines). It should include all incorrect names.
 LL90_rgsm c_ll_ki_0090
 EOF
 cat ll_rename.txt
-bcftools reheader -s ll_rename.txt -o c_ll_ki_c_ll_no_c_ll_po_nm3_origcov_renamed.vcf c_ll_ki_c_ll_no_c_ll_po_nm3_origcov.vcf #copy the VCF and rename the wrong named samples in the new VCF
-rm ll_rename.txt
-mv c_ll_ki_c_ll_no_c_ll_po_nm3_origcov_renamed.vcf c_ll_ki_c_ll_no_c_ll_po_nm3_origcov.vcf
+bcftools reheader -s ll_rename.txt -o c_ll_ki_c_ll_no_c_ll_po_h_ll_pv_nm3_origcov_renamed.vcf c_ll_ki_c_ll_no_c_ll_po_h_ll_pv_nm3_origcov.vcf #copy the VCF and rename the wrong named samples in the new VCF
+#rm ll_rename.txt
+mv c_ll_ki_c_ll_no_c_ll_po_h_ll_pv_nm3_origcov_renamed.vcf c_ll_ki_c_ll_no_c_ll_po_h_ll_pv_nm3_origcov.vcf
 
-grep -v '#' c_ll_ki_c_ll_no_c_ll_po_nm3_origcov.vcf | wc -l #
+grep -v '#' c_ll_ki_c_ll_no_c_ll_po_h_ll_pv_nm3_origcov.vcf | wc -l
 
 ```
 
@@ -846,7 +847,7 @@ $(for var in $SAMPLES; do echo -I ${var}_recal_round-1.nm*.bam" "; done) \
 -XL /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/repeats_and_lowcomp_no_redundant_mappability.k75_lessthan90.bed \
 -o c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov.vcf
 
-grep -v '#' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov.vcf | wc -l #
+grep -v '#' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov.vcf | wc -l #5671526
 
 #Rename the samples with wrong names.
 cd $V_PATH
@@ -858,10 +859,10 @@ LL90_rgsm c_ll_ki_0090
 EOF
 cat lp_ll_rename.txt
 bcftools reheader -s lp_ll_rename.txt -o c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov_renamed.vcf c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov.vcf #copy the VCF and rename the wrong named samples in the new VCF
-rm lp_ll_rename.txt
-mv c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov_renamed.vcf c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov.vcf
+#rm lp_ll_rename.txt
+mv c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov_renamed.vcf $V_PATH/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov.vcf
 
-grep -v '#' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov.vcf | wc -l #
+grep -v '#' $V_PATH/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov.vcf | wc -l #5671526
 
 ```
 
@@ -925,12 +926,12 @@ bgzip -c /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_000
 #Code to annotate the AA (ancestral alleles) subfield from the INFO field in the VCF. I keep getting the following error: "Can't locate Vcf.pm in @INC". I look it up and apparently it's easy to solve: an environment variable PERL5LIB should be defined as the path to perl.
 
 cd $V_PATH
-CALLING=(c_lp_sm_c_lp_do_nm2_origcov)
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov)
 screen -S "${CALLING}_aafilled.log"
-CALLING=(c_lp_sm_c_lp_do_nm2_origcov)
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov)
 script "${CALLING}_aafilled.log"
 
-CALLING=(c_lp_sm_c_lp_do_nm2_origcov)
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov)
 export PERL5LIB=/opt/vcftools_0.1.13/perl/ #set required environmental variable
 V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
 
@@ -1217,12 +1218,12 @@ grep -v '#' "${CALLING}_polarized.lr_ann.vcf" | wc -l
 #Modify the CALLING variable all 3 times.
 
 cd $V_PATH/annotation
-CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov)
+CALLING=(c_lp_sm_c_lp_do_nm2_samecov)
 screen -S "${CALLING}_polarized_filtered.lr_ann.log"
-CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov)
+CALLING=(c_lp_sm_c_lp_do_nm2_samecov)
 script "${CALLING}_polarized_filtered.lr_ann.log"
 
-CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov)
+CALLING=(c_lp_sm_c_lp_do_nm2_samecov)
 REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome (first eight scaffolds only)
 GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
 BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
@@ -1274,22 +1275,63 @@ grep -v '#' "${CALLING}_polarized_filtered4.lr_ann.vcf" | wc -l
 #c_lp_sm_c_lp_do_nm2_origcov 1184450
 #c_ll_ki_c_ll_no_c_ll_po_nm3_origcov 2089908
 
-#First, for each species exclude those positions that have more than 20% missing genotypes, as well as those that have lower (higher) depth than the minimum (maximum) within 0.95 of the distribution, as calculated in the previous section:
-MIN_DP=$(cat /home/dkleinman/datos/nm_depth_calculus/$CALLING*_mean_sd_depthGlobal_nm_per_calling_mean_folds_0.95.csv | awk '{print $9}') #Obtained in section 5
-MAX_DP=$(cat /home/dkleinman/datos/nm_depth_calculus/$CALLING*_mean_sd_depthGlobal_nm_per_calling_mean_folds_0.95.csv | awk '{print $8}') #Obtained in section 5
-echo $MIN_DP
-echo $MAX_DP
-$BCF filter -e "DP < ${MIN_DP} || DP > ${MAX_DP} || F_MISSING > 0.2" -Ov -o "${CALLING}_polarized_filtered5.lr_ann.vcf" "${CALLING}_polarized_filtered4.lr_ann.vcf"
+#Finally, for each species exclude those positions that have more than 20% missing genotypes.
+$BCF filter -e "F_MISSING > 0.2" -Ov -o "${CALLING}_polarized_filtered5.lr_ann.vcf" "${CALLING}_polarized_filtered4.lr_ann.vcf"
 
 grep -v '#' "${CALLING}_polarized_filtered5.lr_ann.vcf" | wc -l 
-#c_lp_sm_c_lp_do_nm2_samecov 1068346
-#c_ll_ki_c_ll_no_c_ll_po_nm3_samecov 2017309
-#c_lp_sm_c_lp_do_nm2_origcov 1019023
-#c_ll_ki_c_ll_no_c_ll_po_nm3_origcov 2027157
+#c_lp_sm_c_lp_do_nm2_samecov 1089524
+#c_ll_ki_c_ll_no_c_ll_po_nm3_samecov 2038604
+#c_lp_sm_c_lp_do_nm2_origcov 1137223
+#c_ll_ki_c_ll_no_c_ll_po_nm3_origcov 2050321
 
 ```
 
-#9: Depth range calculus. Obtain depth range for each species in order to filter low/high depth positions as part of the next section's many filterings.
+#9: Obtain per dataset VCFs.
+##Split the VCF into per datasets VCFs. Generate a VCF for each dataset in order to apply proper depth filters.
+
+```{r Obtain per dataset VCFs, eval=FALSE, engine='bash'}
+
+cd $V_PATH/annotation/
+CALLING=(c_lp_sm_c_lp_do_nm2_origcov)
+screen -S "perdataset_${CALLING}.lr_ann.log"
+CALLING=(c_lp_sm_c_lp_do_nm2_origcov)
+script "perdataset_${CALLING}.lr_ann.log"
+CALLING=(c_lp_sm_c_lp_do_nm2_origcov)
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAM files path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+SPECIES=$(echo $CALLING | cut -c3-4)
+DATASETS=$(ls *$SPECIES*_samples | cut -d'_' -f1,2,3)
+NM_COV=$(echo "${CALLING}" | rev | cut -d'_' -f1,2 | rev)
+cd $V_PATH/annotation/
+for j in ${DATASETS[@]}
+  do
+  echo "${j}"
+  cat /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered/"${j}"_samples
+  mkdir -p "${j}"_"${NM_COV}"_perdataset
+  java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+  -T SelectVariants \
+  -R $REF \
+  -V "${CALLING}_polarized_filtered5.lr_ann.vcf" \
+  -o "${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_perdataset.lr_ann.vcf \
+  -env \
+  --sample_file /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered/"${j}"_samples
+  grep -v '#' "${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_perdataset.lr_ann.vcf | wc -l #
+  done
+
+```
+
+#10: Depth range calculus. Obtain depth range for each species in order to filter low/high depth positions as part of the next section's many filterings.
 
 ##A: write ANGSD depth calculus and store it as .sh
 
@@ -1348,7 +1390,7 @@ scp /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/depth_calculus/depth_c
 
 #Change calling variable
 
-CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_samecov)
+CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov)
 
 cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
 SPECIES=$(echo $CALLING | cut -c3-4)
@@ -1360,11 +1402,14 @@ for i in ${DATASETS[@]}
     N_SIZE0=$(cat /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered/"${i}_samples" | wc -l)
     N_SIZE=$(printf "%03d" $N_SIZE0)
     cd /home/dkleinman/datos/nm_depth_calculus
-    screen -dmS "${i}_${COVERAGE}_${N_SIZE}.log"
-    screen -S "${i}_${COVERAGE}_${N_SIZE}.log" -p 0 -X stuff "script ${i}_${COVERAGE}_n0${N_SIZE}.log$NL"
-    screen -S "${i}_${COVERAGE}_${N_SIZE}.log" -p 0 -X stuff "./depth_calculus.sh; exec bash$NL"
-    #screen -S "${i}_${COVERAGE}_${N_SIZE}.log" -p 0 -X stuff "exit$NL"
+    screen -dmS "${i}_${COVERAGE}_n${N_SIZE}.log"
+    screen -S "${i}_${COVERAGE}_n${N_SIZE}.log" -p 0 -X stuff "script ${i}_${COVERAGE}_n${N_SIZE}.log$NL"
+    screen -S "${i}_${COVERAGE}_n${N_SIZE}.log" -p 0 -X stuff "./depth_calculus.sh; exec bash$NL"
+    #screen -S "${i}_${COVERAGE}_n${N_SIZE}.log" -p 0 -X stuff "exit$NL"
     done
+
+#From outside the server:
+scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/nm_depth_calculus/*depthGlobal /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/depth_calculus
 
 ```
 
@@ -1374,32 +1419,32 @@ for i in ${DATASETS[@]}
 
 #Now we use R to plot the depth distribution and to obtain a summary table:
 
-library(dplyr)
 library(plyr)
+library(dplyr)
 library(ggplot2)
 library(gridExtra)
 library(knitr)
-    
+
 ##Functions:
 get_mean <- function(dat) { with(dat, sum(as.numeric(freq)*value)/sum(as.numeric(freq))) }
 get_sd <- function(dat) { mu <- get_mean (dat) 
 with (dat, sqrt(sum(as.numeric(freq)*(value-mu)^2)/(sum(as.numeric(freq))-1))) } 
-    
+
 #*******************************************************************************************
-    
-my_files_depthGlobal = list.files(path = "/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/lp_depth",pattern="*.depthGlobal$")
+
+my_files_depthGlobal = list.files(path = "/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/depth_calculus",pattern="5x|GP|MG|LD") #"*.depthGlobal$"
 
 for (i in 1:length(my_files_depthGlobal)) {
-  assign(my_files_depthGlobal[i], (scan(paste0("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/lp_depth/",my_files_depthGlobal[i],sep=""), sep = " ", dec = ".")) %>% .[!is.na(.)])
+  assign(my_files_depthGlobal[i], (scan(paste0("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/depth_calculus/",my_files_depthGlobal[i],sep=""), sep = " ", dec = ".")) %>% .[!is.na(.)])
   }
 mean_folds = 0.95
 depth_per_sample <- data.frame()
 
 #Compute globaldepth for all populations found
 #*******************************************************************************************
-    
+
 for (i in 1:length(my_files_depthGlobal)) {
-  DF = read.table(paste0("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/lp_depth/",my_files_depthGlobal[i],sep=""),head=F, stringsAsFactors=F, check.names=FALSE)
+  DF = read.table(paste0("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/depth_calculus/",my_files_depthGlobal[i],sep=""),head=F, stringsAsFactors=F, check.names=FALSE)
   freq_table_DF <- data.frame (value = 1:length (DF), freq = t(DF))
   freq_table_truncated_DF <- filter(freq_table_DF, value < (nrow(freq_table_DF)))
   #Mean depth:
@@ -1432,14 +1477,14 @@ for (i in 1:length(my_files_depthGlobal)) {
     geom_vline(xintercept=minDepth_truncated_DF,colour ="grey",linetype="dashed", size=0.5) + 
     theme_classic() + 
     theme(text = element_text(size=10))
-  plot_name=paste0("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/lp_depth/",my_files_depthGlobal[i],"_",mean_folds,".pdf",sep="")
+  plot_name=paste0("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/depth_calculus/",my_files_depthGlobal[i],"_",mean_folds,".pdf",sep="")
   ggsave(filename = plot_name)
 }
 
 #When finished write the table
 
 #Results for all callings are stored in one single dataframe:
-write.table(x = depth_per_sample,file = paste("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/lp_depth/mean_sd_depthGlobal_nm_per_calling_mean_folds_",mean_folds,".csv", sep= ""),quote=FALSE, col.names = FALSE, row.names = FALSE, sep= " ")
+write.table(x = depth_per_sample,file = paste("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/depth_calculus/mean_sd_depthGlobal_nm_per_dataset_mean_folds_",mean_folds,".csv", sep= ""),quote=FALSE, col.names = FALSE, row.names = FALSE, sep= " ")
 
 ```
 
@@ -1448,32 +1493,75 @@ write.table(x = depth_per_sample,file = paste("/Users/Dani/ownCloud/backup/g-w_a
 ```{r Depth range calculus, eval=FALSE, engine='bash'}
 
 #First upload the summary table to the server:
-scp /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/lp_depth/mean_sd_depthGlobal_nm_per_calling_mean_folds_0.95.csv dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/nm_depth_calculus
+scp /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/depth_calculus/mean_sd_depthGlobal_nm_per_dataset_mean_folds_0.95.csv dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/nm_depth_calculus
 
 #Separate in populations:
 cd /home/dkleinman/datos/nm_depth_calculus
-POPS=$(cat /home/dkleinman/datos/nm_depth_calculus/mean_sd_depthGlobal_nm_per_calling_mean_folds_0.95.csv | awk '{print $1}')
+POPS=$(cat /home/dkleinman/datos/nm_depth_calculus/mean_sd_depthGlobal_nm_per_dataset_mean_folds_0.95.csv | awk '{print $1}')
 for POP in ${POPS[@]}
   do
   echo $POP
-  grep "${POP}" /home/dkleinman/datos/nm_depth_calculus/mean_sd_depthGlobal_nm_per_calling_mean_folds_0.95.csv > "$POP"_mean_sd_depthGlobal_nm_per_calling_mean_folds_0.95.csv
+  grep "${POP}" /home/dkleinman/datos/nm_depth_calculus/mean_sd_depthGlobal_nm_per_dataset_mean_folds_0.95.csv > "$POP"_mean_sd_depthGlobal_nm_per_dataset_mean_folds_0.95.csv
   done
 
 ```    
 
-#10: Obtain per population VCFs.
+#11: Perform depth filtering. Obtain list of sites with very low or high depth within each dataset, join them, and remove those sites as well as those with high missingness.
+##Obtain list of sites with very low or high depth within each dataset, and join them.
+
+```{r Perform depth filtering, eval=FALSE, engine='bash'}
+
+#For each dataset obtain the list of positions that have lower (higher) depth than the minimum (maximum) within 0.95 of the distribution, as calculated in the previous section, and join them to later remove them:
+
+#Modify the CALLING variable all 3 times.
+cd $V_PATH/annotation
+CALLING=(c_lp_sm_c_lp_do_nm2_samecov)
+screen -S "${CALLING}_depth_filter.lr_ann.log"
+CALLING=(c_lp_sm_c_lp_do_nm2_samecov)
+script "${CALLING}_depth_filter.lr_ann.log"
+
+CALLING=(c_lp_sm_c_lp_do_nm2_samecov)
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome (first eight scaffolds only)
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+SPECIES=$(echo $CALLING | cut -c3-4)
+DATASETS=$(ls *$SPECIES*_samples | cut -d'_' -f1,2,3)
+COVERAGE=$(echo "${CALLING}" | rev | cut -d'_' -f1 | rev)
+NM_COV=$(echo "${CALLING}" | rev | cut -d'_' -f1,2 | rev)
+cd $V_PATH/annotation/
+for j in ${DATASETS[@]}
+  do
+  echo "${j}"
+  MIN_DP=$(cat /home/dkleinman/datos/nm_depth_calculus/${j}_${COVERAGE}*_mean_sd_depthGlobal_nm_per_dataset_mean_folds_0.95.csv | awk '{print $9}') #Obtained in section 10
+  MAX_DP=$(cat /home/dkleinman/datos/nm_depth_calculus/${j}_${COVERAGE}*_mean_sd_depthGlobal_nm_per_dataset_mean_folds_0.95.csv | awk '{print $8}') #Obtained in section 10
+  echo $MIN_DP
+  echo $MAX_DP
+  $BCF filter -i "DP < ${MIN_DP} || DP > ${MAX_DP}" -Ov -o "${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_minmaxdepth_to_remove.lr_ann.vcf "${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_perdataset.lr_ann.vcf
+  sed -e 's/chr//' "${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_minmaxdepth_to_remove.lr_ann.vcf | awk '{OFS="\t"; if (!/^#/){print $1,$2-1,$2}}' > "${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_minmaxdepth_to_remove.bed #convert from VCF to BED
+  done
+cat *"${SPECIES}"*"${NM_COV}"_perdataset/*"${SPECIES}"*"${NM_COV}"_minmaxdepth_to_remove.bed | bedtools sort | uniq > joined_"${SPECIES}"_"${NM_COV}"_minmaxdepth_to_remove.bed #join all BEDs from each species (i.e. from each calling)
+for j in ${DATASETS[@]}
+  do
+  echo "${j}"
+  bedtools subtract -a "${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_perdataset.lr_ann.vcf -b joined_"${SPECIES}"_"${NM_COV}"_minmaxdepth_to_remove.bed -header > "${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_perdataset_filtered.lr_ann.vcf
+  done
+
+```
+
+#12: Obtain per population VCFs.
 ##Split the VCF into per population VCFs. Generate a VCF for each population.
 
 ```{r Obtain per population VCFs, eval=FALSE, engine='bash'}
 
-!!! For each calling, split the VCF into per datasets, apply the max depth and min depth filters to obtain list of per-dataset to-remove sites, join those lists, remove those sites from each dataset VCF, and then split them at the population and individual level.
-
 cd $V_PATH/annotation/
-CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov)
+CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_samecov)
 screen -S "perpop_${CALLING}.lr_ann.log"
-CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov)
+CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_samecov)
 script "perpop_${CALLING}.lr_ann.log"
-CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov)
+CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_samecov)
 
 S_PATH=/opt/snpEff #software path
 C_PATH=/home/dkleinman/datos/snpEff #config file path
@@ -1486,40 +1574,48 @@ REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path
 GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
 BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
 
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+SPECIES=$(echo $CALLING | cut -c3-4)
+DATASETS=$(ls *$SPECIES*_samples | cut -d'_' -f1,2,3)
+COVERAGE=$(echo "${CALLING}" | rev | cut -d'_' -f1 | rev)
 NM_COV=$(echo "${CALLING}" | rev | cut -d'_' -f1,2 | rev)
 cd $V_PATH/annotation/
-declare POP=$(bcftools query -l "${CALLING}_polarized_filtered5.lr_ann.vcf" | cut -c1-7 | sort | uniq)
-for j in ${POP[@]}
+for i in ${DATASETS[@]}
   do
-  echo "${j}"
-  rm "${j}"_pop_list_to_remove.txt
-  $BCF query -l $V_PATH/annotation/"${CALLING}_polarized_filtered5.lr_ann.vcf" | grep "${j}" > "${j}"_pop_list_to_remove.txt
-  cat "${j}"_pop_list_to_remove.txt
-  mkdir "${j}"_"${NM_COV}"_perpop
-  java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
-  -T SelectVariants \
-  -R $REF \
-  -V $V_PATH/annotation/"${CALLING}_polarized_filtered5.lr_ann.vcf" \
-  -o $V_PATH/annotation/"${j}"_"${NM_COV}"_perpop/"${j}"_"${NM_COV}"_perpop.lr_ann.vcf \
-  -env \
-  --sample_file "${j}"_pop_list_to_remove.txt
-  rm "${j}"_pop_list_to_remove.txt
-  grep -v '#' $V_PATH/annotation/"${j}"_"${NM_COV}"_perpop/"${j}"_"${NM_COV}"_perpop.lr_ann.vcf | wc -l #
+  echo "${i}"
+  declare POP=$(bcftools query -l "${i}"_"${NM_COV}"_perdataset/"${i}"_"${NM_COV}"_perdataset_filtered.lr_ann.vcf | cut -c1-7 | sort | uniq)
+  for j in ${POP[@]}
+    do
+    echo "${j}"
+    rm "${i}"_"${NM_COV}"_perdataset/"${i}"_"${j}"_pop_list_to_remove.txt
+    $BCF query -l "${i}"_"${NM_COV}"_perdataset/"${i}"_"${NM_COV}"_perdataset_filtered.lr_ann.vcf | grep "${j}" > "${i}"_"${NM_COV}"_perdataset/"${i}"_"${j}"_pop_list_to_remove.txt
+    cat "${i}"_"${NM_COV}"_perdataset/"${i}"_"${j}"_pop_list_to_remove.txt
+    mkdir -p "${j}"_"${NM_COV}"_perpop
+    java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+    -T SelectVariants \
+    -R $REF \
+    -V "${i}"_"${NM_COV}"_perdataset/"${i}"_"${NM_COV}"_perdataset_filtered.lr_ann.vcf \
+    -o "${j}"_"${NM_COV}"_perpop/"${i}"_"${j}"_"${NM_COV}"_perpop.lr_ann.vcf \
+    -env \
+    --sample_file "${i}"_"${NM_COV}"_perdataset/"${i}"_"${j}"_pop_list_to_remove.txt
+    rm "${i}"_"${NM_COV}"_perdataset/"${i}"_"${j}"_pop_list_to_remove.txt
+    grep -v '#' "${j}"_"${NM_COV}"_perpop/"${i}"_"${j}"_"${NM_COV}"_perpop.lr_ann.vcf | wc -l #
+    done
   done
 
 ```
 
-#11: Split the population VCFs into per individual VCFs. Generate a VCF for each individual.
+#13: Split the population VCFs into per individual VCFs. Generate a VCF for each individual.
 
 ```{r Split the population VCFs into per individual VCFs, eval=FALSE, engine='bash'}
 
 #Generate individual VCFs from the per species VCFs:
 cd $V_PATH/annotation/
-CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov)
+CALLING=(c_lp_sm_c_lp_do_nm2_samecov)
 screen -S "individual_${CALLING}.lr_ann.log"
-CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov)
+CALLING=(c_lp_sm_c_lp_do_nm2_samecov)
 script "individual_${CALLING}.lr_ann.log"
-CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov)
+CALLING=(c_lp_sm_c_lp_do_nm2_samecov)
 
 S_PATH=/opt/snpEff #software path
 C_PATH=/home/dkleinman/datos/snpEff #config file path
@@ -1532,41 +1628,49 @@ REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path
 GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
 BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
 
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+SPECIES=$(echo $CALLING | cut -c3-4)
+DATASETS=$(ls *$SPECIES*_samples | cut -d'_' -f1,2,3)
+COVERAGE=$(echo "${CALLING}" | rev | cut -d'_' -f1 | rev)
 NM_COV=$(echo "${CALLING}" | rev | cut -d'_' -f1,2 | rev)
 cd $V_PATH/annotation/
 declare POP=$(bcftools query -l "${CALLING}_polarized_filtered5.lr_ann.vcf" | cut -c1-7 | sort | uniq)
 for i in ${POP[@]}
   do
   echo "${i}"
-  mkdir "${i}"_"${NM_COV}"_individuals
-  declare INDIVIDUALS=$(bcftools query -l "${i}"_"${NM_COV}"_perpop/"${i}"_"${NM_COV}"_perpop.lr_ann.vcf | cut -c1-12 | uniq)
-  for j in ${INDIVIDUALS[@]}
-    do
-    echo "${j}"
-    ID=$(echo "${j}")
-    java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
-    -T SelectVariants \
-    -R $REF \
-    -V "${i}"_"${NM_COV}"_perpop/"${i}"_"${NM_COV}"_perpop.lr_ann.vcf \
-    -o "${i}"_"${NM_COV}"_individuals/"${j}"_"${NM_COV}"_individual.lr_ann.vcf \
-    -env \
-    -sn $ID
+  mkdir -p "${i}"_"${NM_COV}"_individuals
+  VCF_LIST=$(ls "${i}"_"${NM_COV}"_perpop/*_"${i}"_"${NM_COV}"_perpop.lr_ann.vcf)
+  for j in ${VCF_LIST[@]}
+    do 
+    INDIVIDUALS=$(bcftools query -l "${j}" | sort | uniq)
+    for k in ${INDIVIDUALS[@]}
+      do
+      echo "${k}"
+      ID=$(echo "${k}")
+      java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+      -T SelectVariants \
+      -R $REF \
+      -V "${j}" \
+      -o "${i}"_"${NM_COV}"_individuals/"${k}"_"${NM_COV}"_individual.lr_ann.vcf \
+      -env \
+      -sn $ID
+      done
     done
   done
 
 ```
 
-#12: Get annotation statistics.
+#14: Get annotation statistics.
 ##At the individual level.
 
 ```{r Get annotation statistics, eval=FALSE, engine='bash'}
 
 cd $V_PATH/annotation/
-CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov)
+CALLING=(c_lp_sm_c_lp_do_nm2_samecov)
 screen -S "${CALLING}_ann_individual_summary.lr_ann.log"
-CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov)
+CALLING=(c_lp_sm_c_lp_do_nm2_samecov)
 script "${CALLING}_ann_individual_summary.lr_ann.log"
-CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov)
+CALLING=(c_lp_sm_c_lp_do_nm2_samecov)
 
 S_PATH=/opt/snpEff #software path
 C_PATH=/home/dkleinman/datos/snpEff #config file path
@@ -1619,7 +1723,7 @@ scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dan
 
 ```
 
-#13: Plot variant count results.
+#15: Plot variant count results.
 ##Compare NM filtering results.
 
 ```{r Plot variant count results}
@@ -1765,7 +1869,7 @@ library(dplyr)
 library(ggplot2)
 
 #First draw the NM distribution for each individual:
-sample_files <- list.files("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/", pattern="*_ann_individual_summary.lr_ann.txt")
+sample_files <- grep(list.files("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/", pattern="*_ann_individual_summary.lr_ann.txt"),pattern='wrong',inv=T,value=T)
 snpeff_filters_summary <- data_frame()
 for (file in sample_files) {
   snpeff_individual_summary <- read_tsv(paste0("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/",file))
@@ -1891,6 +1995,65 @@ INTR_ggplot <- ggplot(data=snpeff_filters_summary, aes(dataset,intronic_V,colour
   )
   INTR_ggplot
 ggsave("INTR_cov_filters.pdf", width=20, height=15, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
+
+SYN_ggplot <- ggplot(data=snpeff_filters_summary, aes(dataset,synonymous_V,colour=population)) +
+  facet_grid(species ~ filter, scales="free") +
+  geom_point(position = position_jitter(w=0.2,h=0)) +
+  #ggtitle("Proportion of reads at different NM") +
+  ylab("SYN") +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+        rect=element_rect(size=1),
+        axis.line=element_line(colour="black"),
+        axis.title=element_text(size=16),
+        #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+        #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+        #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+        panel.background=element_blank(),
+        panel.border=element_rect(colour="black"),
+        #panel.grid=element_blank(),
+        #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+        plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+        #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+        legend.background=element_rect(linetype="solid", colour="black", size=.5),
+        #legend.justification=c(0,0),
+        legend.key=element_rect(colour="white"),
+        #legend.key.size=unit(1.3,"cm"),
+        legend.position=c(0.07,0.84),
+        legend.title=element_blank()
+  )
+  SYN_ggplot
+ggsave("SYN_cov_filters.pdf", width=20, height=15, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
+
+NSYN_ggplot <- ggplot(data=snpeff_filters_summary, aes(dataset,missense_V,colour=population)) +
+  facet_grid(species ~ filter, scales="free") +
+  geom_point(position = position_jitter(w=0.2,h=0)) +
+  #ggtitle("Proportion of reads at different NM") +
+  ylab("NSYN") +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+        rect=element_rect(size=1),
+        axis.line=element_line(colour="black"),
+        axis.title=element_text(size=16),
+        #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+        #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+        #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+        panel.background=element_blank(),
+        panel.border=element_rect(colour="black"),
+        #panel.grid=element_blank(),
+        #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+        plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+        #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+        legend.background=element_rect(linetype="solid", colour="black", size=.5),
+        #legend.justification=c(0,0),
+        legend.key=element_rect(colour="white"),
+        #legend.key.size=unit(1.3,"cm"),
+        legend.position=c(0.07,0.84),
+        legend.title=element_blank()
+  )
+  NSYN_ggplot
+ggsave("NSYN_cov_filters.pdf", width=20, height=15, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
+
 
 
 ```
