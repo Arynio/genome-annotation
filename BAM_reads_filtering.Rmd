@@ -1240,13 +1240,13 @@ grep -v '#' "${CALLING}_polarized.lr_ann.vcf" | wc -l
 
 #Modify the CALLING variable all 3 times.
 
-CALLING=(c_lp_sm_c_lp_do_nm2_samecov)
-cd $V_PATH/$CALLING/annotation
+CALLING=(c_ll_ki_c_ll_no_c_ll_po_h_ll_pv_nm3_origcov)
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
 screen -S "${CALLING}_polarized_filtered.lr_ann.log"
-CALLING=(c_lp_sm_c_lp_do_nm2_samecov)
+CALLING=(c_ll_ki_c_ll_no_c_ll_po_h_ll_pv_nm3_origcov)
 script "${CALLING}_polarized_filtered.lr_ann.log"
 
-CALLING=(c_lp_sm_c_lp_do_nm2_samecov)
+CALLING=(c_ll_ki_c_ll_no_c_ll_po_h_ll_pv_nm3_origcov)
 REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome (first eight scaffolds only)
 GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
 BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
@@ -1259,6 +1259,7 @@ grep -v '#' "${CALLING}_polarized_filtered1.lr_ann.vcf" | wc -l
 #c_ll_ki_c_ll_no_c_ll_po_nm3_samecov 5008406
 #c_lp_sm_c_lp_do_nm2_origcov 1791154
 #c_ll_ki_c_ll_no_c_ll_po_nm3_origcov 5030301
+#c_ll_ki_c_ll_no_c_ll_po_h_ll_pv_nm3_origcov 5104185 #It has more than the unfiltered one due to some weird behaviour of bedtools subtract with some INDELs that become duplicated. These will be removed in the subsequent step.
 
 #During this step, all INDELs as well as all multiallelic and bad quality SNPs will be dropped from the respective VCFs.
 java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
@@ -1274,6 +1275,7 @@ grep -v '#' "${CALLING}_polarized_filtered2.lr_ann.vcf" | wc -l
 #c_ll_ki_c_ll_no_c_ll_po_nm3_samecov 4165440
 #c_lp_sm_c_lp_do_nm2_origcov 1374341
 #c_ll_ki_c_ll_no_c_ll_po_nm3_origcov 4168579
+#c_ll_ki_c_ll_no_c_ll_po_h_ll_pv_nm3_origcov 4302320
 
 #Remove polarized ANC fixed variants (AF=0) or those that weren't polarizable (AA different from either REF or ALT):
 $BCF view -e '(INFO/AA!=REF & INFO/AA!=ALT) | INFO/AF=0.00' "${CALLING}_polarized_filtered2.lr_ann.vcf" > "${CALLING}_polarized_filtered3.lr_ann.vcf"
@@ -1283,6 +1285,7 @@ grep -v '#' "${CALLING}_polarized_filtered3.lr_ann.vcf" | wc -l
 #c_ll_ki_c_ll_no_c_ll_po_nm3_samecov 2909211
 #c_lp_sm_c_lp_do_nm2_origcov 1323862
 #c_ll_ki_c_ll_no_c_ll_po_nm3_origcov 2911435
+#c_ll_ki_c_ll_no_c_ll_po_h_ll_pv_nm3_origcov 3070696
 
 #Apply GATK's recommended filters, and then some.     
 java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
@@ -1297,6 +1300,7 @@ grep -v '#' "${CALLING}_polarized_filtered4.lr_ann.vcf" | wc -l
 #c_ll_ki_c_ll_no_c_ll_po_nm3_samecov 2080652
 #c_lp_sm_c_lp_do_nm2_origcov 1184450
 #c_ll_ki_c_ll_no_c_ll_po_nm3_origcov 2089908
+#c_ll_ki_c_ll_no_c_ll_po_h_ll_pv_nm3_origcov 2226163
 
 #Finally, for each species exclude those positions that have more than 20% missing genotypes.
 $BCF filter -e "F_MISSING > 0.2" -Ov -o "${CALLING}_polarized_filtered5.lr_ann.vcf" "${CALLING}_polarized_filtered4.lr_ann.vcf"
@@ -1306,6 +1310,7 @@ grep -v '#' "${CALLING}_polarized_filtered5.lr_ann.vcf" | wc -l
 #c_ll_ki_c_ll_no_c_ll_po_nm3_samecov 2038604
 #c_lp_sm_c_lp_do_nm2_origcov 1137223
 #c_ll_ki_c_ll_no_c_ll_po_nm3_origcov 2050321
+#c_ll_ki_c_ll_no_c_ll_po_h_ll_pv_nm3_origcov 2198266
 
 ```
 
@@ -1314,12 +1319,12 @@ grep -v '#' "${CALLING}_polarized_filtered5.lr_ann.vcf" | wc -l
 
 ```{r Obtain per dataset VCFs, eval=FALSE, engine='bash'}
 
-CALLING=(c_lp_sm_c_lp_do_nm2_origcov)
-cd $V_PATH/$CALLING/annotation
+CALLING=(c_ll_ki_c_ll_no_c_ll_po_h_ll_pv_nm3_origcov)
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
 screen -S "perdataset_${CALLING}.lr_ann.log"
-CALLING=(c_lp_sm_c_lp_do_nm2_origcov)
+CALLING=(c_ll_ki_c_ll_no_c_ll_po_h_ll_pv_nm3_origcov)
 script "perdataset_${CALLING}.lr_ann.log"
-CALLING=(c_lp_sm_c_lp_do_nm2_origcov)
+CALLING=(c_ll_ki_c_ll_no_c_ll_po_h_ll_pv_nm3_origcov)
 
 S_PATH=/opt/snpEff #software path
 C_PATH=/home/dkleinman/datos/snpEff #config file path
@@ -1336,7 +1341,7 @@ cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
 SPECIES=$(echo $CALLING | cut -c3-4)
 DATASETS=$(ls *$SPECIES*_samples | cut -d'_' -f1,2,3)
 NM_COV=$(echo "${CALLING}" | rev | cut -d'_' -f1,2 | rev)
-cd cd $V_PATH/$CALLING/annotation
+cd $V_PATH/$CALLING/annotation
 for j in ${DATASETS[@]}
   do
   echo "${j}"
@@ -1360,8 +1365,9 @@ for j in ${DATASETS[@]}
 
 ```{r Depth range calculus, eval=FALSE, engine='bash'}
 
-#I'll use Maria's code to calculate depth. Since these populations are big, we'll be using Elena's captured intergenic fraction of the genome. Save it as .sh and upload it to the server.
+#I'll modify Maria's code to calculate depth. Since these populations are big, we'll be using Elena's captured intergenic fraction of the genome. Save it as .sh and upload it to the server.
 
+CALLING=$(pwd | rev | cut -d'/' -f1 | rev)
 POP=$(echo ${STY#*.} | cut -d'.' -f1)
 DATASET=$(echo ${STY#*.} | cut -d'_' -f1,2,3)
 COVERAGE=$(echo ${STY#*.} | cut -d'_' -f4)
@@ -1413,8 +1419,9 @@ scp /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/depth_calculus/depth_c
 
 #Change calling variable
 
-CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov)
+CALLING=(c_ll_ki_c_ll_no_c_ll_po_h_ll_pv_nm3_origcov)
 
+mkdir -p /home/dkleinman/datos/nm_depth_calculus/$CALLING
 cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
 SPECIES=$(echo $CALLING | cut -c3-4)
 DATASETS=$(ls *$SPECIES*_samples | cut -d'_' -f1,2,3)
@@ -1427,7 +1434,7 @@ for i in ${DATASETS[@]}
     cd /home/dkleinman/datos/nm_depth_calculus/$CALLING
     screen -dmS "${i}_${COVERAGE}_n${N_SIZE}.log"
     screen -S "${i}_${COVERAGE}_n${N_SIZE}.log" -p 0 -X stuff "script ${i}_${COVERAGE}_n${N_SIZE}.log$NL"
-    screen -S "${i}_${COVERAGE}_n${N_SIZE}.log" -p 0 -X stuff "./depth_calculus.sh; exec bash$NL"
+    screen -S "${i}_${COVERAGE}_n${N_SIZE}.log" -p 0 -X stuff "./../depth_calculus.sh; exec bash$NL"
     #screen -S "${i}_${COVERAGE}_n${N_SIZE}.log" -p 0 -X stuff "exit$NL"
     done
 
