@@ -1,5 +1,5 @@
 ---
-title: "BAM_reads_filtering"
+title: "genetic_load_variants_final_pipeline"
 author: "Dani"
 date: "14 de enero de 2019"
 output: html_document
