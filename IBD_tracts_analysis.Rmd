@@ -9,7 +9,7 @@ output: html_document
 
 ```{r Define paths, eval=FALSE, engine='bash'}
 
-I_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis #IBD analysis folder path
+I_PATH=/GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis #IBD analysis folder path
 NGSF=/opt/ngsF-HMM/ngsF-HMM #ngsF-HMM path
 REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
 GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
@@ -27,20 +27,28 @@ BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
 
 cd $I_PATH/beagle_gl
 POPS="c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm"  # <--CHANGE POPS HERE
-for POP in ${POPS[@]}
-do
-echo $POP
-rm "$POP".bamlist
-echo $POP
-IFS='-' read -r -a POPS1 <<< "$POP" # this creates an array stripping by "-"
-for POP1 in "${POPS1[@]}"
-do
-echo "$POP --> $POP1"
-ls /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/*${POP1}*.bam  >> "$POP".bamlist
+for row in ${POPS[@]}
+  do
+  echo "${row}"
+  rm "${row}".bamlist
+  declare POP=$(echo $POPS | fold -w8 | cut -c1-7 | sort | uniq)
+  for p in ${POP[@]}
+    do
+    echo "${p}"
+    declare IDS=$(ls /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered/"${p}"*.bam | rev | cut -d'/' -f1 | rev | cut -c1-12 | sort | uniq)
+    for i in ${IDS[@]}
+      do
+      echo ${i}
+      if [ -e /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered/${i}_recal_round-1_25x.nm*.bam ]
+        then echo /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered/${i}_recal_round-1_25x.nm*.bam >> "${row}".bamlist
+        else echo /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered/${i}_recal_round-1.nm*.bam >> "${row}".bamlist
+        fi
+      done
+    done
+NUMBER_IND=$(printf "%03d" `wc -l "${row}".bamlist | cut -f1 -d " "`);
+mv "${row}".bamlist "${row}"_n"$NUMBER_IND".bamlist
 done
-NUMBER_IND=$(printf "%03d" `wc -l "$POP".bamlist | cut -f1 -d " "`);
-mv "$POP".bamlist "$POP"_n"$NUMBER_IND".bamlist
-done
+
 ```
 
 ###Obtain per population depth statistics:
@@ -52,7 +60,7 @@ done
 screen -S depth_calculus_DANI
 script depth_calculus_DANI.log
 
-I_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis #IBD analysis folder path
+I_PATH=/GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis #IBD analysis folder path
 REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
 
 cd $I_PATH/beagle_gl
@@ -91,7 +99,7 @@ echo $MAXDEPTH
 -maxDepth $MAXDEPTH  
 
 #Once done, download the depth files from the server in order to process them in R:
-scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/beagle_gl/*.depth* /Users/Dani/ownCloud/backup/annotation/IBD_analysis/beagle_gl
+scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/beagle_gl/*.depth* /Users/Dani/ownCloud/backup/g-w_analysis/IBD_analysis/beagle_gl
 
 ```
 
@@ -111,15 +119,15 @@ get_sd <- function(dat) { mu <- get_mean (dat)
 with (dat, sqrt(sum(as.numeric(freq)*(value-mu)^2)/(sum(as.numeric(freq))-1))) } 
 
 #Prepare files:
-my_files_depthGlobal = list.files(path = "/Users/Dani/ownCloud/backup/annotation/IBD_analysis/beagle_gl",pattern="*.depthGlobal$") 
-for (i in 1:length(my_files_depthGlobal)) { assign(my_files_depthGlobal[i], (scan(paste0("/Users/Dani/ownCloud/backup/annotation/IBD_analysis/beagle_gl/",my_files_depthGlobal[i],sep=""), sep = " ", dec = ".")) %>% .[!is.na(.)])}
+my_files_depthGlobal = list.files(path = "/Users/Dani/ownCloud/backup/g-w_analysis/IBD_analysis/beagle_gl",pattern="*.depthGlobal$") 
+for (i in 1:length(my_files_depthGlobal)) { assign(my_files_depthGlobal[i], (scan(paste0("/Users/Dani/ownCloud/backup/g-w_analysis/IBD_analysis/beagle_gl/",my_files_depthGlobal[i],sep=""), sep = " ", dec = ".")) %>% .[!is.na(.)])}
 mean_folds = 0.95
 depth_per_sample <- data.frame()
 
 #Compute globaldepth for all populations in the input:
 for (i in 1:length(my_files_depthGlobal)) 
 {
-DF = read.table(paste0("/Users/Dani/ownCloud/backup/annotation/IBD_analysis/beagle_gl/",my_files_depthGlobal[i],sep=""),head=F, stringsAsFactors=F, check.names=FALSE)
+DF = read.table(paste0("/Users/Dani/ownCloud/backup/g-w_analysis/IBD_analysis/beagle_gl/",my_files_depthGlobal[i],sep=""),head=F, stringsAsFactors=F, check.names=FALSE)
 freq_table_DF <- data.frame (value = 1:length (DF), freq = t(DF))
 freq_table_truncated_DF <- filter(freq_table_DF, value < (nrow(freq_table_DF)))
 
@@ -160,12 +168,12 @@ ggplot(freq_table_truncated_DF, aes(x = value, y = freq)) +
              linetype="dashed", size=0.5)+ 
   theme_classic()+ 
   theme(text = element_text(size=10))
-plot_name=paste0("/Users/Dani/ownCloud/backup/annotation/IBD_analysis/beagle_gl/",my_files_depthGlobal[i],"_",mean_folds,".pdf",sep="")
+plot_name=paste0("/Users/Dani/ownCloud/backup/g-w_analysis/IBD_analysis/beagle_gl/",my_files_depthGlobal[i],"_",mean_folds,".pdf",sep="")
 ggsave(filename = plot_name)
 }
 
 #Write complete csv table:
-write.table(x = depth_per_sample,file = paste("/Users/Dani/ownCloud/backup/annotation/IBD_analysis/beagle_gl/mean_sd_depthGlobal_lynx_per_pop_mean_folds_",mean_folds,".csv", sep= ""),quote=FALSE, col.names = FALSE, row.names = FALSE, sep= " ")
+write.table(x = depth_per_sample,file = paste("/Users/Dani/ownCloud/backup/g-w_analysis/IBD_analysis/beagle_gl/mean_sd_depthGlobal_lynx_per_pop_mean_folds_",mean_folds,".csv", sep= ""),quote=FALSE, col.names = FALSE, row.names = FALSE, sep= " ")
 
 ```
 
@@ -176,7 +184,7 @@ write.table(x = depth_per_sample,file = paste("/Users/Dani/ownCloud/backup/annot
 #Third, run ANGSD to obtain the genotype likelihood files.
 
 #To that end, first the previously obtained depth table must be uploaded to the server (from the local computer).
-scp /Users/Dani/ownCloud/backup/annotation/IBD_analysis/beagle_gl/mean_sd_depthGlobal_lynx_per_pop_mean_folds_0.95.csv dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/beagle_gl/
+scp /Users/Dani/ownCloud/backup/g-w_analysis/IBD_analysis/beagle_gl/mean_sd_depthGlobal_lynx_per_pop_mean_folds_0.95.csv dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/beagle_gl/
 
 #Prepare files and filters to run ANGSD:
 
@@ -269,7 +277,6 @@ paste $I_PATH/ngsF-HMM/scaffolds_list.borrar $I_PATH/ngsF-HMM/positions_list.bor
 ```
 
 #2: Run ngsF-HMM.
-##Run test:
 
 ```{r Run ngsF-HMM, eval=FALSE, engine='bash'}
 
@@ -283,55 +290,84 @@ $NGSF --geno $I_PATH/beagle_gl/c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060.geno
 
 ```
 
-# IBD file to bed
+#3: Modify ngsF-HMM output.
+Author: Enrico, Dani, Maria
 
-We will try to use a script from the webpage (https://github.com/fgvieira/ngsF-HMM/blob/master/scripts/convert_ibd.pl)
+Vamos a modificar el archivo de Enrico que genero para plotear los valores de admixutee. 
 
-Copio y pego el script en el servidor.
-Si lo corro en B me da un problema por perl, pero en A corre perfectamente
+Nosotros tenemos un archivo donde están todas las posiciones de cada scaffold, se llama genome_coordinates.list. A este archivo le vamos a pegar una modificación del archivo ibd que en vez de ser una fila por cada individio sea una columna. Así por cada individuo vamos a pegar la columna con sus valores 0 y 1 y la columna con información de scaffold y de base. Vamos a tener tantos archivos como individuos. 
 
-Los archivos que necesita son:
-
-       --ind_file        File with individual information (IND_ID on first column)
-       --pos_file        TSV file with position information (CHR,POS)
-       --ibd_pos_file    File with regions as IBD state per position (one indiv per line, one 0/1 per site)
-       --ibd_bed_file    BED file with the coordinates of the IBD regions (CHR,START,END,IND_ID).
-                        If IND_ID is blank or '*', interval is assumed on all individuals
+Creamos el archivo con la informaicón de los individuos.
+##Count number of large IBD tracts.
 
 ```{bash}
-cd /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/
-
-# ind_file        File with individual information (IND_ID on first column)
-# Creo este archivo usando la bamlist.
-
-cd /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/beagle_gl
-
-cat c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060.bamlist | sed 's/\/home\/GRUPOS\/grupolince\/lynx_genomes_5x\/BAM_files_final\///g' | sed 's/_recal_round-1.bam//g' > ../c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060.ind
-
-sed '$!{:a;N;s/\n/\t/;ta}' c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060.ind > c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060_modif.ind
-
-
-# pos_file        TSV file with position information (CHR,POS)
-# Es el archivo con la información de cromosoma y longitud, la tenemos en la carpeta del genoma.
-/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/Length_scaffolds_lp23_tab_separated 
-
-# ibd_pos_file
-# El archivo que nos genera el programa de IBD.
-/GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/ngsF-HMM/c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060_ngsF-HMM.ibd
-
-tail -n+2 /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/ngsF-HMM/c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060_ngsF-HMM.ibd | head -n60 > /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/ngsF-HMM/c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060_ngsF-HMM_modif.ibd
-
-# El archivo que usamos
-
-/GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/ngsF-HMM/c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060_ngsF-HMM_modif.ibd
+# Archivo información scaffold-base: genome_coordinates.list
+# El archivo con la informacion ibd por cada individuos en una fila: c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060_ngsF-HMM_modif.ibd (es modif pq no tiene la primera fila que no nos interesa)
+# Primero para este analisis nos vamos a quedar solo con los scaffold mayores de 1.6 MB (que es el n50, así que hacemos una lista con ellos)
+awk '$2 > 1600000 {print $1}' /home/mlucena/grupolince/reference_genomes/lynx_pardinus_genome/Length_scaffolds_lp23 > scaffold_bigger_than_1.6.borrar
+cat <(awk -v OFS='\t' '$2 > 1600000 {print $1,".*",$2}' /home/mlucena/grupolince/reference_genomes/lynx_pardinus_genome/Length_scaffolds_lp23) <(awk  -v OFS='\t' '$2 > 1600000 {print $1, 0}' /home/mlucena/grupolince/reference_genomes/lynx_pardinus_genome/Length_scaffolds_lp23 ) | sort -k1,1 -k2,2n > scaffold_bigger_than_1.6_filtered.borrar
+COUNTER=1
+rm c_ll_ki-h_ll_pv_n014.ibdtract.bed
+echo -e "scaffold\tstart_position\tend_position\tlenght\tind" > c_ll_ki-h_ll_pv_n014.ibdtract.bed
+while read IBD_TRACK 
+do
+# Selecciono el nombre del individuo en cuestión del archivo con los nombres de individuos, usando el número de la iteración
+IND_NAME=($(sed -n "${COUNTER}p"  c_ll_ki-h_ll_pv_n014.ind))
+echo $IND_NAME
+# Guardamos la fila con información ibd del individuo que toque en un archivo temporal
+echo $IBD_TRACK > ibd_per_ind.borrar
+# Convertimos la fila con información ibd en una columna
+fold -w1 ibd_per_ind.borrar > ibd_tracks_temp.borrar
+# Genero un archivo en el que reporto las regiones en las que hay 1 de forma consecutiva (i.e. que son ibd). Estas regiones tienen una longitud igual a la separación entre dos snps con identidad 0 (la identidad 0 significa que no son ibd, todo lo demás sería 1 por defecto). 
+# Primero uno los dos archivos temporales con la información de los sitios variables tomados en consideración y la información del estado de estos sitios (ibd yes/no)
+paste <(cat variable_coordinates.list ) <(cat ibd_tracks_temp.borrar) | \
+# Aquí convierto este archivo en un bed y selecciono solo los valores que no son ibd.
+awk -v OFS='\t' '{print $1, $2-1, $2, $3}' | grep '0$' | \
+# Aquí sustraigo de los valores wg aquellas posiciones que son ibd=0 (no ibd)
+bedtools subtract -a /home/mlucena/grupolince/reference_genomes/lynx_pardinus_genome/bed_file_all_the_genome.bed -b stdin | \
+# Ahora calculo la longitud de estos tracts que son 1. 
+awk -v OFS='\t' -v ind_name="$IND_NAME" '{print $1,$2,$3, $3-$2, ind_name}' | \
+# Nos quitamos todos los scaffolds que tengan menos de 1.6Mb
+grep -f scaffold_bigger_than_1.6.borrar - | \
+grep -v -f scaffold_bigger_than_1.6_filtered.borrar - >> c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060.ibdtract.bed
+COUNTER=$[$COUNTER+1]
+done < <(cat c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060_ngsF-HMM_modif.ibd)
+# Sanity check
+# Hemos contado numero de scaffold antes y despues de filtros para un individuo y hemos visto que los filtros se aplican correctamente. 
 ```
 
-## Lo lanzo
-parece que da problemas con ind_file así que pruebo sin el
-```{bash}
+##Plot results.
 
-screen -S ibd_to_bed
-
-./convert_ibd.pl --pos_file /GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/Length_scaffolds_lp23_tab_separated  --ibd_pos_file /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/ngsF-HMM/c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060_ngsF-HMM_modif.ibd
+```{r}
+library("readr")
+library("ggplot2")
+library("dplyr")
+library("ggrepel")
+ibd_tract <- read_tsv ("/Users/marialucenaperez/Documents/IBD_tract/c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060.ibdtract.bed", col_names = T) %>%  
+  mutate (lenght_category = ifelse (lenght>10000 & lenght<100000,"10-100kb",
+                            ifelse (lenght>100000 & lenght<1000000,"100-1000kb",
+                            ifelse (lenght>1000000, ">1000kb", NA)))) %>% 
+  rename (lenght_ibd=lenght)
+ibd_tract$lenght_category <- factor(ibd_tract$lenght_category, levels=c("10-100kb", "100-1000kb", ">1000kb"))
+ibd_tract2 <- ibd_tract %>% filter (!is.na(ibd_tract$lenght_category)) %>% 
+  mutate (pop = substring(ind,1,7)) %>% 
+  mutate (sps = substring(ind,1,4))
+  
+# ibd_tract3 <- ibd_tract2 %>% filter (., ind=="c_ll_ki_0090" | ind=="c_lp_sm_0450") 
+ibd_tract_cumsumlenght <- ibd_tract2 %>% dplyr::group_by(ind,lenght_category, pop,sps) %>% 
+                                         dplyr::summarise(
+                                                sum_lenght = sum(lenght_ibd),
+                                                n = n())
+                     
+ ggplot (ibd_tract_cumsumlenght %>% filter (lenght_category==">1000kb"), aes(x=ind, y=sum_lenght, colour=pop, fill=pop)) +
+  geom_col() +
+  facet_grid(~sps, scales="free_x") +
+   theme (axis.text.x = element_text(angle = 90, vjust=0)) +
+   ggsave ()
+ ggplot (ibd_tract_cumsumlenght %>% filter (lenght_category==">1000kb"), aes(x=sum_lenght, y=n)) +
+   geom_point(aes(colour=pop, fill=pop))+
+   geom_text_repel(aes(label=ind, colour=pop)) +
+   stat_smooth(method="lm", se=FALSE) +
+   ggsave ()
+ 
 ```
-
