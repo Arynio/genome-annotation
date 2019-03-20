@@ -1367,7 +1367,7 @@ scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/nm_depth_calculus/$CA
 
 ```
 
-##C: compile statistics
+##C: compile statistics and draw graphs
 
 ```{r Depth range calculus}
 
@@ -1828,7 +1828,7 @@ library(dplyr)
 library(ggplot2)
 
 #First draw the NM distribution for each individual:
-sample_files <- grep(list.files("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/", pattern="*_ann_individual_summary.lr_ann.txt"),pattern='wrong',inv=T,value=T)
+sample_files <- grep(list.files("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/", pattern="*_ann_individual_summary.lr_ann.txt"),pattern='wrong|nm2nm3',inv=T,value=T)
 snpeff_filters_summary <- data_frame()
 for (file in sample_files) {
   snpeff_individual_summary <- read_tsv(paste0("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/",file))
@@ -1836,7 +1836,7 @@ for (file in sample_files) {
   snpeff_filters_summary <- rbind(snpeff_filters_summary,snpeff_individual_summary)
 }
 snpeff_filters_summary$dataset <- as.factor(snpeff_filters_summary$dataset)
-snpeff_filters_summary$dataset = factor(snpeff_filters_summary$dataset,levels(snpeff_filters_summary$dataset)[c(4,2,1,3)]) #Reorder factor levels to: REF, GP, 5x, MG
+snpeff_filters_summary$dataset = factor(snpeff_filters_summary$dataset,levels=c("REF","GP","5x","MG")) #Reorder factor levels to: REF, GP, 5x, MG
 print.data.frame(snpeff_filters_summary)
 
 syn_int_ggplot <- ggplot(data=snpeff_filters_summary, aes(dataset,`synonymous/intronic_V`,colour=population)) +
@@ -2216,10 +2216,13 @@ ggsave("NSYN_cov_filters.pdf", width=20, height=15, units="cm", device="pdf", pa
 
 ```{r Measure genetic load, eval=FALSE, engine='bash'}
 
+mkdir -p derived_allele_freq_ratio
 cd /GRUPOS/grupolince/lynx_genomes_5x/genetic_load_analysis/derived_allele_freq_ratio/
 rm features_derived_allele_freq_ratio.txt
-echo 'synonymous_variant' >> features_derived_allele_freq_ratio.txt
-echo 'missense_variant' >> features_derived_allele_freq_ratio.txt
+echo -e "synonymous_variant\tSYN" >> features_derived_allele_freq_ratio.txt
+echo -e "missense_variant\tNSYN" >> features_derived_allele_freq_ratio.txt
+echo -e "|HIGH|\tLOF" >> features_derived_allele_freq_ratio.txt
+cat features_derived_allele_freq_ratio.txt
 
 ```
 
@@ -2227,12 +2230,12 @@ echo 'missense_variant' >> features_derived_allele_freq_ratio.txt
 
 ```{r Measure genetic load, eval=FALSE, engine='bash'}
 
-CALLING=(c_lp_sm_c_lp_do_nm2_origcov)
+CALLING=(c_lp_sm_c_lp_do_nm2_samecov)
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
 screen -S "${CALLING}"
-CALLING=(c_lp_sm_c_lp_do_nm2_origcov)
+CALLING=(c_lp_sm_c_lp_do_nm2_samecov)
 script "${CALLING}_derived_freq_ratio.lr_ann.log"
-CALLING=(c_lp_sm_c_lp_do_nm2_origcov)
+CALLING=(c_lp_sm_c_lp_do_nm2_samecov)
 
 S_PATH=/opt/snpEff #software path
 C_PATH=/home/dkleinman/datos/snpEff #config file path
@@ -2251,43 +2254,74 @@ SPECIES=$(echo $CALLING | fold -w8 | cut -c1-4 | head -n$N_POPS | sort | uniq)
 DATASETS=$(for i in ${SPECIES[@]}; do ls ${i}*_samples | cut -d'_' -f1,2,3; done)
 COVERAGE=$(echo "${CALLING}" | rev | cut -d'_' -f1 | rev)
 NM_COV=$(echo "${CALLING}" | rev | cut -d'_' -f1,2 | rev)
-FEATURES=$(cat /GRUPOS/grupolince/lynx_genomes_5x/genetic_load_analysis/derived_allele_freq_ratio/features_derived_allele_freq_ratio.txt)
+GREP=$(cat /GRUPOS/grupolince/lynx_genomes_5x/genetic_load_analysis/derived_allele_freq_ratio/features_derived_allele_freq_ratio.txt | cut -f1)
 cd $V_PATH/$CALLING/annotation
 POP_VCFS=($(ls `find . -name *'_perpop.lr_ann.vcf' -print`))
-mkdir -p derived_allele_freq_ratio
-rm derived_allele_freq_ratio/"${CALLING}_derived_freq_ratio.txt"
-echo -e "population_1\tpopulation_2\tfeature\tratio" > derived_allele_freq_ratio/"${CALLING}_derived_freq_ratio.txt"
 echo "retrieving variants from each feature from each population"
-for f in ${FEATURES[@]}
+for g in ${GREP[@]}
   do
-  echo "feature: ${f}"
+  echo "feature: ${g}"
+  FEATURE=$(grep "${g}" /GRUPOS/grupolince/lynx_genomes_5x/genetic_load_analysis/derived_allele_freq_ratio/features_derived_allele_freq_ratio.txt | cut -f2)
+  echo $FEATURE
   for p in ${POP_VCFS[@]}
     do
     echo "working with vcf ${p}"
-    grep "${f}" "${p}" | awk -F"\t|;|=" '{printf ("%s_%s_%s\t%s\n", $1,$2-1,$2,$13)}' > ${p/perpop.lr_ann.vcf/perpop_"${f}".lr_ann.bed}
+    grep "${g}" "${p}" | awk -F"\t|;|=" '{printf ("%s_%s_%s\t%s\n", $1,$2-1,$2,$13)}' > ${p/perpop.lr_ann.vcf/perpop_"${FEATURE}".lr_ann.bed}
     #"${POP}"_"${NM_COV}"_perpop_"${f}".lr_ann.bed
     done
   done
+#Prepare file that will contain population and SYN ratio data:
+mkdir -p derived_allele_freq_ratio
+rm derived_allele_freq_ratio/"${CALLING}_SYN_derived_freq_ratio.txt"
+echo -e "population_1\tpopulation_2\tSYN_ratio" > derived_allele_freq_ratio/"${CALLING}_SYN_derived_freq_ratio.txt"
+DEL_FEATURES=$(cat /GRUPOS/grupolince/lynx_genomes_5x/genetic_load_analysis/derived_allele_freq_ratio/features_derived_allele_freq_ratio.txt | grep -v 'synonymous_variant' | cut -f2)
+#Prepare files that will contain DEL categories ratio data:
+for f in ${DEL_FEATURES[@]}
+  do
+  rm derived_allele_freq_ratio/"${CALLING}_${f}_derived_freq_ratio.txt"
+  echo -e "${f}_ratio\t${f}_norm_ratio" > derived_allele_freq_ratio/"${CALLING}_${f}_derived_freq_ratio.txt"
+  done
 POPS=($(ls `find . -name *'_perpop.lr_ann.vcf' -print` | cut -d'/' -f3 | cut -d'_' -f1,2,3,4,5,6))
 echo "calculating ratio for each pair of populations"
-for f in ${FEATURES[@]}
+for p1 in ${POPS[@]}
   do
-  echo "feature: ${f}"
-  for p1 in ${POPS[@]}
+  for p2 in ${POPS[@]}
     do
-    for p2 in ${POPS[@]}
+    echo "${p1} vs ${p2}"
+    LANG=en_EN join -a1 -a2 -e 0.00 -o auto -j 1 <(LANG=en_EN sort -k1 ./*/"${p1}"_"${NM_COV}"_perpop_SYN.lr_ann.bed) <(LANG=en_EN sort -k1 ./*/"${p2}"_"${NM_COV}"_perpop_SYN.lr_ann.bed) | awk -F"\t|_" '{print $1,$2,$3,$4,$5}' OFS="\t" | LANG=en_EN sort -k1,1 -k2,2n | awk '{printf "%s\t%s\t%s\t%.3f\t%.3f\t%.3f\t%.3f\n", $1,$2,$3,$4,$5,$4*(1-$5),$5*(1-$4)}' > derived_allele_freq_ratio/"${p1}"_vs_"${p2}"_"${NM_COV}"_perpop_SYN.lr_ann.bed
+    SUM_P1=$(cut -f6 derived_allele_freq_ratio/"${p1}"_vs_"${p2}"_"${NM_COV}"_perpop_SYN.lr_ann.bed | paste -sd+ | bc)
+    SUM_P2=$(cut -f7 derived_allele_freq_ratio/"${p1}"_vs_"${p2}"_"${NM_COV}"_perpop_SYN.lr_ann.bed | paste -sd+ | bc)
+    RATIO=$(echo "scale=3; $SUM_P1/$SUM_P2" | bc)
+    echo -e "$p1\t$p2\t$RATIO" >> derived_allele_freq_ratio/"${CALLING}_SYN_derived_freq_ratio.txt"
+    for f in ${DEL_FEATURES[@]}
       do
-      echo "${p1} vs ${p2}"
+      echo "feature: ${f}"
       LANG=en_EN join -a1 -a2 -e 0.00 -o auto -j 1 <(LANG=en_EN sort -k1 ./*/"${p1}"_"${NM_COV}"_perpop_"${f}".lr_ann.bed) <(LANG=en_EN sort -k1 ./*/"${p2}"_"${NM_COV}"_perpop_"${f}".lr_ann.bed) | awk -F"\t|_" '{print $1,$2,$3,$4,$5}' OFS="\t" | LANG=en_EN sort -k1,1 -k2,2n | awk '{printf "%s\t%s\t%s\t%.3f\t%.3f\t%.3f\t%.3f\n", $1,$2,$3,$4,$5,$4*(1-$5),$5*(1-$4)}' > derived_allele_freq_ratio/"${p1}"_vs_"${p2}"_"${NM_COV}"_perpop_"${f}".lr_ann.bed
       SUM_P1=$(cut -f6 derived_allele_freq_ratio/"${p1}"_vs_"${p2}"_"${NM_COV}"_perpop_"${f}".lr_ann.bed | paste -sd+ | bc)
       SUM_P2=$(cut -f7 derived_allele_freq_ratio/"${p1}"_vs_"${p2}"_"${NM_COV}"_perpop_"${f}".lr_ann.bed | paste -sd+ | bc)
       RATIO=$(echo "scale=3; $SUM_P1/$SUM_P2" | bc)
-      echo -e "$p1\t$p2\t$f\t$RATIO" >> derived_allele_freq_ratio/"${CALLING}_derived_freq_ratio.txt"
+      echo -e "$RATIO" >> derived_allele_freq_ratio/"${CALLING}_${f}_derived_freq_ratio.txt"
       done
     done
   done
+cd $V_PATH/$CALLING/annotation/derived_allele_freq_ratio
+#Make an ALL features file storing the population and SYN data
+cat "${CALLING}"_SYN_derived_freq_ratio.txt > "${CALLING}"_ALL_derived_freq_ratio.txt
+for f in ${DEL_FEATURES[@]}
+  do
+  #First build a file with the feature's ratio and normalised ratio (i.e. divided by the SYN ratio):
+  head "${CALLING}_${f}_derived_freq_ratio.txt" -n1 > "${CALLING}"_temp_derived_freq_ratio.borrar
+  paste "${CALLING}"_SYN_derived_freq_ratio.txt "${CALLING}_${f}_derived_freq_ratio.txt" | awk 'FNR == 1 {next}{print $4,$4/$3}' OFS="\t" >> "${CALLING}"_temp_derived_freq_ratio.borrar
+  #Now join the ALL and the current DEL feature data
+  paste <(head "${CALLING}"_ALL_derived_freq_ratio.txt -n1) <(head "${CALLING}"_temp_derived_freq_ratio.borrar -n1) > "${CALLING}"_joint_derived_freq_ratio.borrar
+  paste "${CALLING}"_ALL_derived_freq_ratio.txt "${CALLING}"_temp_derived_freq_ratio.borrar | awk 'FNR == 1 {next}{print $0}' OFS="\t" >> "${CALLING}"_joint_derived_freq_ratio.borrar
+  #Replace the ALL table with the updated one
+  mv "${CALLING}"_joint_derived_freq_ratio.borrar "${CALLING}"_ALL_derived_freq_ratio.txt
+  rm "${CALLING}"_temp_derived_freq_ratio.borrar
+  done
 
 #From outside the server:
+scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/*/annotation/derived_allele_freq_ratio/*ALL_derived_freq_ratio.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_ratio/
 
 
 ```
