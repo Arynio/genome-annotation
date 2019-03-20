@@ -1,0 +1,99 @@
+---
+title: "GATK_parallel_tests"
+author: "Dani"
+date: "20 de marzo de 2019"
+output: html_document
+---
+
+#0. This is a test script where I'll execute GATK for only 5 samples and for a small portion of the genome (first 4 scaffolds) in a single calling or parallelising by scaffold.
+
+#1. Subset first 4 scaffolds from 5 random c_lp BAMs.
+```{r, eval=FALSE, engine='bash'}
+
+mkdir -p /home/dkleinman/GATK_tests
+cd /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome
+head -n4 bed_file_all_the_genome.bed > /home/dkleinman/GATK_tests/scaffolds_lp23.s00001_to_s00004.bed
+
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+declare SAMPLES=$(ls c_lp*recal_round-1.nm2.bam | cut -c1-12 | shuf | head -n5)
+for i in ${SAMPLES[@]}
+  do
+  echo "${i}"
+  samtools view -b -h -L /home/dkleinman/GATK_tests/scaffolds_lp23.s00001_to_s00004.bed "${i}"_recal_round-1.nm2.bam > /home/dkleinman/GATK_tests/"${i}"_recal_round-1.s00001_to_s00004.nm2.bam
+  samtools index "${i}"_recal_round-1.s00001_to_s00004.nm2.bam
+  done
+
+```
+
+#2. GATK calling script.
+```{r, eval=FALSE, engine='bash'}
+
+cd /home/dkleinman/GATK_tests/
+
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1) #name of the calling
+SCAFFOLD=$(echo ${STY#*.} | rev | cut -d'-' -f1 | rev) #scaffolds to work with
+N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING)
+#echo $N_POPS
+POPS=$(echo $CALLING | fold -w8 | cut -c1-7 | head -n$N_POPS | sort | uniq)
+#echo $POPS
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+SAMPLES=$(for p in ${POPS[@]}; do ls ${p}*recal_round-1.*.bam | cut -c1-12 | sort | uniq; done)
+
+echo "calling:" $CALLING "will be performed for scaffold(s):" $SCAFFOLD "and for sample(s):"
+echo "${SAMPLES}"
+
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
+-T HaplotypeCaller \
+-R $REF \
+-L scaffold_lp23.${SCAFFOLD}.bed \
+$(for var in $SAMPLES; do if [ -e ${var}_recal_round-1_25x.*.bam ]; then echo -I ${var}_recal_round-1_25x.*.bam" "; else echo -I ${var}_recal_round-1.*.bam" "; fi; done) \
+-o ${CALLING}-${SCAFFOLD}.vcf
+
+exit
+screen -X quit
+
+```
+
+#3. Upload GATK calling script to the server.
+```{r, eval=FALSE, engine='bash'}
+
+#Save it in a text editor as GATK_calling.sh and upload it to the server:
+scp /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/GATK_calling.sh dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/GATK_tests
+
+```
+
+#4. Run GATK for the desired calling in parallel or at once.
+```{r, eval=FALSE, engine='bash'}
+
+PARALLEL=(no) #input 'yes' or 'no' without quotes
+CALLING=(c_lp_sm_c_lp_do_nm2_origcov) #input name of the calling
+
+cd /home/dkleinman/GATK_tests
+unset REGIONS
+if [ $PARALLEL == "no" ]
+  then
+  REGIONS=$(echo "/home/dkleinman/GATK_tests/scaffold_lp23.s00001_to_s00004.bed")
+elif [ $PARALLEL == "yes" ]
+  then
+  readarray COORDINATES < scaffold_lp23.s00001_to_s00004.bed
+  for row in "${COORDINATES[@]}"
+    do
+    SCAFFOLD=$(echo ${row} | cut -d' ' -f1)
+    echo ${row} > "scaffold_"${SCAFFOLD}".bed"
+    done
+  REGIONS=$(realpath scaffold_lp23.*.bed | grep -v "_to_")
+fi
+echo $REGIONS
+NL=$'\n'
+for r in ${REGIONS[@]}
+  do
+  echo ${r}
+  SCAFFOLD=$(echo ${r} | cut -d'.' -f2)
+  echo $SCAFFOLD
+  screen -dmS "${CALLING}-${SCAFFOLD}"
+  screen -S "${CALLING}-${SCAFFOLD}" -p 0 -X stuff "script ${CALLING}-${SCAFFOLD}.log$NL"
+  screen -S "${CALLING}-${SCAFFOLD}" -p 0 -X stuff "time ./GATK_calling.sh; exec bash$NL"
+  done
+
+```
