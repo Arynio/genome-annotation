@@ -50,9 +50,6 @@ java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK
 $(for var in $SAMPLES; do if [ -e ${var}_recal_round-1_25x.*.bam ]; then echo -I ${var}_recal_round-1_25x.*.bam" "; else echo -I ${var}_recal_round-1.*.bam" "; fi; done) \
 -o ${CALLING}-${SCAFFOLD}.vcf
 
-exit
-screen -X quit
-
 ```
 
 #3. Upload GATK calling script to the server.
@@ -66,7 +63,7 @@ scp /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/GATK_calling.sh dklein
 #4. Run GATK for the desired calling in parallel or at once.
 ```{r, eval=FALSE, engine='bash'}
 
-PARALLEL=(no) #input 'yes' or 'no' without quotes
+PARALLEL=(yes) #input 'yes' or 'no' without quotes
 CALLING=(c_lp_sm_c_lp_do_nm2_origcov) #input name of the calling
 
 cd /home/dkleinman/GATK_tests
@@ -94,6 +91,8 @@ for r in ${REGIONS[@]}
   screen -dmS "${CALLING}-${SCAFFOLD}"
   screen -S "${CALLING}-${SCAFFOLD}" -p 0 -X stuff "script ${CALLING}-${SCAFFOLD}.log$NL"
   screen -S "${CALLING}-${SCAFFOLD}" -p 0 -X stuff "time ./GATK_calling.sh; exec bash$NL"
+  screen -S "${CALLING}-${SCAFFOLD}" -p 0 -X stuff "exit$NL"
+  screen -S "${CALLING}-${SCAFFOLD}" -p 0 -X stuff "exit$NL"
   done
 
 ```
