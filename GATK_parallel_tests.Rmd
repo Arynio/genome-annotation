@@ -36,7 +36,7 @@ N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING)
 #echo $N_POPS
 POPS=$(echo $CALLING | fold -w8 | cut -c1-7 | head -n$N_POPS | sort | uniq)
 #echo $POPS
-REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+REF=/home/dkleinman/GATK_tests/lp23.fa #path to reference genome
 GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
 SAMPLES=$(for p in ${POPS[@]}; do ls ${p}*recal_round-1.*.bam | cut -c1-12 | sort | uniq; done)
 
@@ -63,25 +63,32 @@ scp /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/GATK_calling.sh dklein
 #4. Run GATK for the desired calling in parallel or at once.
 ```{r, eval=FALSE, engine='bash'}
 
-PARALLEL=(yes) #input 'yes' or 'no' without quotes
+PARALLEL=(maybe) #input 'yes' or 'no' without quotes
 CALLING=(c_lp_sm_c_lp_do_nm2_origcov) #input name of the calling
 
 cd /home/dkleinman/GATK_tests
 unset REGIONS
 if [ $PARALLEL == "no" ]
   then
+  echo "the calling will be performed at once"
   REGIONS=$(echo "/home/dkleinman/GATK_tests/scaffold_lp23.s00001_to_s00004.bed")
 elif [ $PARALLEL == "yes" ]
   then
+  echo "the calling will be parallelised"
   readarray COORDINATES < scaffold_lp23.s00001_to_s00004.bed
   for row in "${COORDINATES[@]}"
     do
     SCAFFOLD=$(echo ${row} | cut -d' ' -f1)
-    echo ${row} > "scaffold_"${SCAFFOLD}".bed"
+    #echo ${row} > "scaffold_"${SCAFFOLD}".bed"
     done
   REGIONS=$(realpath scaffold_lp23.*.bed | grep -v "_to_")
+else
+  echo "wrong value for variable PARALLEL"
+  REGIONS=
 fi
-echo $REGIONS
+echo "The following region file(s) will be used:"
+echo "${REGIONS}"
+
 NL=$'\n'
 for r in ${REGIONS[@]}
   do
