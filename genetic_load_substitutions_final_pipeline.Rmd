@@ -1060,7 +1060,7 @@ grep -v '#' "${CALLING}_polarized_filtered4.lr_ann.vcf" | wc -l
 #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov 4548968
 #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov 4555453
 
-#Finally, for each species exclude those positions that have more than 20% missing genotypes.
+#Finally, for each species exclude those positions that have more than 15% missing genotypes.
 $BCF filter -e "F_MISSING > 0.15" -Ov -o "${CALLING}_polarized_filtered5.lr_ann.vcf" "${CALLING}_polarized_filtered4.lr_ann.vcf"
 
 grep -v '#' "${CALLING}_polarized_filtered5.lr_ann.vcf" | wc -l 
