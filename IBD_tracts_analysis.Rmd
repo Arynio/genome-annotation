@@ -195,7 +195,7 @@ script c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060.genolike.log
 cd $I_PATH/beagle_gl
 THREADS=8 #no. of computer cores used by bwa and samtools. 20 = OK, >20 = ask people first!
 POP=(c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060)
-read POP mean sd mean_truncated sd_truncated maxDepth minDepth maxDepth_truncated minDepth_truncated < $I_PATH/beagle_gl/"${POP}"_mean_sd_depthGlobal_lynx_per_pop_mean_folds_0.95.csv
+read POP mean sd mean_truncated sd_truncated maxDepth minDepth maxDepth_truncated minDepth_truncated < $I_PATH/beagle_gl/mean_sd_depthGlobal_lynx_per_pop_mean_folds_0.95.csv
 
 ANGSD="/opt/angsd/angsd"
 NGSTOOLS="/opt/angsd/angsd/misc"
