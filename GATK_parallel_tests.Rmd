@@ -63,7 +63,7 @@ scp /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/GATK_calling.sh dklein
 #4. Run GATK for the desired calling in parallel or at once.
 ```{r, eval=FALSE, engine='bash'}
 
-PARALLEL=(maybe) #input 'yes' or 'no' without quotes
+PARALLEL=(yes) #input 'yes' or 'no' without quotes
 CALLING=(c_lp_sm_c_lp_do_nm2_origcov) #input name of the calling
 
 cd /home/dkleinman/GATK_tests
@@ -84,7 +84,7 @@ elif [ $PARALLEL == "yes" ]
   REGIONS=$(realpath scaffold_lp23.*.bed | grep -v "_to_")
 else
   echo "wrong value for variable PARALLEL"
-  REGIONS=
+  REGIONS=()
 fi
 echo "The following region file(s) will be used:"
 echo "${REGIONS}"
