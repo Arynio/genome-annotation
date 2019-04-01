@@ -15,7 +15,7 @@ O_PATH=/home/dkleinman/datos/snpEff #output path
 I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
 V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
 G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
-B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered #BAM files path
+B_PATH=/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered #BAM files path
 REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
 GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
 BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
@@ -374,7 +374,7 @@ for i in ${SAMPLES[@]}
 ####DON 5x:
 ```{r Perform NM-based BAM filterings, eval=FALSE, engine='bash'}
 
-cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
 screen -S c_lp_do_nm2_BAMs.log
 script c_lp_do_nm2_BAMs.log
 
@@ -392,7 +392,7 @@ for i in ${SAMPLES[@]}
 ####DON 25x:
 ```{r Perform NM-based BAM filterings, eval=FALSE, engine='bash'}
 
-cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
 screen -S c_lp_do_nm2_BAMs_25x.log
 script c_lp_do_nm2_BAMs_25x.log
 
@@ -410,7 +410,7 @@ for i in ${SAMPLES[@]}
 ####SMO 5x:
 ```{r Perform NM-based BAM filterings, eval=FALSE, engine='bash'}
 
-cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
 screen -S c_lp_sm_nm2_BAMs.log
 script c_lp_sm_nm2_BAMs.log
 
@@ -428,7 +428,7 @@ for i in ${SAMPLES[@]}
 ####SMO 25x:
 ```{r Perform NM-based BAM filterings, eval=FALSE, engine='bash'}
 
-cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
 screen -S c_lp_sm_nm2_BAMs_25x.log
 script c_lp_sm_nm2_BAMs_25x.log
 
@@ -447,7 +447,7 @@ for i in ${SAMPLES[@]}
 
 ```{r Perform NM-based BAM filterings, eval=FALSE, engine='bash'}
 
-cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
 screen -S c_ll_ki_nm3_BAMs.log
 script c_ll_ki_nm3_BAMs.log
 
@@ -465,7 +465,7 @@ for i in ${SAMPLES[@]}
 ####KIR 25x:
 ```{r Perform NM-based BAM filterings, eval=FALSE, engine='bash'}
 
-cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
 screen -S c_ll_ki_nm3_BAMs_25x.log
 script c_ll_ki_nm3_BAMs_25x.log
 
@@ -484,7 +484,7 @@ for i in ${SAMPLES[@]}
 
 ```{r Perform NM-based BAM filterings, eval=FALSE, engine='bash'}
 
-cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
 screen -S c_ll_no_nm3_BAMs.log
 script c_ll_no_nm3_BAMs.log
 
@@ -503,7 +503,7 @@ for i in ${SAMPLES[@]}
 
 ```{r Perform NM-based BAM filterings, eval=FALSE, engine='bash'}
 
-cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
 screen -S c_ll_po_nm3_BAMs.log
 script c_ll_po_nm3_BAMs.log
 
@@ -1152,7 +1152,7 @@ REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path
 GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
 BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
 
-cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
 N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING)
 SPECIES=$(echo $CALLING | fold -w8 | cut -c1-4 | head -n$N_POPS | sort | uniq)
 DATASETS=$(for i in ${SPECIES[@]}; do ls ${i}*_samples | cut -d'_' -f1,2,3; done)
@@ -1161,7 +1161,7 @@ cd $V_PATH/$CALLING/annotation
 for j in ${DATASETS[@]}
   do
   echo "${j}"
-  cat /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered/"${j}"_samples
+  cat /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered/"${j}"_samples
   mkdir -p "${j}"_"${NM_COV}"_perdataset
   java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
   -T SelectVariants \
@@ -1169,7 +1169,7 @@ for j in ${DATASETS[@]}
   -V "${CALLING}_polarized_substitutions.lr_ann.vcf" \
   -o "${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_perdataset.lr_ann.vcf \
   -env \
-  --sample_file /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered/"${j}"_samples
+  --sample_file /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered/"${j}"_samples
   grep -v '#' "${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_perdataset.lr_ann.vcf | wc -l #
   done
 
@@ -1191,7 +1191,7 @@ REF="/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa"
 THREADS=10
 REGIONFILE="/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_intergenic_capture/BAM_intergenic_capture_filtered/no_genes_Lypa_10000longest_center_final_slop20_dot.rf"
 rm "$POP".bamlist
-cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
 SAMPLES=$(cat "$DATASET"_samples)
 for var in $SAMPLES; do if [ ${var} = "h_ll_pv_0223" ]; then realpath ${var}_sorted_indelrealigner_marked_sorted.nm*.bam >> /home/dkleinman/datos/nm_depth_calculus/$CALLING/"$POP".bamlist; elif [ $COVERAGE = "origcov" ] && [ -e ${var}_recal_round-1_25x.nm*.bam ]; then realpath ${var}_recal_round-1_25x.nm*.bam >> /home/dkleinman/datos/nm_depth_calculus/$CALLING/"$POP".bamlist; else realpath ${var}_recal_round-1.nm*.bam >> /home/dkleinman/datos/nm_depth_calculus/$CALLING/"$POP".bamlist; fi; done
 cat /home/dkleinman/datos/nm_depth_calculus/$CALLING/"$POP".bamlist
@@ -1238,7 +1238,7 @@ scp /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/depth_calculus/depth_c
 CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
 
 mkdir -p /home/dkleinman/datos/nm_depth_calculus/$CALLING
-cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
 N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING)
 SPECIES=$(echo $CALLING | fold -w8 | cut -c1-4 | head -n$N_POPS | sort | uniq)
 DATASETS=$(for i in ${SPECIES[@]}; do ls ${i}*_samples | cut -d'_' -f1,2,3; done)
@@ -1246,7 +1246,7 @@ COVERAGE=$(echo "${CALLING}" | rev | cut -d'_' -f1 | rev)
 NL=$'\n'
 for i in ${DATASETS[@]}
   do
-    N_SIZE0=$(cat /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered/"${i}_samples" | wc -l)
+    N_SIZE0=$(cat /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered/"${i}_samples" | wc -l)
     N_SIZE=$(printf "%03d" $N_SIZE0)
     cd /home/dkleinman/datos/nm_depth_calculus/$CALLING
     screen -dmS "${i}_${COVERAGE}_n${N_SIZE}.log"
@@ -1380,7 +1380,7 @@ GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
 BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
 V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
 
-cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
 N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING)
 SPECIES=$(echo $CALLING | fold -w8 | cut -c1-4 | head -n$N_POPS | sort | uniq)
 DATASETS=$(for i in ${SPECIES[@]}; do ls ${i}*_samples | cut -d'_' -f1,2,3; done)
@@ -1430,7 +1430,7 @@ REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path
 GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
 BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
 
-cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
 N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING)
 SPECIES=$(echo $CALLING | fold -w8 | cut -c1-4 | head -n$N_POPS | sort | uniq)
 DATASETS=$(for i in ${SPECIES[@]}; do ls ${i}*_samples | cut -d'_' -f1,2,3; done)
@@ -1462,7 +1462,229 @@ for i in ${DATASETS[@]}
 
 ```
 
-#13: Split the population VCFs into per individual VCFs. Generate a VCF for each individual.
+#13: Generate data to subsample populations. This should only be performed one time.
+##Estimate relatedness between individuals.
+###Obtain NGSrelate kinship coefficient estimates between individuals.
+
+```{r Obtain per population VCFs, eval=FALSE, engine='bash'}
+
+#First it's necessary to obtain some files with ANGSD. For this purpose, I adapt Maria's code:
+mkdir-p /GRUPOS/grupolince/lynx_genomes_5x/relatedness_analysis/ANGSD_relatedness
+cd /GRUPOS/grupolince/lynx_genomes_5x/relatedness_analysis/ANGSD_relatedness
+
+#I ask Maria to hand me the 'mean_sd_depthGlobal_lynx_per_pop_mean_folds_0.95.csv' files for each population, as she already built them before. She copied them into the current folder. She believes they've been computed over the whole genome (and not just the intergenic portion). They don't use the nm-filtered BAMs (but we know ANGSD isn't too sensible to contamination) and they aren't split by dataset. We decided against repeating them for each dataset x population intersection.
+
+POP=c_lp_sm_n019 #c_lp_do_n012 #c_ll_no_n008 #c_ll_po_n008 #c_ll_ki_n013 #Change pop here
+screen -S "${POP}"_angsdput_mafs_angsdput_glf.log
+POP=c_lp_sm_n019 #c_lp_do_n012 #c_ll_no_n008 #c_ll_po_n008 #c_ll_ki_n013 #Change pop here
+script "${POP}"_angsdput_mafs_angsdput_glf.log
+POP=c_lp_sm_n019 #c_lp_do_n012 #c_ll_no_n008 #c_ll_po_n008 #c_ll_ki_n013 #Change pop here
+
+echo $POP
+POP_SHORT=$(echo $POP | cut -c1-7)
+echo $POP_SHORT
+THREADS=10
+read POP mean sd mean_truncated sd_truncated maxDepth minDepth maxDepth_truncated minDepth_truncated < /GRUPOS/grupolince/lynx_genomes_5x/relatedness_analysis/ANGSD_relatedness/${POP}_mean_sd_depthGlobal_lynx_per_pop_mean_folds_0.95.csv
+
+ANGSD="/opt/angsd/angsd"
+NGSTOOLS="/opt/angsd/angsd/misc"
+REF="/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa"
+ANC="/home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa"
+ls /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_intergenic_5x/"$POP_SHORT"*intergenic.bam > "$POP_SHORT".intergenic.bamlist
+cat "$POP_SHORT".intergenic.bamlist
+FILTER1=" -uniqueOnly 1 -remove_bads 1 -only_proper_pairs 1 -baq 1 -C 50 "
+FILTER2=" -minMapQ 30 -minQ 20 -doCounts 1 "
+N_IND=$(echo ${POP: -3} )
+MIN_IND=$(expr $N_IND / 2)
+#REGIONFILE="/home/mlucena/ANGSD_analysis/depth_calculus/no_genes_Lypa_10000longest_center_final_slop20_dot.rf"
+SNP_PVAL=1e-4
+
+#Sanity checks:
+echo $POP
+echo $N_IND
+echo $MIN_IND
+echo $maxDepth
+echo $minDepth
+echo $SNP_PVAL
+
+#Generate a file with allele frequencies (angsdput.mafs.gz) and a file with genotype likelihoods (angsdput.glf.gz):
+$ANGSD/angsd -P $THREADS -b $POP_SHORT.intergenic.bamlist -ref $REF -out $POP_SHORT.intergenic \
+$FILTER1 $FILTER2 \
+-GL 1 -doMajorMinor 1 -doMaf 1 -skipTriallelic 1 \
+-SNP_pval $SNP_PVAL \
+-minmaf 0.05 -doGlf 3 \
+-minInd $MIN_IND -setMaxDepth $maxDepth -setMinDepth $minDepth 
+#-rf $REGIONFILE \
+
+#Extract the id list (will be used later):
+cat $POP_SHORT.intergenic.bamlist | rev | cut -d "/"  -f 1 | cut -d "_" -f 2,3,4,5 | rev  > $POP_SHORT.id
+
+#Then extract the frequency column from the allele frequency file and remove the header (to convert to the format NgsRelate needs):
+zcat $POP_SHORT.intergenic.mafs.gz | cut -f6 | sed 1d > $POP_SHORT.freq
+
+#Once we have these files we can use NgsRelate to estimate relatedness between any pairs of individuals. E.g. if we want to estimate relatedness between the first two individuals (numbered from 0, so 0 and 1) we can do it using the following command:
+/home/dkleinman/ngsRelate -g $POP_SHORT.intergenic.glf.gz -n $N_IND -f $POP_SHORT.freq -z $POP_SHORT.id > $POP_SHORT.gl.res
+cat $POP_SHORT.gl.res | awk '{if (substr($3, 1, 7)==substr($4, 1, 7)) print $0}' > $POP_SHORT.perpop.gl.res
+
+#Here we specify the name of our file with genotype likelihoods after the option "-g", the number of individuals in the file after the option "-n", the name of the file with allele frequencies after the option "-f" and the number of the two individuals after the options "-a" and "-b" . If -a and -b are not specified NgsRelate will loop through all pairs of individuals in the input file.
+
+#Note that if you want you can also input a file with the IDs of the individuals (one ID per line) in the same order as in the file 'filelist' used to make the genotype likelihoods. If you do the output will also contain these IDs and not just the numbers of the samples (one can actually just use that exact file, however the IDs then tend to be a bit long). This can be done with the optional flag -z followed by the filename.
+
+#Historically, several summary statistics have been used, such as the kinship coefficient θ, however almost all of these statistics can be calculated fromR=(k0,k1,k2), where km is the fraction of genome in which the two individuals share m alleles IBD.
+
+# Relationship	      K_0	  K_1	  K_2
+# mono-zygotic twin	    0 	  0	    1 
+# Parent-Offspring	    0 	  1	    0 
+# Full siblings	      0.25  0.5  	 0.25 
+# Half siblings	      0.5  	0.5 	  0 
+# First cousins	      0.75  0.25 	  0  
+# Unrelated	            1 	  0 	  0  
+
+#The first two columns contain the information of about what two individuals were used for the analysis. The third column contains information about how many sites were used in the analysis. The following three columns are the maximum likelihood (ML) estimates of the relatedness coefficients. The seventh column is the log of the likelihood of the ML estimate. The eigth column is the number of iterations of the maximization algorithm that was used to find the MLE, and finally the ninth column is fraction of non-missing sites, i.e. the fraction of sites where data was available for both individuals, and where the minor allele frequency (MAF) above the threshold (default is 0.05 but the user may specify a different threshold). Note that in some cases nIter is -1. This indicates that values on the boundary of the parameter space had a higher likelihood than the values achieved using the EM-algorithm (ML methods sometimes have trouble finding the ML estimate when it is on the boundary of the parameter space, and we therefore test the boundary values explicitly and output these if these have the highest likelihood).
+
+#Finally, calculate kinship coefficients (k1/2 + k2):
+awk '{printf("%s\t%s\n", $0, $7/2 + $8) }' $POP_SHORT.perpop.gl.res > $POP_SHORT.perpop.kinship.gl.res
+
+#Again, kinships within KIR are all close to 0!
+
+#From outside the server:
+scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/relatedness_analysis/ANGSD_relatedness/*.perpop.kinship.gl.res /Users/dani/ownCloud/backup/g-w_analysis/g-w_relatedness/NGSrelate
+
+```
+
+###Identify highest kinship individuals. Visualise which pairs of individuals have higher kinship coefficient values, in order to later remove individuals involved.
+
+```{r Obtain per population VCFs}
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+
+#Import kinship coefficients data for all 5 populations:
+pops <- list.files(path="/Users/Dani/ownCloud/backup/g-w_analysis/g-w_relatedness/NGSrelate/",pattern=".perpop.kinship.gl.res") %>% substr(1,7)
+kinship_df <- data_frame()
+for (i in pops) {
+  print(i)
+  kinship_file <- read_tsv(paste0("/Users/Dani/ownCloud/backup/g-w_analysis/g-w_relatedness/NGSrelate/",i,".perpop.kinship.gl.res"),col_names=F) %>% select(3,4,12) %>% mutate(pop=i,pair=paste(X3,X4,sep="_vs_")) %>% select(4,5,3)
+  colnames(kinship_file)[3] <- "kinship"
+  kinship_file <- kinship_file[order(-kinship_file$kinship),]
+  kinship_file
+  kinship_df <- rbind(kinship_df, kinship_file)
+}
+kinship_df
+
+#Plot kinship coefficients for all 5 populations:
+kinship_plot <- ggplot(kinship_df,aes(x=pair,y=kinship)) +
+  geom_col(position="identity", colour="grey40", alpha=0.2) +
+  facet_grid(. ~ pop) +
+  theme(axis.text.x=element_text(angle=90,hjust=0,size=2,colour="black")
+  )
+kinship_plot
+ggsave("/Users/Dani/ownCloud/backup/g-w_analysis/g-w_relatedness/NGSrelate/all_kinships.pdf", width=50, height=10, units="cm", device="pdf")
+
+#Visualise highest kinship pairs in order to exclude individuals with kinship > 0.35
+kinship_df[order(-kinship_df$kinship),]
+
+filter(kinship_df[order(-kinship_df$kinship),],kinship>0.35) %>% select(pair) %>% unlist(.,use.names=F) %>% gsub("_vs_", "|", .) %>% as.data.frame() %>% write_tsv(.,"/Users/Dani/ownCloud/backup/g-w_analysis/g-w_relatedness/NGSrelate/individuals_to_exclude.txt",col_names=F)
+
+#From each pair with kinship > 0.35, we'll exclude the one individual that is first involved in another high pair: c_lp_sm_0208, c_lp_sm_0325 and c_lp_sm_0185. The rest of the c_lp_sm individuals to remove (in order to subsample the pop) will be chosen randomly.
+
+```
+
+##Select per population subsample individuals. Apply random removal of individuals after discarding those excluded on account of high relatedness.
+
+```{r Obtain per population VCFs, eval=FALSE, engine='bash'}
+
+#From outside the server, upload the list of individuals to exclude:
+scp /Users/dani/ownCloud/backup/g-w_analysis/g-w_relatedness/NGSrelate/individuals_to_exclude.txt dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/relatedness_analysis/ANGSD_relatedness/
+
+#From inside the server, run this code which will select 8 random individuals from each 5x population after discarding highly related individuals:
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered/
+DATASETS=$(ls *5x_samples)
+POPS=$(ls /GRUPOS/grupolince/lynx_genomes_5x/relatedness_analysis/ANGSD_relatedness/*perpop.kinship.gl.res | rev | cut -d'/' -f1 | rev | cut -c1-7)
+for p in ${POPS[@]} 
+  do 
+  echo ${p}
+  SPECIES=$(echo ${p} | cut -c1-4)
+  DATASET=$(ls *5x_samples | grep $SPECIES | cut -d'_' -f1,2,3)
+  INDIVIDUALS=$(grep ${p} $DATASET"_samples")
+  CONT_REMOVE=()
+  CONTAMINATED=$(printf '%s\n' "${INDIVIDUALS[@]}" | grep "c_ll_ki_0099" | wc -l) #if the contaminated c_ll_ki_0099 is in the list of individuals, then mark it to later remove it:
+  if [ $CONTAMINATED == 1 ]
+    then
+    CONT_REMOVE+=(c_ll_ki_0099)
+    echo "The following individual(s) will be removed on account of contamination: " $CONT_REMOVE
+    fi
+  REL_REMOVE=()
+  #Import file with pairs of individuals with relatedness > 0.35, as calculated in the previous section.
+  while read row
+    do
+    MATCHES=$(grep -E "$row" <(grep ${p} $DATASET"_samples") | wc -l) #check how many individuals from the pair belong to the same dataset.
+    if [ $MATCHES == 2 ]
+      then 
+      REL_REMOVE+=$(echo ${row} | tr '|' '\n' | head -n1) #if both do, then mark the first to later remove it.
+      fi
+    done < /GRUPOS/grupolince/lynx_genomes_5x/relatedness_analysis/ANGSD_relatedness/individuals_to_exclude.txt
+  if [ -n "$REL_REMOVE" ]
+    then
+    echo "The following individual(s) will be removed on account of high relatedness: " $REL_REMOVE
+    fi
+  #Remove individuals that appear in both the INDIVIDUALS and the REMOVE arrays, and then keep 8 random individuals:
+  echo ${INDIVIDUALS[@]} ${REL_REMOVE[@]} ${CONT_REMOVE[@]} | tr ' ' '\n' | sort | uniq -u | shuf -n8 > /GRUPOS/grupolince/lynx_genomes_5x/relatedness_analysis/ANGSD_relatedness/$DATASET"_"${p}"_perpop_subset_individuals.txt"
+  done
+
+```
+
+#14: Subsample populations. Apply random removal of individuals after discarding those excluded on account of high relatedness.
+
+```{r Obtain per population VCFs, eval=FALSE, engine='bash'}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation 
+screen -S "${CALLING}"
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+script "perpop_subsample_${CALLING}.lr_ann.log"
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAM files path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING)
+POPS=$(echo $CALLING | fold -w8 | cut -c1-7 | head -n$N_POPS | sort | uniq)
+COVERAGE=$(echo "${CALLING}" | rev | cut -d'_' -f1 | rev)
+NM_COV=$(echo "${CALLING}" | rev | cut -d'_' -f1,2 | rev)
+
+cd $V_PATH/$CALLING/annotation
+for pop in ${POPS[@]}
+  do
+  echo "Subsampling population:" ${pop}
+  SPECIES=$(echo ${pop} | cut -c1-4)
+  cat /GRUPOS/grupolince/lynx_genomes_5x/relatedness_analysis/ANGSD_relatedness/*${pop}"_perpop_subset_individuals.txt"
+  N_SUBSAMPLE=$(cat /GRUPOS/grupolince/lynx_genomes_5x/relatedness_analysis/ANGSD_relatedness/*${pop}"_perpop_subset_individuals.txt" | wc -l | awk '{printf "%03d\n", $0;}')
+  echo "Subsample size is:" $N_SUBSAMPLE
+  java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+  -T SelectVariants \
+  -R $REF \
+  -V ${pop}"_"$NM_COV"_perpop"/$SPECIES"_5x_"${pop}"_"$NM_COV"_perpop.lr_ann.vcf" \
+  -o ${pop}"_"$NM_COV"_perpop"/$SPECIES"_5x_"${pop}"_"$NM_COV"_perpop_subsample_n"$N_SUBSAMPLE".lr_ann.vcf" \
+  -env \
+  --sample_file /GRUPOS/grupolince/lynx_genomes_5x/relatedness_analysis/ANGSD_relatedness/*${pop}"_perpop_subset_individuals.txt"
+  
+  grep '#' -v ${pop}"_"$NM_COV"_perpop"/$SPECIES"_5x_"${pop}"_"$NM_COV"_perpop_subsample_n"$N_SUBSAMPLE".lr_ann.vcf" | wc -l
+  done
+
+```
+
+#15: Split the population VCFs into per individual VCFs. Generate a VCF for each individual.
 
 ```{r Split the population VCFs into per individual VCFs, eval=FALSE, engine='bash'}
 
@@ -1485,7 +1707,7 @@ REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path
 GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
 BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
 
-cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
 N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING)
 SPECIES=$(echo $CALLING | fold -w8 | cut -c1-4 | head -n$N_POPS | sort | uniq)
 DATASETS=$(for i in ${SPECIES[@]}; do ls ${i}*_samples | cut -d'_' -f1,2,3; done)
@@ -1518,7 +1740,7 @@ for i in ${POP[@]}
 
 ```
 
-#14: Get annotation statistics.
+#16: Get annotation statistics.
 ##At the individual level.
 
 ```{r Get annotation statistics, eval=FALSE, engine='bash'}
@@ -1578,7 +1800,7 @@ scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dan
 
 ```
 
-#15: Plot variant count results.
+#17: Plot variant count results.
 ##Compare NM filtering results.
 
 ```{r Plot variant count results}
