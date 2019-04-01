@@ -231,7 +231,6 @@ GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
 
 N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING)
 SPECIES=$(echo $CALLING | fold -w8 | cut -c1-4 | head -n$N_POPS | sort | uniq)
-#POPS=$(echo $CALLING | fold -w8 | cut -c1-7 | head -n$N_POPS | sort | uniq)
 POPS=($(ls `find $V_PATH/$CALLING/annotation/ -name *'_perpop.lr_ann.vcf' -print` | rev | cut -d'/' -f1 | rev | cut -d'_' -f1,2,3,4,5,6))
 DATASETS=$(for i in ${SPECIES[@]}; do ls /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered/${i}*_samples | cut -d'_' -f1,2,3; done)
 COVERAGE=$(echo "${CALLING}" | rev | cut -d'_' -f1 | rev)
