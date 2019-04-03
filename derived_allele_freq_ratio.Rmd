@@ -3,7 +3,6 @@ title: "derived_allele_freq_ratio"
 output: html_document
 ---
 
-
 #1: Define desired features.
 
 ```{r Define desired features, eval=FALSE, engine='bash'}
@@ -14,6 +13,7 @@ rm features_derived_allele_freq_ratio.txt
 echo -e "synonymous_variant\tSYN" >> features_derived_allele_freq_ratio.txt
 echo -e "missense_variant\tNSYN" >> features_derived_allele_freq_ratio.txt
 echo -e "|HIGH|\tLOF" >> features_derived_allele_freq_ratio.txt
+echo -e "intron_variant\tINTR" >> features_derived_allele_freq_ratio.txt
 cat features_derived_allele_freq_ratio.txt
 
 ```
@@ -22,12 +22,12 @@ cat features_derived_allele_freq_ratio.txt
 ##For variants within species:
 ```{r Calculate derived allele frequency ratio, eval=FALSE, engine='bash'}
 
-CALLING=(c_lp_sm_c_lp_do_nm2_samecov)
+CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov)
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
 screen -S "${CALLING}"
-CALLING=(c_lp_sm_c_lp_do_nm2_samecov)
+CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov)
 script "${CALLING}_derived_freq_ratio.lr_ann.log"
-CALLING=(c_lp_sm_c_lp_do_nm2_samecov)
+CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov)
 
 S_PATH=/opt/snpEff #software path
 C_PATH=/home/dkleinman/datos/snpEff #config file path
@@ -59,14 +59,13 @@ for g in ${GREP[@]}
     do
     echo "working with vcf ${p}"
     grep "${g}" "${p}" | awk -F"\t|;|=" '{printf ("%s_%s_%s\t%s\n", $1,$2-1,$2,$13)}' > ${p/perpop.lr_ann.vcf/perpop_"${FEATURE}".lr_ann.bed}
-    #"${POP}"_"${NM_COV}"_perpop_"${f}".lr_ann.bed
     done
   done
 #Prepare file that will contain population and SYN ratio data:
 mkdir -p derived_allele_freq_ratio
 rm derived_allele_freq_ratio/"${CALLING}_SYN_derived_freq_ratio.txt"
 echo -e "population_1\tpopulation_2\tSYN_ratio" > derived_allele_freq_ratio/"${CALLING}_SYN_derived_freq_ratio.txt"
-DEL_FEATURES=$(cat /GRUPOS/grupolince/lynx_genomes_5x/genetic_load_analysis/derived_allele_freq_ratio/features_derived_allele_freq_ratio.txt | grep -v 'synonymous_variant' | cut -f2)
+DEL_FEATURES=$(cat /GRUPOS/grupolince/lynx_genomes_5x/genetic_load_analysis/derived_allele_freq_ratio/features_derived_allele_freq_ratio.txt | grep -Ev 'synonymous_variant|intron_variant' | cut -f2)
 #Prepare files that will contain DEL categories ratio data:
 for f in ${DEL_FEATURES[@]}
   do
@@ -163,7 +162,7 @@ for g in ${GREP[@]}
 mkdir -p derived_allele_freq_ratio
 rm derived_allele_freq_ratio/"${CALLING}_SYN_derived_freq_ratio.txt"
 echo -e "population_1\tpopulation_2\tSYN_ratio" > derived_allele_freq_ratio/"${CALLING}_SYN_derived_freq_ratio.txt"
-DEL_FEATURES=$(cat /GRUPOS/grupolince/lynx_genomes_5x/genetic_load_analysis/derived_allele_freq_ratio/features_derived_allele_freq_ratio.txt | grep -v 'synonymous_variant' | cut -f2)
+DEL_FEATURES=$(cat /GRUPOS/grupolince/lynx_genomes_5x/genetic_load_analysis/derived_allele_freq_ratio/features_derived_allele_freq_ratio.txt | grep -Ev 'synonymous_variant|intron_variant' | cut -f2)
 #Prepare files that will contain DEL categories ratio data:
 for f in ${DEL_FEATURES[@]}
   do
@@ -304,6 +303,118 @@ for f in ${DEL_FEATURES[@]}
 
 #From outside the server:
 scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/genetic_load_analysis/derived_allele_freq_ratio/*/*ALL_vars_subs_derived_freq_ratio.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_ratio/
+
+```
+
+#3: Plot derived allele frequency spectrum.
+##Combine per population and feature allele frequency files:
+```{r Calculate derived allele frequency ratio, eval=FALSE, engine='bash'}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+screen -S "${CALLING}"
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+script "${CALLING}_derived_freq_spectrum.lr_ann.log"
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAM files path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING)
+SPECIES=$(echo $CALLING | fold -w8 | cut -c1-4 | head -n$N_POPS | sort | uniq)
+DATASETS=$(for i in ${SPECIES[@]}; do ls ${i}*_samples | cut -d'_' -f1,2,3; done)
+COVERAGE=$(echo "${CALLING}" | rev | cut -d'_' -f1 | rev)
+NM_COV=$(echo "${CALLING}" | rev | cut -d'_' -f1,2 | rev)
+GREP=$(cat /GRUPOS/grupolince/lynx_genomes_5x/genetic_load_analysis/derived_allele_freq_ratio/features_derived_allele_freq_ratio.txt | cut -f1)
+cd $V_PATH/$CALLING/annotation
+POPS=($(ls `find . -name *'5x'*'_perpop_'*'.lr_ann.bed' ! -name '*vs*' -print` | rev | cut -d'/' -f1 | rev | cut -d'_' -f-6 | sort | uniq))
+echo "joining frequency files from each feature from each population"
+rm "ALL_5x_"$NM_COV"_perpop_features.lr_ann.af"
+for p in ${POPS[@]}
+  do
+  echo "working with pop ${p}"
+  SHORT_POP=$(echo ${p} | cut -d'_' -f4-6)
+  for g in ${GREP[@]}
+    do
+    echo "feature: ${g}"
+    FEATURE=$(grep "${g}" /GRUPOS/grupolince/lynx_genomes_5x/genetic_load_analysis/derived_allele_freq_ratio/features_derived_allele_freq_ratio.txt | cut -f2)
+    echo $FEATURE
+    cat $SHORT_POP"_"$NM_COV"_perpop"/${p}"_"$NM_COV"_perpop_"$FEATURE".lr_ann.bed" | awk -v pop="$SHORT_POP" -v feat="$FEATURE" '{print pop,feat,$0}' OFS="\t" >> $CALLING"_5x_perpop_ALL_features.lr_ann.af"
+    done
+  done
+
+#From outside the server:
+scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/*/annotation/*5x_perpop_ALL_features.lr_ann.af /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_spectrum/
+
+```
+
+##Plot spectra:
+```{r}
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+
+callings_af_files <- grep(list.files("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_spectrum/", pattern="*ALL_features.lr_ann.af"),pattern='nm2nm3',inv=T,value=T)
+all_plot_data <- data_frame("pop"=character(0),"feat"=factor(0),"af"=double(0),"n"=numeric(0))
+for (file in callings_af_files) {
+  calling_af <- read_tsv(paste0("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_spectrum/",file),col_names=c("pop","feat","pos","af"))
+  for (p in unique(calling_af$pop)) {
+    print(p)
+    pop_af_data <- filter(calling_af,pop==p)
+    #popsize=ifelse(p=="c_lp_sm"|p=="c_ll_ki",12,8)
+    pop_plot_data <- pop_af_data %>% group_by(af,feat) %>% summarize(n=n(),pop=pop[n]) %>% arrange(feat) %>% select(pop,feat,af,n) %>% as.data.frame(.)
+    #pop_af_data %>% mutate(af_groups=cut(af,breaks=seq(0,1.1,by=1/(2*popsize)))) %>% group_by(af_groups,feat) %>% summarize(n=n()) #problem with the binning due to rounded allele frequencies
+    all_plot_data <- rbind(all_plot_data,pop_plot_data)
+  }
+}  
+all_plot_data$feat <- as.factor(all_plot_data$feat)
+all_plot_data$feat = factor(all_plot_data$feat,levels=c("INTR","SYN","NSYN","LOF")) #Reorder factor levels to
+all_plot_data <- all_plot_data %>% arrange(pop,feat,af)
+all_plot_data
+
+for (f in unique(all_plot_data$feat)) {
+  feat_ggplot <- ggplot(data=filter(all_plot_data,feat==f),aes(af,n,fill=pop)) +
+    geom_col(width=0.07) +
+    facet_grid(~pop,scales="free_x",space="free_x") +
+    ggtitle(paste0(f," derived allele frequency spectrum")) +
+    ylab("N") +
+    theme_bw() +
+    theme(text=element_text(size=12,face="bold"),
+          rect=element_rect(size=1),
+          axis.line=element_line(colour="black"),
+          axis.title=element_text(size=16),
+          #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+          #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+          #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+          panel.background=element_blank(),
+          panel.border=element_rect(colour="black"),
+          #panel.grid=element_blank(),
+          #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+          plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+          #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+          legend.background=element_rect(linetype="solid", colour="black", size=.5),
+          #legend.justification=c(0,0),
+          legend.key=element_rect(colour="white"),
+          #legend.key.size=unit(1.3,"cm"),
+          legend.position=c(0.94,0.82),
+          legend.title=element_blank()
+    )
+    feat_ggplot
+    ggsave(paste0(f,"_derived_allele_frequency_spectrum.pdf"), width=30, height=15, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_spectrum")
+}
+  
+  
+
 
 
 ```
