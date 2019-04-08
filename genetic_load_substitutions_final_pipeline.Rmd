@@ -1006,81 +1006,114 @@ grep -v '#' "${CALLING}_polarized.lr_ann.vcf" | wc -l
 
 ```{r Filter the annotated VCF, eval=FALSE, engine='bash'}
 
-#Modify the CALLING variable all 3 times.
-
-CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov) #write down name of the calling
+TYPE=(INDEL) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
-screen -S "${CALLING}"
-CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
-script "${CALLING}_polarized_filtered.lr_ann.log"
+screen -S "${CALLING}-${TYPE}"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+script "${CALLING}_polarized_filtered_${TYPE}.lr_ann.log"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
 
-CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
 REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome (first eight scaffolds only)
 GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
 BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+#The following short loop defines the OTHER variable as the opposite of the TYPE variable (SNP or INDEL)
+if [ $TYPE = "SNP" ]
+  then
+  OTHER=(INDEL)
+elif [ $TYPE = "INDEL" ]
+  then
+  OTHER=(SNP)
+fi
 
-#Remove repetitive regions and those with low mappability:
-bedtools subtract -a "${CALLING}_polarized.lr_ann.vcf" -b /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/repeats_and_lowcomp_no_redundant_mappability.k75_lessthan90.bed -header > "${CALLING}_polarized_filtered1.lr_ann.vcf"
+if [ $TYPE != "SNP" ] && [ $TYPE != "INDEL" ] #Don't apply filters if $TYPE is invalid
+  then
+  echo "Invalid value for variable TYPE"
+  echo "Filtering aborted"
+  else #Apply filters if $TYPE is valid
+  echo "Initializing filtering for $TYPE variants"
+  
+  if [ -f ${CALLING}"_polarized_filtered1.lr_ann.vcf" ] #Since filter 1 is common for both types of variants, skip it if it's been performed before
+    then
+    echo "Repetitive and low mappability regions already filtered out"
+    echo "Skipping this step"
+    else
+    #Filter 1: Remove repetitive regions and those with low mappability:
+    echo "Filtering out repetitive and low mappability regions"
+    bedtools subtract -a ${CALLING}"_polarized.lr_ann.vcf" -b /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/repeats_and_lowcomp_no_redundant_mappability.k75_lessthan90.bed -header | uniq > ${CALLING}"_polarized_filtered0.lr_ann.vcf"
+    #${CALLING}"_polarized_filtered1.lr_ann.vcf"
+    
+    grep -v '#' ${CALLING}"_polarized_filtered1.lr_ann.vcf" | wc -l
+    #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov (XL nr filtered) 5671908
+    #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov (XL nr filtered) 5784144
+    #It has more than the unfiltered one due to some weird behaviour of bedtools subtract with some INDELs that become duplicated. These will be removed in the subsequent step.
 
-grep -v '#' "${CALLING}_polarized_filtered1.lr_ann.vcf" | wc -l
-#c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov (XL nr filtered) 5671908
-#c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov (XL nr filtered) 5784144
-
-#It has more than the unfiltered one due to some weird behaviour of bedtools subtract with some INDELs that become duplicated. These will be removed in the subsequent step.
-
-#During this step, all INDELs as well as all multiallelic and bad quality SNPs will be dropped from the respective VCFs.
-java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
--T SelectVariants \
--selectType SNP \
--restrictAllelesTo BIALLELIC \
--R $REF \
--V "${CALLING}_polarized_filtered1.lr_ann.vcf" \
--o "${CALLING}_polarized_filtered2.lr_ann.vcf"
-
-grep -v '#' "${CALLING}_polarized_filtered2.lr_ann.vcf" | wc -l 
-#c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov 4782660
-#c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov 4865867
-
-#Remove polarized ANC fixed variants (AF=0) or those that weren't polarizable (AA different from either REF or ALT):
-$BCF view -e '(INFO/AA!=REF & INFO/AA!=ALT) | INFO/AF=0.00 | INFO/AF=1.00' "${CALLING}_polarized_filtered2.lr_ann.vcf" > "${CALLING}_polarized_filtered3.lr_ann.vcf"
-
-grep -v '#' "${CALLING}_polarized_filtered3.lr_ann.vcf" | wc -l 
-#c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov 4676648
-#c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov 4758637
-
-#Apply GATK's recommended filters, and then some.     
-java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
--T SelectVariants \
--select "QUAL >= 30 && QD >= 2.0 && FS <= 60.0 && MQ >= 40.0 && MQRankSum >= -12.5 && ReadPosRankSum >= -8.0" \
--R $REF \
--V "${CALLING}_polarized_filtered3.lr_ann.vcf" \
--o "${CALLING}_polarized_filtered4.lr_ann.vcf"
-
-grep -v '#' "${CALLING}_polarized_filtered4.lr_ann.vcf" | wc -l 
-#c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov 4548968
-#c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov 4555453
-
-#Finally, for each species exclude those positions that have more than 15% missing genotypes.
-$BCF filter -e "F_MISSING > 0.15" -Ov -o "${CALLING}_polarized_filtered5.lr_ann.vcf" "${CALLING}_polarized_filtered4.lr_ann.vcf"
-
-grep -v '#' "${CALLING}_polarized_filtered5.lr_ann.vcf" | wc -l 
-#c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov 4332653
-#c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov 4420467
+  fi
+  #Filter 2: During this step, all multiallelic variants as well as all variants from the other type (SNPs/INDELs) will be dropped from the respective VCFs.
+  echo "Filtering out multiallelic variants and $OTHER variants"
+  java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+  -T SelectVariants \
+  -selectType ${TYPE} \
+  -restrictAllelesTo BIALLELIC \
+  -R $REF \
+  -V ${CALLING}"_polarized_filtered1.lr_ann.vcf" \
+  -o ${CALLING}"_polarized_filtered2_"${TYPE}".lr_ann.vcf"
+  
+  grep -v '#' ${CALLING}"_polarized_filtered2_"${TYPE}".lr_ann.vcf" | wc -l 
+  #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov 4782660
+  #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov 4865867
+  
+  #Filter 3: Remove polarized fixed variants (AF=0 or AF=1) or those that weren't polarizable (AA different from either REF or ALT):
+  echo "Filtering out non-polarizable and fixed ancestral variants"
+  $BCF view -e '(INFO/AA!=REF & INFO/AA!=ALT) | INFO/AF=0.00 | INFO/AF=1.00' ${CALLING}"_polarized_filtered2_"${TYPE}".lr_ann.vcf" > ${CALLING}"_polarized_filtered3_"${TYPE}".lr_ann.vcf"
+  
+  grep -v '#' ${CALLING}"_polarized_filtered3_"${TYPE}".lr_ann.vcf" | wc -l 
+  #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov 4676648
+  #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov 4758637
+  
+  #Filter 4: Apply GATK's recommended hard-filters, and then some.
+  echo "Filtering out low quality and unreliable variants"
+  java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+  -T SelectVariants \
+  -select "QUAL >= 30 && QD >= 2.0 && FS <= 60.0 && MQ >= 40.0 && MQRankSum >= -12.5 && ReadPosRankSum >= -8.0" \
+  -R $REF \
+  -V ${CALLING}"_polarized_filtered3_"${TYPE}"L.lr_ann.vcf" \
+  -o ${CALLING}"_polarized_filtered4_"${TYPE}".lr_ann.vcf"
+  
+  grep -v '#' ${CALLING}"_polarized_filtered4_"${TYPE}".lr_ann.vcf" | wc -l 
+  #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov 4548968
+  #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov 4555453
+  
+  #Filter 5: Finally, for each species exclude those positions that have more than 15% missing genotypes.
+  echo "Filtering out high missingness variants"
+  $BCF filter -e "F_MISSING > 0.15" -Ov -o ${CALLING}"_polarized_filtered5_"${TYPE}".lr_ann.vcf" ${CALLING}"_polarized_filtered4_"${TYPE}".lr_ann.vcf"
+  
+  grep -v '#' ${CALLING}"_polarized_filtered5_"${TYPE}".lr_ann.vcf" | wc -l 
+  #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov 4332653
+  #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov 4420467
+fi
 
 ```
 
 ##Keep substitutions only. Drop those positions that appear in either the lp or the ll separate calling 
 ```{r Filter the annotated VCF, eval=FALSE, engine='bash'}
 
-#Modify the CALLING variable all 3 times.
-
-CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov) #write down name of the calling
+TYPE=(INDEL) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
-screen -S "${CALLING}"
-CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
-script "${CALLING}_polarized_substitutions.lr_ann.log"
+screen -S "${CALLING}-${TYPE}"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+script "${CALLING}_polarized_substitutions_${TYPE}.lr_ann.log"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
 
-CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
 REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome (first eight scaffolds only)
 GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
 BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
@@ -1091,36 +1124,36 @@ COVERAGE=$(echo "${CALLING}" | rev | cut -d'_' -f1 | rev)
 
 if [[ $CALLING == "c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3"* ]] #the double brackets turns the test into a regex
   then
-    echo "${CALLING} calling recognised"
+    echo ${CALLING} "calling recognised"
     echo "retrieving true variants from the separate callings"
-    grep -v '#' /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_nm2_"$COVERAGE"/annotation/c_lp_sm_c_lp_do_nm2_"$COVERAGE"_polarized_filtered5.lr_ann.vcf | cut -f1,2 | awk '{printf ("%s\t%s\t%s\n", $1, $2-1, $2)}' > /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_nm2_"$COVERAGE"/annotation/c_lp_sm_c_lp_do_nm2_"$COVERAGE"_polarized_filtered5.bed #grab coordinates of the true lp variants (obtained in the separate calling)
+    grep -v '#' /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_nm2_"$COVERAGE"/annotation/c_lp_sm_c_lp_do_nm2_"$COVERAGE"_polarized_filtered5_"$TYPE".lr_ann.vcf | cut -f1,2 | awk '{printf ("%s\t%s\t%s\n", $1, $2-1, $2)}' > /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_nm2_"$COVERAGE"/annotation/c_lp_sm_c_lp_do_nm2_"$COVERAGE"_polarized_filtered5_"$TYPE".lr_ann.bed #grab coordinates of the true lp variants (obtained in the separate calling)
     echo "c_lp true variants retrieved"
-    grep -v '#' /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_ll_ki_c_ll_no_c_ll_po_nm3_"$COVERAGE"/annotation/c_ll_ki_c_ll_no_c_ll_po_nm3_"$COVERAGE"_polarized_filtered5.lr_ann.vcf | cut -f1,2 | awk '{printf ("%s\t%s\t%s\n", $1, $2-1, $2)}' > /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_ll_ki_c_ll_no_c_ll_po_nm3_"$COVERAGE"/annotation/c_ll_ki_c_ll_no_c_ll_po_nm3_"$COVERAGE"_polarized_filtered5.bed #grab coordinates of the true ll variants (obtained in the separate calling)
+    grep -v '#' /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_ll_ki_c_ll_no_c_ll_po_nm3_"$COVERAGE"/annotation/c_ll_ki_c_ll_no_c_ll_po_nm3_"$COVERAGE"_polarized_filtered5_"$TYPE".lr_ann.vcf | cut -f1,2 | awk '{printf ("%s\t%s\t%s\n", $1, $2-1, $2)}' > /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_ll_ki_c_ll_no_c_ll_po_nm3_"$COVERAGE"/annotation/c_ll_ki_c_ll_no_c_ll_po_nm3_"$COVERAGE"_polarized_filtered5_"$TYPE".lr_ann.bed #grab coordinates of the true ll variants (obtained in the separate calling)
     echo "c_ll true variants retrieved"
-    cat /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/*"$COVERAGE"/annotation/*_"$COVERAGE"_polarized_filtered5.bed | bedtools sort | uniq > "${CALLING}"_variants_to_remove.bed #join the lp and ll true variants bed
+    cat /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/*"$COVERAGE"/annotation/*_"$COVERAGE"_polarized_filtered5_"$TYPE".lr_ann.bed | bedtools sort | uniq > "${CALLING}"_variants_to_remove_"$TYPE".bed #join the lp and ll true variants bed
     echo "true variants joined"
-    bedtools subtract -a "${CALLING}"_polarized_filtered5.lr_ann.vcf -b "${CALLING}"_variants_to_remove.bed -header > "${CALLING}"_polarized_filtered6.lr_ann.vcf #remove true lp and ll variants from the vcf
+    bedtools subtract -a "${CALLING}"_polarized_filtered5_"$TYPE".lr_ann.vcf -b "${CALLING}"_variants_to_remove_"$TYPE".bed -header > "${CALLING}"_polarized_filtered6_"$TYPE".lr_ann.vcf #remove true lp and ll variants from the vcf
     echo "true variants filtered out"
-    grep -v '#' "${CALLING}"_polarized_filtered6.lr_ann.vcf | wc -l 
+    grep -v '#' "${CALLING}"_polarized_filtered6_"$TYPE".lr_ann.vcf | wc -l 
     #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov 1485078
     #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov 1485468
     for s in ${SPECIES[@]}
       do
       echo "retrieving 1 and 0 positions from ${s}"
-      bcftools query -l "${CALLING}"_polarized_filtered6.lr_ann.vcf | cut -c1-12 | sort | uniq | grep "${s}" > "${s}"_samples.txt
+      bcftools query -l "${CALLING}"_polarized_filtered6_"$TYPE".lr_ann.vcf | cut -c1-12 | sort | uniq | grep "${s}" > "${s}"_samples.txt
       N_SAMPLES=$(cat "${s}"_samples.txt | wc -l)
       AF_THRES=$(echo "scale=4; ($N_SAMPLES*2-2)/($N_SAMPLES*2)" | bc)
-      bcftools view -S "${s}"_samples.txt "${CALLING}"_polarized_filtered6.lr_ann.vcf | bcftools view -i "AC/AN = 0 | AC/AN > ${AF_THRES}" -Ov -o "${CALLING}"_"${s}"_1_and_0_positions.vcf #grab only those positions that have AF=0 or AF~1 (more exactly, AF>(num_alleles-2)/num_alleles, i.e. at most one derived allele). Use AC/AN instead of AF since the latter isn't recalculated for the subset of samples
-      grep -v '#' "${CALLING}"_"${s}"_1_and_0_positions.vcf | cut -f1,2 | awk '{printf ("%s\t%s\t%s\n", $1, $2-1, $2)}' >  "${CALLING}"_"${s}"_1_and_0_positions.bed
+      bcftools view -S "${s}"_samples.txt "${CALLING}"_polarized_filtered6_"$TYPE".lr_ann.vcf | bcftools view -i "AC/AN = 0 | AC/AN > ${AF_THRES}" -Ov -o "${CALLING}"_"${s}"_1_and_0_positions_"$TYPE".vcf #grab only those positions that have AF=0 or AF~1 (more exactly, AF>(num_alleles-2)/num_alleles, i.e. at most one derived allele). Use AC/AN instead of AF since the latter isn't recalculated for the subset of samples
+      grep -v '#' "${CALLING}"_"${s}"_1_and_0_positions_"$TYPE".vcf | cut -f1,2 | awk '{printf ("%s\t%s\t%s\n", $1, $2-1, $2)}' >  "${CALLING}"_"${s}"_1_and_0_positions_"$TYPE".bed
       echo "${s} 1 and 0 positions retrieved"
       done
-    bedtools intersect -a *c_lp_1_and_0_positions.bed -b *c_ll_1_and_0_positions.bed > "${CALLING}"_joined_1_and_0_positions.bed #inner join (retrieves only positions that have AF=0 or AF~1 in both species simultaneously, dropping from both species those that are variable within any)
-    bedtools intersect -a "${CALLING}"_polarized_filtered6.lr_ann.vcf -b "${CALLING}"_joined_1_and_0_positions.bed -header > "${CALLING}"_polarized_substitutions.lr_ann.vcf
+    bedtools intersect -a *c_lp_1_and_0_positions_"$TYPE".bed -b *c_ll_1_and_0_positions_"$TYPE".bed > "${CALLING}"_joined_1_and_0_positions_"$TYPE".bed #inner join (retrieves only positions that have AF=0 or AF~1 in both species simultaneously, dropping from both species those that are variable within any)
+    bedtools intersect -a "${CALLING}"_polarized_filtered6_"$TYPE".lr_ann.vcf -b "${CALLING}"_joined_1_and_0_positions_"$TYPE".bed -header > "${CALLING}"_polarized_substitutions_"$TYPE".lr_ann.vcf
     echo "non 1 and 0 positions filtered out"
-    grep -v '#' "${CALLING}"_polarized_substitutions.lr_ann.vcf | wc -l
+    grep -v '#' "${CALLING}"_polarized_substitutions_"$TYPE".lr_ann.vcf | wc -l
     #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov 1414480
     #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov 1420249
-    bedtools subtract -a "${CALLING}"_polarized_filtered6.lr_ann.vcf -b "${CALLING}"_joined_1_and_0_positions.bed -header | grep -v '#' | wc -l #sanity check that counts the number of discarded variants. This number should equal the difference between _filtered6 and _substitutions. It is for both treatments:
+    bedtools subtract -a "${CALLING}"_polarized_filtered6_"$TYPE".lr_ann.vcf -b "${CALLING}"_joined_1_and_0_positions_"$TYPE".bed -header | grep -v '#' | wc -l #sanity check that counts the number of discarded variants. This number should equal the difference between _filtered6 and _substitutions. It is for both treatments:
     #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov 70598
     #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov 65219
     else
