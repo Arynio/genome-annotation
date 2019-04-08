@@ -1,5 +1,5 @@
 ---
-title: "derived_allele_freq_ratio"
+title: "genetic_load_statistics"
 output: html_document
 ---
 
