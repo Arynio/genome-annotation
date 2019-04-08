@@ -412,10 +412,68 @@ for (f in unique(all_plot_data$feat)) {
     feat_ggplot
     ggsave(paste0(f,"_derived_allele_frequency_spectrum.pdf"), width=30, height=15, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_spectrum")
 }
-  
-  
-
-
 
 ```
 
+#4: Plot variant counts comparisons:
+```{r}
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+
+calling_counts_files <- grep(list.files("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/", pattern="*population_summary_SNP.lr_ann.txt"),pattern='nm2nm3',inv=T,value=T)
+perpop_counts <- data_frame()
+for (file in calling_counts_files) {
+  calling_counts <- read_tsv(paste0("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/",file),col_names=T) %>% select(., -species, -dataset) %>% gather(feature,N,-population,factor_key=T)
+  perpop_counts <- rbind(perpop_counts,calling_counts)
+}
+perpop_counts$population <- as.factor(perpop_counts$population)
+perpop_counts$population = factor(perpop_counts$population,levels=c("ki","no","po","sm","do"))
+perpop_counts %>% gather()
+
+counter=0
+for (i in levels(perpop_counts$population)) {
+  counter=which(levels(perpop_counts$population)==i)
+  if (counter < length(levels(perpop_counts$population))) {
+    for (j in levels(perpop_counts$population)[c((counter+1):length(levels(perpop_counts$population)))]) {
+    print(paste0(i," vs ",j))
+    i_vs_j_counts <- full_join(filter(perpop_counts,population==i),filter(perpop_counts,population==j),by=c("feature"),suffix=c(paste0("_",i),paste0("_",j))) %>% select(-contains("population"))
+    i_vs_j_counts[paste0("log_N_",i)] <- log(i_vs_j_counts[,which(colnames(i_vs_j_counts)==paste0("N_",i))])
+    i_vs_j_counts[paste0("log_N_",j)] <- log(i_vs_j_counts[,which(colnames(i_vs_j_counts)==paste0("N_",j))])
+    i_vs_j_counts <- i_vs_j_counts %>% filter(!grepl("/",feature)&!grepl("_V",feature)&!grepl("coding",feature))
+    i_vs_j_ggplot <- ggplot(data=as.data.frame(i_vs_j_counts)) +
+      geom_point(aes_string(x=paste0("log_N_",i),y=paste0("log_N_",j),colour="feature")) +
+      ggtitle(paste0(i, " vs ",j)) +
+      xlab(paste0("log_N_",i)) +
+      ylab(paste0("log_N_",j)) +
+      geom_abline() +
+      theme_bw() +
+      theme(text=element_text(size=12,face="bold"),
+          rect=element_rect(size=1),
+          axis.line=element_line(colour="black"),
+          axis.title=element_text(size=16),
+          #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+          #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+          #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+          panel.background=element_blank(),
+          panel.border=element_rect(colour="black"),
+          #panel.grid=element_blank(),
+          #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+          plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+          #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+          legend.background=element_rect(linetype="solid", colour="black", size=.5),
+          #legend.justification=c(0,0),
+          legend.key=element_rect(colour="white"),
+          #legend.key.size=unit(1.3,"cm"),
+          legend.position=c(0.18,0.78),
+          legend.title=element_blank()
+      )
+    i_vs_j_ggplot
+    ggsave(paste0("derived_allele_counts_",i,"_vs_",j,".pdf"), width=15, height=15, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_counts")
+    }
+  }
+}
+
+```
