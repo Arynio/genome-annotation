@@ -1153,157 +1153,112 @@ grep -v '#' "${CALLING}_polarized.lr_ann.vcf" | wc -l
 
 ```
 
-#8: Filter the annotated VCF.
-##Filter SNPs. Subset the VCF files in order to keep only good quality biallelic SNP variants.
+#8: Filter the annotated VCF. Subset the VCF files in order to keep only good quality biallelic variants of the desired type (SNPs or INDELs).
 ```{r Filter the annotated VCF, eval=FALSE, engine='bash'}
 
-CALLING=(c_lp_sm_c_lp_do_nm2_origcov)
+CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov) #write down name of the calling
+TYPE=(INDEL) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
-screen -S "${CALLING}"
+screen -S "${CALLING}-${TYPE}"
 CALLING=${STY#*.}
-script "${CALLING}_polarized_filtered.lr_ann.log"
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+script "${CALLING}_polarized_filtered_${TYPE}.lr_ann.log"
 CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
 
 REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome (first eight scaffolds only)
 GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
 BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
-
-#Remove repetitive regions and those with low mappability:
-bedtools subtract -a "${CALLING}_polarized.lr_ann.vcf" -b /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/repeats_and_lowcomp_no_redundant_mappability.k75_lessthan90.bed -header > "${CALLING}_polarized_filtered1.lr_ann.vcf"
-
-grep -v '#' "${CALLING}_polarized_filtered1.lr_ann.vcf" | wc -l
-#c_lp_sm_c_lp_do_nm2_samecov 1639704
-#c_ll_ki_c_ll_no_c_ll_po_nm3_samecov 5008406
-#c_lp_sm_c_lp_do_nm2_origcov 1791154
-#c_ll_ki_c_ll_no_c_ll_po_nm3_origcov 5030301
-#c_ll_ki_c_ll_no_c_ll_po_h_ll_pv_nm3_origcov 5104185 #It has more than the unfiltered one due to some weird behaviour of bedtools subtract with some INDELs that become duplicated. These will be removed in the subsequent step.
-
-#During this step, all INDELs as well as all multiallelic and bad quality SNPs will be dropped from the respective VCFs.
-java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
--T SelectVariants \
--selectType SNP \
--restrictAllelesTo BIALLELIC \
--R $REF \
--V "${CALLING}_polarized_filtered1.lr_ann.vcf" \
--o "${CALLING}_polarized_filtered2.lr_ann.vcf"
-
-grep -v '#' "${CALLING}_polarized_filtered2.lr_ann.vcf" | wc -l 
-#c_lp_sm_c_lp_do_nm2_samecov 1276973
-#c_ll_ki_c_ll_no_c_ll_po_nm3_samecov 4165440
-#c_lp_sm_c_lp_do_nm2_origcov 1374341
-#c_ll_ki_c_ll_no_c_ll_po_nm3_origcov 4168579
-#c_ll_ki_c_ll_no_c_ll_po_h_ll_pv_nm3_origcov 4302320
-
-#Remove polarized ANC fixed variants (AF=0) or those that weren't polarizable (AA different from either REF or ALT):
-$BCF view -e '(INFO/AA!=REF & INFO/AA!=ALT) | INFO/AF=0.00' "${CALLING}_polarized_filtered2.lr_ann.vcf" > "${CALLING}_polarized_filtered3.lr_ann.vcf"
-
-grep -v '#' "${CALLING}_polarized_filtered3.lr_ann.vcf" | wc -l 
-#c_lp_sm_c_lp_do_nm2_samecov 1228607
-#c_ll_ki_c_ll_no_c_ll_po_nm3_samecov 2909211
-#c_lp_sm_c_lp_do_nm2_origcov 1323862
-#c_ll_ki_c_ll_no_c_ll_po_nm3_origcov 2911435
-#c_ll_ki_c_ll_no_c_ll_po_h_ll_pv_nm3_origcov 3070696
-
-#Apply GATK's recommended filters, and then some.     
-java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
--T SelectVariants \
--select "QUAL >= 30 && QD >= 2.0 && FS <= 60.0 && MQ >= 40.0 && MQRankSum >= -12.5 && ReadPosRankSum >= -8.0" \
--R $REF \
--V "${CALLING}_polarized_filtered3.lr_ann.vcf" \
--o "${CALLING}_polarized_filtered4.lr_ann.vcf"
-
-grep -v '#' "${CALLING}_polarized_filtered4.lr_ann.vcf" | wc -l 
-#c_lp_sm_c_lp_do_nm2_samecov 1175599
-#c_ll_ki_c_ll_no_c_ll_po_nm3_samecov 2080652
-#c_lp_sm_c_lp_do_nm2_origcov 1184450
-#c_ll_ki_c_ll_no_c_ll_po_nm3_origcov 2089908
-#c_ll_ki_c_ll_no_c_ll_po_h_ll_pv_nm3_origcov 2226163
-
-#Finally, for each species exclude those positions that have more than 20% missing genotypes.
-$BCF filter -e "F_MISSING > 0.2" -Ov -o "${CALLING}_polarized_filtered5.lr_ann.vcf" "${CALLING}_polarized_filtered4.lr_ann.vcf"
-
-grep -v '#' "${CALLING}_polarized_filtered5.lr_ann.vcf" | wc -l 
-#c_lp_sm_c_lp_do_nm2_samecov 1089524
-#c_ll_ki_c_ll_no_c_ll_po_nm3_samecov 2038604
-#c_lp_sm_c_lp_do_nm2_origcov 1137223
-#c_ll_ki_c_ll_no_c_ll_po_nm3_origcov 2050321
-#c_ll_ki_c_ll_no_c_ll_po_h_ll_pv_nm3_origcov 2198266
-
-```
-
-##Filter INDELs. Subset the VCF files in order to keep only good quality biallelic INDEL variants.
-```{r Filter the annotated VCF, eval=FALSE, engine='bash'}
-
-CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov)
-cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
-screen -S "${CALLING}"
-CALLING=${STY#*.}
-script "${CALLING}_polarized_filtered_INDEL.lr_ann.log"
-CALLING=${STY#*.}
-
-REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome (first eight scaffolds only)
-GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
-BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
-
-#Remove repetitive regions and those with low mappability:
-#Already performed when filtering SNPs (the first filtering step is common to SNPs and INDELs).
-
-if [ -f ${CALLING}"_polarized_filtered1.lr_ann.vcf" ]
+#The following short loop defines the OTHER variable as the opposite of the TYPE variable (SNP or INDEL)
+if [ $TYPE = "SNP" ]
   then
-  echo "Filtering INDELs"
-  #During this step, all INDELs as well as all multiallelic and bad quality SNPs will be dropped from the respective VCFs.
+  OTHER=(INDEL)
+elif [ $TYPE = "INDEL" ]
+  then
+  OTHER=(SNP)
+fi
+
+if [ $TYPE != "SNP" ] && [ $TYPE != "INDEL" ] #Don't apply filters if $TYPE is invalid
+  then
+  echo "Invalid value for variable TYPE"
+  echo "Filtering aborted"
+  else #Apply filters if $TYPE is valid
+  echo "Initializing filtering for $TYPE variants"
+  
+  if [ -f ${CALLING}"_polarized_filtered1.lr_ann.vcf" ] #Since filter 1 is common for both types of variants, skip it if it's been performed before
+    then
+    echo "Repetitive and low mappability regions already filtered out"
+    echo "Skipping this step"
+    else
+    #Filter 1: Remove repetitive regions and those with low mappability:
+    echo "Filtering out repetitive and low mappability regions"
+    bedtools subtract -a ${CALLING}"_polarized.lr_ann.vcf" -b /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/repeats_and_lowcomp_no_redundant_mappability.k75_lessthan90.bed -header > ${CALLING}"_polarized_filtered1.lr_ann.vcf"
+    
+    grep -v '#' ${CALLING}"_polarized_filtered1.lr_ann.vcf" | wc -l
+    #c_lp_sm_c_lp_do_nm2_samecov 1639704
+    #c_ll_ki_c_ll_no_c_ll_po_nm3_samecov 5008406
+    #c_lp_sm_c_lp_do_nm2_origcov 1791154
+    #c_ll_ki_c_ll_no_c_ll_po_nm3_origcov 5030301
+    #c_ll_ki_c_ll_no_c_ll_po_h_ll_pv_nm3_origcov 5104185 #It has more than the unfiltered one due to some weird behaviour of bedtools subtract with some INDELs that become duplicated. These will be removed in the subsequent step.
+  fi
+  
+  #Filter 2: During this step, all multiallelic variants as well as all variants from the other type (SNPs/INDELs) will be dropped from the respective VCFs.
+  echo "Filtering out multiallelic variants and $OTHER variants"
   java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
   -T SelectVariants \
-  -selectType INDEL \
+  -selectType ${TYPE} \
   -restrictAllelesTo BIALLELIC \
   -R $REF \
   -V ${CALLING}"_polarized_filtered1.lr_ann.vcf" \
-  -o ${CALLING}"_polarized_filtered2_INDEL.lr_ann.vcf"
+  -o ${CALLING}"_polarized_filtered2_"${TYPE}".lr_ann.vcf"
   
-  grep -v '#' ${CALLING}"_polarized_filtered2_INDEL.lr_ann.vcf" | wc -l 
+  grep -v '#' ${CALLING}"_polarized_filtered2_"${TYPE}".lr_ann.vcf" | wc -l 
   #c_lp_sm_c_lp_do_nm2_samecov 1276973
   #c_ll_ki_c_ll_no_c_ll_po_nm3_samecov 4165440
   #c_lp_sm_c_lp_do_nm2_origcov 1374341
   #c_ll_ki_c_ll_no_c_ll_po_nm3_origcov 4168579
   #c_ll_ki_c_ll_no_c_ll_po_h_ll_pv_nm3_origcov 4302320
   
-  #Remove polarized ANC fixed variants (AF=0) or those that weren't polarizable (AA different from either REF or ALT):
-  $BCF view -e '(INFO/AA!=REF & INFO/AA!=ALT) | INFO/AF=0.00' ${CALLING}"_polarized_filtered2_INDEL.lr_ann.vcf" > ${CALLING}"_polarized_filtered3_INDEL.lr_ann.vcf"
+  #Filter 3: Remove polarized ANC fixed variants (AF=0) or those that weren't polarizable (AA different from either REF or ALT):
+  echo "Filtering out non-polarizable and fixed ancestral variants"
+  $BCF view -e '(INFO/AA!=REF & INFO/AA!=ALT) | INFO/AF=0.00' ${CALLING}"_polarized_filtered2_"${TYPE}".lr_ann.vcf" > ${CALLING}"_polarized_filtered3_"${TYPE}".lr_ann.vcf"
   
-  grep -v '#' ${CALLING}"_polarized_filtered3_INDEL.lr_ann.vcf" | wc -l 
+  grep -v '#' ${CALLING}"_polarized_filtered3_"${TYPE}".lr_ann.vcf" | wc -l 
   #c_lp_sm_c_lp_do_nm2_samecov 1228607
   #c_ll_ki_c_ll_no_c_ll_po_nm3_samecov 2909211
   #c_lp_sm_c_lp_do_nm2_origcov 1323862
   #c_ll_ki_c_ll_no_c_ll_po_nm3_origcov 2911435
   #c_ll_ki_c_ll_no_c_ll_po_h_ll_pv_nm3_origcov 3070696
   
-  #Apply GATK's recommended filters, and then some.     
+  #Filter 4: Apply GATK's recommended hard-filters, and then some.
+  echo "Filtering out low quality and unreliable variants"
   java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
   -T SelectVariants \
   -select "QUAL >= 30 && QD >= 2.0 && FS <= 60.0 && MQ >= 40.0 && MQRankSum >= -12.5 && ReadPosRankSum >= -8.0" \
   -R $REF \
-  -V ${CALLING}"_polarized_filtered3_INDEL.lr_ann.vcf" \
-  -o ${CALLING}"_polarized_filtered4_INDEL.lr_ann.vcf"
+  -V ${CALLING}"_polarized_filtered3_"${TYPE}"L.lr_ann.vcf" \
+  -o ${CALLING}"_polarized_filtered4_"${TYPE}".lr_ann.vcf"
   
-  grep -v '#' ${CALLING}"_polarized_filtered4_INDEL.lr_ann.vcf" | wc -l 
+  grep -v '#' ${CALLING}"_polarized_filtered4_"${TYPE}".lr_ann.vcf" | wc -l 
   #c_lp_sm_c_lp_do_nm2_samecov 1175599
   #c_ll_ki_c_ll_no_c_ll_po_nm3_samecov 2080652
   #c_lp_sm_c_lp_do_nm2_origcov 1184450
   #c_ll_ki_c_ll_no_c_ll_po_nm3_origcov 2089908
   #c_ll_ki_c_ll_no_c_ll_po_h_ll_pv_nm3_origcov 2226163
   
-  #Finally, for each species exclude those positions that have more than 20% missing genotypes.
-  $BCF filter -e "F_MISSING > 0.2" -Ov -o ${CALLING}"_polarized_filtered5_INDEL.lr_ann.vcf" ${CALLING}"_polarized_filtered4_INDEL.lr_ann.vcf"
+  #Filter 5: Finally, for each species exclude those positions that have more than 20% missing genotypes.
+  echo "Filtering out high missingness variants"
+  $BCF filter -e "F_MISSING > 0.2" -Ov -o ${CALLING}"_polarized_filtered5_"${TYPE}".lr_ann.vcf" ${CALLING}"_polarized_filtered4_"${TYPE}".lr_ann.vcf"
   
-  grep -v '#' ${CALLING}"_polarized_filtered5_INDEL.lr_ann.vcf" | wc -l 
+  grep -v '#' ${CALLING}"_polarized_filtered5_"${TYPE}".lr_ann.vcf" | wc -l 
   #c_lp_sm_c_lp_do_nm2_samecov 1089524
   #c_ll_ki_c_ll_no_c_ll_po_nm3_samecov 2038604
   #c_lp_sm_c_lp_do_nm2_origcov 1137223
   #c_ll_ki_c_ll_no_c_ll_po_nm3_origcov 2050321
   #c_ll_ki_c_ll_no_c_ll_po_h_ll_pv_nm3_origcov 2198266
-  else
-  echo "ERROR: run the SNPs filters first"
-  fi
+fi
 
 ```
 
@@ -1312,7 +1267,7 @@ if [ -f ${CALLING}"_polarized_filtered1.lr_ann.vcf" ]
 
 ```{r Obtain per dataset VCFs, eval=FALSE, engine='bash'}
 
-CALLING=(c_lp_sm_c_lp_do_nm2_origcov) #write down name of the calling
+CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov) #write down name of the calling
 TYPE=(INDEL) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
 screen -S "${CALLING}-${TYPE}"
@@ -1549,7 +1504,7 @@ for POP in ${POPS[@]}
 
 #For each dataset obtain the list of positions that have lower (higher) depth than the minimum (maximum) within 0.95 of the distribution, as calculated in the previous section, and join them to later remove them:
 
-CALLING=(c_lp_sm_c_lp_do_nm2_origcov) #write down name of the calling
+CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov) #write down name of the calling
 TYPE=(INDEL) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
 screen -S "${CALLING}-${TYPE}"
@@ -1597,7 +1552,7 @@ for j in ${DATASETS[@]}
 
 ```{r Obtain per population VCFs, eval=FALSE, engine='bash'}
 
-CALLING=(c_lp_sm_c_lp_do_nm2_origcov) #write down name of the calling
+CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov) #write down name of the calling
 TYPE=(INDEL) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
 screen -S "${CALLING}-${TYPE}"
@@ -1829,7 +1784,7 @@ for p in ${POPS[@]}
 
 ```{r Obtain per population VCFs, eval=FALSE, engine='bash'}
 
-CALLING=(c_lp_sm_c_lp_do_nm2_origcov) #write down name of the calling
+CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov) #write down name of the calling
 TYPE=(INDEL) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
 screen -S "${CALLING}-${TYPE}"
@@ -1883,7 +1838,7 @@ for pop in ${POPS[@]}
 
 ```{r Split the population VCFs into per individual VCFs, eval=FALSE, engine='bash'}
 
-CALLING=(c_lp_sm_c_lp_do_nm2_origcov) #write down name of the calling
+CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov) #write down name of the calling
 TYPE=(INDEL) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
 screen -S "${CALLING}-${TYPE}"
@@ -1918,7 +1873,7 @@ for i in ${POP[@]}
   do
   echo "${i}"
   mkdir -p "${i}"_"${NM_COV}"_individuals
-  VCF_LIST=$(ls ${i}"_"${NM_COV}"_perpop/*_"${i}"_"${NM_COV}"_perpop_"${TYPE}".lr_ann.vcf")
+  VCF_LIST=$(ls ${i}"_"${NM_COV}"_perpop/"*"_"${i}"_"${NM_COV}"_perpop_"${TYPE}".lr_ann.vcf")
   for j in ${VCF_LIST[@]}
     do 
     INDIVIDUALS=$(bcftools query -l "${j}" | sort | uniq)
@@ -2008,8 +1963,8 @@ scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dan
 
 ```{r Get annotation statistics, eval=FALSE, engine='bash'}
 
-CALLING=(c_lp_sm_c_lp_do_nm2_origcov) #write down name of the calling
-TYPE=(INDEL) #write down SNP or INDEL
+CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov) #write down name of the calling
+TYPE=(SNP) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
 screen -S "${CALLING}-${TYPE}"
 CALLING=${STY#*.}
@@ -2033,7 +1988,7 @@ BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
 
 cd $V_PATH/$CALLING/annotation
 rm ${CALLING}"_ann_population_summary_"${TYPE}".lr_ann.txt"
-echo -e "species\tpopulation\tdataset\ttotal_V\tintergenic_V\tintronic_V\tcoding_V\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tUCNE_V\tmissense/synonymous_V\tmissense/synonymous_A\tsynonymous/intronic_V\tmissense/intronic_V" > ${CALLING}"_ann_population_summary_"${TYPE}".lr_ann.txt"
+echo -e "species\tpopulation\tdataset\ttotal_V\ttotal_A\tintergenic_V\tintergenic_A\tintronic_V\tintronic_A\tcoding_V\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tUCNE_V\tUCNE_A\tmissense/synonymous_V\tmissense/synonymous_A\tsynonymous/intronic_V\tmissense/intronic_V" > ${CALLING}"_ann_population_summary_"${TYPE}".lr_ann.txt"
 POPLIST=($(ls `find . -name *"_perpop_subsample_n008_"${TYPE}".lr_ann.vcf" -print`))
 for i in "${POPLIST[@]}"
   do
@@ -2044,21 +1999,25 @@ for i in "${POPLIST[@]}"
   POPULATION=$(echo "${vcf}" | cut -c14-15)
   DATASET=$(echo "${vcf}" | cut -c6-7)
   TOTAL_V=$(grep -v '#' ${i} | wc -l)
+  TOTAL_A=$(grep -v '#' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
   INTERGENIC_V=$(grep 'intergenic' ${i} | wc -l)
+  INTERGENIC_A=$(grep 'intergenic' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
   INTRONIC_V=$(grep 'intron_variant' ${i} | wc -l)
+  INTRONIC_A=$(grep 'intron_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
   CODING_V=$(grep 'CDS' ${i} | wc -l)
   SYNONYMOUS_V=$(grep 'synonymous_variant' ${i} | wc -l)
   SYNONYMOUS_A=$(grep 'synonymous_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
   MISSENSE_V=$(grep 'missense_variant' ${i} | wc -l)
   MISSENSE_A=$(grep 'missense_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
-  NONSENSE_V=$(grep -e 'lost' -e 'gained' ${i} | wc -l)
-  NONSENSE_A=$(grep -e 'lost' -e 'gained' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  NONSENSE_V=$(grep '|HIGH|' ${i} | wc -l)
+  NONSENSE_A=$(grep '|HIGH|' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
   UCNE_V=$(grep 'UCNE' ${i} | wc -l)
+  UCNE_A=$(grep 'UCNE' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
   MISSENSE_SYNONYMOUS_V=$(echo "scale=4; $MISSENSE_V/$SYNONYMOUS_V" | bc)
   MISSENSE_SYNONYMOUS_A=$(echo "scale=4; $MISSENSE_A/$SYNONYMOUS_A" | bc)
   SYNONYMOUS_INTRONIC_V=$(echo "scale=4; $SYNONYMOUS_V/$INTRONIC_V" | bc)
   MISSENSE_INTRONIC_V=$(echo "scale=4; $MISSENSE_V/$INTRONIC_V" | bc)
-  echo -e "$SPECIES\t$POPULATION\t$DATASET\t$TOTAL_V\t$INTERGENIC_V\t$INTRONIC_V\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$UCNE_V\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A\t$SYNONYMOUS_INTRONIC_V\t$MISSENSE_INTRONIC_V" >> ${CALLING}"_ann_population_summary_"${TYPE}".lr_ann.txt"
+  echo -e "$SPECIES\t$POPULATION\t$DATASET\t$TOTAL_V\t$TOTAL_A\t$INTERGENIC_V\t$INTERGENIC_A\t$INTRONIC_V\t$INTRONIC_A\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$UCNE_V\t$UCNE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A\t$SYNONYMOUS_INTRONIC_V\t$MISSENSE_INTRONIC_V" >> ${CALLING}"_ann_population_summary_"${TYPE}".lr_ann.txt"
   done
 
 #From outside the server:
