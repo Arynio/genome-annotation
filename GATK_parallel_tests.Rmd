@@ -10,16 +10,16 @@ output: html_document
 #1. Subset first 4 scaffolds from 5 random c_lp BAMs.
 ```{r, eval=FALSE, engine='bash'}
 
-mkdir -p /home/dkleinman/GATK_tests
+mkdir -p /GRUPOS/grupolince/GATK_tests
 cd /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome
-head -n4 bed_file_all_the_genome.bed > /home/dkleinman/GATK_tests/scaffolds_lp23.s00001_to_s00004.bed
+head -n4 bed_file_all_the_genome.bed > /GRUPOS/grupolince/GATK_tests/scaffolds_lp23.s00001_to_s00004.bed
 
-cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
 declare SAMPLES=$(ls c_lp*recal_round-1.nm2.bam | cut -c1-12 | shuf | head -n5)
 for i in ${SAMPLES[@]}
   do
   echo "${i}"
-  samtools view -b -h -L /home/dkleinman/GATK_tests/scaffolds_lp23.s00001_to_s00004.bed "${i}"_recal_round-1.nm2.bam > /home/dkleinman/GATK_tests/"${i}"_recal_round-1.s00001_to_s00004.nm2.bam
+  samtools view -b -h -L /GRUPOS/grupolince/GATK_tests/scaffolds_lp23.s00001_to_s00004.bed "${i}"_recal_round-1.nm2.bam > /GRUPOS/grupolince/GATK_tests/"${i}"_recal_round-1.s00001_to_s00004.nm2.bam
   samtools index "${i}"_recal_round-1.s00001_to_s00004.nm2.bam
   done
 
@@ -28,27 +28,27 @@ for i in ${SAMPLES[@]}
 #2. GATK calling script.
 ```{r, eval=FALSE, engine='bash'}
 
-cd /home/dkleinman/GATK_tests/
+cd /GRUPOS/grupolince/GATK_tests
 
 CALLING=$(echo ${STY#*.} | cut -d'-' -f1) #name of the calling
-SCAFFOLD=$(echo ${STY#*.} | rev | cut -d'-' -f1 | rev) #scaffolds to work with
+SCAFFOLDS=$(echo ${STY#*.} | rev | cut -d'-' -f1 | rev) #scaffolds to work with
 N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING)
 #echo $N_POPS
 POPS=$(echo $CALLING | fold -w8 | cut -c1-7 | head -n$N_POPS | sort | uniq)
 #echo $POPS
-REF=/home/dkleinman/GATK_tests/lp23.fa #path to reference genome
+REF=/GRUPOS/grupolince/GATK_tests/lp23.fa #path to reference genome
 GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
-SAMPLES=$(for p in ${POPS[@]}; do ls ${p}*recal_round-1.*.bam | cut -c1-12 | sort | uniq; done)
+SAMPLES=$(for p in ${POPS[@]}; do ls /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered/${p}*recal_round-1.*.bam | cut -c1-12 | sort | uniq; done)
 
-echo "calling:" $CALLING "will be performed for scaffold(s):" $SCAFFOLD "and for sample(s):"
+echo "calling:" $CALLING "will be performed for scaffold(s):" $SCAFFOLDS "and for sample(s):"
 echo "${SAMPLES}"
 
 java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
 -T HaplotypeCaller \
 -R $REF \
--L scaffold_lp23.${SCAFFOLD}.bed \
-$(for var in $SAMPLES; do if [ -e ${var}_recal_round-1_25x.*.bam ]; then echo -I ${var}_recal_round-1_25x.*.bam" "; else echo -I ${var}_recal_round-1.*.bam" "; fi; done) \
--o ${CALLING}-${SCAFFOLD}.vcf
+-L bed_file_lp23.${SCAFFOLDS}.bed \
+$(for var in $SAMPLES; do if [ -e /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered/${var}_recal_round-1_25x.*.bam ]; then echo -I /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered/${var}_recal_round-1_25x.*.bam" "; else echo -I /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered/${var}_recal_round-1.*.bam" "; fi; done) \
+-o ${CALLING}-${SCAFFOLDS}.vcf
 
 ```
 
@@ -56,32 +56,43 @@ $(for var in $SAMPLES; do if [ -e ${var}_recal_round-1_25x.*.bam ]; then echo -I
 ```{r, eval=FALSE, engine='bash'}
 
 #Save it in a text editor as GATK_calling.sh and upload it to the server:
-scp /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/GATK_calling.sh dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/GATK_tests
+scp /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/GATK_calling.sh dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/GATK_tests
 
 ```
 
 #4. Run GATK for the desired calling in parallel or at once.
 ```{r, eval=FALSE, engine='bash'}
 
-PARALLEL=(yes) #input 'yes' or 'no' without quotes
 CALLING=(c_lp_sm_c_lp_do_nm2_origcov) #input name of the calling
+PARALLEL=(yes) #input 'yes' or 'no' without quotes
+PARTITIONS=10
 
-cd /home/dkleinman/GATK_tests
+cd /GRUPOS/grupolince/GATK_tests
 unset REGIONS
 if [ $PARALLEL == "no" ]
   then
   echo "the calling will be performed at once"
-  REGIONS=$(echo "/home/dkleinman/GATK_tests/scaffold_lp23.s00001_to_s00004.bed")
+  REGIONS=$(realpath bed_file_all_the_genome.bed)
 elif [ $PARALLEL == "yes" ]
   then
   echo "the calling will be parallelised"
-  readarray COORDINATES < scaffold_lp23.s00001_to_s00004.bed
-  for row in "${COORDINATES[@]}"
+  rm bed_file_lp23.*_to_*.bed
+  TOTAL_SCAFFOLDS=$(cat bed_file_all_the_genome.bed | wc -l)
+  GROUP=$(echo "($TOTAL_SCAFFOLDS/$PARTITIONS)-1" | bc)
+  readarray COORDINATES < bed_file_all_the_genome.bed
+  COUNTER=1
+  for ((row=1; row < "${#COORDINATES[@]}"; row+=$GROUP+1));
     do
-    SCAFFOLD=$(echo ${row} | cut -d' ' -f1)
-    #echo ${row} > "scaffold_"${SCAFFOLD}".bed"
+    START=$row
+    START_SC=$(printf "s%05d" $START)
+    END=$(echo "$START+$GROUP" | bc)
+    END_SC=$(printf "s%05d" $END)
+    NEXT=$(echo "$END+1" | bc)
+    sed -n $START','$END'p;'$NEXT'q' bed_file_all_the_genome.bed > "bed_file_lp23."$START_SC"_to_"$END_SC".bed"
+    echo "partition" $COUNTER "starts at scaffold" $START_SC "and finishes at scaffold" $END_SC
+    ((COUNTER+=1))
     done
-  REGIONS=$(realpath scaffold_lp23.*.bed | grep -v "_to_")
+  REGIONS=$(realpath bed_file_lp23.*_to_*.bed)
 else
   echo "wrong value for variable PARALLEL"
   REGIONS=()
@@ -93,13 +104,13 @@ NL=$'\n'
 for r in ${REGIONS[@]}
   do
   echo ${r}
-  SCAFFOLD=$(echo ${r} | cut -d'.' -f2)
-  echo $SCAFFOLD
-  screen -dmS "${CALLING}-${SCAFFOLD}"
-  screen -S "${CALLING}-${SCAFFOLD}" -p 0 -X stuff "script ${CALLING}-${SCAFFOLD}.log$NL"
-  screen -S "${CALLING}-${SCAFFOLD}" -p 0 -X stuff "time ./GATK_calling.sh; exec bash$NL"
-  screen -S "${CALLING}-${SCAFFOLD}" -p 0 -X stuff "exit$NL"
-  screen -S "${CALLING}-${SCAFFOLD}" -p 0 -X stuff "exit$NL"
+  SCAFFOLDS=$(echo ${r} | cut -d'.' -f2)
+  echo $SCAFFOLDS
+  screen -dmS "${CALLING}-${SCAFFOLDS}"
+  screen -S "${CALLING}-${SCAFFOLDS}" -p 0 -X stuff "script ${CALLING}-${SCAFFOLDS}.log$NL"
+  screen -S "${CALLING}-${SCAFFOLDS}" -p 0 -X stuff "time ./GATK_calling.sh; exec bash$NL"
+  screen -S "${CALLING}-${SCAFFOLDS}" -p 0 -X stuff "exit$NL"
+  screen -S "${CALLING}-${SCAFFOLDS}" -p 0 -X stuff "exit$NL"
   done
 
 ```
