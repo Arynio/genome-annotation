@@ -38,7 +38,7 @@ POPS=$(echo $CALLING | fold -w8 | cut -c1-7 | head -n$N_POPS | sort | uniq)
 #echo $POPS
 REF=/GRUPOS/grupolince/GATK_tests/lp23.fa #path to reference genome
 GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
-SAMPLES=$(for p in ${POPS[@]}; do ls /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered/${p}*recal_round-1.*.bam | cut -c1-12 | sort | uniq; done)
+SAMPLES=$(for p in ${POPS[@]}; do ls /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered/${p}*recal_round-1.*.bam | rev | cut -d'/' -f1 | rev | cut -c1-12 | sort | uniq; done)
 
 echo "calling:" $CALLING "will be performed for scaffold(s):" $SCAFFOLDS "and for sample(s):"
 echo "${SAMPLES}"
@@ -48,6 +48,7 @@ java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK
 -R $REF \
 -L bed_file_lp23.${SCAFFOLDS}.bed \
 $(for var in $SAMPLES; do if [ -e /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered/${var}_recal_round-1_25x.*.bam ]; then echo -I /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered/${var}_recal_round-1_25x.*.bam" "; else echo -I /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered/${var}_recal_round-1.*.bam" "; fi; done) \
+-ERC BP_RESOLUTION \
 -o ${CALLING}-${SCAFFOLDS}.vcf
 
 ```
@@ -65,7 +66,7 @@ scp /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/GATK_calling.sh dklein
 
 CALLING=(c_lp_sm_c_lp_do_nm2_origcov) #input name of the calling
 PARALLEL=(yes) #input 'yes' or 'no' without quotes
-PARTITIONS=10
+PARTITIONS=6
 
 cd /GRUPOS/grupolince/GATK_tests
 unset REGIONS
@@ -103,7 +104,7 @@ echo "${REGIONS}"
 NL=$'\n'
 for r in ${REGIONS[@]}
   do
-  echo ${r}
+  #echo ${r}
   SCAFFOLDS=$(echo ${r} | cut -d'.' -f2)
   echo $SCAFFOLDS
   screen -dmS "${CALLING}-${SCAFFOLDS}"
