@@ -23,7 +23,7 @@ cat features_derived_allele_freq_ratio.txt
 ###For variants within species:
 ```{r Calculate derived allele frequency ratio, eval=FALSE, engine='bash'}
 
-CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov)
+CALLING=(c_lp_sm_c_lp_do_nm2_origcov) #c_ll_ki_c_ll_no_c_ll_po_nm3_origcov #c_lp_sm_c_lp_do_nm2_origcov
 TYPE=(SNP) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
 screen -S "${CALLING}-${TYPE}"
@@ -88,7 +88,7 @@ for p1 in ${POPS[@]}
     LANG=en_EN join -a1 -a2 -e 0.00 -o auto -j 1 <(LANG=en_EN sort -k1 ./*/${p1}_${NM_COV}_perpop_SYN_${TYPE}.lr_ann.bed) <(LANG=en_EN sort -k1 ./*/${p2}_${NM_COV}_perpop_SYN_${TYPE}.lr_ann.bed) | awk -F"\t|_" '{print $1,$2,$3,$4,$5}' OFS="\t" | LANG=en_EN sort -k1,1 -k2,2n | awk '{printf "%s\t%s\t%s\t%.3f\t%.3f\t%.3f\t%.3f\n", $1,$2,$3,$4,$5,$4*(1-$5),$5*(1-$4)}' > derived_allele_freq_ratio/${p1}_vs_${p2}_${NM_COV}_perpop_SYN_${TYPE}.lr_ann.bed #col1: scaffold, col2: pos_start, col3: pos_end, col4: p1_af, col5: p2_af, col6: p1_af*(1-p2_af), col7: p2_af*(1-p1_af)
     SUM_P1=$(cut -f6 derived_allele_freq_ratio/${p1}_vs_${p2}_${NM_COV}_perpop_SYN_${TYPE}.lr_ann.bed | paste -sd+ | bc)
     SUM_P2=$(cut -f7 derived_allele_freq_ratio/${p1}_vs_${p2}_${NM_COV}_perpop_SYN_${TYPE}.lr_ann.bed | paste -sd+ | bc)
-    RATIO=$(echo "scale=3; $SUM_P1/$SUM_P2" | bc)
+    RATIO=$(echo "scale=6; $SUM_P1/$SUM_P2" | bc)
     echo -e "$p1\t$p2\t$RATIO" >> derived_allele_freq_ratio/${CALLING}_SYN_derived_freq_ratio_${TYPE}.txt
     for f in ${DEL_FEATURES[@]}
       do
@@ -96,7 +96,7 @@ for p1 in ${POPS[@]}
       LANG=en_EN join -a1 -a2 -e 0.00 -o auto -j 1 <(LANG=en_EN sort -k1 ./*/${p1}_${NM_COV}_perpop_${f}_${TYPE}.lr_ann.bed) <(LANG=en_EN sort -k1 ./*/${p2}_${NM_COV}_perpop_${f}_${TYPE}.lr_ann.bed) | awk -F"\t|_" '{print $1,$2,$3,$4,$5}' OFS="\t" | LANG=en_EN sort -k1,1 -k2,2n | awk '{printf "%s\t%s\t%s\t%.3f\t%.3f\t%.3f\t%.3f\n", $1,$2,$3,$4,$5,$4*(1-$5),$5*(1-$4)}' > derived_allele_freq_ratio/${p1}_vs_${p2}_${NM_COV}_perpop_${f}_${TYPE}.lr_ann.bed
       SUM_P1=$(cut -f6 derived_allele_freq_ratio/${p1}_vs_${p2}_${NM_COV}_perpop_${f}_${TYPE}.lr_ann.bed | paste -sd+ | bc)
       SUM_P2=$(cut -f7 derived_allele_freq_ratio/${p1}_vs_${p2}_${NM_COV}_perpop_${f}_${TYPE}.lr_ann.bed | paste -sd+ | bc)
-      RATIO=$(echo "scale=3; $SUM_P1/$SUM_P2" | bc)
+      RATIO=$(echo "scale=6; $SUM_P1/$SUM_P2" | bc)
       echo -e "$RATIO" >> derived_allele_freq_ratio/${CALLING}_${f}_derived_freq_ratio_${TYPE}.txt
       done
     done
@@ -190,7 +190,7 @@ for p1 in ${POPS[@]}
     LANG=en_EN join -a1 -a2 -e 0.00 -o auto -j 1 <(LANG=en_EN sort -k1 ./*/${p1}_${NM_COV}_perpop_SYN_${TYPE}.lr_ann.bed) <(LANG=en_EN sort -k1 ./*/${p2}_${NM_COV}_perpop_SYN_${TYPE}.lr_ann.bed) | awk -F"\t|_" '{print $1,$2,$3,$4,$5}' OFS="\t" | LANG=en_EN sort -k1,1 -k2,2n | awk '{printf "%s\t%s\t%s\t%.3f\t%.3f\t%.3f\t%.3f\n", $1,$2,$3,$4,$5,$4*(1-$5),$5*(1-$4)}' > derived_allele_freq_ratio/${p1}_vs_${p2}_${NM_COV}_perpop_SYN_${TYPE}.lr_ann.bed #col1: scaffold, col2: pos_start, col3: pos_end, col4: p1_af, col5: p2_af, col6: p1_af*(1-p2_af), col7: p2_af*(1-p1_af)
     SUM_P1=$(cut -f6 derived_allele_freq_ratio/${p1}_vs_${p2}_${NM_COV}_perpop_SYN_${TYPE}.lr_ann.bed | paste -sd+ | bc)
     SUM_P2=$(cut -f7 derived_allele_freq_ratio/${p1}_vs_${p2}_${NM_COV}_perpop_SYN_${TYPE}.lr_ann.bed | paste -sd+ | bc)
-    RATIO=$(if [ $SUM_P1 == 0 ] || [ $SUM_P2 == 0 ]; then echo 0.00; else echo "scale=3; $SUM_P1/$SUM_P2" | bc; fi)
+    RATIO=$(if [ $SUM_P1 == 0 ] || [ $SUM_P2 == 0 ]; then echo 0.00; else echo "scale=6; $SUM_P1/$SUM_P2" | bc; fi)
     echo -e "$p1\t$p2\t$RATIO" >> derived_allele_freq_ratio/${CALLING}_SYN_derived_freq_ratio_${TYPE}.txt
     for f in ${DEL_FEATURES[@]}
       do
@@ -198,7 +198,7 @@ for p1 in ${POPS[@]}
       LANG=en_EN join -a1 -a2 -e 0.00 -o auto -j 1 <(LANG=en_EN sort -k1 ./*/${p1}_${NM_COV}_perpop_${f}_${TYPE}.lr_ann.bed) <(LANG=en_EN sort -k1 ./*/${p2}_${NM_COV}_perpop_${f}_${TYPE}.lr_ann.bed) | awk -F"\t|_" '{print $1,$2,$3,$4,$5}' OFS="\t" | LANG=en_EN sort -k1,1 -k2,2n | awk '{printf "%s\t%s\t%s\t%.3f\t%.3f\t%.3f\t%.3f\n", $1,$2,$3,$4,$5,$4*(1-$5),$5*(1-$4)}' > derived_allele_freq_ratio/${p1}_vs_${p2}_${NM_COV}_perpop_${f}_${TYPE}.lr_ann.bed
       SUM_P1=$(cut -f6 derived_allele_freq_ratio/${p1}_vs_${p2}_${NM_COV}_perpop_${f}_${TYPE}.lr_ann.bed | paste -sd+ | bc)
       SUM_P2=$(cut -f7 derived_allele_freq_ratio/${p1}_vs_${p2}_${NM_COV}_perpop_${f}_${TYPE}.lr_ann.bed | paste -sd+ | bc)
-      RATIO=$(if [ $SUM_P1 == 0 ] || [ $SUM_P2 == 0 ]; then echo 0.00; else echo "scale=3; $SUM_P1/$SUM_P2" | bc; fi)
+      RATIO=$(if [ $SUM_P1 == 0 ] || [ $SUM_P2 == 0 ]; then echo 0.00; else echo "scale=6; $SUM_P1/$SUM_P2" | bc; fi)
       echo -e "$RATIO" >> derived_allele_freq_ratio/${CALLING}_${f}_derived_freq_ratio_${TYPE}.txt
       done
     done
@@ -235,7 +235,7 @@ screen -S "${CALLING}-${TYPE}"
 CALLING=${STY#*.}
 CALLING=${CALLING%-*}
 TYPE=${STY#*-}
-script "${CALLING}_vars_subs_derived_freq_ratio.lr_ann.log"
+script "${CALLING}_vars_subs_derived_freq_ratio_${TYPE}.lr_ann.log"
 CALLING=${STY#*.}
 CALLING=${CALLING%-*}
 TYPE=${STY#*-}
@@ -247,7 +247,7 @@ GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
 
 N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING)
 SPECIES=$(echo $CALLING | fold -w8 | cut -c1-4 | head -n$N_POPS | sort | uniq)
-POPS=($(ls `find $V_PATH/$CALLING/annotation/ -name *'_perpop.lr_ann.vcf' -print` | rev | cut -d'/' -f1 | rev | cut -d'_' -f1,2,3,4,5,6))
+POPS=($(ls `find $V_PATH/$CALLING/annotation/ -name *'_perpop_'$TYPE'.lr_ann.vcf' -print` | rev | cut -d'/' -f1 | rev | cut -d'_' -f1,2,3,4,5,6))
 DATASETS=$(for i in ${SPECIES[@]}; do ls /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered/${i}*_samples | cut -d'_' -f1,2,3; done)
 COVERAGE=$(echo "${CALLING}" | rev | cut -d'_' -f1 | rev)
 NM_COV=$(echo "${CALLING}" | rev | cut -d'_' -f1,2 | rev)
@@ -290,7 +290,7 @@ for p1 in ${POPS[@]}
     LANG=en_EN join -a1 -a2 -e 0.00 -o auto -j 1 <(LANG=en_EN sort -k1 ${p1}"_"${NM_COV}"_perpop_SYN_vars_subs"_${TYPE}".lr_ann.bed") <(LANG=en_EN sort -k1 ${p2}"_"${NM_COV}"_perpop_SYN_vars_subs"_${TYPE}".lr_ann.bed") | awk -F"\t|_" '{print $1,$2,$3,$4,$5}' OFS="\t" | LANG=en_EN sort -k1,1 -k2,2n | awk '{printf "%s\t%s\t%s\t%.3f\t%.3f\t%.3f\t%.3f\n", $1,$2,$3,$4,$5,$4*(1-$5),$5*(1-$4)}' > ${p1}"_vs_"${p2}"_"${NM_COV}"_perpop_SYN_vars_subs"_${TYPE}".lr_ann.bed"
     SUM_P1=$(cut -f6 ${p1}"_vs_"${p2}"_"${NM_COV}"_perpop_SYN_vars_subs"_${TYPE}".lr_ann.bed" | paste -sd+ | bc)
     SUM_P2=$(cut -f7 ${p1}"_vs_"${p2}"_"${NM_COV}"_perpop_SYN_vars_subs"_${TYPE}".lr_ann.bed" | paste -sd+ | bc)
-    RATIO=$(if [ $SUM_P1 == 0 ] || [ $SUM_P2 == 0 ]; then echo 0.00; else echo "scale=3; $SUM_P1/$SUM_P2" | bc; fi)
+    RATIO=$(if [ $SUM_P1 == 0 ] || [ $SUM_P2 == 0 ]; then echo 0.00; else echo "scale=6; $SUM_P1/$SUM_P2" | bc; fi)
     echo -e "$p1\t$p2\t$RATIO" >> ${CALLING}_SYN_vars_subs_derived_freq_ratio_${TYPE}.txt
     for f in ${DEL_FEATURES[@]}
       do
@@ -298,8 +298,8 @@ for p1 in ${POPS[@]}
       LANG=en_EN join -a1 -a2 -e 0.00 -o auto -j 1 <(LANG=en_EN sort -k1 ${p1}"_"${NM_COV}"_perpop_"${f}"_vars_subs"_${TYPE}".lr_ann.bed") <(LANG=en_EN sort -k1 ${p2}"_"${NM_COV}"_perpop_"${f}"_vars_subs"_${TYPE}".lr_ann.bed") | awk -F"\t|_" '{print $1,$2,$3,$4,$5}' OFS="\t" | LANG=en_EN sort -k1,1 -k2,2n | awk '{printf "%s\t%s\t%s\t%.3f\t%.3f\t%.3f\t%.3f\n", $1,$2,$3,$4,$5,$4*(1-$5),$5*(1-$4)}' > ${p1}"_vs_"${p2}"_"${NM_COV}"_perpop_"${f}"_vars_subs"_${TYPE}".lr_ann.bed"
       SUM_P1=$(cut -f6 ${p1}"_vs_"${p2}"_"${NM_COV}"_perpop_"${f}"_vars_subs"_${TYPE}".lr_ann.bed" | paste -sd+ | bc)
       SUM_P2=$(cut -f7 ${p1}"_vs_"${p2}"_"${NM_COV}"_perpop_"${f}"_vars_subs"_${TYPE}".lr_ann.bed" | paste -sd+ | bc)
-      RATIO=$(if [ $SUM_P1 == 0 ] || [ $SUM_P2 == 0 ]; then echo 0.00; else echo "scale=3; $SUM_P1/$SUM_P2" | bc; fi)
-      echo -e "$RATIO" >> "${CALLING}_${f}_vars_subs_derived_freq_ratio"_${TYPE}".txt"
+      RATIO=$(if [ $SUM_P1 == 0 ] || [ $SUM_P2 == 0 ]; then echo 0.00; else echo "scale=6; $SUM_P1/$SUM_P2" | bc; fi)
+      echo -e "$RATIO" >> ${CALLING}_${f}_vars_subs_derived_freq_ratio_${TYPE}.txt
       done
     done
   done
@@ -312,11 +312,102 @@ for f in ${DEL_FEATURES[@]}
   paste ${CALLING}_SYN_vars_subs_derived_freq_ratio_${TYPE}.txt ${CALLING}_${f}_vars_subs_derived_freq_ratio_${TYPE}.txt | awk 'FNR == 1 {next} $3==0 {print $4,0.0} $3>0 {print $4,$4/$3}' OFS="\t" >> ${CALLING}_temp_vars_subs_derived_freq_ratio_${TYPE}.borrar
   #Now join the ALL and the current DEL feature data
   paste <(head ${CALLING}_ALL_vars_subs_derived_freq_ratio_${TYPE}.txt -n1) <(head ${CALLING}_temp_vars_subs_derived_freq_ratio_${TYPE}.borrar -n1) > ${CALLING}_joint_vars_subs_derived_freq_ratio_${TYPE}.borrar
-  paste ${CALLING}_ALL_vars_subs_derived_freq_ratio.txt ${CALLING}_temp_vars_subs_derived_freq_ratio_${TYPE}.borrar | awk 'FNR == 1 {next}{print $0}' OFS="\t" >> ${CALLING}_joint_vars_subs_derived_freq_ratio_${TYPE}.borrar
+  paste ${CALLING}_ALL_vars_subs_derived_freq_ratio_${TYPE}.txt ${CALLING}_temp_vars_subs_derived_freq_ratio_${TYPE}.borrar | awk 'FNR == 1 {next}{print $0}' OFS="\t" >> ${CALLING}_joint_vars_subs_derived_freq_ratio_${TYPE}.borrar
   #Replace the ALL table with the updated one
   mv ${CALLING}_joint_vars_subs_derived_freq_ratio_${TYPE}.borrar ${CALLING}_ALL_vars_subs_derived_freq_ratio_${TYPE}.txt
   rm ${CALLING}_temp_vars_subs_derived_freq_ratio_${TYPE}.borrar
   done
+
+#From outside the server:
+scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/genetic_load_analysis/derived_allele_freq_ratio/*/*ALL_vars_subs_derived_freq_ratio.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_ratio/
+
+```
+
+##JACKKNIFE:
+```{r Calculate derived allele frequency ratio, eval=FALSE, engine='bash'}
+
+#Follows: https://www.math.wustl.edu/~sawyer/handouts/Jackknife.pdf
+
+<!-- CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov) #use the substitutions calling, which is the more complete name -->
+<!-- TYPE=(SNP) #write down SNP or INDEL -->
+<!-- mkdir -p /GRUPOS/grupolince/lynx_genomes_5x/genetic_load_analysis/derived_allele_freq_ratio/$CALLING -->
+<!-- cd /GRUPOS/grupolince/lynx_genomes_5x/genetic_load_analysis/derived_allele_freq_ratio/$CALLING -->
+<!-- screen -S "${CALLING}-${TYPE}" -->
+<!-- CALLING=${STY#*.} -->
+<!-- CALLING=${CALLING%-*} -->
+<!-- TYPE=${STY#*-} -->
+<!-- script "${CALLING}_vars_subs_derived_freq_ratio.lr_ann.log" -->
+<!-- CALLING=${STY#*.} -->
+<!-- CALLING=${CALLING%-*} -->
+<!-- TYPE=${STY#*-} -->
+
+
+<!-- V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path -->
+<!-- REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome -->
+<!-- GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path -->
+
+<!-- N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING) -->
+<!-- SPECIES=$(echo $CALLING | fold -w8 | cut -c1-4 | head -n$N_POPS | sort | uniq) -->
+<!-- POPS=($(ls `find $V_PATH/$CALLING/annotation/ -name *'_perpop.lr_ann.vcf' -print` | rev | cut -d'/' -f1 | rev | cut -d'_' -f1,2,3,4,5,6)) -->
+<!-- DATASETS=$(for i in ${SPECIES[@]}; do ls /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered/${i}*_samples | cut -d'_' -f1,2,3; done) -->
+<!-- COVERAGE=$(echo "${CALLING}" | rev | cut -d'_' -f1 | rev) -->
+<!-- NM_COV=$(echo "${CALLING}" | rev | cut -d'_' -f1,2 | rev) -->
+
+
+
+#Prepare output file:
+rm ${CALLING}"_vars_subs_derived_freq_ratio_variance_"${TYPE}".lr_ann.txt"
+echo -e "population_pair\tfeature\tglobal_ratio\tmean_subsample_ratio\tvariance_subsample_ratio" > ${CALLING}"_vars_subs_derived_freq_ratio_variance_"${TYPE}".lr_ann.txt"
+FILES=$(ls *_vs_*vars_subs_SNP.lr_ann.bed | grep -Ev '_INTR_|_SYN_') #Only perform jackknife for deleterious categories.
+for FILE in ${FILES[@]}
+  do
+  #Define comparison file related variables:
+  echo $FILE
+  rm ${FILE/.bed/.jack}
+  POP_PAIR=$(echo $FILE | cut -d'_' -f1-13)
+  FEATURE=$(echo $FILE | rev | cut -d'_' -f5 | rev)
+  #Compute the ratio for all variants:
+  SUM_P1=$(cut -f6  ${FILE} | paste -sd+ | bc)
+  SUM_P2=$(cut -f7  ${FILE} | paste -sd+ | bc)
+  RATIO_ALL=$(if [ $SUM_P1 == 0 ] || [ $SUM_P2 == 0 ]; then echo 0.00; else echo "scale=6; $SUM_P1/$SUM_P2" | bc; fi)
+  #Define jackknife block related variables:
+  if [[ $FEATURE == "LOF" ]]
+    then
+    BLOCK_SIZE=(10)
+    else
+    BLOCK_SIZE=(100)
+  fi
+  VARIANT_N=$(cat $FILE | wc -l)
+  MODULE=$(($VARIANT_N % $BLOCK_SIZE))
+  BLOCK_N=$((($VARIANT_N-$MODULE)/$BLOCK_SIZE))
+  #Compute the ratio for all block-less subsamples:
+  for i in $(seq 1 $BLOCK_N)
+    do
+    #echo ${i}
+    START=$((${i}*$BLOCK_SIZE-($BLOCK_SIZE-1)))
+    #echo $START
+    END=$((${i}*$BLOCK_SIZE))
+    #echo $END
+    sed $START','$END'd' $FILE > ${FILE/.bed/.temp}
+    SUM_P1=$(cut -f6  ${FILE/.bed/.temp} | paste -sd+ | bc)
+    SUM_P2=$(cut -f7  ${FILE/.bed/.temp} | paste -sd+ | bc)
+    RATIO_SUBS=$(if [ $SUM_P1 == 0 ] || [ $SUM_P2 == 0 ]; then echo 0.00; else echo "scale=6; $SUM_P1/$SUM_P2" | bc; fi) ADD ZERO TO THE LEFT
+    echo $RATIO_SUBS >> ${FILE/.bed/.jack} #store all subsample ratios in a file
+    done
+  rm ${FILE/.bed/.temp}
+  #Compute the subsamples average ratio:
+  RATIO_SUM=$(cut -f1 ${FILE/.bed/.jack} | paste -sd+ | bc)
+  RATIO_MEAN=$(echo "scale=6; $RATIO_SUM/$BLOCK_N" | bc)
+  #Obtain the jackknife pseudovalues (for more info, see https://www.math.wustl.edu/~sawyer/handouts/Jackknife.pdf)
+  awk -v mean_ratio=$RATIO_MEAN -v num_blocks=$BLOCK_N -F "\t" '{printf "%s\t%s\t%s\t%s\n", $1, $num_blocks*$mean_ratio, ($num_blocks-1)*$1, ($num_blocks*$mean_ratio)-($num_blocks-1)*$1}' ${FILE/.bed/.jack} > ${FILE/.bed/.var} LEAVE ONLY CURRENT COLS 1 AND 4
+  PSEUDOVALUES_SUM=$(cut -f2 ${FILE/.bed/.var} | paste -sd+ | bc)
+  #Compute variance of the pseudovalues:
+  VARIANCE=$(echo "scale=6; $PSEUDOVALUES_SUM/($BLOCK_N-1)" | bc)
+  echo -e "$POP_PAIR\t$FEATURE\t$RATIO_ALL\t$RATIO_MEAN\t$VARIANCE" >> 
+${CALLING}"_vars_subs_derived_freq_ratio_variance_"${TYPE}".lr_ann.txt"
+    done
+
+($num_blocks*$mean_ratio)-($num_blocks-1)*$1
 
 #From outside the server:
 scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/genetic_load_analysis/derived_allele_freq_ratio/*/*ALL_vars_subs_derived_freq_ratio.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_ratio/
