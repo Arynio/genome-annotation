@@ -290,84 +290,110 @@ $NGSF --geno $I_PATH/beagle_gl/c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060.geno
 
 ```
 
-#3: Modify ngsF-HMM output.
-Author: Enrico, Dani, Maria
+#3: Visualize ngsF-HMM output.
+Autores: Enrico, Dani, Maria. Nosotros tenemos un archivo donde están todas las posiciones de cada scaffold, se llama genome_coordinates.list. A este archivo le vamos a pegar una modificación del archivo ibd que en vez de ser una fila por cada individuo sea una columna. Así por cada individuo vamos a pegar la columna con sus valores 0 y 1 y la columna con información de scaffold y de base. Vamos a tener tantos archivos como individuos. 
 
-Vamos a modificar el archivo de Enrico que genero para plotear los valores de admixutee. 
-
-Nosotros tenemos un archivo donde están todas las posiciones de cada scaffold, se llama genome_coordinates.list. A este archivo le vamos a pegar una modificación del archivo ibd que en vez de ser una fila por cada individio sea una columna. Así por cada individuo vamos a pegar la columna con sus valores 0 y 1 y la columna con información de scaffold y de base. Vamos a tener tantos archivos como individuos. 
-
-Creamos el archivo con la informaicón de los individuos.
 ##Count number of large IBD tracts.
 
 ```{bash}
-# Archivo información scaffold-base: genome_coordinates.list
-# El archivo con la informacion ibd por cada individuos en una fila: c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060_ngsF-HMM_modif.ibd (es modif pq no tiene la primera fila que no nos interesa)
-# Primero para este analisis nos vamos a quedar solo con los scaffold mayores de 1.6 MB (que es el n50, así que hacemos una lista con ellos)
-awk '$2 > 1600000 {print $1}' /home/mlucena/grupolince/reference_genomes/lynx_pardinus_genome/Length_scaffolds_lp23 > scaffold_bigger_than_1.6.borrar
-cat <(awk -v OFS='\t' '$2 > 1600000 {print $1,".*",$2}' /home/mlucena/grupolince/reference_genomes/lynx_pardinus_genome/Length_scaffolds_lp23) <(awk  -v OFS='\t' '$2 > 1600000 {print $1, 0}' /home/mlucena/grupolince/reference_genomes/lynx_pardinus_genome/Length_scaffolds_lp23 ) | sort -k1,1 -k2,2n > scaffold_bigger_than_1.6_filtered.borrar
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/ngsF-HMM
+
+#El archivo con la informacion ibd de cada individuo por fila (generado en la sección 2) lo guardamos en la variable $INPUT_FILE:
+INPUT_FILE=$(echo c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060_ngsF-HMM.ibd)
+screen -S "${INPUT_FILE}"
+INPUT_FILE=${STY#*.}
+script "${INPUT_FILE}.log"
+INPUT_FILE=${STY#*.}
+
+#A este archivo le quitamos los cabeceros y las filas de likelihoods, dejando solo las filas con información IBD, y lo guardamos en la variable $MODIF_FILE:
+N_IND=$(echo $INPUT_FILE | awk  '{gsub("_","\t",$0); print;}' | grep -o '\bn0\w*' | sed 's/n//')
+tail -n+2 ${INPUT_FILE} | head -n$N_IND > ${INPUT_FILE/.ibd/-headless.ibd}
+MODIF_FILE=$(echo ${INPUT_FILE/.ibd/-headless.ibd})
+
+#Para este análisis nos vamos a quedar solo con los scaffold mayores de 1.6 MB (que es el n50), así que hacemos una lista con ellos:
+awk '$2 > 1600000 {print $1}' /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/Length_scaffolds_lp23 > scaffold_bigger_than_1.6.borrar
+cat <(awk -v OFS='\t' '$2 > 1600000 {print $1,".*",$2}' /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/Length_scaffolds_lp23) <(awk -v OFS='\t' '$2 > 1600000 {print $1, 0}' /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/Length_scaffolds_lp23) | sort -k1,1 -k2,2n > scaffold_bigger_than_1.6_filtered.borrar
+
+#A continuación iteramos sobre las líneas de $MODIF_FILE:
 COUNTER=1
-rm c_ll_ki-h_ll_pv_n014.ibdtract.bed
-echo -e "scaffold\tstart_position\tend_position\tlenght\tind" > c_ll_ki-h_ll_pv_n014.ibdtract.bed
-while read IBD_TRACK 
-do
-# Selecciono el nombre del individuo en cuestión del archivo con los nombres de individuos, usando el número de la iteración
-IND_NAME=($(sed -n "${COUNTER}p"  c_ll_ki-h_ll_pv_n014.ind))
-echo $IND_NAME
-# Guardamos la fila con información ibd del individuo que toque en un archivo temporal
-echo $IBD_TRACK > ibd_per_ind.borrar
-# Convertimos la fila con información ibd en una columna
-fold -w1 ibd_per_ind.borrar > ibd_tracks_temp.borrar
-# Genero un archivo en el que reporto las regiones en las que hay 1 de forma consecutiva (i.e. que son ibd). Estas regiones tienen una longitud igual a la separación entre dos snps con identidad 0 (la identidad 0 significa que no son ibd, todo lo demás sería 1 por defecto). 
-# Primero uno los dos archivos temporales con la información de los sitios variables tomados en consideración y la información del estado de estos sitios (ibd yes/no)
-paste <(cat variable_coordinates.list ) <(cat ibd_tracks_temp.borrar) | \
-# Aquí convierto este archivo en un bed y selecciono solo los valores que no son ibd.
-awk -v OFS='\t' '{print $1, $2-1, $2, $3}' | grep '0$' | \
-# Aquí sustraigo de los valores wg aquellas posiciones que son ibd=0 (no ibd)
-bedtools subtract -a /home/mlucena/grupolince/reference_genomes/lynx_pardinus_genome/bed_file_all_the_genome.bed -b stdin | \
-# Ahora calculo la longitud de estos tracts que son 1. 
-awk -v OFS='\t' -v ind_name="$IND_NAME" '{print $1,$2,$3, $3-$2, ind_name}' | \
-# Nos quitamos todos los scaffolds que tengan menos de 1.6Mb
-grep -f scaffold_bigger_than_1.6.borrar - | \
-grep -v -f scaffold_bigger_than_1.6_filtered.borrar - >> c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060.ibdtract.bed
-COUNTER=$[$COUNTER+1]
-done < <(cat c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060_ngsF-HMM_modif.ibd)
-# Sanity check
-# Hemos contado numero de scaffold antes y despues de filtros para un individuo y hemos visto que los filtros se aplican correctamente. 
+rm ${INPUT_FILE/_ngsF-HMM.ibd/.ibdtract.bed}
+echo -e "scaffold\tstart_position\tend_position\tlenght\tind" > ${INPUT_FILE/_ngsF-HMM.ibd/.ibdtract.bed}
+while read IBD_TRACK
+  do
+  #Seleccionamos del archivo con los nombres de individuos el nombre del individuo actual usando el número de la iteración:
+  IND_NAME=($(sed -n "${COUNTER}p" ${INPUT_FILE/_ngsF-HMM.ibd/.ind}))
+  echo $IND_NAME
+  #Guardamos la fila con información ibd del individuo actual en un archivo temporal:
+  echo $IBD_TRACK > ibd_per_ind.borrar
+  #Convertimos la fila con información ibd en una columna:
+  fold -w1 ibd_per_ind.borrar > ibd_tracks_temp.borrar
+  #Generamos un archivo en el que reportamos las regiones en las que hay identidad 1 de forma consecutiva (i.e. las regiones ibd). Estas regiones tienen una longitud igual a la separación entre dos snps con identidad 0 (la identidad 0 significa que no son ibd, todo lo demás sería 1 por defecto). 
+  #Para ello, en primer lugar unimos el archivo con la información de los sitios variables tomados en consideración (obtenido en la sección 1) y el archivo que contiene la información ibd del individuo actual en una columna, que contiene el estado ibd de los sitios (1 = IBD; 0 != IBD):
+  paste <(cat ${INPUT_FILE/_ngsF-HMM.ibd/_variable_coordinates.list}) <(cat ibd_tracks_temp.borrar) | \
+  #Aquí convertimos este archivo en un bed y seleccionamos solo los valores que no son IBD:
+  awk -v OFS='\t' '{print $1, $2-1, $2, $3}' | grep '0$' | \
+  #Aquí sustraemos de las coordenadas de todo el genoma aquellas posiciones que no son IBD, para quedarnos únicamente con los tramos que sí son IBD:
+  bedtools subtract -a /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/bed_file_all_the_genome.bed -b stdin | \
+  #Ahora calculamos la longitud de estos tracts que son 1. 
+  awk -v OFS='\t' -v ind_name="$IND_NAME" '{print $1, $2, $3, $3-$2, ind_name}' | \
+  #Nos quitamos todos los scaffolds que tengan menos de 1.6Mb
+  grep -f scaffold_bigger_than_1.6.borrar - | \
+  grep -v -f scaffold_bigger_than_1.6_filtered.borrar - >> ${INPUT_FILE/_ngsF-HMM.ibd/.ibdtract.bed}
+  COUNTER=$[$COUNTER+1]
+done < <(cat $MODIF_FILE)
+
+#Sanity check: hemos contado numero de scaffold antes y despues de filtros para un individuo y hemos visto que los filtros se aplican correctamente.
+
+#From outside the server:
+INPUT_FILE=$(echo c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060_ngsF-HMM.ibd)
+scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/ngsF-HMM/${INPUT_FILE/_ngsF-HMM.ibd/.ibdtract.bed} /Users/dani/ownCloud/backup/g-w_analysis/IBD_analysis/ngsF-HMM/
+
 ```
 
 ##Plot results.
 
 ```{r}
+
 library("readr")
 library("ggplot2")
 library("dplyr")
 library("ggrepel")
-ibd_tract <- read_tsv ("/Users/marialucenaperez/Documents/IBD_tract/c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060.ibdtract.bed", col_names = T) %>%  
-  mutate (lenght_category = ifelse (lenght>10000 & lenght<100000,"10-100kb",
+
+ibd_tract <- read_tsv ("/Users/dani/ownCloud/backup/g-w_analysis/IBD_analysis/ngsF-HMM/c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060.ibdtract.bed", col_names = T) %>% 
+  mutate (length_category = ifelse (lenght>10000 & lenght<100000,"10-100kb",
                             ifelse (lenght>100000 & lenght<1000000,"100-1000kb",
-                            ifelse (lenght>1000000, ">1000kb", NA)))) %>% 
-  rename (lenght_ibd=lenght)
-ibd_tract$lenght_category <- factor(ibd_tract$lenght_category, levels=c("10-100kb", "100-1000kb", ">1000kb"))
-ibd_tract2 <- ibd_tract %>% filter (!is.na(ibd_tract$lenght_category)) %>% 
+                            ifelse (lenght>1000000, ">1000kb","<10kb")))) %>% 
+  rename (length_ibd=lenght)
+ibd_tract$length_category <- factor(ibd_tract$length_category, levels=c("<10kb","10-100kb", "100-1000kb", ">1000kb"))
+ibd_tract2 <- ibd_tract %>% 
+  filter (ibd_tract$length_category!="<10kb") %>% 
   mutate (pop = substring(ind,1,7)) %>% 
   mutate (sps = substring(ind,1,4))
-  
-# ibd_tract3 <- ibd_tract2 %>% filter (., ind=="c_ll_ki_0090" | ind=="c_lp_sm_0450") 
-ibd_tract_cumsumlenght <- ibd_tract2 %>% dplyr::group_by(ind,lenght_category, pop,sps) %>% 
-                                         dplyr::summarise(
-                                                sum_lenght = sum(lenght_ibd),
-                                                n = n())
-                     
- ggplot (ibd_tract_cumsumlenght %>% filter (lenght_category==">1000kb"), aes(x=ind, y=sum_lenght, colour=pop, fill=pop)) +
+ibd_tract_cumsumlength <- ibd_tract2 %>% 
+  dplyr::group_by(ind,length_category, pop,sps) %>% 
+  dplyr::summarise(sum_length = sum(length_ibd),n = n())
+
+ggplot (ibd_tract_cumsumlength %>% filter (length_category==">1000kb"), aes(x=ind, y=sum_length, colour=pop, fill=pop)) +
   geom_col() +
   facet_grid(~sps, scales="free_x") +
-   theme (axis.text.x = element_text(angle = 90, vjust=0)) +
-   ggsave ()
- ggplot (ibd_tract_cumsumlenght %>% filter (lenght_category==">1000kb"), aes(x=sum_lenght, y=n)) +
-   geom_point(aes(colour=pop, fill=pop))+
-   geom_text_repel(aes(label=ind, colour=pop)) +
-   stat_smooth(method="lm", se=FALSE) +
-   ggsave ()
- 
+  theme (axis.text.x = element_text(size=6, angle=90, vjust=0.5)) +
+  ggsave("/Users/dani/ownCloud/backup/g-w_analysis/IBD_analysis/ngsF-HMM/>1000kb_ibd_tract_cumsumlength.pdf", width=15, height=15, units="cm", device="pdf")
+
+ggplot (ibd_tract_cumsumlength %>% filter (length_category==">1000kb"), aes(x=sum_length, y=n)) +
+  geom_point(aes(colour=pop, fill=pop)) +
+  geom_text_repel(aes(label=ind, colour=pop), size=3) +
+  stat_smooth(method="lm", se=FALSE) +
+  ggsave("/Users/dani/ownCloud/backup/g-w_analysis/IBD_analysis/ngsF-HMM/>1000kb_ibd_tract_length_n_cor.pdf", width=15, height=15, units="cm", device="pdf")
+
+ibd_tract3 <- ibd_tract %>% 
+  dplyr::group_by(ind,length_category) %>%
+  dplyr::summarise(n = n())
+
+PLOTEAR por individuo?
+ggplot (ibd_tract3, aes(x=length_category, y=n, colour=pop, fill=pop)) +
+  geom_col() +
+  facet_grid(~sps, scales="free_x") +
+  theme (axis.text.x = element_text(size=6, angle=90, vjust=0.5))
+
 ```
