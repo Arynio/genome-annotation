@@ -323,53 +323,49 @@ scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/genetic_
 
 ```
 
-##JACKKNIFE:
+##Perform block-jackknife to estimate derived allele frequency ratio variance.
 ```{r Calculate derived allele frequency ratio, eval=FALSE, engine='bash'}
 
-#Follows: https://www.math.wustl.edu/~sawyer/handouts/Jackknife.pdf
+#Block-jackknife method was performed following: https://www.math.wustl.edu/~sawyer/handouts/Jackknife.pdf
 
-<!-- CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov) #use the substitutions calling, which is the more complete name -->
-<!-- TYPE=(SNP) #write down SNP or INDEL -->
-<!-- mkdir -p /GRUPOS/grupolince/lynx_genomes_5x/genetic_load_analysis/derived_allele_freq_ratio/$CALLING -->
-<!-- cd /GRUPOS/grupolince/lynx_genomes_5x/genetic_load_analysis/derived_allele_freq_ratio/$CALLING -->
-<!-- screen -S "${CALLING}-${TYPE}" -->
-<!-- CALLING=${STY#*.} -->
-<!-- CALLING=${CALLING%-*} -->
-<!-- TYPE=${STY#*-} -->
-<!-- script "${CALLING}_vars_subs_derived_freq_ratio.lr_ann.log" -->
-<!-- CALLING=${STY#*.} -->
-<!-- CALLING=${CALLING%-*} -->
-<!-- TYPE=${STY#*-} -->
+#Option 1: use the normalized ratio:
 
-
-<!-- V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path -->
-<!-- REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome -->
-<!-- GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path -->
-
-<!-- N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING) -->
-<!-- SPECIES=$(echo $CALLING | fold -w8 | cut -c1-4 | head -n$N_POPS | sort | uniq) -->
-<!-- POPS=($(ls `find $V_PATH/$CALLING/annotation/ -name *'_perpop.lr_ann.vcf' -print` | rev | cut -d'/' -f1 | rev | cut -d'_' -f1,2,3,4,5,6)) -->
-<!-- DATASETS=$(for i in ${SPECIES[@]}; do ls /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered/${i}*_samples | cut -d'_' -f1,2,3; done) -->
-<!-- COVERAGE=$(echo "${CALLING}" | rev | cut -d'_' -f1 | rev) -->
-<!-- NM_COV=$(echo "${CALLING}" | rev | cut -d'_' -f1,2 | rev) -->
-
-
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov) #use the substitutions calling, which is the more complete name
+TYPE=(SNP) #write down SNP or INDEL
+mkdir -p /GRUPOS/grupolince/lynx_genomes_5x/genetic_load_analysis/derived_allele_freq_ratio/$CALLING
+cd /GRUPOS/grupolince/lynx_genomes_5x/genetic_load_analysis/derived_allele_freq_ratio/$CALLING
+screen -S "${CALLING}-${TYPE}"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+script "${CALLING}_vars_subs_derived_freq_ratio_jackknife.lr_ann.log"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
 
 #Prepare output file:
 rm ${CALLING}"_vars_subs_derived_freq_ratio_variance_"${TYPE}".lr_ann.txt"
-echo -e "population_pair\tfeature\tglobal_ratio\tmean_subsample_ratio\tvariance_subsample_ratio" > ${CALLING}"_vars_subs_derived_freq_ratio_variance_"${TYPE}".lr_ann.txt"
+echo -e "population_pair\tsynonymous_ratio\tfeature\tglobal_ratio\tglobal_ratio_norm\tmean_subsample_ratio_norm\tvariance_subsample_ratio_norm\t±2SD_subsample_ratio_norm" > ${CALLING}"_vars_subs_derived_freq_ratio_variance_"${TYPE}".lr_ann.txt"
+"$POP_PAIR\t$SYN_RATIO_ALL\t$FEATURE\t$DEL_RATIO_ALL\t$DEL_RATIO_ALL_NORM\t$DEL_RATIO_SUBSAMPLE_MEAN\t$VARIANCE\t$TWO_SD"
 FILES=$(ls *_vs_*vars_subs_SNP.lr_ann.bed | grep -Ev '_INTR_|_SYN_') #Only perform jackknife for deleterious categories.
 for FILE in ${FILES[@]}
   do
   #Define comparison file related variables:
   echo $FILE
-  rm ${FILE/.bed/.jack}
+  rm -f ${FILE/.bed/.jack1.temp}
   POP_PAIR=$(echo $FILE | cut -d'_' -f1-13)
   FEATURE=$(echo $FILE | rev | cut -d'_' -f5 | rev)
+  echo "Working with comparison" $POP_PAIR "and feature" $FEATURE
   #Compute the ratio for all variants:
-  SUM_P1=$(cut -f6  ${FILE} | paste -sd+ | bc)
-  SUM_P2=$(cut -f7  ${FILE} | paste -sd+ | bc)
-  RATIO_ALL=$(if [ $SUM_P1 == 0 ] || [ $SUM_P2 == 0 ]; then echo 0.00; else echo "scale=6; $SUM_P1/$SUM_P2" | bc; fi)
+  DEL_SUM_P1=$(cut -f6  ${FILE} | paste -sd+ | bc)
+  DEL_SUM_P2=$(cut -f7  ${FILE} | paste -sd+ | bc)
+  DEL_RATIO_ALL=$(if [ $DEL_SUM_P1 == 0 ] || [ $DEL_SUM_P2 == 0 ]; then echo 0.00; else echo "scale=6; $DEL_SUM_P1/$DEL_SUM_P2" | bc | awk '{printf "%f", $0}'; fi)
+  #Compute the ratio for synonymous variants:
+  SYN_FILE=$(ls $POP_PAIR*.bed | grep '_SYN_')
+  SYN_SUM_P1=$(cut -f6  ${SYN_FILE} | paste -sd+ | bc)
+  SYN_SUM_P2=$(cut -f7  ${SYN_FILE} | paste -sd+ | bc)
+  SYN_RATIO_ALL=$(if [ $SYN_SUM_P1 == 0 ] || [ $SYN_SUM_P2 == 0 ]; then echo 0.00; else echo "scale=6; $SYN_SUM_P1/$SYN_SUM_P2" | bc | awk '{printf "%f", $0}'; fi)
+  DEL_RATIO_ALL_NORM=$(echo "scale=6; $DEL_RATIO_ALL/$SYN_RATIO_ALL" | bc | awk '{printf "%f", $0}')
   #Define jackknife block related variables:
   if [[ $FEATURE == "LOF" ]]
     then
@@ -381,6 +377,7 @@ for FILE in ${FILES[@]}
   MODULE=$(($VARIANT_N % $BLOCK_SIZE))
   BLOCK_N=$((($VARIANT_N-$MODULE)/$BLOCK_SIZE))
   #Compute the ratio for all block-less subsamples:
+  echo "Performing jackknife"
   for i in $(seq 1 $BLOCK_N)
     do
     #echo ${i}
@@ -389,28 +386,128 @@ for FILE in ${FILES[@]}
     END=$((${i}*$BLOCK_SIZE))
     #echo $END
     sed $START','$END'd' $FILE > ${FILE/.bed/.temp}
-    SUM_P1=$(cut -f6  ${FILE/.bed/.temp} | paste -sd+ | bc)
-    SUM_P2=$(cut -f7  ${FILE/.bed/.temp} | paste -sd+ | bc)
-    RATIO_SUBS=$(if [ $SUM_P1 == 0 ] || [ $SUM_P2 == 0 ]; then echo 0.00; else echo "scale=6; $SUM_P1/$SUM_P2" | bc; fi) ADD ZERO TO THE LEFT
-    echo $RATIO_SUBS >> ${FILE/.bed/.jack} #store all subsample ratios in a file
+    DEL_SUM_SUBSAMPLE_P1=$(cut -f6  ${FILE/.bed/.temp} | paste -sd+ | bc)
+    DEL_SUM_SUBSAMPLE_P2=$(cut -f7  ${FILE/.bed/.temp} | paste -sd+ | bc)
+    DEL_RATIO_SUBSAMPLE=$(if [ $DEL_SUM_SUBSAMPLE_P1 == 0 ] || [ $DEL_SUM_SUBSAMPLE_P2 == 0 ]; then echo 0.00; else echo "scale=6; $DEL_SUM_SUBSAMPLE_P1/$DEL_SUM_SUBSAMPLE_P2" | bc | awk '{printf "%f", $0}'; fi)
+    DEL_RATIO_SUBSAMPLE_NORM=$(echo "scale=6; $DEL_RATIO_SUBSAMPLE/$SYN_RATIO_ALL" | bc | awk '{printf "%f", $0}')
+    echo $DEL_RATIO_SUBSAMPLE_NORM >> ${FILE/.bed/.jack1.temp} #store all subsample ratios in a file
     done
-  rm ${FILE/.bed/.temp}
+  echo "Computing jackknife pseudovalues and variance"
   #Compute the subsamples average ratio:
-  RATIO_SUM=$(cut -f1 ${FILE/.bed/.jack} | paste -sd+ | bc)
-  RATIO_MEAN=$(echo "scale=6; $RATIO_SUM/$BLOCK_N" | bc)
+  DEL_RATIO_SUBSAMPLE_SUM=$(cut -f1 ${FILE/.bed/.jack1.temp} | paste -sd+ | bc)
+  DEL_RATIO_SUBSAMPLE_MEAN=$(echo "scale=6; $DEL_RATIO_SUBSAMPLE_SUM/$BLOCK_N" | bc | awk '{printf "%f", $0}')
   #Obtain the jackknife pseudovalues (for more info, see https://www.math.wustl.edu/~sawyer/handouts/Jackknife.pdf)
-  awk -v mean_ratio=$RATIO_MEAN -v num_blocks=$BLOCK_N -F "\t" '{printf "%s\t%s\t%s\t%s\n", $1, $num_blocks*$mean_ratio, ($num_blocks-1)*$1, ($num_blocks*$mean_ratio)-($num_blocks-1)*$1}' ${FILE/.bed/.jack} > ${FILE/.bed/.var} LEAVE ONLY CURRENT COLS 1 AND 4
-  PSEUDOVALUES_SUM=$(cut -f2 ${FILE/.bed/.var} | paste -sd+ | bc)
+  awk -v mean_ratio="$DEL_RATIO_SUBSAMPLE_MEAN" -v num_blocks="$BLOCK_N" -F "\t" '{printf "%.6f\t%.6f\n", $1, (num_blocks*mean_ratio)-(num_blocks-1)*$1}' ${FILE/.bed/.jack1.temp} > ${FILE/.bed/.jack2.temp}
+  DEL_PSEUDOVALUES_SUM=$(cut -f2 ${FILE/.bed/.jack2.temp} | paste -sd+ | bc)
+  DEL_PSEUDOVALUES_MEAN=$(echo "scale=6; $DEL_PSEUDOVALUES_SUM/$BLOCK_N" | bc | awk '{printf "%f", $0}')
   #Compute variance of the pseudovalues:
-  VARIANCE=$(echo "scale=6; $PSEUDOVALUES_SUM/($BLOCK_N-1)" | bc)
-  echo -e "$POP_PAIR\t$FEATURE\t$RATIO_ALL\t$RATIO_MEAN\t$VARIANCE" >> 
-${CALLING}"_vars_subs_derived_freq_ratio_variance_"${TYPE}".lr_ann.txt"
-    done
+  awk -v mean_psv="$DEL_PSEUDOVALUES_MEAN" -F "\t" '{printf "%.6f\t%.6f\t%.6f\n", $1, $2, ($2-mean_psv)*($2-mean_psv)}' ${FILE/.bed/.jack2.temp} > ${FILE/.bed/.jack}
+  VARIANCE_NUMERATOR_SUM=$(cut -f3 ${FILE/.bed/.jack} | paste -sd+ | bc)
+  VARIANCE=$(echo "scale=6; $VARIANCE_NUMERATOR_SUM/($BLOCK_N-1)" | bc | awk '{printf "%f", $0}')
+  TWO_SD=$(echo "scale=6; sqrt ($VARIANCE)" | bc | awk '{printf "%f", $0*2}')
+  #Compile summary table:
+  echo -e "$POP_PAIR\t$SYN_RATIO_ALL\t$FEATURE\t$DEL_RATIO_ALL\t$DEL_RATIO_ALL_NORM\t$DEL_RATIO_SUBSAMPLE_MEAN\t$VARIANCE\t$TWO_SD" >> ${CALLING}"_vars_subs_derived_freq_ratio_variance_"${TYPE}".lr_ann.txt"
+  rm *.temp 
+  done
+POP1=($(cat ${CALLING}"_vars_subs_derived_freq_ratio_variance_"${TYPE}".lr_ann.txt" | grep 'NSYN' | cut -f1 | awk 'BEGIN {FS="_vs_"} {print $1}'))
+POP2=($(cat ${CALLING}"_vars_subs_derived_freq_ratio_variance_"${TYPE}".lr_ann.txt" | grep 'NSYN' | cut -f1 | awk 'BEGIN {FS="_vs_"} {print $2}'))
+NSYN_TWO_SD=($(cat ${CALLING}"_vars_subs_derived_freq_ratio_variance_"${TYPE}".lr_ann.txt" | grep 'NSYN' | cut -f8))
+LOF_TWO_SD=($(cat ${CALLING}"_vars_subs_derived_freq_ratio_variance_"${TYPE}".lr_ann.txt" | grep 'LOF' | cut -f8))
 
-($num_blocks*$mean_ratio)-($num_blocks-1)*$1
+echo -e "population_1\tpopulation_2\tNSYN_norm_ratio_2SD\tLOF_norm_ratio_2SD" > ${CALLING}"_vars_subs_derived_freq_ratio_2SD_"${TYPE}".lr_ann.txt"
+for ((i=0; i<=${#POP1[@]}; i++))
+  do
+  printf '%s\t%s\t%s\t%s\n' "${POP1[i]}" "${POP2[i]}" "${NSYN_TWO_SD[i]}" "${LOF_TWO_SD[i]}" >> ${CALLING}"_vars_subs_derived_freq_ratio_2SD_"${TYPE}".lr_ann.txt"
+done
+
+
+#Option 2: use the non-normalized ratio and include the syn ratio in the variance estimation (it yields the same result).
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov) #use the substitutions calling, which is the more complete name
+TYPE=(SNP) #write down SNP or INDEL
+mkdir -p /GRUPOS/grupolince/lynx_genomes_5x/genetic_load_analysis/derived_allele_freq_ratio/$CALLING
+cd /GRUPOS/grupolince/lynx_genomes_5x/genetic_load_analysis/derived_allele_freq_ratio/$CALLING
+screen -S "${CALLING}-${TYPE}"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+script "${CALLING}_vars_subs_derived_freq_ratio_jackknife_bis.lr_ann.log"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+
+#Prepare output file:
+rm ${CALLING}"_vars_subs_derived_freq_ratio_variance_"${TYPE}"_bis.lr_ann.txt"
+echo -e "population_pair\tsynonymous_ratio\tfeature\tglobal_ratio\tglobal_ratio_norm\tmean_subsample_ratio_norm\tvariance_subsample_ratio_norm\t±2SD_subsample_ratio_norm" > ${CALLING}"_vars_subs_derived_freq_ratio_variance_"${TYPE}"_bis.lr_ann.txt"
+"$POP_PAIR\t$SYN_RATIO_ALL\t$FEATURE\t$DEL_RATIO_ALL\t$DEL_RATIO_ALL_NORM\t$DEL_RATIO_SUBSAMPLE_MEAN\t$VARIANCE\t$TWO_SD"
+FILES=$(ls *_vs_*vars_subs_SNP.lr_ann.bed | grep -Ev '_INTR_|_SYN_') #Only perform jackknife for deleterious categories.
+for FILE in ${FILES[@]}
+  do
+  #Define comparison file related variables:
+  echo $FILE
+  rm -f ${FILE/.bed/.jack1_bis.temp}
+  POP_PAIR=$(echo $FILE | cut -d'_' -f1-13)
+  FEATURE=$(echo $FILE | rev | cut -d'_' -f5 | rev)
+  echo "Working with comparison" $POP_PAIR "and feature" $FEATURE
+  #Compute the ratio for all variants:
+  DEL_SUM_P1=$(cut -f6  ${FILE} | paste -sd+ | bc)
+  DEL_SUM_P2=$(cut -f7  ${FILE} | paste -sd+ | bc)
+  DEL_RATIO_ALL=$(if [ $DEL_SUM_P1 == 0 ] || [ $DEL_SUM_P2 == 0 ]; then echo 0.00; else echo "scale=6; $DEL_SUM_P1/$DEL_SUM_P2" | bc | awk '{printf "%f", $0}'; fi)
+  #Compute the ratio for synonymous variants:
+  SYN_FILE=$(ls $POP_PAIR*.bed | grep '_SYN_')
+  SYN_SUM_P1=$(cut -f6  ${SYN_FILE} | paste -sd+ | bc)
+  SYN_SUM_P2=$(cut -f7  ${SYN_FILE} | paste -sd+ | bc)
+  SYN_RATIO_ALL=$(if [ $SYN_SUM_P1 == 0 ] || [ $SYN_SUM_P2 == 0 ]; then echo 0.00; else echo "scale=6; $SYN_SUM_P1/$SYN_SUM_P2" | bc | awk '{printf "%f", $0}'; fi)
+  INV_SYN_RATIO_ALL=$(echo "scale=6; 1/$SYN_RATIO_ALL" | bc | awk '{printf "%f", $0}')
+  DEL_RATIO_ALL_NORM=$(echo "scale=6; $DEL_RATIO_ALL/$SYN_RATIO_ALL" | bc | awk '{printf "%f", $0}')
+  #Define jackknife block related variables:
+  if [[ $FEATURE == "LOF" ]]
+    then
+    BLOCK_SIZE=(10)
+    else
+    BLOCK_SIZE=(100)
+  fi
+  VARIANT_N=$(cat $FILE | wc -l)
+  MODULE=$(($VARIANT_N % $BLOCK_SIZE))
+  BLOCK_N=$((($VARIANT_N-$MODULE)/$BLOCK_SIZE))
+  #Compute the ratio for all block-less subsamples:
+  echo "Performing jackknife"
+  for i in $(seq 1 $BLOCK_N)
+    do
+    #echo ${i}
+    START=$((${i}*$BLOCK_SIZE-($BLOCK_SIZE-1)))
+    #echo $START
+    END=$((${i}*$BLOCK_SIZE))
+    #echo $END
+    sed $START','$END'd' $FILE > ${FILE/.bed/_bis.temp}
+    DEL_SUM_SUBSAMPLE_P1=$(cut -f6  ${FILE/.bed/_bis.temp} | paste -sd+ | bc)
+    DEL_SUM_SUBSAMPLE_P2=$(cut -f7  ${FILE/.bed/_bis.temp} | paste -sd+ | bc)
+    DEL_RATIO_SUBSAMPLE=$(if [ $DEL_SUM_SUBSAMPLE_P1 == 0 ] || [ $DEL_SUM_SUBSAMPLE_P2 == 0 ]; then echo 0.00; else echo "scale=6; $DEL_SUM_SUBSAMPLE_P1/$DEL_SUM_SUBSAMPLE_P2" | bc | awk '{printf "%f", $0}'; fi)
+    DEL_RATIO_SUBSAMPLE_NORM=$(echo "scale=6; $DEL_RATIO_SUBSAMPLE/$SYN_RATIO_ALL" | bc | awk '{printf "%f", $0}')
+    echo $DEL_RATIO_SUBSAMPLE >> ${FILE/.bed/.jack1_bis.temp} #store all subsample ratios in a file
+    done
+  echo "Computing jackknife pseudovalues and variance"
+  #Compute the subsamples average ratio:
+  DEL_RATIO_SUBSAMPLE_SUM=$(cut -f1 ${FILE/.bed/.jack1_bis.temp} | paste -sd+ | bc)
+  DEL_RATIO_SUBSAMPLE_MEAN=$(echo "scale=6; $DEL_RATIO_SUBSAMPLE_SUM/$BLOCK_N" | bc | awk '{printf "%f", $0}')
+  #Obtain the jackknife pseudovalues (for more info, see https://www.math.wustl.edu/~sawyer/handouts/Jackknife.pdf)
+  awk -v mean_ratio="$DEL_RATIO_SUBSAMPLE_MEAN" -v num_blocks="$BLOCK_N" -F "\t" '{printf "%.6f\t%.6f\n", $1, (num_blocks*mean_ratio)-(num_blocks-1)*$1}' ${FILE/.bed/.jack1_bis.temp} > ${FILE/.bed/.jack2_bis.temp}
+  DEL_PSEUDOVALUES_SUM=$(cut -f2 ${FILE/.bed/.jack2_bis.temp} | paste -sd+ | bc)
+  DEL_PSEUDOVALUES_MEAN=$(echo "scale=6; $DEL_PSEUDOVALUES_SUM/$BLOCK_N" | bc | awk '{printf "%f", $0}')
+  #Compute variance of the pseudovalues:
+  awk -v syn_ratio="$INV_SYN_RATIO_ALL" -v mean_psv="$DEL_PSEUDOVALUES_MEAN" -F "\t" '{printf "%.6f\t%.6f\t%.6f\n", $1, $2, ($2*$2*syn_ratio*syn_ratio)-(mean_psv*syn_ratio)*(mean_psv*syn_ratio)}' ${FILE/.bed/.jack2_bis.temp} > ${FILE/.bed/.jack_bis}
+  VARIANCE_NUMERATOR_SUM=$(cut -f3 ${FILE/.bed/.jack_bis} | paste -sd+ | bc)
+  VARIANCE=$(echo "scale=6; $VARIANCE_NUMERATOR_SUM/($BLOCK_N-1)" | bc | awk '{printf "%f", $0}')
+  TWO_SD=$(echo "scale=6; sqrt ($VARIANCE)" | bc | awk '{printf "%f", $0*2}')
+  #Compile summary table:
+  echo -e "$POP_PAIR\t$SYN_RATIO_ALL\t$FEATURE\t$DEL_RATIO_ALL\t$DEL_RATIO_ALL_NORM\t$DEL_RATIO_SUBSAMPLE_MEAN\t$VARIANCE\t$TWO_SD" >> ${CALLING}"_vars_subs_derived_freq_ratio_variance_"${TYPE}"_bis.lr_ann.txt"
+  rm *.temp
+  done
+
+#awk -v mean_all="$DEL_RATIO_ALL_NORM" -F "\t" '{printf "%.6f\t%.6f\t%.6f\n", $1, ($1-mean_all), ($1-mean_all)*($1-mean_all)}' ${FILE/.bed/.jack} to obtain variance of original values
 
 #From outside the server:
-scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/genetic_load_analysis/derived_allele_freq_ratio/*/*ALL_vars_subs_derived_freq_ratio.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_ratio/
+scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/genetic_load_analysis/derived_allele_freq_ratio/*/*derived_freq_ratio_2SD_SNP.lr_ann.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_ratio/
 
 ```
 
@@ -424,7 +521,13 @@ library(tidyr)
 
 global_derived_freq_ratios <- read_tsv("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_ratio/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_ALL_vars_subs_derived_freq_ratio.txt",col_names=T,col_types=c("ffddddd")) %>% 
   dplyr::filter(., grepl('5x', population_1),grepl('5x', population_2))
-  
+
+global_derived_freq_ratios_errors <- read_tsv("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_ratio/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_vars_subs_derived_freq_ratio_2SD_SNP.lr_ann.txt",col_names=T,col_types=c("ffdd")) %>% 
+  dplyr::filter(., grepl('5x', population_1),grepl('5x', population_2))
+
+global_derived_freq_ratios <- left_join(global_derived_freq_ratios,global_derived_freq_ratios_errors,by=c("population_1","population_2"))
+global_derived_freq_ratios
+
 filtered_derived_freq_ratios = data_frame()
 levels <- c("c_lp_5x_c_lp_do","c_lp_5x_c_lp_sm","c_ll_5x_c_ll_po","c_ll_5x_c_ll_no","c_ll_5x_c_ll_ki")
 counter=0
