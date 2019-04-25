@@ -1552,8 +1552,8 @@ for j in ${DATASETS[@]}
 
 ```{r Obtain per population VCFs, eval=FALSE, engine='bash'}
 
-CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov) #write down name of the calling
-TYPE=(INDEL) #write down SNP or INDEL
+CALLING=(c_lp_sm_c_lp_do_nm2_origcov) #c_ll_ki_c_ll_no_c_ll_po_nm3_origcov #c_lp_sm_c_lp_do_nm2_origcov
+TYPE=(SNP) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
 screen -S "${CALLING}-${TYPE}"
 CALLING=${STY#*.}
@@ -1890,6 +1890,123 @@ for i in ${POP[@]}
       -sn $ID
       done
     done
+  done
+
+```
+
+#16: Obtain diversity estimates. Join María's diversity estimates with the rest of the information on variants.
+##Option A: the good one.
+```{r Obtain diversity estimates, eval=FALSE, engine='bash'}
+
+#This code should be run in server B using María's account. Otherwise some files won't be accessible.
+
+CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov) #c_ll_ki_c_ll_no_c_ll_po_nm3_origcov #c_lp_sm_c_lp_do_nm2_origcov
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+screen -S "${CALLING}-${TYPE}"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+script "${CALLING}_diversity_estimates_${TYPE}.lr_ann.log"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAM files path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING)
+SPECIES=$(echo $CALLING | fold -w8 | cut -c1-4 | head -n$N_POPS | sort | uniq)
+DATASETS=$(for i in ${SPECIES[@]}; do ls ${i}*_samples | cut -d'_' -f1,2,3; done)
+COVERAGE=$(echo "${CALLING}" | rev | cut -d'_' -f1 | rev)
+NM_COV=$(echo "${CALLING}" | rev | cut -d'_' -f1,2 | rev)
+cd $V_PATH/$CALLING/annotation
+POP_VCFS=($(ls `find . -name *'_5x_'*'_perpop_'$TYPE'.lr_ann.vcf' -print`))
+for p in ${POP_VCFS[@]}
+  do
+  POP_SHORT=$(echo ${p} | rev | cut -d'/' -f1 | rev | cut -d'_' -f4-6)
+  echo "retrieving VCF information from variants from population" $POP_SHORT
+  grep -v '#' ${p} | awk -F"\t|;|=" '{printf ("%s\t%s\t%s\t%s\t%s\n", $1,$2-1,$2,$13,$17)}' > ${p/perpop_${TYPE}.lr_ann.vcf/perpop_${TYPE}.lr_ann.bed}
+  NUMBER_IND=$(printf "n%03d" `$BCF query -l ${CALLING}_polarized.lr_ann.vcf | grep $POP_SHORT | wc -l`) #retrieve the total number of individuals in the population, irrespective of the dataset
+  DIV_FILES=$(ls /home/mlucena/ANGSD_analysis/whole_genome_analysis/sfs/${POP_SHORT}_${NUMBER_IND}_separated_by_scaffold/${POP_SHORT}_${NUMBER_IND}.transformedThetas_lp23.*)
+  rm -f ${POP_SHORT}_${NM_COV}_perpop/${POP_SHORT}_${NUMBER_IND}_variants_diversity_${TYPE}.lr_ann.bed
+  echo "retrieving diversity information from variants from population" $POP_SHORT
+  for scaffold in ${DIV_FILES[@]}
+    do
+    echo "processing scaffold" $(echo ${scaffold} | rev | cut -d'_' -f1 | rev)
+    bedtools intersect -a ${scaffold} -b ${p/perpop_${TYPE}.lr_ann.vcf/perpop_${TYPE}.lr_ann.bed} | awk -F"\t" '{printf ("%s_%s_%s\t%s\t%s\n", $1,$2,$3,$4,$5)}' >> ${POP_SHORT}_${NM_COV}_perpop/${POP_SHORT}_${NUMBER_IND}_variants_diversity_${TYPE}.lr_ann.bed
+    done
+  echo "joining VCF and diversity information from variants from population" $POP_SHORT
+  LANG=en_EN join -j 1 -t $'\t' <(awk -F"\t" '{printf ("%s_%s_%s\t%s\t%s\n", $1,$2,$3,$4,$5)}' ${p/perpop_${TYPE}.lr_ann.vcf/perpop_${TYPE}.lr_ann.bed} | LANG=en_EN sort -k1) <(LANG=en_EN sort -k1 ${POP_SHORT}_${NM_COV}_perpop/${POP_SHORT}_${NUMBER_IND}_variants_diversity_${TYPE}.lr_ann.bed) | awk -F"\t" '{gsub(/[_]/, "\t", $1); printf ("%s\t%s\t%s\t%s\t%s\n", $1,$2,$4,$5,$3)}' | sort -k1,1 -k2n > ${p/perpop_${TYPE}.lr_ann.vcf/perpop_diversity_${TYPE}.lr_ann.bed}
+  chgrp grupolince ${p/perpop_${TYPE}.lr_ann.vcf/perpop_diversity_${TYPE}.lr_ann.bed}
+  done
+
+```
+
+##Option B: too slow
+```{r Obtain diversity estimates, eval=FALSE, engine='bash'}
+
+#This code should be run in server B using María's account. Otherwise some files won't be accessible.
+
+CALLING=(c_lp_sm_c_lp_do_nm2_origcov) #c_ll_ki_c_ll_no_c_ll_po_nm3_origcov #c_lp_sm_c_lp_do_nm2_origcov
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+screen -S "${CALLING}-${TYPE}"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+script "${CALLING}_diversity_estimates_${TYPE}.lr_ann.log"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAM files path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING)
+SPECIES=$(echo $CALLING | fold -w8 | cut -c1-4 | head -n$N_POPS | sort | uniq)
+DATASETS=$(for i in ${SPECIES[@]}; do ls ${i}*_samples | cut -d'_' -f1,2,3; done)
+COVERAGE=$(echo "${CALLING}" | rev | cut -d'_' -f1 | rev)
+NM_COV=$(echo "${CALLING}" | rev | cut -d'_' -f1,2 | rev)
+cd $V_PATH/$CALLING/annotation
+POP_VCFS=($(ls `find . -name *'_5x_'*'_perpop_'$TYPE'.lr_ann.vcf' -print`))
+for p in ${POP_VCFS[@]}
+  do
+  POP_SHORT=$(echo ${p} | rev | cut -d'/' -f1 | rev | cut -d'_' -f4-6)
+  echo "retrieving target coordinates from population" $POP_SHORT
+  grep -v '#' ${p} | awk -F"\t|;|=" '{printf ("%s\t%s\t%s\t%s\t%s\n", $1,$2-1,$2,$13,$17)}' > ${p/perpop_${TYPE}.lr_ann.vcf/perpop_${TYPE}.lr_ann.bed}
+  NUMBER_IND=$(printf "n%03d" `$BCF query -l ${CALLING}_polarized.lr_ann.vcf | grep $POP_SHORT | wc -l`) #retrieve the total number of individuals in the population, irrespective of the dataset
+  NUMBER_POS=$(cat ${p} | wc -l)
+  echo -e "scaffold\tstart_pos\end_pos\ttotal_V\tAF\tWatterson\tPi\tANN" > ${p/perpop_${TYPE}.lr_ann.vcf/perpop_diversity_${TYPE}.lr_ann.bed}
+  i=0
+  echo "processing variants from population" $POP_SHORT
+  while ((i++)); IFS=$'\t' read -r SCAFFOLD START_POS END_POS AF ANN
+    do
+    if (($i % 1000 == 0))
+      then echo $i "processed variants out of" $NUMBER_POS
+    fi
+    DIV_FILE=$(find /home/mlucena/ANGSD_analysis/whole_genome_analysis/sfs/${POP_SHORT}_${NUMBER_IND}_separated_by_scaffold/ -name ${POP_SHORT}_${NUMBER_IND}.transformedThetas_$SCAFFOLD)
+    DIV_ROW=$(grep $SCAFFOLD$'\t'$START_POS$'\t'$END_POS $DIV_FILE | awk -F"\t" '{print $4,$5}' OFS="\t")
+    echo -e "$SCAFFOLD\t$START_POS\t$END_POS\t$AF\t$DIV_ROW\t$ANN" >> ${p/perpop_${TYPE}.lr_ann.vcf/perpop_diversity_${TYPE}.lr_ann.bed} #the diversity information will refer to all individuals sampled from one population, irrespective of the dataset, while the rest of the information will be relative to the 5x individuals only
+    done < ${p/perpop_${TYPE}.lr_ann.vcf/perpop_${TYPE}.lr_ann.bed}    
   done
 
 ```
