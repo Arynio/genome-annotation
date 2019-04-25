@@ -64,7 +64,7 @@ for g in ${GREP[@]}
   for p in ${POP_VCFS[@]}
     do
     echo "working with vcf ${p}"
-    grep "${g}" "${p}" | awk -F"\t|;|=" '{printf ("%s_%s_%s\t%s\n", $1,$2-1,$2,$13)}' > ${p/perpop.lr_ann.vcf/perpop_${FEATURE}_${TYPE}.lr_ann.bed}
+    grep "${g}" "${p}" | awk -F"\t|;|=" '{printf ("%s_%s_%s\t%s\n", $1,$2-1,$2,$13)}' > ${p/perpop_${TYPE}.lr_ann.vcf/perpop_${FEATURE}_${TYPE}.lr_ann.bed}
     done
   done
 #Prepare file that will contain population and SYN ratio data:
@@ -166,7 +166,7 @@ for g in ${GREP[@]}
   for p in ${POP_VCFS[@]}
     do
     echo "working with vcf ${p}"
-    grep "${g}" "${p}" | awk -F"\t|;|=" '{printf ("%s_%s_%s\t%s\n", $1,$2-1,$2,$13)}' > ${p/perpop.lr_ann.vcf/perpop_${FEATURE}_${TYPE}.lr_ann.bed}
+    grep "${g}" "${p}" | awk -F"\t|;|=" '{printf ("%s_%s_%s\t%s\n", $1,$2-1,$2,$13)}' > ${p/perpop_${TYPE}.lr_ann.vcf/perpop_${FEATURE}_${TYPE}.lr_ann.bed}
     done
   done
 #Prepare file that will contain population and SYN ratio data:
@@ -328,7 +328,7 @@ scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/genetic_
 
 #Block-jackknife method was performed following: https://www.math.wustl.edu/~sawyer/handouts/Jackknife.pdf
 
-#Option 1: use the normalized ratio:
+#Option 1: use the normalized ratio, remove consecutive SNPs:
 
 CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov) #use the substitutions calling, which is the more complete name
 TYPE=(SNP) #write down SNP or INDEL
@@ -369,9 +369,9 @@ for FILE in ${FILES[@]}
   #Define jackknife block related variables:
   if [[ $FEATURE == "LOF" ]]
     then
-    BLOCK_SIZE=(10)
+    BLOCK_SIZE=(50)
     else
-    BLOCK_SIZE=(100)
+    BLOCK_SIZE=(1000)
   fi
   VARIANT_N=$(cat $FILE | wc -l)
   MODULE=$(($VARIANT_N % $BLOCK_SIZE))
@@ -421,7 +421,96 @@ for ((i=0; i<=${#POP1[@]}; i++))
 done
 
 
-#Option 2: use the non-normalized ratio and include the syn ratio in the variance estimation (it yields the same result).
+
+#Option 2: use the normalized ratio, remove random SNPs:
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov) #use the substitutions calling, which is the more complete name
+TYPE=(SNP) #write down SNP or INDEL
+mkdir -p /GRUPOS/grupolince/lynx_genomes_5x/genetic_load_analysis/derived_allele_freq_ratio/$CALLING
+cd /GRUPOS/grupolince/lynx_genomes_5x/genetic_load_analysis/derived_allele_freq_ratio/$CALLING
+screen -S "${CALLING}-${TYPE}"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+script "${CALLING}_vars_subs_derived_freq_ratio_jackknife_shuffle.lr_ann.log"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+
+#Prepare output file:
+rm ${CALLING}"_vars_subs_derived_freq_ratio_variance_shuffle_"${TYPE}".lr_ann.txt"
+echo -e "population_pair\tsynonymous_ratio\tfeature\tglobal_ratio\tglobal_ratio_norm\tmean_subsample_ratio_norm\tvariance_subsample_ratio_norm\t±2SD_subsample_ratio_norm" > ${CALLING}"_vars_subs_derived_freq_ratio_variance_shuffle_"${TYPE}".lr_ann.txt"
+"$POP_PAIR\t$SYN_RATIO_ALL\t$FEATURE\t$DEL_RATIO_ALL\t$DEL_RATIO_ALL_NORM\t$DEL_RATIO_SUBSAMPLE_MEAN\t$VARIANCE\t$TWO_SD"
+FILES=$(ls *_vs_*vars_subs_SNP.lr_ann.bed | grep -Ev '_INTR_|_SYN_') #Only perform jackknife for deleterious categories.
+for FILE in ${FILES[@]}
+  do
+  #Define comparison file related variables:
+  echo $FILE
+  rm -f ${FILE/.bed/.jack1.temp}
+  POP_PAIR=$(echo $FILE | cut -d'_' -f1-13)
+  FEATURE=$(echo $FILE | rev | cut -d'_' -f5 | rev)
+  echo "Working with comparison" $POP_PAIR "and feature" $FEATURE
+  #Compute the ratio for all variants:
+  DEL_SUM_P1=$(cut -f6  ${FILE} | paste -sd+ | bc)
+  DEL_SUM_P2=$(cut -f7  ${FILE} | paste -sd+ | bc)
+  DEL_RATIO_ALL=$(if [ $DEL_SUM_P1 == 0 ] || [ $DEL_SUM_P2 == 0 ]; then echo 0.00; else echo "scale=6; $DEL_SUM_P1/$DEL_SUM_P2" | bc | awk '{printf "%f", $0}'; fi)
+  #Compute the ratio for synonymous variants:
+  SYN_FILE=$(ls $POP_PAIR*.bed | grep '_SYN_')
+  SYN_SUM_P1=$(cut -f6  ${SYN_FILE} | paste -sd+ | bc)
+  SYN_SUM_P2=$(cut -f7  ${SYN_FILE} | paste -sd+ | bc)
+  SYN_RATIO_ALL=$(if [ $SYN_SUM_P1 == 0 ] || [ $SYN_SUM_P2 == 0 ]; then echo 0.00; else echo "scale=6; $SYN_SUM_P1/$SYN_SUM_P2" | bc | awk '{printf "%f", $0}'; fi)
+  DEL_RATIO_ALL_NORM=$(echo "scale=6; $DEL_RATIO_ALL/$SYN_RATIO_ALL" | bc | awk '{printf "%f", $0}')
+  #Define jackknife block related variables:
+  if [[ $FEATURE == "LOF" ]]
+    then
+    BLOCK_SIZE=(10)
+    else
+    BLOCK_SIZE=(100)
+  fi
+  VARIANT_N=$(cat $FILE | wc -l)
+  BLOCK_N=(100)
+  #Compute the ratio for all block-less subsamples:
+  echo "Performing jackknife"
+  for i in $(seq 1 $BLOCK_N)
+    do
+    shuf -n$(($VARIANT_N-$BLOCK_SIZE)) $FILE > ${FILE/.bed/.temp}
+    DEL_SUM_SUBSAMPLE_P1=$(cut -f6  ${FILE/.bed/.temp} | paste -sd+ | bc)
+    DEL_SUM_SUBSAMPLE_P2=$(cut -f7  ${FILE/.bed/.temp} | paste -sd+ | bc)
+    DEL_RATIO_SUBSAMPLE=$(if [ $DEL_SUM_SUBSAMPLE_P1 == 0 ] || [ $DEL_SUM_SUBSAMPLE_P2 == 0 ]; then echo 0.00; else echo "scale=6; $DEL_SUM_SUBSAMPLE_P1/$DEL_SUM_SUBSAMPLE_P2" | bc | awk '{printf "%f", $0}'; fi)
+    DEL_RATIO_SUBSAMPLE_NORM=$(echo "scale=6; $DEL_RATIO_SUBSAMPLE/$SYN_RATIO_ALL" | bc | awk '{printf "%f", $0}')
+    echo $DEL_RATIO_SUBSAMPLE_NORM >> ${FILE/.bed/.jack1.temp} #store all subsample ratios in a file
+    done
+  echo "Computing jackknife pseudovalues and variance"
+  #Compute the subsamples average ratio:
+  DEL_RATIO_SUBSAMPLE_SUM=$(cut -f1 ${FILE/.bed/.jack1.temp} | paste -sd+ | bc)
+  DEL_RATIO_SUBSAMPLE_MEAN=$(echo "scale=6; $DEL_RATIO_SUBSAMPLE_SUM/$BLOCK_N" | bc | awk '{printf "%f", $0}')
+  #Obtain the jackknife pseudovalues (for more info, see https://www.math.wustl.edu/~sawyer/handouts/Jackknife.pdf)
+  awk -v mean_ratio="$DEL_RATIO_SUBSAMPLE_MEAN" -v num_blocks="$BLOCK_N" -F "\t" '{printf "%.6f\t%.6f\n", $1, (num_blocks*mean_ratio)-(num_blocks-1)*$1}' ${FILE/.bed/.jack1.temp} > ${FILE/.bed/.jack2.temp}
+  DEL_PSEUDOVALUES_SUM=$(cut -f2 ${FILE/.bed/.jack2.temp} | paste -sd+ | bc)
+  DEL_PSEUDOVALUES_MEAN=$(echo "scale=6; $DEL_PSEUDOVALUES_SUM/$BLOCK_N" | bc | awk '{printf "%f", $0}')
+  #Compute variance of the pseudovalues:
+  awk -v mean_psv="$DEL_PSEUDOVALUES_MEAN" -F "\t" '{printf "%.6f\t%.6f\t%.6f\n", $1, $2, ($2-mean_psv)*($2-mean_psv)}' ${FILE/.bed/.jack2.temp} > ${FILE/.bed/.jack}
+  VARIANCE_NUMERATOR_SUM=$(cut -f3 ${FILE/.bed/.jack} | paste -sd+ | bc)
+  VARIANCE=$(echo "scale=6; $VARIANCE_NUMERATOR_SUM/($BLOCK_N-1)" | bc | awk '{printf "%f", $0}')
+  TWO_SD=$(echo "scale=6; sqrt ($VARIANCE)" | bc | awk '{printf "%f", $0*2}')
+  #Compile summary table:
+  echo -e "$POP_PAIR\t$SYN_RATIO_ALL\t$FEATURE\t$DEL_RATIO_ALL\t$DEL_RATIO_ALL_NORM\t$DEL_RATIO_SUBSAMPLE_MEAN\t$VARIANCE\t$TWO_SD" >> ${CALLING}"_vars_subs_derived_freq_ratio_variance_shuffle_"${TYPE}".lr_ann.txt"
+  rm *.temp 
+  done
+POP1=($(cat ${CALLING}"_vars_subs_derived_freq_ratio_variance_shuffle_"${TYPE}".lr_ann.txt" | grep 'NSYN' | cut -f1 | awk 'BEGIN {FS="_vs_"} {print $1}'))
+POP2=($(cat ${CALLING}"_vars_subs_derived_freq_ratio_variance_shuffle_"${TYPE}".lr_ann.txt" | grep 'NSYN' | cut -f1 | awk 'BEGIN {FS="_vs_"} {print $2}'))
+NSYN_TWO_SD=($(cat ${CALLING}"_vars_subs_derived_freq_ratio_variance_shuffle_"${TYPE}".lr_ann.txt" | grep 'NSYN' | cut -f8))
+LOF_TWO_SD=($(cat ${CALLING}"_vars_subs_derived_freq_ratio_variance_shuffle_"${TYPE}".lr_ann.txt" | grep 'LOF' | cut -f8))
+
+echo -e "population_1\tpopulation_2\tNSYN_norm_ratio_2SD\tLOF_norm_ratio_2SD" > ${CALLING}"_vars_subs_derived_freq_ratio_2SD_shuffle_"${TYPE}".lr_ann.txt"
+for ((i=0; i<=${#POP1[@]}; i++))
+  do
+  printf '%s\t%s\t%s\t%s\n' "${POP1[i]}" "${POP2[i]}" "${NSYN_TWO_SD[i]}" "${LOF_TWO_SD[i]}" >> ${CALLING}"_vars_subs_derived_freq_ratio_2SD_shuffle_"${TYPE}".lr_ann.txt"
+done
+
+
+
+#Option 3: use the non-normalized ratio, remove consecutive SNPs, and include the syn ratio in the variance estimation (it yields the same result as option 1).
 
 CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov) #use the substitutions calling, which is the more complete name
 TYPE=(SNP) #write down SNP or INDEL
@@ -507,7 +596,7 @@ for FILE in ${FILES[@]}
 #awk -v mean_all="$DEL_RATIO_ALL_NORM" -F "\t" '{printf "%.6f\t%.6f\t%.6f\n", $1, ($1-mean_all), ($1-mean_all)*($1-mean_all)}' ${FILE/.bed/.jack} to obtain variance of original values
 
 #From outside the server:
-scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/genetic_load_analysis/derived_allele_freq_ratio/*/*derived_freq_ratio_2SD_SNP.lr_ann.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_ratio/
+scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/genetic_load_analysis/derived_allele_freq_ratio/*/*_vars_subs_derived_freq_ratio_*_SNP.lr_ann.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_ratio/
 
 ```
 
@@ -526,6 +615,8 @@ global_derived_freq_ratios_errors <- read_tsv("/Users/dani/ownCloud/backup/g-w_a
   dplyr::filter(., grepl('5x', population_1),grepl('5x', population_2))
 
 global_derived_freq_ratios <- left_join(global_derived_freq_ratios,global_derived_freq_ratios_errors,by=c("population_1","population_2"))
+global_derived_freq_ratios$population_1 <- factor(global_derived_freq_ratios$population_1,levels=unique(global_derived_freq_ratios$population_1))
+global_derived_freq_ratios$population_2 <- factor(global_derived_freq_ratios$population_2,levels=unique(global_derived_freq_ratios$population_2))
 global_derived_freq_ratios
 
 filtered_derived_freq_ratios = data_frame()
@@ -542,10 +633,15 @@ for (i in levels) {
 }
 filtered_derived_freq_ratios[] <- as.data.frame(lapply(filtered_derived_freq_ratios, function(x) gsub("c_lp_5x_|c_ll_5x_", "", x)),stringsAsFactors=F)
 filtered_derived_freq_ratios
-tidy_derived_freq_ratios <- filtered_derived_freq_ratios %>% mutate(populations=paste(population_1,population_2,sep="/")) %>% select(-population_1,-population_2) %>% gather(ratio_type,ratio_value,-populations)
+tidy_derived_freq_ratios <- filtered_derived_freq_ratios %>% mutate(populations=paste(population_1,population_2,sep="/")) %>% select(contains("_norm_"),populations,-contains("_2SD")) %>% gather(ratio_type,ratio_value,-populations)
+tidy_derived_freq_ratios_errors <- filtered_derived_freq_ratios %>% mutate(populations=paste(population_1,population_2,sep="/")) %>%
+select(populations,contains("_2SD")) %>% gather(error_type,error_value,-populations)
+tidy_derived_freq_ratios_errors <- as_tibble(lapply(tidy_derived_freq_ratios_errors, function(x) {gsub("_2SD", "", x)}))
+tidy_derived_freq_ratios <- left_join(tidy_derived_freq_ratios,tidy_derived_freq_ratios_errors,by=c("populations","ratio_type"="error_type"))
 tidy_derived_freq_ratios$populations <- factor(tidy_derived_freq_ratios$populations,levels=unique(tidy_derived_freq_ratios$populations))
 tidy_derived_freq_ratios$ratio_type <- factor(tidy_derived_freq_ratios$ratio_type,levels=unique(tidy_derived_freq_ratios$ratio_type))
 tidy_derived_freq_ratios$ratio_value <- as.double(tidy_derived_freq_ratios$ratio_value)
+tidy_derived_freq_ratios$error_value <- as.double(tidy_derived_freq_ratios$error_value)
 tidy_derived_freq_ratios <- tidy_derived_freq_ratios %>% mutate(ratio_value_from1=ratio_value-1)
 
 derived_freq_ratios_ggplot <- ggplot(data=filter(tidy_derived_freq_ratios,ratio_type=="NSYN_norm_ratio"|ratio_type=="LOF_norm_ratio"),aes(x=populations,y=ratio_value_from1,fill=ratio_type)) +
@@ -560,6 +656,19 @@ derived_freq_ratios_ggplot <- ggplot(data=filter(tidy_derived_freq_ratios,ratio_
 derived_freq_ratios_ggplot
 ggsave("c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_ALL_vars_subs_derived_freq_ratio.pdf", width=20, height=15, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_ratio")
 
+derived_freq_ratios_errors_ggplot <- ggplot(data=tidy_derived_freq_ratios,aes(x=populations,y=ratio_value_from1,fill=ratio_type)) +
+  geom_bar(stat='identity', position=position_dodge()) +
+  geom_errorbar(aes(ymin=ratio_value_from1-error_value, ymax=ratio_value_from1+error_value), position=position_dodge()) +
+  scale_x_discrete(limits = rev(levels(tidy_derived_freq_ratios$populations))) +
+  scale_y_continuous(breaks=seq(-0.6,0.2,by=0.1), labels=seq(-0.6,0.2,by=0.1)+1) +
+  scale_fill_manual("legend",values=c("LOF_norm_ratio"="red","NSYN_norm_ratio"="orange"),guide=guide_legend(reverse = TRUE)) +
+  coord_flip() +
+  xlab("Populations") +
+  ylab(expression(R["X/Y"])) +
+  theme_bw() 
+derived_freq_ratios_errors_ggplot
+
+ggsave("c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_ALL_vars_subs_derived_freq_ratio_errors.pdf", width=20, height=15, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_ratio")
 
 
 + theme(text=element_text(size=12,face="bold"),
