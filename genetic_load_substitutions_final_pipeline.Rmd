@@ -1446,11 +1446,17 @@ for j in ${DATASETS[@]}
 ```{r Obtain per population VCFs, eval=FALSE, engine='bash'}
 
 CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+TYPE=(SNP) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
-screen -S "${CALLING}"
-CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
-script "perpop_${CALLING}.lr_ann.log"
-CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+screen -S "${CALLING}-${TYPE}"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+script "perpop_${CALLING}_${TYPE}.lr_ann.log"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+
 
 S_PATH=/opt/snpEff #software path
 C_PATH=/home/dkleinman/datos/snpEff #config file path
@@ -1473,23 +1479,23 @@ cd $V_PATH/$CALLING/annotation
 for i in ${DATASETS[@]}
   do
   echo "${i}"
-  declare POP=$(bcftools query -l "${i}"_"${NM_COV}"_perdataset/"${i}"_"${NM_COV}"_perdataset_filtered.lr_ann.vcf | cut -c1-7 | sort | uniq)
+  declare POP=$(bcftools query -l ${i}"_"${NM_COV}"_perdataset/"${i}"_"${NM_COV}"_perdataset_filtered_"${TYPE}".lr_ann.vcf" | cut -c1-7 | sort | uniq)
   for j in ${POP[@]}
     do
     echo "${j}"
-    rm "${i}"_"${NM_COV}"_perdataset/"${i}"_"${j}"_pop_list_to_remove.txt
-    $BCF query -l "${i}"_"${NM_COV}"_perdataset/"${i}"_"${NM_COV}"_perdataset_filtered.lr_ann.vcf | grep "${j}" > "${i}"_"${NM_COV}"_perdataset/"${i}"_"${j}"_pop_list_to_remove.txt
-    cat "${i}"_"${NM_COV}"_perdataset/"${i}"_"${j}"_pop_list_to_remove.txt
+    rm ${i}"_"${NM_COV}"_perdataset/"${i}"_"${j}"_pop_list_to_remove.txt"
+    $BCF query -l ${i}"_"${NM_COV}"_perdataset/"${i}"_"${NM_COV}"_perdataset_filtered_"${TYPE}".lr_ann.vcf" | grep "${j}" > ${i}"_"${NM_COV}"_perdataset/"${i}"_"${j}"_pop_list_to_remove.txt"
+    cat ${i}"_"${NM_COV}"_perdataset/"${i}"_"${j}"_pop_list_to_remove.txt"
     mkdir -p "${j}"_"${NM_COV}"_perpop
     java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
     -T SelectVariants \
     -R $REF \
-    -V "${i}"_"${NM_COV}"_perdataset/"${i}"_"${NM_COV}"_perdataset_filtered.lr_ann.vcf \
-    -o "${j}"_"${NM_COV}"_perpop/"${i}"_"${j}"_"${NM_COV}"_perpop.lr_ann.vcf \
+    -V ${i}"_"${NM_COV}"_perdataset/"${i}"_"${NM_COV}"_perdataset_filtered_"${TYPE}".lr_ann.vcf" \
+    -o ${j}"_"${NM_COV}"_perpop/"${i}"_"${j}"_"${NM_COV}"_perpop_"${TYPE}".lr_ann.vcf" \
     -env \
-    --sample_file "${i}"_"${NM_COV}"_perdataset/"${i}"_"${j}"_pop_list_to_remove.txt
-    rm "${i}"_"${NM_COV}"_perdataset/"${i}"_"${j}"_pop_list_to_remove.txt
-    grep -v '#' "${j}"_"${NM_COV}"_perpop/"${i}"_"${j}"_"${NM_COV}"_perpop.lr_ann.vcf | wc -l #
+    --sample_file ${i}"_"${NM_COV}"_perdataset/"${i}"_"${j}"_pop_list_to_remove.txt"
+    rm ${i}"_"${NM_COV}"_perdataset/"${i}"_"${j}"_pop_list_to_remove.txt"
+    grep -v '#' ${j}"_"${NM_COV}"_perpop/"${i}"_"${j}"_"${NM_COV}"_perpop_"${TYPE}".lr_ann.vcf" | wc -l #
     done
   done
 
