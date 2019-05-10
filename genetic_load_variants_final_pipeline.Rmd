@@ -1157,7 +1157,7 @@ grep -v '#' "${CALLING}_polarized.lr_ann.vcf" | wc -l
 ```{r Filter the annotated VCF, eval=FALSE, engine='bash'}
 
 CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov) #write down name of the calling
-TYPE=(INDEL) #write down SNP or INDEL
+TYPE=(SNP) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
 screen -S "${CALLING}-${TYPE}"
 CALLING=${STY#*.}
@@ -1835,11 +1835,11 @@ for pop in ${POPS[@]}
 ```
 
 #15: Split the population VCFs into per individual VCFs. Generate a VCF for each individual.
-
+##Whole-genome.
 ```{r Split the population VCFs into per individual VCFs, eval=FALSE, engine='bash'}
 
 CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov) #write down name of the calling
-TYPE=(INDEL) #write down SNP or INDEL
+TYPE=(SNP) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
 screen -S "${CALLING}-${TYPE}"
 CALLING=${STY#*.}
@@ -1894,8 +1894,53 @@ for i in ${POP[@]}
 
 ```
 
-#16: Obtain diversity estimates. Join María's diversity estimates with the rest of the information on variants.
-##Option A: the good one.
+##IBD and non-IBD tracts.
+```{r Split the population VCFs into per individual VCFs, eval=FALSE, engine='bash'}
+
+#This code will only work if the whole-genome individual VCFs have been generated before.
+
+CALLING=(c_lp_sm_c_lp_do_nm2_origcov) #c_ll_ki_c_ll_no_c_ll_po_nm3_origcov #c_lp_sm_c_lp_do_nm2_origcov
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+screen -S "${CALLING}-${TYPE}"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+script "individual_IBD_notIBD_${CALLING}_${TYPE}.lr_ann.log"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAM files path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+cd $V_PATH/$CALLING/annotation
+INDLIST=($(ls `find . -name *"_individual_"${TYPE}".lr_ann.vcf" -print`))
+for i in "${INDLIST[@]}"
+  do
+  echo "${i}"
+  ind=$(echo "${i}" | awk -F'[/]' '{print $3}' | cut -c1-12)
+  echo "${ind}"
+  bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/ngsF-HMM/*/${ind}.ibdtract.bed -header > ${i/_individual_${TYPE}.lr_ann.vcf/_individual_IBD_${TYPE}.lr_ann.vcf}
+  bedtools intersect -a ${i} -b <(awk '$4 >= 1000000' /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/ngsF-HMM/*/${ind}.ibdtract.bed) -header > ${i/_individual_${TYPE}.lr_ann.vcf/_individual_IBD1000k_${TYPE}.lr_ann.vcf}
+  bedtools intersect -a ${i} -b <(awk '$4 >= 100000 && $4 < 1000000' /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/ngsF-HMM/*/${ind}.ibdtract.bed) -header > ${i/_individual_${TYPE}.lr_ann.vcf/_individual_IBD100k_${TYPE}.lr_ann.vcf}
+  bedtools intersect -a ${i} -b <(awk '$4 >= 10000 && $4 < 100000' /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/ngsF-HMM/*/${ind}.ibdtract.bed) -header > ${i/_individual_${TYPE}.lr_ann.vcf/_individual_IBD10k_${TYPE}.lr_ann.vcf}
+  bedtools subtract -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/ngsF-HMM/*/${ind}.ibdtract.bed -header > ${i/_individual_${TYPE}.lr_ann.vcf/_individual_notIBD_${TYPE}.lr_ann.vcf}
+  done
+
+```
+
+#16: Obtain per population diversity estimates. Join María's diversity estimates with the rest of the information on variants.
+##Join diversity and VCF data.
+###Option A: the good one.
 ```{r Obtain diversity estimates, eval=FALSE, engine='bash'}
 
 #This code should be run in server B using María's account. Otherwise some files won't be accessible.
@@ -1952,7 +1997,7 @@ for p in ${POP_VCFS[@]}
 
 ```
 
-##Option B: too slow
+###Option B: too slow
 ```{r Obtain diversity estimates, eval=FALSE, engine='bash'}
 
 #This code should be run in server B using María's account. Otherwise some files won't be accessible.
@@ -2008,5 +2053,88 @@ for p in ${POP_VCFS[@]}
     echo -e "$SCAFFOLD\t$START_POS\t$END_POS\t$AF\t$DIV_ROW\t$ANN" >> ${p/perpop_${TYPE}.lr_ann.vcf/perpop_diversity_${TYPE}.lr_ann.bed} #the diversity information will refer to all individuals sampled from one population, irrespective of the dataset, while the rest of the information will be relative to the 5x individuals only
     done < ${p/perpop_${TYPE}.lr_ann.vcf/perpop_${TYPE}.lr_ann.bed}    
   done
+
+```
+
+##Calculate per-feature average values.
+```{r Get annotation statistics, eval=FALSE, engine='bash'}
+
+CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov) #c_lp_sm_c_lp_do_nm2_origcov #c_ll_ki_c_ll_no_c_ll_po_nm3_origcov
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+screen -S "${CALLING}-${TYPE}"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+script "${CALLING}_ann_population_summary_diversity_${TYPE}.lr_ann.log"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAM files path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+cd $V_PATH/$CALLING/annotation
+rm ${CALLING}"_ann_population_summary_diversity_"${TYPE}".lr_ann.txt"
+echo -e "species\tpopulation\tdataset\ttotal_Z_DIV\ttotal_P_DIV\tintergenic_Z_DIV\tintergenic_P_DIV\tintronic_Z_DIV\tintronic_P_DIV\tcoding_Z_DIV\tsynonymous_Z_DIV\tsynonymous_P_DIV\tmissense_Z_DIV\tmissense_P_DIV\tnonsense_Z_DIV\tnonsense_P_DIV\tUCNE_Z_DIV\tUCNE_P_DIV" > ${CALLING}"_ann_population_summary_diversity_"${TYPE}".lr_ann.txt"
+POPLIST=($(ls `find . -name *"_perpop_diversity_"${TYPE}".lr_ann.bed" -print`))
+for i in "${POPLIST[@]}"
+  do
+  echo "${i}"
+  vcf=$(echo "${i}" | rev | cut -d'/' -f1 | rev)
+  echo "${vcf}"
+  SPECIES=$(echo "${vcf}" | cut -c3-4)
+  POPULATION=$(echo "${vcf}" | cut -c14-15)
+  DATASET=$(echo "${vcf}" | cut -c6-7)
+  TOTAL_V=$(grep -v '#' ${i} | wc -l)
+  TOTAL_Z=$(grep -v '#' ${i} | cut -f5 | paste -sd+ | bc)
+  TOTAL_Z_DIV=$(echo "scale=4; $TOTAL_Z/$TOTAL_V" | bc | awk '{printf "%f", $0}')
+  TOTAL_P=$(grep -v '#' ${i} | cut -f6 | paste -sd+ | bc)
+  TOTAL_P_DIV=$(echo "scale=4; $TOTAL_P/$TOTAL_V" | bc | awk '{printf "%f", $0}')
+  INTERGENIC_V=$(grep 'intergenic' ${i} | wc -l)
+  INTERGENIC_Z=$(grep 'intergenic' ${i} | cut -f5 | paste -sd+ | bc)
+  INTERGENIC_Z_DIV=$(echo "scale=4; $INTERGENIC_Z/$INTERGENIC_V" | bc | awk '{printf "%f", $0}')
+  INTERGENIC_P=$(grep 'intergenic' ${i} | cut -f6 | paste -sd+ | bc)
+  INTERGENIC_P_DIV=$(echo "scale=4; $INTERGENIC_P/$INTERGENIC_V" | bc | awk '{printf "%f", $0}')
+  INTRONIC_V=$(grep 'intron_variant' ${i} | wc -l)
+  INTRONIC_Z=$(grep 'intron_variant' ${i} | cut -f5 | paste -sd+ | bc)
+  INTRONIC_Z_DIV=$(echo "scale=4; $INTRONIC_Z/$INTRONIC_V" | bc | awk '{printf "%f", $0}')
+  INTRONIC_P=$(grep 'intron_variant' ${i} | cut -f6 | paste -sd+ | bc)
+  INTRONIC_P_DIV=$(echo "scale=4; $INTRONIC_P/$INTRONIC_V" | bc | awk '{printf "%f", $0}')
+  CODING_V=$(grep 'CDS' ${i} | wc -l)
+  SYNONYMOUS_V=$(grep 'synonymous_variant' ${i} | wc -l)
+  SYNONYMOUS_Z=$(grep 'synonymous_variant' ${i} | cut -f5 | paste -sd+ | bc)
+  SYNONYMOUS_Z_DIV=$(echo "scale=4; $SYNONYMOUS_Z/$SYNONYMOUS_V" | bc | awk '{printf "%f", $0}')
+  SYNONYMOUS_P=$(grep 'synonymous_variant' ${i} | cut -f6 | paste -sd+ | bc)
+  SYNONYMOUS_P_DIV=$(echo "scale=4; $SYNONYMOUS_P/$SYNONYMOUS_V" | bc | awk '{printf "%f", $0}')
+  MISSENSE_V=$(grep 'missense_variant' ${i} | wc -l)
+  MISSENSE_Z=$(grep 'missense_variant' ${i} | cut -f5 | paste -sd+ | bc)
+  MISSENSE_Z_DIV=$(echo "scale=4; $MISSENSE_Z/$MISSENSE_V" | bc | awk '{printf "%f", $0}')
+  MISSENSE_P=$(grep 'missense_variant' ${i} | cut -f6 | paste -sd+ | bc)
+  MISSENSE_P_DIV=$(echo "scale=4; $MISSENSE_P/$MISSENSE_V" | bc | awk '{printf "%f", $0}')
+  NONSENSE_V=$(grep '|HIGH|' ${i} | wc -l)
+  NONSENSE_Z=$(grep '|HIGH|' ${i} | cut -f5 | paste -sd+ | bc)
+  NONSENSE_Z_DIV=$(echo "scale=4; $NONSENSE_Z/$NONSENSE_V" | bc | awk '{printf "%f", $0}')
+  NONSENSE_P=$(grep '|HIGH|' ${i} | cut -f6 | paste -sd+ | bc)
+  NONSENSE_P_DIV=$(echo "scale=4; $NONSENSE_P/$NONSENSE_V" | bc | awk '{printf "%f", $0}')
+  UCNE_V=$(grep 'UCNE' ${i} | wc -l)
+  UCNE_Z=$(grep 'UCNE' ${i} | cut -f5 | paste -sd+ | bc)
+  UCNE_Z_DIV=$(echo "scale=4; $UCNE_Z/$UCNE_V" | bc | awk '{printf "%f", $0}')
+  UCNE_P=$(grep 'UCNE' ${i} | cut -f6 | paste -sd+ | bc)
+  UCNE_P_DIV=$(echo "scale=4; $UCNE_P/$UCNE_V" | bc | awk '{printf "%f", $0}')
+  echo -e "$SPECIES\t$POPULATION\t$DATASET\t$TOTAL_Z_DIV\t$TOTAL_P_DIV\t$INTERGENIC_Z_DIV\t$INTERGENIC_P_DIV\t$INTRONIC_Z_DIV\t$INTRONIC_P_DIV\t$CODING_Z_DIV\t$SYNONYMOUS_Z_DIV\t$SYNONYMOUS_P_DIV\t$MISSENSE_Z_DIV\t$MISSENSE_P_DIV\t$NONSENSE_Z_DIV\t$NONSENSE_P_DIV\t$UCNE_Z_DIV\t$UCNE_P_DIV" >> ${CALLING}"_ann_population_summary_diversity_"${TYPE}".lr_ann.txt"
+  done
+
+#From outside the server:
+CALLING=(c_lp_sm_c_lp_do_nm2_origcov)
+scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/*_ann_population_summary*.lr_ann.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/
 
 ```
