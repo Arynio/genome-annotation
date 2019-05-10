@@ -1103,7 +1103,7 @@ fi
 ```{r Filter the annotated VCF, eval=FALSE, engine='bash'}
 
 CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov) #write down name of the calling
-TYPE=(INDEL) #write down SNP or INDEL
+TYPE=(SNP) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
 screen -S "${CALLING}-${TYPE}"
 CALLING=${STY#*.}
@@ -1724,16 +1724,20 @@ for pop in ${POPS[@]}
 ```
 
 #15: Split the population VCFs into per individual VCFs. Generate a VCF for each individual.
-
+##Whole-genome.
 ```{r Split the population VCFs into per individual VCFs, eval=FALSE, engine='bash'}
 
-#Generate individual VCFs from the per species VCFs:
-CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov) #write down name of the calling
+TYPE=(SNP) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
-screen -S "${CALLING}"
-CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
-script "individual_${CALLING}.lr_ann.log"
-CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+screen -S "${CALLING}-${TYPE}"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+script "individual_${CALLING}_${TYPE}.lr_ann.log"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
 
 S_PATH=/opt/snpEff #software path
 C_PATH=/home/dkleinman/datos/snpEff #config file path
@@ -1753,12 +1757,13 @@ DATASETS=$(for i in ${SPECIES[@]}; do ls ${i}*_samples | cut -d'_' -f1,2,3; done
 COVERAGE=$(echo "${CALLING}" | rev | cut -d'_' -f1 | rev)
 NM_COV=$(echo "${CALLING}" | rev | cut -d'_' -f1,2 | rev)
 cd $V_PATH/$CALLING/annotation
-declare POP=$(bcftools query -l "${CALLING}_polarized_substitutions.lr_ann.vcf" | cut -c1-7 | sort | uniq)
+declare POP=$(bcftools query -l ${CALLING}"_polarized_substitutions_"${TYPE}".lr_ann.vcf" | cut -c1-7 | sort | uniq)
+
 for i in ${POP[@]}
   do
   echo "${i}"
   mkdir -p "${i}"_"${NM_COV}"_individuals
-  VCF_LIST=$(ls "${i}"_"${NM_COV}"_perpop/*_"${i}"_"${NM_COV}"_perpop.lr_ann.vcf)
+  VCF_LIST=$(ls ${i}"_"${NM_COV}"_perpop/"*"_"${i}"_"${NM_COV}"_perpop_"${TYPE}".lr_ann.vcf")
   for j in ${VCF_LIST[@]}
     do 
     INDIVIDUALS=$(bcftools query -l "${j}" | sort | uniq)
@@ -1770,11 +1775,55 @@ for i in ${POP[@]}
       -T SelectVariants \
       -R $REF \
       -V "${j}" \
-      -o "${i}"_"${NM_COV}"_individuals/"${k}"_"${NM_COV}"_individual.lr_ann.vcf \
+      -o ${i}"_"${NM_COV}"_individuals/"${k}"_"${NM_COV}"_individual_"${TYPE}".lr_ann.vcf" \
       -env \
       -sn $ID
       done
     done
+  done
+
+```
+
+##IBD and non-IBD tracts.
+```{r Split the population VCFs into per individual VCFs, eval=FALSE, engine='bash'}
+
+#This code will only work if the whole-genome individual VCFs have been generated before.
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+screen -S "${CALLING}-${TYPE}"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+script "individual_IBD_notIBD_${CALLING}_${TYPE}.lr_ann.log"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAM files path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+cd $V_PATH/$CALLING/annotation
+INDLIST=($(ls `find . -name *"_individual_"${TYPE}".lr_ann.vcf" -print`))
+for i in "${INDLIST[@]}"
+  do
+  echo "${i}"
+  ind=$(echo "${i}" | awk -F'[/]' '{print $3}' | cut -c1-12)
+  echo "${ind}"
+  bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/ngsF-HMM/*/${ind}.ibdtract.bed > ${i/_individual_${TYPE}.lr_ann.vcf/_individual_IBD_${TYPE}.lr_ann.vcf}
+  bedtools intersect -a ${i} -b <(awk '$4 >= 1000000' /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/ngsF-HMM/*/${ind}.ibdtract.bed) -header > ${i/_individual_${TYPE}.lr_ann.vcf/_individual_IBD1000k_${TYPE}.lr_ann.vcf}
+  bedtools intersect -a ${i} -b <(awk '$4 >= 100000 && $4 < 1000000' /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/ngsF-HMM/*/${ind}.ibdtract.bed) -header > ${i/_individual_${TYPE}.lr_ann.vcf/_individual_IBD100k_${TYPE}.lr_ann.vcf}
+  bedtools intersect -a ${i} -b <(awk '$4 >= 10000 && $4 < 100000' /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/ngsF-HMM/*/${ind}.ibdtract.bed) -header > ${i/_individual_${TYPE}.lr_ann.vcf/_individual_IBD10k_${TYPE}.lr_ann.vcf}
+  bedtools subtract -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/ngsF-HMM/*/${ind}.ibdtract.bed > ${i/_individual_${TYPE}.lr_ann.vcf/_individual_notIBD_${TYPE}.lr_ann.vcf}
   done
 
 ```
