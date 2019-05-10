@@ -12,14 +12,14 @@ output: html_document
 
 mkdir -p /GRUPOS/grupolince/GATK_tests
 cd /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome
-head -n4 bed_file_all_the_genome.bed > /GRUPOS/grupolince/GATK_tests/scaffolds_lp23.s00001_to_s00004.bed
+head -n4 bed_file_all_the_genome.bed > /GRUPOS/grupolince/GATK_tests/scaffold_lp23.s00001_to_s00004.bed
 
 cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
 declare SAMPLES=$(ls c_lp*recal_round-1.nm2.bam | cut -c1-12 | shuf | head -n5)
 for i in ${SAMPLES[@]}
   do
   echo "${i}"
-  samtools view -b -h -L /GRUPOS/grupolince/GATK_tests/scaffolds_lp23.s00001_to_s00004.bed "${i}"_recal_round-1.nm2.bam > /GRUPOS/grupolince/GATK_tests/"${i}"_recal_round-1.s00001_to_s00004.nm2.bam
+  samtools view -b -h -L /GRUPOS/grupolince/GATK_tests/scaffold_lp23.s00001_to_s00004.bed "${i}"_recal_round-1.nm2.bam > /GRUPOS/grupolince/GATK_tests/"${i}"_recal_round-1.s00001_to_s00004.nm2.bam
   samtools index "${i}"_recal_round-1.s00001_to_s00004.nm2.bam
   done
 
