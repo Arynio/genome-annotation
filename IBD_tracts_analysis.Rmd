@@ -290,7 +290,7 @@ $NGSF --geno $I_PATH/beagle_gl/c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060.geno
 
 ```
 
-#3: Visualize ngsF-HMM output.
+#3: Analyse ngsF-HMM output.
 Autores: Enrico, Dani, Maria. Nosotros tenemos un archivo donde están todas las posiciones de cada scaffold, se llama genome_coordinates.list. A este archivo le vamos a pegar una modificación del archivo ibd que en vez de ser una fila por cada individuo sea una columna. Así por cada individuo vamos a pegar la columna con sus valores 0 y 1 y la columna con información de scaffold y de base. Vamos a tener tantos archivos como individuos. 
 
 ##Count number of large IBD tracts.
@@ -351,7 +351,7 @@ scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/IBD_anal
 
 ```
 
-##Plot results.
+##Plot tract length results.
 
 ```{r}
 
@@ -390,10 +390,35 @@ ibd_tract3 <- ibd_tract %>%
   dplyr::group_by(ind,length_category) %>%
   dplyr::summarise(n = n())
 
-PLOTEAR por individuo?
+#PLOTEAR por individuo?
 ggplot (ibd_tract3, aes(x=length_category, y=n, colour=pop, fill=pop)) +
   geom_col() +
   facet_grid(~sps, scales="free_x") +
   theme (axis.text.x = element_text(size=6, angle=90, vjust=0.5))
 
 ```
+
+##Retrieve IBD tract coordinates for each individual. Generate BAM files with coordinates for each IBD tract (in scaffolds bigger than 1.6Mb).
+
+```{bash}
+
+#El archivo de entrada es un .bed con las coordenadas de los IBD tracts de todos los individuos del dataset, y se genera en la sección "Count number of large IBD tracts". En esta sección partimos ese archivo por individuo.
+
+INPUT_FILE=(c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060.ibdtract.bed)
+cd /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/ngsF-HMM
+screen -S "${INPUT_FILE}"
+INPUT_FILE=${STY#*.}
+script "per_individual-${INPUT_FILE}.log"
+INPUT_FILE=${STY#*.}
+
+INDIVIDUALS=$(cut -f5 c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060.ibdtract.bed | uniq | tail -n +2)
+for i in ${INDIVIDUALS[@]}
+  do
+  echo "processing individual" ${i}
+  POP=$(echo ${i} | cut -c1-7)
+  mkdir -p ./$POP"_ibdtracts"
+  grep ${i} $INPUT_FILE > $POP"_ibdtracts"/${i}".ibdtract.bed"
+  done
+
+```
+
