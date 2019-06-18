@@ -2646,8 +2646,7 @@ for k in ${INDIVIDUALS[@]}
 #Test VEP:
 ```{bash}
 
-docker run -t -i ensemblorg/ensembl-vep ./vep -i c_lp_5x_c_lp_sm_nm2_origcov_perpop_SNP.lr_ann.vcf -gff LYPA23C.all.fix.nr.gff3.gz -fasta c_lr_zz_0001_recal1.fa.gz -vcf -species "lynx_pardinus"
-
+#It works but we need to build first the SIFT scores database.
 docker run -t -i -v $HOME/vep_data:/opt/vep/.vep ensemblorg/ensembl-vep ./vep -i /opt/vep/.vep/c_lp_5x_c_lp_sm_nm2_origcov_perpop_SNP.lr_ann.vcf -gff /opt/vep/.vep/LYPA23C.all.fix.nr.gff3.gz -fasta /opt/vep/.vep/c_lr_zz_0001_recal1.fa.gz -o /opt/vep/.vep/c_lp_5x_c_lp_sm_nm2_origcov_perpop_SNP.lr_ann_vep.vcf -vcf -species "lynx_pardinus"
 
 ```
