@@ -85,6 +85,7 @@ for p1 in ${POPS[@]}
   for p2 in ${POPS[@]}
     do
     echo "${p1} vs ${p2}"
+    echo "feature: SYN"
     LANG=en_EN join -a1 -a2 -e 0.00 -o auto -j 1 <(LANG=en_EN sort -k1 ./*/${p1}_${NM_COV}_perpop_SYN_${TYPE}.lr_ann.bed) <(LANG=en_EN sort -k1 ./*/${p2}_${NM_COV}_perpop_SYN_${TYPE}.lr_ann.bed) | awk -F"\t|_" '{print $1,$2,$3,$4,$5}' OFS="\t" | LANG=en_EN sort -k1,1 -k2,2n | awk '{printf "%s\t%s\t%s\t%.3f\t%.3f\t%.3f\t%.3f\n", $1,$2,$3,$4,$5,$4*(1-$5),$5*(1-$4)}' > derived_allele_freq_ratio/${p1}_vs_${p2}_${NM_COV}_perpop_SYN_${TYPE}.lr_ann.bed #col1: scaffold, col2: pos_start, col3: pos_end, col4: p1_af, col5: p2_af, col6: p1_af*(1-p2_af), col7: p2_af*(1-p1_af)
     SUM_P1=$(cut -f6 derived_allele_freq_ratio/${p1}_vs_${p2}_${NM_COV}_perpop_SYN_${TYPE}.lr_ann.bed | paste -sd+ | bc)
     SUM_P2=$(cut -f7 derived_allele_freq_ratio/${p1}_vs_${p2}_${NM_COV}_perpop_SYN_${TYPE}.lr_ann.bed | paste -sd+ | bc)
@@ -110,7 +111,7 @@ for f in ${DEL_FEATURES[@]}
   head ${CALLING}_${f}_derived_freq_ratio_${TYPE}.txt -n1 > ${CALLING}_temp_derived_freq_ratio_${TYPE}.borrar
   paste ${CALLING}_SYN_derived_freq_ratio_${TYPE}.txt ${CALLING}_${f}_derived_freq_ratio_${TYPE}.txt | awk 'FNR == 1 {next}{print $4,$4/$3}' OFS="\t" >> ${CALLING}_temp_derived_freq_ratio_${TYPE}.borrar
   #Now join the ALL and the current DEL feature data
-  paste <(head ${CALLING}_ALL_derived_freq_ratio_${TYPE}.txt -n1) <(head ${CALLING}_temp_derived_freq_ratio_${TYPE}.borrar -n1) > "${CALLING}"_joint_derived_freq_ratio.borrar
+  paste <(head ${CALLING}_ALL_derived_freq_ratio_${TYPE}.txt -n1) <(head ${CALLING}_temp_derived_freq_ratio_${TYPE}.borrar -n1) > "${CALLING}"_joint_derived_freq_ratio_${TYPE}.borrar
   paste ${CALLING}_ALL_derived_freq_ratio_${TYPE}.txt ${CALLING}_temp_derived_freq_ratio_${TYPE}.borrar | awk 'FNR == 1 {next}{print $0}' OFS="\t" >> ${CALLING}_joint_derived_freq_ratio_${TYPE}.borrar
   #Replace the ALL table with the updated one
   mv ${CALLING}_joint_derived_freq_ratio_${TYPE}.borrar ${CALLING}_ALL_derived_freq_ratio_${TYPE}.txt
@@ -187,6 +188,7 @@ for p1 in ${POPS[@]}
   for p2 in ${POPS[@]}
     do
     echo "${p1} vs ${p2}"
+    echo "feature: SYN"
     LANG=en_EN join -a1 -a2 -e 0.00 -o auto -j 1 <(LANG=en_EN sort -k1 ./*/${p1}_${NM_COV}_perpop_SYN_${TYPE}.lr_ann.bed) <(LANG=en_EN sort -k1 ./*/${p2}_${NM_COV}_perpop_SYN_${TYPE}.lr_ann.bed) | awk -F"\t|_" '{print $1,$2,$3,$4,$5}' OFS="\t" | LANG=en_EN sort -k1,1 -k2,2n | awk '{printf "%s\t%s\t%s\t%.3f\t%.3f\t%.3f\t%.3f\n", $1,$2,$3,$4,$5,$4*(1-$5),$5*(1-$4)}' > derived_allele_freq_ratio/${p1}_vs_${p2}_${NM_COV}_perpop_SYN_${TYPE}.lr_ann.bed #col1: scaffold, col2: pos_start, col3: pos_end, col4: p1_af, col5: p2_af, col6: p1_af*(1-p2_af), col7: p2_af*(1-p1_af)
     SUM_P1=$(cut -f6 derived_allele_freq_ratio/${p1}_vs_${p2}_${NM_COV}_perpop_SYN_${TYPE}.lr_ann.bed | paste -sd+ | bc)
     SUM_P2=$(cut -f7 derived_allele_freq_ratio/${p1}_vs_${p2}_${NM_COV}_perpop_SYN_${TYPE}.lr_ann.bed | paste -sd+ | bc)
@@ -212,7 +214,7 @@ for f in ${DEL_FEATURES[@]}
   head ${CALLING}_${f}_derived_freq_ratio_${TYPE}.txt -n1 > ${CALLING}_temp_derived_freq_ratio_${TYPE}.borrar
   paste ${CALLING}_SYN_derived_freq_ratio_${TYPE}.txt ${CALLING}_${f}_derived_freq_ratio_${TYPE}.txt | awk 'FNR == 1 {next} $3==0 {print $4,0.0} $3>0 {print $4,$4/$3}' OFS="\t" >> ${CALLING}_temp_derived_freq_ratio_${TYPE}.borrar
   #Now join the ALL and the current DEL feature data
-  paste <(head ${CALLING}_ALL_derived_freq_ratio_${TYPE}.txt -n1) <(head ${CALLING}_temp_derived_freq_ratio_${TYPE}.borrar -n1) > "${CALLING}"_joint_derived_freq_ratio.borrar
+  paste <(head ${CALLING}_ALL_derived_freq_ratio_${TYPE}.txt -n1) <(head ${CALLING}_temp_derived_freq_ratio_${TYPE}.borrar -n1) > "${CALLING}"_joint_derived_freq_ratio_${TYPE}.borrar
   paste ${CALLING}_ALL_derived_freq_ratio_${TYPE}.txt ${CALLING}_temp_derived_freq_ratio_${TYPE}.borrar | awk 'FNR == 1 {next}{print $0}' OFS="\t" >> ${CALLING}_joint_derived_freq_ratio_${TYPE}.borrar
   #Replace the ALL table with the updated one
   mv ${CALLING}_joint_derived_freq_ratio_${TYPE}.borrar ${CALLING}_ALL_derived_freq_ratio_${TYPE}.txt
@@ -224,7 +226,7 @@ scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dan
 
 ```
 
-###Global ratios (variants + substitutions):
+###Global ratios (variants + substitutions) for the separate callings:
 ```{r Calculate derived allele frequency ratio, eval=FALSE, engine='bash'}
 
 CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov) #use the substitutions calling, which is the more complete name
@@ -239,7 +241,6 @@ script "${CALLING}_vars_subs_derived_freq_ratio_${TYPE}.lr_ann.log"
 CALLING=${STY#*.}
 CALLING=${CALLING%-*}
 TYPE=${STY#*-}
-
 
 V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
 REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
@@ -287,6 +288,7 @@ for p1 in ${POPS[@]}
   for p2 in ${POPS[@]}
     do
     echo "${p1} vs ${p2}"
+    echo "feature: SYN"
     LANG=en_EN join -a1 -a2 -e 0.00 -o auto -j 1 <(LANG=en_EN sort -k1 ${p1}"_"${NM_COV}"_perpop_SYN_vars_subs"_${TYPE}".lr_ann.bed") <(LANG=en_EN sort -k1 ${p2}"_"${NM_COV}"_perpop_SYN_vars_subs"_${TYPE}".lr_ann.bed") | awk -F"\t|_" '{print $1,$2,$3,$4,$5}' OFS="\t" | LANG=en_EN sort -k1,1 -k2,2n | awk '{printf "%s\t%s\t%s\t%.3f\t%.3f\t%.3f\t%.3f\n", $1,$2,$3,$4,$5,$4*(1-$5),$5*(1-$4)}' > ${p1}"_vs_"${p2}"_"${NM_COV}"_perpop_SYN_vars_subs"_${TYPE}".lr_ann.bed"
     SUM_P1=$(cut -f6 ${p1}"_vs_"${p2}"_"${NM_COV}"_perpop_SYN_vars_subs"_${TYPE}".lr_ann.bed" | paste -sd+ | bc)
     SUM_P2=$(cut -f7 ${p1}"_vs_"${p2}"_"${NM_COV}"_perpop_SYN_vars_subs"_${TYPE}".lr_ann.bed" | paste -sd+ | bc)
@@ -323,6 +325,212 @@ scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/genetic_
 
 ```
 
+###Global ratios (variants + substitutions) for the joint calling:
+```{r Calculate derived allele frequency ratio, eval=FALSE, engine='bash'}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov) 
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+screen -S "${CALLING}-${TYPE}"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+script "${CALLING}_derived_freq_ratio_varssubs_${TYPE}.lr_ann.log"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAM files path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING)
+SPECIES=$(echo $CALLING | fold -w8 | cut -c1-4 | head -n$N_POPS | sort | uniq)
+DATASETS=$(for i in ${SPECIES[@]}; do ls ${i}*_samples | cut -d'_' -f1,2,3; done)
+COVERAGE=$(echo "${CALLING}" | rev | cut -d'_' -f1 | rev)
+NM_COV=$(echo "${CALLING}" | rev | cut -d'_' -f1,2 | rev)
+GREP=$(cat /GRUPOS/grupolince/lynx_genomes_5x/genetic_load_analysis/derived_allele_freq_ratio/features_derived_allele_freq_ratio.txt | cut -f1)
+cd $V_PATH/$CALLING/annotation
+POP_VCFS=($(ls `find . -name *'_perpop_varssubs_'$TYPE'.lr_ann.vcf' -print`))
+echo "retrieving variants from each feature from each population"
+for g in ${GREP[@]}
+  do
+  echo "feature: ${g}"
+  FEATURE=$(grep "${g}" /GRUPOS/grupolince/lynx_genomes_5x/genetic_load_analysis/derived_allele_freq_ratio/features_derived_allele_freq_ratio.txt | cut -f2)
+  echo $FEATURE
+  for p in ${POP_VCFS[@]}
+    do
+    echo "working with vcf ${p}"
+    grep "${g}" "${p}" | awk -F"\t|;|=" '{printf ("%s_%s_%s\t%s\n", $1,$2-1,$2,$13)}' > ${p/perpop_varssubs_${TYPE}.lr_ann.vcf/perpop_varssubs_${FEATURE}_${TYPE}.lr_ann.bed}
+    done
+  done
+#Prepare file that will contain population and SYN ratio data:
+mkdir -p derived_allele_freq_ratio
+rm derived_allele_freq_ratio/${CALLING}_SYN_derived_freq_ratio_varssubs_${TYPE}.txt
+echo -e "population_1\tpopulation_2\tSYN_ratio" > derived_allele_freq_ratio/${CALLING}_SYN_derived_freq_ratio_varssubs_${TYPE}.txt
+DEL_FEATURES=$(cat /GRUPOS/grupolince/lynx_genomes_5x/genetic_load_analysis/derived_allele_freq_ratio/features_derived_allele_freq_ratio.txt | grep -Ev 'synonymous_variant|intron_variant' | cut -f2)
+#Prepare files that will contain DEL categories ratio data:
+for f in ${DEL_FEATURES[@]}
+  do
+  rm derived_allele_freq_ratio/${CALLING}_${f}_derived_freq_ratio_varssubs_${TYPE}.txt
+  echo -e "${f}_ratio\t${f}_norm_ratio" > derived_allele_freq_ratio/${CALLING}_${f}_derived_freq_ratio_varssubs_${TYPE}.txt
+  done
+POPS=($(ls `find . -name *'_perpop_varssubs_'$TYPE'.lr_ann.vcf' -print` | cut -d'/' -f3 | cut -d'_' -f1,2,3,4,5,6))
+echo "calculating ratio for each pair of populations"
+for p1 in ${POPS[@]}
+  do
+  for p2 in ${POPS[@]}
+    do
+    echo "${p1} vs ${p2}"
+    echo "feature: SYN"
+    LANG=en_EN join -a1 -a2 -e 0.00 -o auto -j 1 <(LANG=en_EN sort -k1 ./*/${p1}_${NM_COV}_perpop_varssubs_SYN_${TYPE}.lr_ann.bed) <(LANG=en_EN sort -k1 ./*/${p2}_${NM_COV}_perpop_varssubs_SYN_${TYPE}.lr_ann.bed) | awk -F"\t|_" '{print $1,$2,$3,$4,$5}' OFS="\t" | LANG=en_EN sort -k1,1 -k2,2n | awk '{printf "%s\t%s\t%s\t%.3f\t%.3f\t%.3f\t%.3f\n", $1,$2,$3,$4,$5,$4*(1-$5),$5*(1-$4)}' > derived_allele_freq_ratio/${p1}_vs_${p2}_${NM_COV}_perpop_varssubs_SYN_${TYPE}.lr_ann.bed #col1: scaffold, col2: pos_start, col3: pos_end, col4: p1_af, col5: p2_af, col6: p1_af*(1-p2_af), col7: p2_af*(1-p1_af)
+    SUM_P1=$(cut -f6 derived_allele_freq_ratio/${p1}_vs_${p2}_${NM_COV}_perpop_varssubs_SYN_${TYPE}.lr_ann.bed | paste -sd+ | bc)
+    SUM_P2=$(cut -f7 derived_allele_freq_ratio/${p1}_vs_${p2}_${NM_COV}_perpop_varssubs_SYN_${TYPE}.lr_ann.bed | paste -sd+ | bc)
+    RATIO=$(echo "scale=6; $SUM_P1/$SUM_P2" | bc)
+    echo -e "$p1\t$p2\t$RATIO" >> derived_allele_freq_ratio/${CALLING}_SYN_derived_freq_ratio_varssubs_${TYPE}.txt
+    for f in ${DEL_FEATURES[@]}
+      do
+      echo "feature: ${f}"
+      LANG=en_EN join -a1 -a2 -e 0.00 -o auto -j 1 <(LANG=en_EN sort -k1 ./*/${p1}_${NM_COV}_perpop_varssubs_${f}_${TYPE}.lr_ann.bed) <(LANG=en_EN sort -k1 ./*/${p2}_${NM_COV}_perpop_varssubs_${f}_${TYPE}.lr_ann.bed) | awk -F"\t|_" '{print $1,$2,$3,$4,$5}' OFS="\t" | LANG=en_EN sort -k1,1 -k2,2n | awk '{printf "%s\t%s\t%s\t%.3f\t%.3f\t%.3f\t%.3f\n", $1,$2,$3,$4,$5,$4*(1-$5),$5*(1-$4)}' > derived_allele_freq_ratio/${p1}_vs_${p2}_${NM_COV}_perpop_varssubs_${f}_${TYPE}.lr_ann.bed
+      SUM_P1=$(cut -f6 derived_allele_freq_ratio/${p1}_vs_${p2}_${NM_COV}_perpop_varssubs_${f}_${TYPE}.lr_ann.bed | paste -sd+ | bc)
+      SUM_P2=$(cut -f7 derived_allele_freq_ratio/${p1}_vs_${p2}_${NM_COV}_perpop_varssubs_${f}_${TYPE}.lr_ann.bed | paste -sd+ | bc)
+      RATIO=$(echo "scale=6; $SUM_P1/$SUM_P2" | bc)
+      echo -e "$RATIO" >> derived_allele_freq_ratio/${CALLING}_${f}_derived_freq_ratio_varssubs_${TYPE}.txt
+      done
+    done
+  done
+cd $V_PATH/$CALLING/annotation/derived_allele_freq_ratio
+#Make an ALL features file storing the population and SYN data
+cat ${CALLING}_SYN_derived_freq_ratio_varssubs_${TYPE}.txt > ${CALLING}_ALL_derived_freq_ratio_varssubs_${TYPE}.txt
+for f in ${DEL_FEATURES[@]}
+  do
+  #First build a file with the feature's ratio and normalised ratio (i.e. divided by the SYN ratio):
+  head ${CALLING}_${f}_derived_freq_ratio_varssubs_${TYPE}.txt -n1 > ${CALLING}_temp_derived_freq_ratio_varssubs_${TYPE}.borrar
+  paste ${CALLING}_SYN_derived_freq_ratio_varssubs_${TYPE}.txt ${CALLING}_${f}_derived_freq_ratio_varssubs_${TYPE}.txt | awk 'FNR == 1 {next}{print $4,$4/$3}' OFS="\t" >> ${CALLING}_temp_derived_freq_ratio_varssubs_${TYPE}.borrar
+  #Now join the ALL and the current DEL feature data
+  paste <(head ${CALLING}_ALL_derived_freq_ratio_varssubs_${TYPE}.txt -n1) <(head ${CALLING}_temp_derived_freq_ratio_varssubs_${TYPE}.borrar -n1) > "${CALLING}"_joint_derived_freq_ratio_varssubs_${TYPE}.borrar
+  paste ${CALLING}_ALL_derived_freq_ratio_varssubs_${TYPE}.txt ${CALLING}_temp_derived_freq_ratio_varssubs_${TYPE}.borrar | awk 'FNR == 1 {next}{print $0}' OFS="\t" >> ${CALLING}_joint_derived_freq_ratio_varssubs_${TYPE}.borrar
+  #Replace the ALL table with the updated one
+  mv ${CALLING}_joint_derived_freq_ratio_varssubs_${TYPE}.borrar ${CALLING}_ALL_derived_freq_ratio_varssubs_${TYPE}.txt
+  rm ${CALLING}_temp_derived_freq_ratio_varssubs_${TYPE}.borrar
+  done
+
+#From outside the server:
+scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/*/annotation/derived_allele_freq_ratio/*ALL_derived_freq_ratio_varssubs*.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_ratio/
+
+```
+
+###For variants within species (transversions only):
+```{r Calculate derived allele frequency ratio, eval=FALSE, engine='bash'}
+
+CALLING=(c_ll_ki_c_ll_no_c_ll_po_h_ll_pv_nm3_origcov) #c_ll_ki_c_ll_no_c_ll_po_nm3_origcov #c_lp_sm_c_lp_do_nm2_origcov
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+screen -S "${CALLING}-${TYPE}"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+script "${CALLING}_TVonly_derived_freq_ratio_${TYPE}.lr_ann.log"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAM files path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING)
+SPECIES=$(echo $CALLING | fold -w8 | cut -c1-4 | head -n$N_POPS | sort | uniq)
+DATASETS=$(for i in ${SPECIES[@]}; do ls ${i}*_samples | cut -d'_' -f1,2,3; done)
+COVERAGE=$(echo "${CALLING}" | rev | cut -d'_' -f1 | rev)
+NM_COV=$(echo "${CALLING}" | rev | cut -d'_' -f1,2 | rev)
+GREP=$(cat /GRUPOS/grupolince/lynx_genomes_5x/genetic_load_analysis/derived_allele_freq_ratio/features_derived_allele_freq_ratio.txt | cut -f1)
+cd $V_PATH/$CALLING/annotation
+POP_VCFS=($(ls `find . -name *'_perpop_TVonly_'$TYPE'.lr_ann.vcf' -print`))
+echo "retrieving variants from each feature from each population"
+for g in ${GREP[@]}
+  do
+  echo "feature: ${g}"
+  FEATURE=$(grep "${g}" /GRUPOS/grupolince/lynx_genomes_5x/genetic_load_analysis/derived_allele_freq_ratio/features_derived_allele_freq_ratio.txt | cut -f2)
+  echo $FEATURE
+  for p in ${POP_VCFS[@]}
+    do
+    echo "working with vcf ${p}"
+    grep "${g}" "${p}" | awk -F"\t|;|=" '{printf ("%s_%s_%s\t%s\n", $1,$2-1,$2,$13)}' > ${p/perpop_TVonly_${TYPE}.lr_ann.vcf/perpop_TVonly_${FEATURE}_${TYPE}.lr_ann.bed}
+    done
+  done
+#Prepare file that will contain population and SYN ratio data:
+mkdir -p derived_allele_freq_ratio
+rm derived_allele_freq_ratio/${CALLING}_SYN_TVonly_derived_freq_ratio_${TYPE}.txt
+echo -e "population_1\tpopulation_2\tSYN_ratio" > derived_allele_freq_ratio/${CALLING}_SYN_TVonly_derived_freq_ratio_${TYPE}.txt
+DEL_FEATURES=$(cat /GRUPOS/grupolince/lynx_genomes_5x/genetic_load_analysis/derived_allele_freq_ratio/features_derived_allele_freq_ratio.txt | grep -Ev 'synonymous_variant|intron_variant' | cut -f2)
+#Prepare files that will contain DEL categories ratio data:
+for f in ${DEL_FEATURES[@]}
+  do
+  rm derived_allele_freq_ratio/${CALLING}_${f}_TVonly_derived_freq_ratio_${TYPE}.txt
+  echo -e "${f}_ratio\t${f}_norm_ratio" > derived_allele_freq_ratio/${CALLING}_${f}_TVonly_derived_freq_ratio_${TYPE}.txt
+  done
+POPS=($(ls `find . -name *'_perpop_TVonly_'$TYPE'.lr_ann.vcf' -print` | cut -d'/' -f3 | cut -d'_' -f1,2,3,4,5,6))
+echo "calculating ratio for each pair of populations"
+for p1 in ${POPS[@]}
+  do
+  for p2 in ${POPS[@]}
+    do
+    echo "${p1} vs ${p2}"
+    echo "feature: SYN"
+    LANG=en_EN join -a1 -a2 -e 0.00 -o auto -j 1 <(LANG=en_EN sort -k1 ./*/${p1}_${NM_COV}_perpop_TVonly_SYN_${TYPE}.lr_ann.bed) <(LANG=en_EN sort -k1 ./*/${p2}_${NM_COV}_perpop_TVonly_SYN_${TYPE}.lr_ann.bed) | awk -F"\t|_" '{print $1,$2,$3,$4,$5}' OFS="\t" | LANG=en_EN sort -k1,1 -k2,2n | awk '{printf "%s\t%s\t%s\t%.3f\t%.3f\t%.3f\t%.3f\n", $1,$2,$3,$4,$5,$4*(1-$5),$5*(1-$4)}' > derived_allele_freq_ratio/${p1}_vs_${p2}_${NM_COV}_perpop_TVonly_SYN_${TYPE}.lr_ann.bed #col1: scaffold, col2: pos_start, col3: pos_end, col4: p1_af, col5: p2_af, col6: p1_af*(1-p2_af), col7: p2_af*(1-p1_af)
+    SUM_P1=$(cut -f6 derived_allele_freq_ratio/${p1}_vs_${p2}_${NM_COV}_perpop_TVonly_SYN_${TYPE}.lr_ann.bed | paste -sd+ | bc)
+    SUM_P2=$(cut -f7 derived_allele_freq_ratio/${p1}_vs_${p2}_${NM_COV}_perpop_TVonly_SYN_${TYPE}.lr_ann.bed | paste -sd+ | bc)
+    RATIO=$(echo "scale=6; $SUM_P1/$SUM_P2" | bc)
+    echo -e "$p1\t$p2\t$RATIO" >> derived_allele_freq_ratio/${CALLING}_SYN_TVonly_derived_freq_ratio_${TYPE}.txt
+    for f in ${DEL_FEATURES[@]}
+      do
+      echo "feature: ${f}"
+      LANG=en_EN join -a1 -a2 -e 0.00 -o auto -j 1 <(LANG=en_EN sort -k1 ./*/${p1}_${NM_COV}_perpop_TVonly_${f}_${TYPE}.lr_ann.bed) <(LANG=en_EN sort -k1 ./*/${p2}_${NM_COV}_perpop_TVonly_${f}_${TYPE}.lr_ann.bed) | awk -F"\t|_" '{print $1,$2,$3,$4,$5}' OFS="\t" | LANG=en_EN sort -k1,1 -k2,2n | awk '{printf "%s\t%s\t%s\t%.3f\t%.3f\t%.3f\t%.3f\n", $1,$2,$3,$4,$5,$4*(1-$5),$5*(1-$4)}' > derived_allele_freq_ratio/${p1}_vs_${p2}_${NM_COV}_perpop_TVonly_${f}_${TYPE}.lr_ann.bed
+      SUM_P1=$(cut -f6 derived_allele_freq_ratio/${p1}_vs_${p2}_${NM_COV}_perpop_TVonly_${f}_${TYPE}.lr_ann.bed | paste -sd+ | bc)
+      SUM_P2=$(cut -f7 derived_allele_freq_ratio/${p1}_vs_${p2}_${NM_COV}_perpop_TVonly_${f}_${TYPE}.lr_ann.bed | paste -sd+ | bc)
+      RATIO=$(echo "scale=6; $SUM_P1/$SUM_P2" | bc)
+      echo -e "$RATIO" >> derived_allele_freq_ratio/${CALLING}_${f}_TVonly_derived_freq_ratio_${TYPE}.txt
+      done
+    done
+  done
+cd $V_PATH/$CALLING/annotation/derived_allele_freq_ratio
+#Make an ALL features file storing the population and SYN data
+cat ${CALLING}_SYN_TVonly_derived_freq_ratio_${TYPE}.txt > ${CALLING}_ALL_TVonly_derived_freq_ratio_${TYPE}.txt
+for f in ${DEL_FEATURES[@]}
+  do
+  #First build a file with the feature's ratio and normalised ratio (i.e. divided by the SYN ratio):
+  head ${CALLING}_${f}_TVonly_derived_freq_ratio_${TYPE}.txt -n1 > ${CALLING}_temp_TVonly_derived_freq_ratio_${TYPE}.borrar
+  paste ${CALLING}_SYN_TVonly_derived_freq_ratio_${TYPE}.txt ${CALLING}_${f}_TVonly_derived_freq_ratio_${TYPE}.txt | awk 'FNR == 1 {next}{print $4,$4/$3}' OFS="\t" >> ${CALLING}_temp_TVonly_derived_freq_ratio_${TYPE}.borrar
+  #Now join the ALL and the current DEL feature data
+  paste <(head ${CALLING}_ALL_TVonly_derived_freq_ratio_${TYPE}.txt -n1) <(head ${CALLING}_temp_TVonly_derived_freq_ratio_${TYPE}.borrar -n1) > "${CALLING}"_joint_TVonly_derived_freq_ratio_${TYPE}.borrar
+  paste ${CALLING}_ALL_TVonly_derived_freq_ratio_${TYPE}.txt ${CALLING}_temp_TVonly_derived_freq_ratio_${TYPE}.borrar | awk 'FNR == 1 {next}{print $0}' OFS="\t" >> ${CALLING}_joint_TVonly_derived_freq_ratio_${TYPE}.borrar
+  #Replace the ALL table with the updated one
+  mv ${CALLING}_joint_TVonly_derived_freq_ratio_${TYPE}.borrar ${CALLING}_ALL_TVonly_derived_freq_ratio_${TYPE}.txt
+  rm ${CALLING}_temp_TVonly_derived_freq_ratio_${TYPE}.borrar
+  done
+
+#From outside the server:
+scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/*/annotation/derived_allele_freq_ratio/*ALL_TVonly_derived_freq_ratio.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_ratio/
+
+```
+
 ##Perform block-jackknife to estimate derived allele frequency ratio variance.
 ```{r Calculate derived allele frequency ratio, eval=FALSE, engine='bash'}
 
@@ -346,7 +554,6 @@ TYPE=${STY#*-}
 #Prepare output file:
 rm ${CALLING}"_vars_subs_derived_freq_ratio_variance_"${TYPE}".lr_ann.txt"
 echo -e "population_pair\tsynonymous_ratio\tfeature\tglobal_ratio\tglobal_ratio_norm\tmean_subsample_ratio_norm\tvariance_subsample_ratio_norm\t±2SD_subsample_ratio_norm" > ${CALLING}"_vars_subs_derived_freq_ratio_variance_"${TYPE}".lr_ann.txt"
-"$POP_PAIR\t$SYN_RATIO_ALL\t$FEATURE\t$DEL_RATIO_ALL\t$DEL_RATIO_ALL_NORM\t$DEL_RATIO_SUBSAMPLE_MEAN\t$VARIANCE\t$TWO_SD"
 FILES=$(ls *_vs_*vars_subs_SNP.lr_ann.bed | grep -Ev '_INTR_|_SYN_') #Only perform jackknife for deleterious categories.
 for FILE in ${FILES[@]}
   do
@@ -921,7 +1128,7 @@ for (f in unique(all_plot_data$feat)) {
 #2: Derived allele counts approaches.
 #2A: Variant and allele level.
 ##At the individual level.
-###Whole-genome.
+###Whole-genome (separate callings).
 ####Get counts.
 ```{r Get annotation statistics, eval=FALSE, engine='bash'}
 
@@ -999,6 +1206,7 @@ library(dplyr)
 library(ggplot2)
 library(tidyr)
 
+wd_path <- ("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
 variant_files <- grep(list.files("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/", pattern="*origcov_ann_individual_summary_SNP.lr_ann.txt"),pattern='wrong|nm2nm3',inv=T,value=T)
 substitution_files <- grep(list.files("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/", pattern="*nm2nm3_origcov_ann_individual_summary_SNP.lr_ann.txt"),pattern='wrong',inv=T,value=T)
 variants_wg <- rbind(read_tsv(paste0(wd_path,grep(variant_files,pattern='c_ll',value=T))),read_tsv(paste0(wd_path,grep(variant_files,pattern='c_lp',value=T))))
@@ -1144,6 +1352,163 @@ derived_allele_allele_ratio_ggplot <- ggplot(data=variants_and_subst_wg_alleleR,
   derived_allele_allele_ratio_ggplot
 ggsave("derived_allele_allele_ratio.pdf", width=15, height=15, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
 
+
+```
+
+#####Visualise derived allele counts (variant transversions only).
+
+```{r Plot variant count results}
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+
+wd_path <- ("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/c_ll_ki_c_ll_no_c_ll_po_h_ll_pv_nm3_origcov/")
+variant_files <- grep(list.files("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/c_ll_ki_c_ll_no_c_ll_po_h_ll_pv_nm3_origcov/", pattern="*origcov_ann_individual_summary_Tvonly.lr_ann.txt"),pattern='wrong|nm2nm3',inv=T,value=T)
+#substitution_files <- grep(list.files("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/", pattern="*nm2nm3_origcov_ann_individual_summary_Tvonly.lr_ann.txt"),pattern='wrong',inv=T,value=T)
+variants_wg <- rbind(read_tsv(paste0(wd_path,variant_files)))
+#subst_wg <- read_tsv(paste0(wd_path,substitution_files))
+#variants_and_subst_wg <- cbind(variants_wg[c(1:4)],variants_wg[-c(1:4,20:23)]+subst_wg[-c(1:4,20:23)])
+
+variants_wg$dataset <- as.factor(variants_wg$dataset)
+variants_wg$dataset = factor(variants_wg$dataset,levels=c("5x","MG","LD")) #Reorder factor levels
+variants_wg$population = factor(variants_wg$population,levels=c("ki","no","po","pv"))
+print.data.frame(variants_wg)
+
+variants_wg_varN <- variants_wg %>% select(c(1:5,9,12,14,16,18)) %>% gather(feature,N,-species,-population,-dataset,-sample,factor_key=T)
+variants_wg_varN
+
+derived_allele_variant_counts_ggplot <- ggplot(data=variants_wg_varN, aes(population,N,colour=population)) +
+  facet_grid(feature ~ .,scales="free") +
+  geom_boxplot(width=0.5) +
+  #ggtitle("Proportion of reads at different NM") +
+  ylab("N variants") +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+        rect=element_rect(size=1),
+        axis.line=element_line(colour="black"),
+        axis.title=element_text(size=16),
+        #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+        #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+        #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+        panel.background=element_blank(),
+        panel.border=element_rect(colour="black"),
+        #panel.grid=element_blank(),
+        #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+        plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+        #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+        legend.background=element_rect(linetype="solid", colour="black", size=.5),
+        #legend.justification=c(0,0),
+        legend.key=element_rect(colour="white"),
+        #legend.key.size=unit(1.3,"cm"),
+        #legend.position=c(0.07,0.84),
+        legend.title=element_blank()
+  )
+  derived_allele_variant_counts_ggplot
+ggsave("derived_allele_variant_counts.pdf", width=15, height=20, units="cm", device="pdf", path=wd_path)
+
+
+variants_wg_alleleN <- variants_wg %>% select(c(1:4,6,10,13,15,17,19)) %>% gather(feature,N,-species,-population,-dataset,-sample,factor_key=T)
+variants_wg_alleleN
+
+derived_allele_allele_counts_ggplot <- ggplot(data=variants_wg_alleleN, aes(population,N,colour=population)) +
+  #facet_wrap(feature ~ species,nrow=6,ncol=2,scales="free") +
+  facet_grid(feature ~ .,scales="free") +
+  geom_boxplot(width=0.5) +
+  #ggtitle("Proportion of reads at different NM") +
+  ylab("N alleles") +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+        rect=element_rect(size=1),
+        axis.line=element_line(colour="black"),
+        axis.title=element_text(size=16),
+        #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+        #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+        #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+        panel.background=element_blank(),
+        panel.border=element_rect(colour="black"),
+        #panel.grid=element_blank(),
+        #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+        plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+        #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+        legend.background=element_rect(linetype="solid", colour="black", size=.5),
+        #legend.justification=c(0,0),
+        legend.key=element_rect(colour="white"),
+        #legend.key.size=unit(1.3,"cm"),
+        #legend.position=c(0.07,0.84),
+        legend.title=element_blank()
+  )
+  derived_allele_allele_counts_ggplot
+ggsave("derived_allele_allele_counts.pdf", width=15, height=20, units="cm", device="pdf", path=wd_path)
+
+derived_allele_allele_counts_sep_ggplot <- ggplot(data=variants_wg_alleleN, aes(population,N,colour=population)) +
+  facet_wrap(feature ~ species,nrow=6,ncol=2,scales="free") +
+  #facet_grid(feature ~ .,scales="free") +
+  geom_boxplot(width=0.5) +
+  #ggtitle("Proportion of reads at different NM") +
+  ylab("N alleles") +
+  theme_bw() +
+  theme(strip.text.x = element_blank(),
+        text=element_text(size=12,face="bold"),
+        rect=element_rect(size=1),
+        axis.line=element_line(colour="black"),
+        axis.title=element_text(size=16),
+        #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+        #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+        #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+        panel.background=element_blank(),
+        panel.border=element_rect(colour="black"),
+        #panel.grid=element_blank(),
+        #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+        plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+        #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+        legend.background=element_rect(linetype="solid", colour="black", size=.5),
+        #legend.justification=c(0,0),
+        legend.key=element_rect(colour="white"),
+        #legend.key.size=unit(1.3,"cm"),
+        #legend.position=c(0.07,0.84),
+        legend.title=element_blank()
+  )
+  derived_allele_allele_counts_sep_ggplot
+ggsave("derived_allele_allele_counts_sep.pdf", width=15, height=20, units="cm", device="pdf", path=wd_path)
+
+variants_wg_alleleN <- variants_wg %>% select(c(1:4,6,10,13,15,17,19)) %>% gather(feature,N,-species,-population,-dataset,-sample,factor_key=T)
+variants_wg_alleleN
+
+
+variants_wg_alleleR <- variants_wg %>% select(-c(20:24)) %>% mutate(syn_intr_R=synonymous_A/intronic_A,mis_intr_R=missense_A/intronic_A,non_intr_R=nonsense_A/intronic_A,UCNE_intr_R=UCNE_A/intronic_A) %>% select(c(1:4,20:23)) %>% gather(ratio,value,-species,-population,-dataset,-sample,factor_key=T)
+variants_wg_alleleR
+
+derived_allele_allele_ratio_ggplot <- ggplot(data=variants_wg_alleleR, aes(population,value,colour=population)) +
+  #facet_wrap(feature ~ species,nrow=6,ncol=2,scales="free") +
+  facet_grid(ratio ~ .,scales="free") +
+  geom_boxplot(width=0.5) +
+  #ggtitle("Proportion of reads at different NM") +
+  ylab("ratio") +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+        rect=element_rect(size=1),
+        axis.line=element_line(colour="black"),
+        axis.title=element_text(size=16),
+        #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+        #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+        #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+        panel.background=element_blank(),
+        panel.border=element_rect(colour="black"),
+        #panel.grid=element_blank(),
+        #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+        plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+        #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+        legend.background=element_rect(linetype="solid", colour="black", size=.5),
+        #legend.justification=c(0,0),
+        legend.key=element_rect(colour="white"),
+        #legend.key.size=unit(1.3,"cm"),
+        #legend.position=c(0.07,0.84),
+        legend.title=element_blank()
+  )
+  derived_allele_allele_ratio_ggplot
+ggsave("derived_allele_allele_ratio.pdf", width=15, height=15, units="cm", device="pdf", path=wd_path)
 
 ```
 
@@ -1728,6 +2093,74 @@ ggsave("NSYN_SYN_ratio.pdf", width=15, height=10, units="cm", device="pdf", path
 
 ```
 
+###Whole-genome (joint calling).
+####Get counts.
+```{r Get annotation statistics, eval=FALSE, engine='bash'}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov) #c_lp_sm_c_lp_do_nm2_origcov #c_ll_ki_c_ll_no_c_ll_po_nm3_origcov #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+screen -S "${CALLING}-${TYPE}"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+script "${CALLING}_ann_individual_summary_varssubs_${TYPE}.lr_ann.log"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAM files path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+cd $V_PATH/$CALLING/annotation
+rm ${CALLING}"_ann_individual_summary_varssubs_"${TYPE}".lr_ann.txt"
+echo -e "species\tpopulation\tdataset\tsample\ttotal_V\ttotal_A\tintergenic_V\tintergenic_A\tintronic_V\tintronic_A\tcoding_V\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tUCNE_V\tUCNE_A\tmissense/synonymous_V\tmissense/synonymous_A\tsynonymous/intronic_V\tmissense/intronic_V" > ${CALLING}"_ann_individual_summary_varssubs_"${TYPE}".lr_ann.txt"
+INDLIST=($(ls `find . -name *"_individual_varssubs_"${TYPE}".lr_ann.vcf" -print`))
+for i in "${INDLIST[@]}"
+  do
+  echo "${i}"
+  ind=$(echo "${i}" | awk -F'[/]' '{print $3}' | cut -c1-12)
+  echo "${ind}"
+  SPECIES=$(echo "${ind}" | cut -c3-4)
+  POPULATION=$(echo "${ind}" | cut -c6-7)
+  DATASET=$(if [ $ind = "c_lp_sm_0221" ]; then echo "REF"; elif [ $ind = "c_ll_ki_0090" ]; then echo "MG"; elif [ $ind = "h_ll_pv_0223" ]; then echo "LD"; elif grep -Fxq $ind /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/c_lp_5x_samples || [ $SPECIES = "ll" ]; then echo "5x"; else echo "GP"; fi)
+  SAMPLE=$(echo "${ind}" | cut -c9-12)
+  TOTAL_V=$(grep -v '#' ${i} | wc -l)
+  TOTAL_A=$(grep -v '#' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  INTERGENIC_V=$(grep 'intergenic' ${i} | wc -l)
+  INTERGENIC_A=$(grep 'intergenic' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  INTRONIC_V=$(grep 'intron_variant' ${i} | wc -l)
+  INTRONIC_A=$(grep 'intron_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  CODING_V=$(grep 'CDS' ${i} | wc -l)
+  SYNONYMOUS_V=$(grep 'synonymous_variant' ${i} | wc -l)
+  SYNONYMOUS_A=$(grep 'synonymous_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_V=$(grep 'missense_variant' ${i} | wc -l)
+  MISSENSE_A=$(grep 'missense_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  NONSENSE_V=$(grep '|HIGH|' ${i} | wc -l)
+  NONSENSE_A=$(grep '|HIGH|' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  UCNE_V=$(grep 'UCNE' ${i} | wc -l)
+  UCNE_A=$(grep 'UCNE' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_SYNONYMOUS_V=$(echo "scale=4; $MISSENSE_V/$SYNONYMOUS_V" | bc)
+  MISSENSE_SYNONYMOUS_A=$(echo "scale=4; $MISSENSE_A/$SYNONYMOUS_A" | bc)
+  SYNONYMOUS_INTRONIC_V=$(echo "scale=4; $SYNONYMOUS_V/$INTRONIC_V" | bc)
+  MISSENSE_INTRONIC_V=$(echo "scale=4; $MISSENSE_V/$INTRONIC_V" | bc)
+  echo -e "$SPECIES\t$POPULATION\t$DATASET\t$SAMPLE\t$TOTAL_V\t$TOTAL_A\t$INTERGENIC_V\t$INTERGENIC_A\t$INTRONIC_V\t$INTRONIC_A\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$UCNE_V\t$UCNE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A\t$SYNONYMOUS_INTRONIC_V\t$MISSENSE_INTRONIC_V" >> ${CALLING}"_ann_individual_summary_varssubs_"${TYPE}".lr_ann.txt"
+  done
+
+#From outside the server:
+CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov) #c_lp_sm_c_lp_do_nm2_origcov #c_ll_ki_c_ll_no_c_ll_po_nm3_origcov #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov
+scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/*_ann_individual_summary_varssubs_SNP.lr_ann.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/
+
+```
+
 ###IBD tracts and non IBD tracts.
 ####Get counts.
 ```{r Get annotation statistics, eval=FALSE, engine='bash'}
@@ -1964,6 +2397,73 @@ ggplot_LOF_INTR_ratio_IBD_detail <- ggplot(data=filter(LOF_INTR_ratio,IBD_type!=
 ggplot_LOF_INTR_ratio_IBD_detail
 ggsave("LOF_INTR_ratio_IBD_and_notIBD_detailed.pdf", width=15, height=10, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/IBD_and_notIBD/")
 
+
+```
+###Transversions only.
+####Get counts.
+```{r Get annotation statistics, eval=FALSE, engine='bash'}
+
+CALLING=(c_ll_ki_c_ll_no_c_ll_po_h_ll_pv_nm3_origcov) #c_lp_sm_c_lp_do_nm2_origcov #c_ll_ki_c_ll_no_c_ll_po_nm3_origcov #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+screen -S "${CALLING}-${TYPE}"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+script "${CALLING}_ann_individual_summary_TVonly_${TYPE}.lr_ann.log"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAM files path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+cd $V_PATH/$CALLING/annotation
+rm ${CALLING}"_ann_individual_summary_TVonly_"${TYPE}".lr_ann.txt"
+echo -e "species\tpopulation\tdataset\tsample\ttotal_V\ttotal_A\tintergenic_V\tintergenic_A\tintronic_V\tintronic_A\tcoding_V\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tUCNE_V\tUCNE_A\tmissense/synonymous_V\tmissense/synonymous_A\tsynonymous/intronic_V\tmissense/intronic_V" > ${CALLING}"_ann_individual_summary_TVonly_"${TYPE}".lr_ann.txt"
+INDLIST=($(ls `find . -name *"_individual_TVonly_"${TYPE}".lr_ann.vcf" -print`))
+for i in "${INDLIST[@]}"
+  do
+  echo "${i}"
+  ind=$(echo "${i}" | awk -F'[/]' '{print $3}' | cut -c1-12)
+  echo "${ind}"
+  SPECIES=$(echo "${ind}" | cut -c3-4)
+  POPULATION=$(echo "${ind}" | cut -c6-7)
+  DATASET=$(if [ $ind = "c_lp_sm_0221" ]; then echo "REF"; elif [ $ind = "c_ll_ki_0090" ]; then echo "MG"; elif [ $ind = "h_ll_pv_0223" ]; then echo "LD"; elif grep -Fxq $ind /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/c_lp_5x_samples || [ $SPECIES = "ll" ]; then echo "5x"; else echo "GP"; fi)
+  SAMPLE=$(echo "${ind}" | cut -c9-12)
+  TOTAL_V=$(grep -v '#' ${i} | wc -l)
+  TOTAL_A=$(grep -v '#' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  INTERGENIC_V=$(grep 'intergenic' ${i} | wc -l)
+  INTERGENIC_A=$(grep 'intergenic' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  INTRONIC_V=$(grep 'intron_variant' ${i} | wc -l)
+  INTRONIC_A=$(grep 'intron_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  CODING_V=$(grep 'CDS' ${i} | wc -l)
+  SYNONYMOUS_V=$(grep 'synonymous_variant' ${i} | wc -l)
+  SYNONYMOUS_A=$(grep 'synonymous_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_V=$(grep 'missense_variant' ${i} | wc -l)
+  MISSENSE_A=$(grep 'missense_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  NONSENSE_V=$(grep '|HIGH|' ${i} | wc -l)
+  NONSENSE_A=$(grep '|HIGH|' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  UCNE_V=$(grep 'UCNE' ${i} | wc -l)
+  UCNE_A=$(grep 'UCNE' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_SYNONYMOUS_V=$(echo "scale=4; $MISSENSE_V/$SYNONYMOUS_V" | bc)
+  MISSENSE_SYNONYMOUS_A=$(echo "scale=4; $MISSENSE_A/$SYNONYMOUS_A" | bc)
+  SYNONYMOUS_INTRONIC_V=$(echo "scale=4; $SYNONYMOUS_V/$INTRONIC_V" | bc)
+  MISSENSE_INTRONIC_V=$(echo "scale=4; $MISSENSE_V/$INTRONIC_V" | bc)
+  echo -e "$SPECIES\t$POPULATION\t$DATASET\t$SAMPLE\t$TOTAL_V\t$TOTAL_A\t$INTERGENIC_V\t$INTERGENIC_A\t$INTRONIC_V\t$INTRONIC_A\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$UCNE_V\t$UCNE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A\t$SYNONYMOUS_INTRONIC_V\t$MISSENSE_INTRONIC_V" >> ${CALLING}"_ann_individual_summary_TVonly_"${TYPE}".lr_ann.txt"
+  done
+
+#From outside the server:
+CALLING=(c_ll_ki_c_ll_no_c_ll_po_h_ll_pv_nm3_origcov) #c_lp_sm_c_lp_do_nm2_origcov #c_ll_ki_c_ll_no_c_ll_po_nm3_origcov #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov
+scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/*_ann_individual_summary_SNP.lr_ann.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/
 
 ```
 
