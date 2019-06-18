@@ -1,0 +1,77 @@
+---
+title: "sift_database"
+author: "Dani"
+date: "14 de enero de 2019"
+output: html_document
+---
+
+To install and configure the SIFT database builder, I'll follow instructions from here: https://github.com/pauline-ng/SIFT4G_Create_Genomic_DB/blob/master/README.md
+
+#1:
+```{bash}
+
+#1. First install the SIFT algorithm and the SIFT database builder, and make the parent directory for the Lynx pardinus database:
+git clone --recursive https://github.com/rvaser/sift4g.git /Users/dani/opt/sift4g
+cd /Users/dani/opt/sift4g/
+make release #fails. It needs a gcc+ compiler which is not present in mac. I'll have to move to the server if possible...
+git clone https://github.com/pauline-ng/SIFT4G_Create_Genomic_DB.git /Users/dani/opt/scripts_to_build_SIFT_db
+mkdir /Users/dani/opt/scripts_to_build_SIFT_db/lynx_pardinus
+
+#2. Then follow the instructions in the section called "Making a SIFT database from genomic DNA (.fa.gz) and gene annotation file (.gff)".
+##2A. The first step involves installing gffread to convert from .gff3 to .gtf:
+/Users/dani/opt
+git clone https://github.com/gpertea/gclib
+git clone https://github.com/gpertea/gffread
+cd gffread
+make release
+
+##2B. Next, obtain the annotation .gtf file:
+cd /Users/dani/opt/scripts_to_build_SIFT_db/lynx_pardinus
+scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.all.fix.nr.gff3 /Users/dani/opt/scripts_to_build_SIFT_db/lynx_pardinus #first download the .gff3 from the server
+/Users/dani/opt/gffread/gffread LYPA23C.all.fix.nr.gff3 -T -o LYPA23C.all.fix.nr.gene.gtf #convert it to .gtf using gffread
+awk -F'\t' -v OFS='\t' '$3 == "exon" || $4 == "CDS" { $9=$9 "gene_biotype \"protein_coding\";" }1' < LYPA23C.all.fix.nr.gene.gtf > LYPA23C.all.fix.nr.gtf #add the text 'gene_biotype " protein_coding";' to the 9th column, as the guide indicates
+gzip LYPA23C.all.fix.nr.gtf
+
+#3. Then follow the instructions in the section called "Making a SIFT database from local genomic and gene annotation file (.gtf)".
+##3A. First create a config file, manually editing the fields with nano.
+cd /Users/dani/opt/scripts_to_build_SIFT_db/test_files/
+cp homo_sapiens-test.txt lynx_pardinus-test.txt
+nano lynx_pardinus-test.txt #substitute the contents of the file with the following variables:
+GENETIC_CODE_TABLE=1
+GENETIC_CODE_TABLENAME=Standard
+MITO_GENETIC_CODE_TABLE=2
+MITO_GENETIC_CODE_TABLENAME=Vertebrate Mitochondrial
+
+PARENT_DIR=./lynx_pardinus
+ORG=lynx_pardinus
+ORG_VERSION=lp23
+DBSNP_VCF_FILE=
+
+#Running SIFT 4G
+SIFT4G_PATH=PENDIENTE!
+PROTEIN_DB=
+COMPUTER=Dani
+
+# Sub-directories, don't need to change
+GENE_DOWNLOAD_DEST=gene-annotation-src
+CHR_DOWNLOAD_DEST=chr-src
+LOGFILE=Log.txt
+ZLOGFILE=Log2.txt
+FASTA_DIR=fasta
+SUBST_DIR=subst
+ALIGN_DIR=SIFT_alignments
+SIFT_SCORE_DIR=SIFT_predictions
+SINGLE_REC_BY_CHR_DIR=singleRecords
+SINGLE_REC_WITH_SIFTSCORE_DIR=singleRecords_with_scores
+DBSNP_DIR=dbSNP
+
+# Doesn't need to change
+FASTA_LOG=fasta.log
+INVALID_LOG=invalid.log
+PEPTIDE_LOG=peptide.log
+ENS_PATTERN=ENS
+SINGLE_RECORD_PATTERN=:change:_aa1valid_dbsnp.singleRecord
+
+
+```
+
