@@ -1,0 +1,1163 @@
+---
+title: "genetic_load_allpositions_final_pipeline"
+output: html_document
+---
+
+#0: Define paths.
+
+```{r Define paths, eval=FALSE, engine='bash'}
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+B_PATH=/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered #BAM files path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+```
+
+
+#1: Perform separate calling for each species. Combine all gVCFs of interest into the per species VCF.
+##For Lynx pardinus.
+
+```{r Perform separate calling for each species, eval=FALSE, engine='bash'}
+
+#Perform all sites calling (later on, all variants and substitutions between species will need to be retrieved) of all c_lp samples. All gVCFs were generated before in section 1a of ll_phylogeography_VCFs. The filter 1 (removes repetitive and low mappability regions is applied).
+
+cd $V_PATH
+screen -S c_lp_sm_c_lp_do_all.log
+script c_lp_sm_c_lp_do_all.log
+
+cd $G_PATH
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
+-T GenotypeGVCFs \
+-R $REF \
+$(for var in c_{lp_sm*,lp_do*}.g.vcf.gz; do echo -V ${var}" ";done) \
+-allSites \
+-o $V_PATH/c_lp_sm_c_lp_do_all.vcf
+
+
+screen -S c_lp_sm_c_lp_do_all_renamed
+#Fix sample names:
+cd $V_PATH
+bcftools query -l c_lp_sm_c_lp_do_all.vcf #check sample names
+#!/bin/bash
+#cat << "EOF" > lp_rename.txt #Unmark this line when running it (I marked it in R because it doesn't understand it and messes the colours of subsequent lines). It should include all incorrect names.
+h_lp_do_0007 c_lp_do_0007
+EOF
+
+bcftools reheader -s lp_rename.txt -o c_lp_sm_c_lp_do_all_renamed.vcf c_lp_sm_c_lp_do_all.vcf #copy the VCF and rename the wrong named samples in the new VCF
+mv c_lp_sm_c_lp_do_all_renamed.vcf c_lp_sm_c_lp_do_all.vcf
+
+grep -v '#' c_lp_sm_c_lp_do_all.vcf #2412190308
+
+```
+
+##For Lynx lynx.
+
+```{r Perform separate calling for each species, eval=FALSE, engine='bash'}
+
+#Perform all sites calling(later on, all variants and substitutions between species will need to be retrieved) of all c_ll samples from Kirov, Norway and Poland (Bialowieza pop). All gVCFs were generated before in section 1a of ll_phylogeography_VCFs. The filter 1 (removes repetitive and low mappability regions is applied).
+
+cd $V_PATH
+screen -S c_ll_ki_c_ll_no_c_ll_po_all.log
+script c_ll_ki_c_ll_no_c_ll_po_all.log
+
+cd $G_PATH
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
+-T GenotypeGVCFs \
+-R $REF \
+$(for var in c_{ll_ki*,ll_no*,ll_po*}.g.vcf.gz; do echo -V ${var}" ";done) \
+-allSites \
+-o $V_PATH/c_ll_ki_c_ll_no_c_ll_po_all.vcf
+
+
+screen -S c_ll_ki_c_ll_no_c_ll_po_all_renamed
+#Fix sample names:
+cd $V_PATH
+bcftools query -l c_ll_ki_c_ll_no_c_ll_po_all.vcf #check sample names
+#!/bin/bash
+#cat << "EOF" > ll_rename.txt #Unmark this line when running it (I marked it in R because it doesn't understand it and messes the colours of subsequent lines). It should include all incorrect names.
+LL90_rgsm c_ll_ki_0090
+EOF
+
+bcftools reheader -s ll_rename.txt -o c_ll_ki_c_ll_no_c_ll_po_all_renamed.vcf c_ll_ki_c_ll_no_c_ll_po_all.vcf #copy the VCF and rename the wrong named samples in the new VCF
+mv c_ll_ki_c_ll_no_c_ll_po_all_renamed.vcf c_ll_ki_c_ll_no_c_ll_po_all.vcf
+
+grep -v '#' c_ll_ki_c_ll_no_c_ll_po_all.vcf #2410274444
+
+```
+
+#2: Polarize contemporary VCFs. Use VCFtools in order to polarize (ancestral vs. derived) the contemporary ll & lp VCFs. The ancestral state was inferred by Maria.
+##Use vcftools to add Ancestral Allele annotation to the VCF, and then polarize it.
+###Prepare fasta.
+
+```{r Polarize contemporary VCF, eval=FALSE, engine='bash'}
+
+#This is the command to use in order to add to a VCF information on the ancestral/derived alleles: /opt/vcftools_0.1.13/perl/fill-aa. There's documentation inside that command that I'll follow here.
+
+#First, the ancestral alleles file should be bgzipped (according to the documentation, they should be gzipped, but later on when trying to run faidx I got an error stating that files should be gzipped in order to build a fai index):
+bgzip -c /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa > /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa.gz
+
+#Next they should be fai indexed:
+/opt/samtools-1.6/samtools faidx /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa.gz
+
+```
+
+###For Lynx pardinus.
+
+```{r Polarize contemporary VCF, eval=FALSE, engine='bash'}
+
+#All positions:
+
+#Code to annotate the AA (ancestral alleles) subfield from the INFO field in the VCF. I keep getting the following error: "Can't locate Vcf.pm in @INC". I look it up and apparently it's easy to solve: an environment variable PERL5LIB should be defined as the path to perl.
+screen -S c_lp_sm_c_lp_do_all_aafilled.log
+script c_lp_sm_c_lp_do_all_aafilled.log
+
+export PERL5LIB=/opt/vcftools_0.1.13/perl/ #set required environmental variable
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+
+cat $V_PATH/c_lp_sm_c_lp_do_all.vcf | /opt/vcftools_0.1.13/perl/fill-aa -a /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa.gz | bgzip -c > c_lp_sm_c_lp_do_all_aafilled.vcf.gz #I tried to run this first without bgzipping it, and it was increasingly slow. Each day it did around half the previous day. When the server crashed, I relaunched it adding the bgzip command and it finished in a little over 24h.
+
+gzip -d -c c_lp_sm_c_lp_do_all_aafilled.vcf.gz > c_lp_sm_c_lp_do_all_aafilled.vcf #Get decompressed version. I ran md5sum for both the gzipped and the unzipped versions and there were no differences.
+
+
+screen -S c_lp_sm_c_lp_do_all_aafilled_renamed
+#Fix sample names:
+cd $V_PATH
+bcftools query -l c_lp_sm_c_lp_do_all_aafilled.vcf #check sample names
+#!/bin/bash
+#cat << "EOF" > lp_rename.txt #Unmark this line when running it (I marked it in R because it doesn't understand it and messes the colours of subsequent lines). It should include all incorrect names.
+h_lp_do_0007 c_lp_do_0007
+EOF
+
+bcftools reheader -s lp_rename.txt -o c_lp_sm_c_lp_do_all_aafilled_renamed.vcf c_lp_sm_c_lp_do_all_aafilled.vcf #copy the VCF and rename the wrong named samples in the new VCF
+rm lp_rename.txt
+mv c_lp_sm_c_lp_do_all_aafilled_renamed.vcf c_lp_sm_c_lp_do_all_aafilled.vcf
+grep -v '#' c_lp_sm_c_lp_do_all_aafilled.vcf | wc -l
+
+
+---
+#Variants only:
+
+#Code to annotate the AA (ancestral alleles) subfield from the INFO field in the VCF. I keep getting the following error: "Can't locate Vcf.pm in @INC". I look it up and apparently it's easy to solve: an environment variable PERL5LIB should be defined as the path to perl.
+screen -S c_lp_sm_c_lp_do_var_aafilled.log
+script c_lp_sm_c_lp_do_var_aafilled.log
+
+export PERL5LIB=/opt/vcftools_0.1.13/perl/ #set required environmental variable
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+
+cat $V_PATH/c_lp_sm_c_lp_do_var.vcf | /opt/vcftools_0.1.13/perl/fill-aa -a /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa.gz | bgzip -c > c_lp_sm_c_lp_do_var_aafilled.vcf.gz #I tried to run this first without bgzipping it, and it was increasingly slow. Each day it did around half the previous day. When the server crashed, I relaunched it adding the bgzip command and it finished in a little over 24h.
+
+gzip -d -c c_lp_sm_c_lp_do_var_aafilled.vcf.gz > c_lp_sm_c_lp_do_var_aafilled.vcf #Get decompressed version. I ran md5sum for both the gzipped and the unzipped versions and there were no differences.
+
+
+screen -S c_lp_sm_c_lp_do_var_aafilled_renamed
+#Fix sample names:
+cd $V_PATH
+bcftools query -l c_lp_sm_c_lp_do_var_aafilled.vcf #check sample names
+#!/bin/bash
+#cat << "EOF" > lp_rename.txt #Unmark this line when running it (I marked it in R because it doesn't understand it and messes the colours of subsequent lines). It should include all incorrect names.
+h_lp_do_0007 c_lp_do_0007
+EOF
+
+bcftools reheader -s lp_rename.txt -o c_lp_sm_c_lp_do_var_aafilled_renamed.vcf c_lp_sm_c_lp_do_var_aafilled.vcf #copy the VCF and rename the wrong named samples in the new VCF
+rm lp_rename.txt
+mv c_lp_sm_c_lp_do_var_aafilled_renamed.vcf c_lp_sm_c_lp_do_var_aafilled.vcf
+grep -v '#' c_lp_sm_c_lp_do_var_aafilled.vcf | wc -l #4972251
+
+
+```
+
+###For Lynx lynx.
+
+```{r Polarize contemporary VCF, eval=FALSE, engine='bash'}
+
+#All positions:
+
+#Code to annotate the AA (ancestral alleles) subfield from the INFO field in the VCF. I keep getting the following error: "Can't locate Vcf.pm in @INC". I look it up and apparently it's easy to solve: an environment variable PERL5LIB should be defined as the path to perl.
+screen -S c_ll_ki_c_ll_no_c_ll_po_all_aafilled.log
+script c_ll_ki_c_ll_no_c_ll_po_all_aafilled.log
+
+export PERL5LIB=/opt/vcftools_0.1.13/perl/ #set required environmental variable
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+
+cat $V_PATH/c_ll_ki_c_ll_no_c_ll_po_all.vcf | /opt/vcftools_0.1.13/perl/fill-aa -a /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa.gz | bgzip -c > c_ll_ki_c_ll_no_c_ll_po_all_aafilled.vcf.gz #I tried to run this first without bgzipping it, and it was increasingly slow. Each day it did around half the previous day. When the server crashed, I relaunched it adding the bgzip command and it finished in a little over 24h.
+
+gzip -d -c c_ll_ki_c_ll_no_c_ll_po_all_aafilled.vcf.gz > c_ll_ki_c_ll_no_c_ll_po_all_aafilled.vcf #Get decompressed version. I ran md5sum for both the gzipped and the unzipped versions and there were no differences.
+
+
+screen -S c_ll_ki_c_ll_no_c_ll_po_all_aafilled_renamed
+#Fix sample names:
+cd $V_PATH
+bcftools query -l c_ll_ki_c_ll_no_c_ll_po_all_aafilled.vcf #check sample names
+#!/bin/bash
+#cat << "EOF" > ll_rename.txt #Unmark this line when running it (I marked it in R because it doesn't understand it and messes the colours of subsequent lines). It should include all incorrect names.
+LL90_rgsm c_ll_ki_0090
+EOF
+
+bcftools reheader -s ll_rename.txt -o c_ll_ki_c_ll_no_c_ll_po_all_aafilled_renamed.vcf c_ll_ki_c_ll_no_c_ll_po_all_aafilled.vcf #copy the VCF and rename the wrong named samples in the new VCF
+rm ll_rename.txt
+mv c_ll_ki_c_ll_no_c_ll_po_all_aafilled_renamed.vcf c_ll_ki_c_ll_no_c_ll_po_all_aafilled.vcf
+grep -v '#' c_ll_ki_c_ll_no_c_ll_po_all_aafilled.vcf | wc -l
+
+---
+#Variants only:
+
+#Code to annotate the AA (ancestral alleles) subfield from the INFO field in the VCF. I keep getting the following error: "Can't locate Vcf.pm in @INC". I look it up and apparently it's easy to solve: an environment variable PERL5LIB should be defined as the path to perl.
+screen -S c_ll_ki_c_ll_no_c_ll_po_var_aafilled.log
+script c_ll_ki_c_ll_no_c_ll_po_var_aafilled.log
+
+export PERL5LIB=/opt/vcftools_0.1.13/perl/ #set required environmental variable
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+
+cat $V_PATH/c_ll_ki_c_ll_no_c_ll_po_var.vcf | /opt/vcftools_0.1.13/perl/fill-aa -a /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa.gz | bgzip -c > c_ll_ki_c_ll_no_c_ll_po_var_aafilled.vcf.gz #I tried to run this first without bgzipping it, and it was increasingly slow. Each day it did around half the previous day. When the server crashed, I relaunched it adding the bgzip command and it finished in a little over 24h.
+
+gzip -d -c c_ll_ki_c_ll_no_c_ll_po_var_aafilled.vcf.gz > c_ll_ki_c_ll_no_c_ll_po_var_aafilled.vcf #Get decompressed version. I ran md5sum for both the gzipped and the unzipped versions and there were no differences.
+
+
+screen -S c_ll_ki_c_ll_no_c_ll_po_var_aafilled_renamed
+#Fix sample names:
+cd $V_PATH
+bcftools query -l c_ll_ki_c_ll_no_c_ll_po_var_aafilled.vcf #check sample names
+#!/bin/bash
+#cat << "EOF" > ll_rename.txt #Unmark this line when running it (I marked it in R because it doesn't understand it and messes the colours of subsequent lines). It should include all incorrect names.
+LL90_rgsm c_ll_ki_0090
+EOF
+
+bcftools reheader -s ll_rename.txt -o c_ll_ki_c_ll_no_c_ll_po_var_aafilled_renamed.vcf c_ll_ki_c_ll_no_c_ll_po_var_aafilled.vcf #copy the VCF and rename the wrong named samples in the new VCF
+rm ll_rename.txt
+mv c_ll_ki_c_ll_no_c_ll_po_var_aafilled_renamed.vcf c_ll_ki_c_ll_no_c_ll_po_var_aafilled.vcf
+grep -v '#' c_ll_ki_c_ll_no_c_ll_po_var_aafilled.vcf | wc -l #12492854
+
+```
+
+###For Lynx pardinus 5x only.
+
+```{r Polarize contemporary VCF, eval=FALSE, engine='bash'}
+
+#Variants only:
+
+#Code to annotate the AA (ancestral alleles) subfield from the INFO field in the VCF. I keep getting the following error: "Can't locate Vcf.pm in @INC". I look it up and apparently it's easy to solve: an environment variable PERL5LIB should be defined as the path to perl.
+screen -S c_lp_sm_c_lp_do_5x_var_aafilled.log
+script c_lp_sm_c_lp_do_5x_var_aafilled.log
+
+export PERL5LIB=/opt/vcftools_0.1.13/perl/ #set required environmental variable
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+
+cat $V_PATH/c_lp_sm_c_lp_do_5x_var.vcf | /opt/vcftools_0.1.13/perl/fill-aa -a /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa.gz | bgzip -c > c_lp_sm_c_lp_do_5x_var_aafilled.vcf.gz #I tried to run this first without bgzipping it, and it was increasingly slow. Each day it did around half the previous day. When the server crashed, I relaunched it adding the bgzip command and it finished in a little over 24h.
+
+gzip -d -c c_lp_sm_c_lp_do_5x_var_aafilled.vcf.gz > c_lp_sm_c_lp_do_5x_var_aafilled.vcf #Get decompressed version. I ran md5sum for both the gzipped and the unzipped versions and there were no differences.
+
+```
+
+###For Lynx pardinus GP only.
+
+```{r Polarize contemporary VCF, eval=FALSE, engine='bash'}
+
+#Variants only:
+
+#Code to annotate the AA (ancestral alleles) subfield from the INFO field in the VCF. I keep getting the following error: "Can't locate Vcf.pm in @INC". I look it up and apparently it's easy to solve: an environment variable PERL5LIB should be defined as the path to perl.
+screen -S c_lp_sm_c_lp_do_GP_var_aafilled.log
+script c_lp_sm_c_lp_do_GP_var_aafilled.log
+
+export PERL5LIB=/opt/vcftools_0.1.13/perl/ #set required environmental variable
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+
+cat $V_PATH/c_lp_sm_c_lp_do_GP_var.vcf | /opt/vcftools_0.1.13/perl/fill-aa -a /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa.gz | bgzip -c > c_lp_sm_c_lp_do_GP_var_aafilled.vcf.gz #I tried to run this first without bgzipping it, and it was increasingly slow. Each day it did around half the previous day. When the server crashed, I relaunched it adding the bgzip command and it finished in a little over 24h.
+
+gzip -d -c c_lp_sm_c_lp_do_GP_var_aafilled.vcf.gz > c_lp_sm_c_lp_do_GP_var_aafilled.vcf #Get decompressed version. I ran md5sum for both the gzipped and the unzipped versions and there were no differences.
+
+```
+
+##Use VcfFilterJdk to polarize the AA-filled VCF.
+###For Lynx pardinus.
+
+```{r Polarize contemporary VCF, eval=FALSE, engine='bash'}
+
+#Polarize the AA-filled VCF based on the new INFO/AA column. Alleles will be switched whenever the ancestral allele matches the alternative one, and genotypes will be properly recoded as well. The following code was originally provided by Pierre Lindenbaum and modified by José Luis Castro.
+
+#For all positions:
+
+cd $V_PATH
+screen -S c_lp_sm_c_lp_do_all_polarized.log
+script c_lp_sm_c_lp_do_all_polarized.log
+
+java -jar /opt/jvarkit/dist/vcffilterjdk.jar -e 'if(variant.getNAlleles()!=2 || !variant.hasAttribute("AA")) return true; 
+final String aa = variant.getAttributeAsString("AA",""); 
+if(!variant.getAlleles().get(1).getDisplayString().equalsIgnoreCase(aa)) return true; 
+VariantContextBuilder vb=new VariantContextBuilder(variant); 
+
+Allele oldalt = variant.getAlleles().get(1);
+Allele oldref = variant.getAlleles().get(0); 
+Allele ref= Allele.create(oldalt.getDisplayString(),true); 
+Allele alt= Allele.create(oldref.getDisplayString(),false);
+
+vb.alleles(Arrays.asList(ref,alt)); 
+
+List genotypes= new ArrayList<>(); 
+for(Genotype g: variant.getGenotypes()) 
+  { 
+  if(!g.isCalled()) 
+  { genotypes.add(g); continue;} 
+  GenotypeBuilder gb = new GenotypeBuilder(g); 
+  List alleles = new ArrayList<>(); 
+  for(Allele a:g.getAlleles()) { 
+    if(a.equals(oldalt)) { a=ref;} 
+    else if(a.equals(oldref)) { a=alt;} 
+    alleles.add(a); 
+    } 
+  if(g.hasPL()) { 
+    int pl[] = g.getPL(); 
+    int pl2[] = new int[pl.length]; 
+    for(int i=0;i< pl.length;i++) pl2[i]=pl[(pl.length-1)-i]; 
+    gb.PL(pl2); 
+    } 
+  if(g.hasAD()) 
+    { int ad[] = g.getAD(); 
+    int ad2[] = new int[ad.length]; 
+    for(int i=0;i< ad.length;i++) ad2[i]=ad[(ad.length-1)-i];
+    gb.AD(ad2); 
+  } 
+  genotypes.add(gb.alleles(alleles).make()); 
+  }
+
+vb.attribute("AF",1.0d - Double.parseDouble(variant.getAttributeAsString("AF",""))); vb.attribute("AC",variant.getGenotypes().stream().flatMap(G->G.getAlleles().stream()).filter(A->A.equals(oldref)).count()); 
+vb.genotypes(genotypes); 
+return vb.make();' -o c_lp_sm_c_lp_do_all_polarized.vcf c_lp_sm_c_lp_do_all_aafilled.vcf
+
+-----
+
+#For variants only:
+
+cd $V_PATH
+screen -S c_lp_sm_c_lp_do_var_polarized.log
+script c_lp_sm_c_lp_do_var_polarized.log
+
+java -jar /opt/jvarkit/dist/vcffilterjdk.jar -e 'if(variant.getNAlleles()!=2 || !variant.hasAttribute("AA")) return true; 
+final String aa = variant.getAttributeAsString("AA",""); 
+if(!variant.getAlleles().get(1).getDisplayString().equalsIgnoreCase(aa)) return true; 
+VariantContextBuilder vb=new VariantContextBuilder(variant); 
+
+Allele oldalt = variant.getAlleles().get(1);
+Allele oldref = variant.getAlleles().get(0); 
+Allele ref= Allele.create(oldalt.getDisplayString(),true); 
+Allele alt= Allele.create(oldref.getDisplayString(),false);
+
+vb.alleles(Arrays.asList(ref,alt)); 
+
+List genotypes= new ArrayList<>(); 
+for(Genotype g: variant.getGenotypes()) 
+  { 
+  if(!g.isCalled()) 
+  { genotypes.add(g); continue;} 
+  GenotypeBuilder gb = new GenotypeBuilder(g); 
+  List alleles = new ArrayList<>(); 
+  for(Allele a:g.getAlleles()) { 
+    if(a.equals(oldalt)) { a=ref;} 
+    else if(a.equals(oldref)) { a=alt;} 
+    alleles.add(a); 
+    } 
+  if(g.hasPL()) { 
+    int pl[] = g.getPL(); 
+    int pl2[] = new int[pl.length]; 
+    for(int i=0;i< pl.length;i++) pl2[i]=pl[(pl.length-1)-i]; 
+    gb.PL(pl2); 
+    } 
+  if(g.hasAD()) 
+    { int ad[] = g.getAD(); 
+    int ad2[] = new int[ad.length]; 
+    for(int i=0;i< ad.length;i++) ad2[i]=ad[(ad.length-1)-i];
+    gb.AD(ad2); 
+  } 
+  genotypes.add(gb.alleles(alleles).make()); 
+  }
+
+vb.attribute("AF",1.0d - Double.parseDouble(variant.getAttributeAsString("AF",""))); vb.attribute("AC",variant.getGenotypes().stream().flatMap(G->G.getAlleles().stream()).filter(A->A.equals(oldref)).count()); 
+vb.genotypes(genotypes); 
+return vb.make();' -o c_lp_sm_c_lp_do_var_polarized.vcf c_lp_sm_c_lp_do_var_aafilled.vcf
+
+```
+
+###For Lynx lynx.
+
+```{r Polarize contemporary VCF, eval=FALSE, engine='bash'}
+
+#Polarize the AA-filled VCF based on the new INFO/AA column. Alleles will be switched whenever the ancestral allele matches the alternative one, and genotypes will be properly recoded as well. The following code was originally provided by Pierre Lindenbaum and modified by José Luis Castro.
+
+#For all positions:
+
+cd $V_PATH
+screen -S c_ll_ki_c_ll_no_c_ll_po_all_polarized.log
+script c_ll_ki_c_ll_no_c_ll_po_all_polarized.log
+
+java -jar /opt/jvarkit/dist/vcffilterjdk.jar -e 'if(variant.getNAlleles()!=2 || !variant.hasAttribute("AA")) return true; 
+final String aa = variant.getAttributeAsString("AA",""); 
+if(!variant.getAlleles().get(1).getDisplayString().equalsIgnoreCase(aa)) return true; 
+VariantContextBuilder vb=new VariantContextBuilder(variant); 
+
+Allele oldalt = variant.getAlleles().get(1);
+Allele oldref = variant.getAlleles().get(0); 
+Allele ref= Allele.create(oldalt.getDisplayString(),true); 
+Allele alt= Allele.create(oldref.getDisplayString(),false);
+
+vb.alleles(Arrays.asList(ref,alt)); 
+
+List genotypes= new ArrayList<>(); 
+for(Genotype g: variant.getGenotypes()) 
+  { 
+  if(!g.isCalled()) 
+  { genotypes.add(g); continue;} 
+  GenotypeBuilder gb = new GenotypeBuilder(g); 
+  List alleles = new ArrayList<>(); 
+  for(Allele a:g.getAlleles()) { 
+    if(a.equals(oldalt)) { a=ref;} 
+    else if(a.equals(oldref)) { a=alt;} 
+    alleles.add(a); 
+    } 
+  if(g.hasPL()) { 
+    int pl[] = g.getPL(); 
+    int pl2[] = new int[pl.length]; 
+    for(int i=0;i< pl.length;i++) pl2[i]=pl[(pl.length-1)-i]; 
+    gb.PL(pl2); 
+    } 
+  if(g.hasAD()) 
+    { int ad[] = g.getAD(); 
+    int ad2[] = new int[ad.length]; 
+    for(int i=0;i< ad.length;i++) ad2[i]=ad[(ad.length-1)-i];
+    gb.AD(ad2); 
+  } 
+  genotypes.add(gb.alleles(alleles).make()); 
+  }
+
+vb.attribute("AF",1.0d - Double.parseDouble(variant.getAttributeAsString("AF",""))); vb.attribute("AC",variant.getGenotypes().stream().flatMap(G->G.getAlleles().stream()).filter(A->A.equals(oldref)).count()); 
+vb.genotypes(genotypes); 
+return vb.make();' -o c_ll_ki_c_ll_no_c_ll_po_all_polarized.vcf c_ll_ki_c_ll_no_c_ll_po_all_aafilled.vcf
+
+-----
+
+#For variants only:
+
+cd $V_PATH
+screen -S c_ll_ki_c_ll_no_c_ll_po_var_polarized.log
+script c_ll_ki_c_ll_no_c_ll_po_var_polarized.log
+
+java -jar /opt/jvarkit/dist/vcffilterjdk.jar -e 'if(variant.getNAlleles()!=2 || !variant.hasAttribute("AA")) return true; 
+final String aa = variant.getAttributeAsString("AA",""); 
+if(!variant.getAlleles().get(1).getDisplayString().equalsIgnoreCase(aa)) return true; 
+VariantContextBuilder vb=new VariantContextBuilder(variant); 
+
+Allele oldalt = variant.getAlleles().get(1);
+Allele oldref = variant.getAlleles().get(0); 
+Allele ref= Allele.create(oldalt.getDisplayString(),true); 
+Allele alt= Allele.create(oldref.getDisplayString(),false);
+
+vb.alleles(Arrays.asList(ref,alt)); 
+
+List genotypes= new ArrayList<>(); 
+for(Genotype g: variant.getGenotypes()) 
+  { 
+  if(!g.isCalled()) 
+  { genotypes.add(g); continue;} 
+  GenotypeBuilder gb = new GenotypeBuilder(g); 
+  List alleles = new ArrayList<>(); 
+  for(Allele a:g.getAlleles()) { 
+    if(a.equals(oldalt)) { a=ref;} 
+    else if(a.equals(oldref)) { a=alt;} 
+    alleles.add(a); 
+    } 
+  if(g.hasPL()) { 
+    int pl[] = g.getPL(); 
+    int pl2[] = new int[pl.length]; 
+    for(int i=0;i< pl.length;i++) pl2[i]=pl[(pl.length-1)-i]; 
+    gb.PL(pl2); 
+    } 
+  if(g.hasAD()) 
+    { int ad[] = g.getAD(); 
+    int ad2[] = new int[ad.length]; 
+    for(int i=0;i< ad.length;i++) ad2[i]=ad[(ad.length-1)-i];
+    gb.AD(ad2); 
+  } 
+  genotypes.add(gb.alleles(alleles).make()); 
+  }
+
+vb.attribute("AF",1.0d - Double.parseDouble(variant.getAttributeAsString("AF",""))); vb.attribute("AC",variant.getGenotypes().stream().flatMap(G->G.getAlleles().stream()).filter(A->A.equals(oldref)).count()); 
+vb.genotypes(genotypes); 
+return vb.make();' -o c_ll_ki_c_ll_no_c_ll_po_var_polarized.vcf c_ll_ki_c_ll_no_c_ll_po_var_aafilled.vcf
+
+```
+
+###For Lynx pardinus 5x only.
+
+```{r Polarize contemporary VCF, eval=FALSE, engine='bash'}
+
+#For variants only:
+
+cd $V_PATH
+screen -S c_lp_sm_c_lp_do_5x_var_polarized.log
+script c_lp_sm_c_lp_do_5x_var_polarized.log
+
+java -jar /opt/jvarkit/dist/vcffilterjdk.jar -e 'if(variant.getNAlleles()!=2 || !variant.hasAttribute("AA")) return true; 
+final String aa = variant.getAttributeAsString("AA",""); 
+if(!variant.getAlleles().get(1).getDisplayString().equalsIgnoreCase(aa)) return true; 
+VariantContextBuilder vb=new VariantContextBuilder(variant); 
+
+Allele oldalt = variant.getAlleles().get(1);
+Allele oldref = variant.getAlleles().get(0); 
+Allele ref= Allele.create(oldalt.getDisplayString(),true); 
+Allele alt= Allele.create(oldref.getDisplayString(),false);
+
+vb.alleles(Arrays.asList(ref,alt)); 
+
+List genotypes= new ArrayList<>(); 
+for(Genotype g: variant.getGenotypes()) 
+  { 
+  if(!g.isCalled()) 
+  { genotypes.add(g); continue;} 
+  GenotypeBuilder gb = new GenotypeBuilder(g); 
+  List alleles = new ArrayList<>(); 
+  for(Allele a:g.getAlleles()) { 
+    if(a.equals(oldalt)) { a=ref;} 
+    else if(a.equals(oldref)) { a=alt;} 
+    alleles.add(a); 
+    } 
+  if(g.hasPL()) { 
+    int pl[] = g.getPL(); 
+    int pl2[] = new int[pl.length]; 
+    for(int i=0;i< pl.length;i++) pl2[i]=pl[(pl.length-1)-i]; 
+    gb.PL(pl2); 
+    } 
+  if(g.hasAD()) 
+    { int ad[] = g.getAD(); 
+    int ad2[] = new int[ad.length]; 
+    for(int i=0;i< ad.length;i++) ad2[i]=ad[(ad.length-1)-i];
+    gb.AD(ad2); 
+  } 
+  genotypes.add(gb.alleles(alleles).make()); 
+  }
+
+vb.attribute("AF",1.0d - Double.parseDouble(variant.getAttributeAsString("AF",""))); vb.attribute("AC",variant.getGenotypes().stream().flatMap(G->G.getAlleles().stream()).filter(A->A.equals(oldref)).count()); 
+vb.genotypes(genotypes); 
+return vb.make();' -o c_lp_sm_c_lp_do_5x_var_polarized.vcf c_lp_sm_c_lp_do_5x_var_aafilled.vcf
+
+```
+
+###For Lynx pardinus GP only.
+
+```{r Polarize contemporary VCF, eval=FALSE, engine='bash'}
+
+#For variants only:
+
+cd $V_PATH
+screen -S c_lp_sm_c_lp_do_GP_var_polarized.log
+script c_lp_sm_c_lp_do_GP_var_polarized.log
+
+java -jar /opt/jvarkit/dist/vcffilterjdk.jar -e 'if(variant.getNAlleles()!=2 || !variant.hasAttribute("AA")) return true; 
+final String aa = variant.getAttributeAsString("AA",""); 
+if(!variant.getAlleles().get(1).getDisplayString().equalsIgnoreCase(aa)) return true; 
+VariantContextBuilder vb=new VariantContextBuilder(variant); 
+
+Allele oldalt = variant.getAlleles().get(1);
+Allele oldref = variant.getAlleles().get(0); 
+Allele ref= Allele.create(oldalt.getDisplayString(),true); 
+Allele alt= Allele.create(oldref.getDisplayString(),false);
+
+vb.alleles(Arrays.asList(ref,alt)); 
+
+List genotypes= new ArrayList<>(); 
+for(Genotype g: variant.getGenotypes()) 
+  { 
+  if(!g.isCalled()) 
+  { genotypes.add(g); continue;} 
+  GenotypeBuilder gb = new GenotypeBuilder(g); 
+  List alleles = new ArrayList<>(); 
+  for(Allele a:g.getAlleles()) { 
+    if(a.equals(oldalt)) { a=ref;} 
+    else if(a.equals(oldref)) { a=alt;} 
+    alleles.add(a); 
+    } 
+  if(g.hasPL()) { 
+    int pl[] = g.getPL(); 
+    int pl2[] = new int[pl.length]; 
+    for(int i=0;i< pl.length;i++) pl2[i]=pl[(pl.length-1)-i]; 
+    gb.PL(pl2); 
+    } 
+  if(g.hasAD()) 
+    { int ad[] = g.getAD(); 
+    int ad2[] = new int[ad.length]; 
+    for(int i=0;i< ad.length;i++) ad2[i]=ad[(ad.length-1)-i];
+    gb.AD(ad2); 
+  } 
+  genotypes.add(gb.alleles(alleles).make()); 
+  }
+
+vb.attribute("AF",1.0d - Double.parseDouble(variant.getAttributeAsString("AF",""))); vb.attribute("AC",variant.getGenotypes().stream().flatMap(G->G.getAlleles().stream()).filter(A->A.equals(oldref)).count()); 
+vb.genotypes(genotypes); 
+return vb.make();' -o c_lp_sm_c_lp_do_GP_var_polarized.vcf c_lp_sm_c_lp_do_GP_var_aafilled.vcf
+
+```
+
+#3: Set up SnpEff. I'll be following this manual for all SnpEff configuration purposes: http://snpeff.sourceforge.net/SnpEff_manual.html
+##Search for the Lynx pardinus database. 
+Search for the Lynx pardinus assembly database in the program's pre-built database. As of June the 6th, 2017, the Lynx pardinus genome isn't included in the snpEff database. A second option would be building our own Lynx pardinus database.
+
+```{r Set up SnpEff, eval=FALSE, engine='bash'}
+
+java -jar /opt/snpEff/snpEff.jar databases | grep -i pardinus
+
+```
+
+##Build the Lynx pardinus genome database.
+In the end we opt to build our own database since we don't know when they will get themselves to add it. This step should be omitted if the desired database was found in the previous step. In the end it's best to use the Lynx rufus genome as reference if the VCF is polarized based on Lynx rufus, else the polarized SNPs are wrongly annotated.
+
+###Add entry to the config file
+
+```{r Set up SnpEff, eval=FALSE, engine='bash'}
+
+#Originally the config was just in the software folder and I didn't have writing permission. If this is the only config file available, writing permission is required, and when annotating later on, the file should be called using the -c command followed by the path to the file.
+#However, in my case I believe the tech group created a copy of the file in my folder after I sent them an e-mail, and this is the one that I was able to edit.
+
+cd /home/dkleinman/
+mv snpEff.config $C_PATH #I move the config file that appeared in my folder to a subfolder that I created for snpEff
+vi snpEff.config  #initiate the editing process
+
+#Following the manual, I added the following two lines (use :o to start editing -watch out for the current line- and :wq to save and exit):
+
+# Lynx_pardinus
+LYPA.23.genome : Iberian lynx #from now on, LYPA.23 is the code for the Lynx pardinus reference genome (in snpEff)
+
+# Lynx_pardinus, detailed annotation (obsolete)
+LYPA.23b.genome : Iberian lynx #LYPA.23b is the code for the highly detailed annotation of the Lynx pardinus reference genome (in snpEff)
+
+#In the end it's best to use the Lynx rufus genome as reference if the VCF is polarized based on Lynx rufus, else the polarized SNPs are wrongly annotated.
+
+```
+
+###Create directory and move files
+
+```{r Set up SnpEff, eval=FALSE, engine='bash'}
+
+#First for the regular annotation:
+mkdir $S_PATH/data/LYPA.23 #create a directory inside the software's dependencies whose name matches the code
+cd $S_PATH/data/LYPA.23
+
+scp /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.all.fix.nr.gff3 $S_PATH/data/LYPA.23/ #copy the annotation file (can be gff or gtf) to the newly created directory. This gff file includes CDS, introns, exons and genes, so it's very basic. A more complex version that Maria created which includes lncRNAs, etc., will be considered as custom annotation.
+mv LYPA23C.all.fix.nr.gff3 genes.gff #rename the file as the tutorial indicates
+
+mkdir $S_PATH/data/genomes #create a directory inside the software's dependencies called genomes
+cd $S_PATH/data/genomes
+scp /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa $S_PATH/data/genomes #copy the reference genome fasta to the new genomes directory
+mv lp23.fa LYPA.23.fa #rename the file so that it matches the code
+
+
+#In the end this won't be used. The detailed (custom) annotation will be intersected using a bed and the -interval command.
+#Second, for the detailed annotation:
+mkdir $C_PATH/data/LYPA.23b #create a directory inside the software's dependencies whose name matches the code
+cd $C_PATH/data/LYPA.23b
+
+scp /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.UCNE.intergenic.nr.gff3 $C_PATH/data/LYPA.23b/ #copy the annotation file (can be gff or gtf) to the newly created directory. This gff file is very detailed and includes CDS, introns, exons, genes, and many more.
+mv LYPA23C.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.UCNE.intergenic.nr.gff3 genes.gff #rename the file as the tutorial indicates
+
+cd $C_PATH/data/genomes
+scp LYPA.23.fa LYPA.23b.fa #copy the reference genome and rename it so that it also matches the detailed annotation entry
+
+```
+
+###Build the database
+
+```{r Set up SnpEff, eval=FALSE, engine='bash'}
+
+cd $C_PATH
+screen -S build_snpEff_db #open a dettachable screen in case the database building takes too long
+script build_snpEff_db.txt #initiate the log file
+
+S_PATH=/opt/snpEff #redefine the variable, since we're inside a script
+C_PATH=/home/dkleinman/datos/snpEff #redefine the variable, since we're inside a script
+
+cd $S_PATH
+java -jar snpEff.jar build -gff3 -v LYPA.23 -c $C_PATH/snpEff.config -dataDir $C_PATH/data #build the database. Use the -gff3 command for gff files and -gtf22 for gtf files. Use -v for verbose (expanded information on the processes and the warnings/errors that may appear). Use -c to indicate the path to my own config file. Then use -dataDir to override the data directory from the config file (by default the software thinks that the data folder with the genome and the genes files is located where config is, so it's necessary to give it the correct path).
+
+ctrl + D #terminate the script
+ctrl + D #terminate the screen
+
+#The following is obsolete since I fixed the original code.
+scp -r $S_PATH/data $C_PATH #afterwards I realize anyone can access the data folder so I copy it to my own folder and then I remove the stuff I created inside the original data folder
+cd $S_PATH/data
+rm -r LYPA.23/
+rm -r genomes/
+
+```
+
+### Tutorial annotation
+Annotate one of the examples that comes with the software
+
+```{r Tutorial annotation, eval=FALSE, engine='bash'}
+
+java -Xmx16g -jar $S_PATH/snpEff.jar GRCh37.75 -s $O_PATH/toys/test.chr22.ann $S_PATH/examples/test.chr22.vcf > $O_PATH/toys/test.chr22.ann.vcf
+
+```
+
+##Build the Lynx rufus genome database.
+In the end we opt to build our own database since we don't know when they will get themselves to add it. This step should be omitted if the desired database was found in the previous step. Annotating against the Lynx rufus genome is the correct option if the VCF has been polarized based on that genome.
+
+###Add entry to the config file
+
+```{r Set up SnpEff, eval=FALSE, engine='bash'}
+
+#Originally the config was just in the software folder and I didn't have writing permission. If this is the only config file available, writing permission is required, and when annotating later on, the file should be called using the -c command followed by the path to the file.
+#However, in my case I believe the tech group created a copy of the file in my folder after I sent them an e-mail, and this is the one that I was able to edit.
+
+cd /home/dkleinman/
+mv snpEff.config $C_PATH #I move the config file that appeared in my folder to a subfolder that I created for snpEff
+vi snpEff.config  #initiate the editing process
+
+#Following the manual, I added the following two lines (use :o to start editing -watch out for the current line- and :wq to save and exit):
+
+# Lynx_rufus
+LYRU.23.genome : Bobcat #from now on, LYRU.23 is the code for the Lynx rufus c_lr_zz_0001_recal1.fa genome (in snpEff)
+
+```
+
+###Create directory and move files
+
+```{r Set up SnpEff, eval=FALSE, engine='bash'}
+
+#First for the regular annotation:
+mkdir $C_PATH/data/LYRU.23 #create a directory inside the software's dependencies whose name matches the code
+cd $C_PATH/data/LYRU.23
+
+scp /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.all.fix.nr.gff3 $C_PATH/data/LYRU.23/ #copy the annotation file (can be gff or gtf) to the newly created directory. This gff file includes CDS, introns, exons and genes, so it's very basic. A more complex version that Maria created which includes lncRNAs, etc., will be considered as custom annotation.
+mv LYPA23C.all.fix.nr.gff3 genes.gff #rename the file as the tutorial indicates
+
+mkdir $C_PATH/data/genomes #create a directory inside the software's dependencies called genomes
+cd $C_PATH/data/genomes
+scp /home/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa $C_PATH/data/genomes #copy the reference genome fasta to the new genomes directory
+mv c_lr_zz_0001_recal1.fa LYRU.23.fa #rename the file so that it matches the code
+
+```
+
+###Build the database
+
+```{r Set up SnpEff, eval=FALSE, engine='bash'}
+
+cd $C_PATH
+screen -S build_LYRU_snpEff_db #open a dettachable screen in case the database building takes too long
+script build_LYRU_snpEff_db.txt #initiate the log file
+
+S_PATH=/opt/snpEff #redefine the variable, since we're inside a script
+C_PATH=/home/dkleinman/datos/snpEff #redefine the variable, since we're inside a script
+
+cd $S_PATH
+java -jar snpEff.jar build -gff3 -v LYRU.23 -c $C_PATH/snpEff.config -dataDir $C_PATH/data #build the database. Use the -gff3 command for gff files and -gtf22 for gtf files. Use -v for verbose (expanded information on the processes and the warnings/errors that may appear). Use -c to indicate the path to my own config file. Then use -dataDir to override the data directory from the config file (by default the software thinks that the data folder with the genome and the genes files is located where config is, so it's necessary to give it the correct path).
+
+ctrl + D #terminate the script
+ctrl + D #terminate the screen
+
+```
+
+#4: Annotate using SnpEff.
+##Create custom annotation bed file
+
+```{r Annotate using SnpEff, eval=FALSE, engine='bash'}
+
+#Create bed file with custom annotations based on the gff3 that María compiled.
+cut -d$'\t' -f1,3,4,5 /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.UCNE.intergenic.nr.gff3 | awk '{printf ("%s\t%s\t%s\t%s\n", $1, $3, $4, $2)}' > /home/dkleinman/datos/snpEff/data/LYPA23C.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.UCNE.intergenic.nr.bed
+
+```
+
+##Annotate the VCF with custom annotation
+
+###For Lynx pardinus. Monomorphic positions (incl. substitutions) are NOT polarized, but this doesn't matter here, since the goal is to count total sites per category.
+
+```{r Annotate using SnpEff, eval=FALSE, engine='bash'}
+
+#For all positions:
+
+cd $V_PATH/annotation/
+screen -S c_lp_sm_c_lp_do_all_polarized.lr_ann.log #open a dettachable screen in case the test takes too long
+script c_lp_sm_c_lp_do_all_polarized.lr_ann.log #initiate the log file
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+
+cd $O_PATH #run this code from the directory where the config is located.
+java -Xmx16g -jar $S_PATH/snpEff.jar LYRU.23 -v -s $V_PATH/annotation/c_lp_sm_c_lp_do_all_polarized.lr_ann.html -csvStats $V_PATH/annotation/c_lp_sm_c_lp_do_all_polarized.lr_ann.csv -interval $C_PATH/data/LYPA23C.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.UCNE.intergenic.nr.bed $V_PATH/c_lp_sm_c_lp_do_all_polarized.vcf > $V_PATH/annotation/c_lp_sm_c_lp_do_all_polarized.lr_ann.vcf #run this code from the directory where the config is located.
+
+grep -v '#' c_lp_sm_c_lp_do_all_polarized.lr_ann.vcf | wc -l #
+
+-----
+
+#For variants only:
+
+cd $V_PATH/annotation/
+screen -S c_lp_sm_c_lp_do_var_polarized.lr_ann.log #open a dettachable screen in case the test takes too long
+script c_lp_sm_c_lp_do_var_polarized.lr_ann.log #initiate the log file
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+
+cd $O_PATH #run this code from the directory where the config is located.
+java -Xmx16g -jar $S_PATH/snpEff.jar LYRU.23 -v -s $V_PATH/annotation/c_lp_sm_c_lp_do_var_polarized.lr_ann.html -csvStats $V_PATH/annotation/c_lp_sm_c_lp_do_var_polarized.lr_ann.csv -interval $C_PATH/data/LYPA23C.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.UCNE.intergenic.nr.bed $V_PATH/c_lp_sm_c_lp_do_var_polarized.vcf > $V_PATH/annotation/c_lp_sm_c_lp_do_var_polarized.lr_ann.vcf #run this code from the directory where the config is located.
+
+```
+
+###For Lynx lynx. Monomorphic positions (incl. substitutions) are NOT polarized, but this doesn't matter here, since the goal is to count total sites per category.
+
+```{r Annotate using SnpEff, eval=FALSE, engine='bash'}
+
+#For all positions:
+
+cd $V_PATH/annotation/
+screen -S c_ll_ki_c_ll_no_c_ll_po_all_polarized.lr_ann.log #open a dettachable screen in case the test takes too long
+script c_ll_ki_c_ll_no_c_ll_po_all_polarized.lr_ann.log #initiate the log file
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+
+cd $O_PATH #run this code from the directory where the config is located.
+java -Xmx16g -jar $S_PATH/snpEff.jar LYRU.23 -v -s $V_PATH/annotation/c_ll_ki_c_ll_no_c_ll_po_all_polarized.lr_ann.html -csvStats $V_PATH/annotation/c_ll_ki_c_ll_no_c_ll_po_all_polarized.lr_ann.csv -interval $C_PATH/data/LYPA23C.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.UCNE.intergenic.nr.bed $V_PATH/c_ll_ki_c_ll_no_c_ll_po_all_polarized.vcf > $V_PATH/annotation/c_ll_ki_c_ll_no_c_ll_po_all_polarized.lr_ann.vcf #run this code from the directory where the config is located.
+
+grep -v '#' c_ll_ki_c_ll_no_c_ll_po_all_polarized.lr_ann.vcf | wc -l #
+
+-----
+
+#For variants only:
+
+cd $V_PATH/annotation/
+screen -S c_ll_ki_c_ll_no_c_ll_po_var_polarized.lr_ann.log #open a dettachable screen in case the test takes too long
+script c_ll_ki_c_ll_no_c_ll_po_var_polarized.lr_ann.log #initiate the log file
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+
+cd $O_PATH #run this code from the directory where the config is located.
+java -Xmx16g -jar $S_PATH/snpEff.jar LYRU.23 -v -s $V_PATH/annotation/c_ll_ki_c_ll_no_c_ll_po_var_polarized.lr_ann.html -csvStats $V_PATH/annotation/c_ll_ki_c_ll_no_c_ll_po_var_polarized.lr_ann.csv -interval $C_PATH/data/LYPA23C.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.UCNE.intergenic.nr.bed $V_PATH/c_ll_ki_c_ll_no_c_ll_po_var_polarized.vcf > $V_PATH/annotation/c_ll_ki_c_ll_no_c_ll_po_var_polarized.lr_ann.vcf #run this code from the directory where the config is located.
+
+
+```
+
+###For Lynx pardinus 5x only. Monomorphic positions (incl. substitutions) are NOT polarized, but this doesn't matter here, since the goal is to count total sites per category.
+
+```{r Annotate using SnpEff, eval=FALSE, engine='bash'}
+
+#For variants only:
+
+cd $V_PATH/annotation/
+screen -S c_lp_sm_c_lp_do_5x_var_polarized.lr_ann.log #open a dettachable screen in case the test takes too long
+script c_lp_sm_c_lp_do_5x_var_polarized.lr_ann.log #initiate the log file
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+
+cd $O_PATH #run this code from the directory where the config is located.
+java -Xmx16g -jar $S_PATH/snpEff.jar LYRU.23 -v -s $V_PATH/annotation/c_lp_sm_c_lp_do_5x_var_polarized.lr_ann.html -csvStats $V_PATH/annotation/c_lp_sm_c_lp_do_5x_var_polarized.lr_ann.csv -interval $C_PATH/data/LYPA23C.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.UCNE.intergenic.nr.bed $V_PATH/c_lp_sm_c_lp_do_5x_var_polarized.vcf > $V_PATH/annotation/c_lp_sm_c_lp_do_5x_var_polarized.lr_ann.vcf #run this code from the directory where the config is located.
+
+```
+
+###For Lynx pardinus GP only. Monomorphic positions (incl. substitutions) are NOT polarized, but this doesn't matter here, since the goal is to count total sites per category.
+
+```{r Annotate using SnpEff, eval=FALSE, engine='bash'}
+
+#For variants only:
+
+cd $V_PATH/annotation/
+screen -S c_lp_sm_c_lp_do_GP_var_polarized.lr_ann.log #open a dettachable screen in case the test takes too long
+script c_lp_sm_c_lp_do_GP_var_polarized.lr_ann.log #initiate the log file
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+
+cd $O_PATH #run this code from the directory where the config is located.
+java -Xmx16g -jar $S_PATH/snpEff.jar LYRU.23 -v -s $V_PATH/annotation/c_lp_sm_c_lp_do_GP_var_polarized.lr_ann.html -csvStats $V_PATH/annotation/c_lp_sm_c_lp_do_GP_var_polarized.lr_ann.csv -interval $C_PATH/data/LYPA23C.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.UCNE.intergenic.nr.bed $V_PATH/c_lp_sm_c_lp_do_GP_var_polarized.vcf > $V_PATH/annotation/c_lp_sm_c_lp_do_GP_var_polarized.lr_ann.vcf #run this code from the directory where the config is located.
+
+```
+
+#5: Filter the annotated VCF. Subset the VCF files in order to keep only good quality biallelic variants of the desired type (SNPs or INDELs).
+##Separate callings:
+```{r Filter the annotated VCF, eval=FALSE, engine='bash'}
+
+CALLING=(c_ll_ki_c_ll_no_c_ll_po_all) #c_ll_ki_c_ll_no_c_ll_po_all #c_lp_sm_c_lp_do_all
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation
+screen -S "${CALLING}-${TYPE}"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+script "${CALLING}_polarized_filtered_${TYPE}.lr_ann.log"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome (first eight scaffolds only)
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+#The following short loop defines the OTHER variable as the opposite of the TYPE variable (SNP or INDEL)
+if [ $TYPE = "SNP" ]
+  then
+  OTHER=(INDEL)
+elif [ $TYPE = "INDEL" ]
+  then
+  OTHER=(SNP)
+fi
+
+if [ $TYPE != "SNP" ] && [ $TYPE != "INDEL" ] #Don't apply filters if $TYPE is invalid
+  then
+  echo "Invalid value for variable TYPE"
+  echo "Filtering aborted"
+  else #Apply filters if $TYPE is valid
+  echo "Initializing filtering for $TYPE variants"
+  
+  if [ -f ${CALLING}"_polarized_filtered1.lr_ann.vcf" ] #Since filter 1 is common for both types of variants, skip it if it's been performed before
+    then
+    echo "Repetitive and low mappability regions already filtered out"
+    echo "Skipping this step"
+    else
+    #Filter 1: Remove repetitive regions and those with low mappability:
+    echo "Filtering out repetitive and low mappability regions"
+    bedtools subtract -a ${CALLING}"_polarized.lr_ann.vcf" -b /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/repeats_and_lowcomp_no_redundant_mappability.k75_lessthan90.bed -header > ${CALLING}"_polarized_filtered1.lr_ann.vcf"
+    
+    grep -v '#' ${CALLING}"_polarized_filtered1.lr_ann.vcf" | wc -l
+    #c_lp_sm_c_lp_do_nm2_samecov 1639704
+    #c_ll_ki_c_ll_no_c_ll_po_nm3_samecov 5008406
+    #c_lp_sm_c_lp_do_nm2_origcov 1791154
+    #c_ll_ki_c_ll_no_c_ll_po_nm3_origcov 5030301
+    #c_ll_ki_c_ll_no_c_ll_po_h_ll_pv_nm3_origcov 5104185 #It has more than the unfiltered one due to some weird behaviour of bedtools subtract with some INDELs that become duplicated. These will be removed in the subsequent step.
+  fi
+  
+  #Filters 2-5:
+  echo "Applying filters 2-5"
+  $BCF view --max-alleles 2 --exclude-types indels,mnps,bnd,other -e 'ALT="*" | (INFO/AA!=REF & INFO/AA!=ALT) | INFO/AF=0.00 | QUAL < 30 | INFO/QD < 2.0 | INFO/FS > 60.0 | INFO/MQ < 40.0 | MQRankSum < -12.5 | ReadPosRankSum < -8.0 | F_MISSING > 0.2' ${CALLING}"_polarized_filtered1.lr_ann.vcf" > ${CALLING}"_polarized_filtered5_"${TYPE}".lr_ann.vcf"
+
+  grep -v '#' ${CALLING}"_polarized_filtered5_"${TYPE}".lr_ann.vcf" | wc -l 
+  #c_lp_sm_c_lp_do_nm2_samecov 1276973
+  #c_ll_ki_c_ll_no_c_ll_po_nm3_samecov 4165440
+  #c_lp_sm_c_lp_do_nm2_origcov 1374341
+  #c_ll_ki_c_ll_no_c_ll_po_nm3_origcov 4168579
+  #c_ll_ki_c_ll_no_c_ll_po_h_ll_pv_nm3_origcov 4302320
+fi
+
+```
+
+##Rename samples with bad names:
+```{r Filter the annotated VCF, eval=FALSE, engine='bash'}
+
+CALLING=(c_lp_sm_c_lp_do_all) #c_ll_ki_c_ll_no_c_ll_po_all #c_lp_sm_c_lp_do_all
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation
+screen -S "${CALLING}-${TYPE}"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+script "${CALLING}_renamed.lr_ann.log"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+
+#Fix sample names:
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation
+N_POPS=$(awk -F"_" '{print (NF-1)/3}' <<< $CALLING)
+SPECIES=$(echo $CALLING | fold -w8 | cut -c1-4 | head -n$N_POPS | sort | uniq)
+bcftools query -l ${CALLING}"_polarized_filtered5_"${TYPE}".lr_ann.vcf" #check sample names
+
+if [ $SPECIES == "c_lp" ]
+then
+#!/bin/bash
+#cat << "EOF" > samples_rename.txt #Unmark this line when running it (I marked it in R because it doesn't understand it and messes the colours of subsequent lines). It should include all incorrect names.
+h_lp_do_0007 c_lp_do_0007
+EOF
+elif [ $SPECIES == "c_ll" ]
+then
+#!/bin/bash
+#cat << "EOF" > samples_rename.txt #Unmark this line when running it (I marked it in R because it doesn't understand it and messes the colours of subsequent lines). It should include all incorrect names.
+LL90_rgsm c_ll_ki_0090
+EOF
+fi
+
+bcftools reheader -s samples_rename.txt -o ${CALLING}"_polarized_filtered5_renamed_"${TYPE}".lr_ann.vcf" ${CALLING}"_polarized_filtered5_"${TYPE}".lr_ann.vcf" #copy the VCF and rename the wrong named samples in the new VCF
+mv ${CALLING}"_polarized_filtered5_renamed_"${TYPE}".lr_ann.vcf" ${CALLING}"_polarized_filtered5_"${TYPE}".lr_ann.vcf"
+
+```
+
+#6: Tally sites. Count the number of positions for each category, before and after estimating the depth filter:
+```{r Filter the annotated VCF, eval=FALSE, engine='bash'}
+
+CALLING=(c_ll_ki_c_ll_no_c_ll_po_all) #c_ll_ki_c_ll_no_c_ll_po_all #c_lp_sm_c_lp_do_all
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation
+screen -S "${CALLING}-${TYPE}"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+script "${CALLING}_polarized_filtered_${TYPE}.lr_ann.log"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+
+#Define paths:
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome (first eight scaffolds only)
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+#Define variables:
+CATEGORIES=$(realpath /home/dkleinman/datos/snpEff/data/*.bed | grep -v 'nr')
+if [ $CALLING == "c_ll_ki_c_ll_no_c_ll_po_all" ]
+  then DEPTH_PATH=$(echo "c_ll_ki_c_ll_no_c_ll_po_nm3_samecov")
+  elif [ $CALLING == "c_lp_sm_c_lp_do_all" ]
+  then DEPTH_PATH=$(echo "c_lp_sm_c_lp_do_nm2_samecov")
+fi
+FILE=$(ls $CALLING"_polarized_filtered5_"${TYPE}".lr_ann.vcf")
+
+#Obtain the proportion of variants that were dropped due to low or high depth with the variants-only pipeline.
+echo "calculating proportion of variants filtered due to depth"
+PRE_DEPTH_FILTER_N=$(grep -v '#' /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$DEPTH_PATH/annotation/$DEPTH_PATH"_polarized_filtered5.lr_ann.vcf" | wc -l)
+DEPTH_FILTER_N=$(cat /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$DEPTH_PATH/annotation/joined*minmaxdepth_to_remove.bed | wc -l)
+DEPTH_FILTER_PROP=$(echo "scale=6; $DEPTH_FILTER_N/$PRE_DEPTH_FILTER_N" | bc | awk '{printf "%3.4f", $0}')
+
+#Prepare output file:
+rm ${CALLING}"_category_sites_total_counts_"${TYPE}".lr_ann.txt"
+echo -e "calling\tcategory\ttotal_N\ttotal_N_depth_correction" > ${CALLING}"_category_sites_total_counts_"${TYPE}".lr_ann.txt"
+
+#Subset the VCF for each category of interest, then count the number of sites, then estimate the number that would remain after applying the depth filter, then store all the information in the output file, and finally remove the (heavy) VCF:
+for category in ${CATEGORIES[@]}
+  do
+  CATEGORY_NAME=$(echo $category | cut -d'.' -f2)
+  echo "extracting" $CATEGORY_NAME "sites"
+  bedtools intersect -a $FILE -b $category -header > ${CALLING}"_"${CATEGORY_NAME}"_"${TYPE}".lr_ann.vcf"
+  echo "calculating number of" $CATEGORY_NAME "sites that would result from applying the depth filtering"
+  SITES_COUNT=$(grep -v '#' ${CALLING}"_"${CATEGORY_NAME}"_"${TYPE}".lr_ann.vcf" | wc -l)
+  DEPTH_FILTER_SITES=$(echo "scale=6; $DEPTH_FILTER_PROP*$SITES_COUNT" | bc | awk '{printf "%d", $0}')
+  SITES_DEPTH_CORRECTED=$((SITES_COUNT-DEPTH_FILTER_SITES))
+  echo -e "$CALLING\t$CATEGORY_NAME\t$SITES_COUNT\t$SITES_DEPTH_CORRECTED" >> ${CALLING}"_category_sites_total_counts_"${TYPE}".lr_ann.txt"
+  rm ${CALLING}"_"${CATEGORY_NAME}"_"${TYPE}".lr_ann.vcf"
+  done
+
+```
+
+#Z: Finally unused:
+#Z1: Obtain per dataset VCFs. Split the VCF into per datasets VCFs. Generate a VCF for each dataset in order to apply proper depth filters.
+##Separate callings:
+```{r Obtain per dataset VCFs, eval=FALSE, engine='bash'}
+
+CALLING=(c_ll_ki_c_ll_no_c_ll_po_all) #c_ll_ki_c_ll_no_c_ll_po_all #c_lp_sm_c_lp_do_all
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation
+screen -S "${CALLING}-${TYPE}"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+script "perdataset_${CALLING}_${TYPE}.lr_ann.log"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAM files path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+N_POPS=$(awk -F"_" '{print (NF-1)/3}' <<< $CALLING)
+SPECIES=$(echo $CALLING | fold -w8 | cut -c1-4 | head -n$N_POPS | sort | uniq)
+DATASETS=$(for i in ${SPECIES[@]}; do ls ${i}*_samples | cut -d'_' -f1,2,3; done)
+if [ $CALLING == "c_ll_ki_c_ll_no_c_ll_po_all" ]
+  then DEPTH_PATH=$(echo "c_ll_ki_c_ll_no_c_ll_po_nm3_samecov")
+  elif [ $CALLING == "c_lp_sm_c_lp_do_all" ]
+  then DEPTH_PATH=$(echo "c_lp_sm_c_lp_do_nm2_samecov")
+fi
+NM_COV=$(echo "${DEPTH_PATH}" | rev | cut -d'_' -f1,2 | rev)
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation
+for j in ${DATASETS[@]}
+  do
+  echo "${j}"
+  cat /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered/"${j}"_samples
+  mkdir -p $CALLING"_perdataset"
+  
+  $BCF view -S /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered/${j}_samples ${CALLING}"_polarized_filtered5_"${TYPE}".lr_ann.vcf" > $CALLING"_perdataset"/${j}"_"${NM_COV}"_perdataset_"${TYPE}".lr_ann.vcf"
+  grep -v '#' $CALLING"_perdataset"/${j}"_"${NM_COV}"_perdataset_"${TYPE}".lr_ann.vcf" | wc -l #
+  done
+
+```
+
+#Z2: Depth range calculus. Obtain depth range for each species in order to filter low/high depth positions as part of the next section's many filterings. Already performed as part of the "genetic_load_variants_final_pipeline".
+
+#Z3: Perform depth filtering. Obtain list of sites with very low or high depth within each dataset, join them, and remove those sites as well as those with high missingness.
+##Separate callings:
+```{r Perform depth filtering, eval=FALSE, engine='bash'}
+
+#For each dataset obtain the list of positions that have lower (higher) depth than the minimum (maximum) within 0.95 of the distribution, as calculated in the previous section, and join them to later remove them:
+
+CALLING=(c_ll_ki_c_ll_no_c_ll_po_all) #c_ll_ki_c_ll_no_c_ll_po_all #c_lp_sm_c_lp_do_all
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation
+screen -S "${CALLING}-${TYPE}"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+script "${CALLING}_depth_filter_${TYPE}.lr_ann.log"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome (first eight scaffolds only)
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+N_POPS=$(awk -F"_" '{print (NF-1)/3}' <<< $CALLING)
+SPECIES=$(echo $CALLING | fold -w8 | cut -c1-4 | head -n$N_POPS | sort | uniq)
+DATASETS=$(for i in ${SPECIES[@]}; do ls ${i}*_samples | cut -d'_' -f1,2,3; done)
+if [ $CALLING == "c_ll_ki_c_ll_no_c_ll_po_all" ]
+  then DEPTH_PATH=$(echo "c_ll_ki_c_ll_no_c_ll_po_nm3_samecov")
+  elif [ $CALLING == "c_lp_sm_c_lp_do_all" ]
+  then DEPTH_PATH=$(echo "c_lp_sm_c_lp_do_nm2_samecov")
+fi
+NM_COV=$(echo "${DEPTH_PATH}" | rev | cut -d'_' -f1,2 | rev)
+COVERAGE=$(echo "${DEPTH_PATH}" | rev | cut -d'_' -f1 | rev)
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation
+for j in ${DATASETS[@]}
+  do
+  echo "${j}"
+  MIN_DP=$(cat /home/dkleinman/datos/nm_depth_calculus/$DEPTH_PATH/${j}_${COVERAGE}*_mean_sd_depthGlobal_nm_per_dataset_mean_folds_0.95.csv | awk '{print $9}') #Obtained in section 10
+  MAX_DP=$(cat /home/dkleinman/datos/nm_depth_calculus/$DEPTH_PATH/${j}_${COVERAGE}*_mean_sd_depthGlobal_nm_per_dataset_mean_folds_0.95.csv | awk '{print $8}') #Obtained in section 10
+  echo $MIN_DP
+  echo $MAX_DP
+  $BCF filter -i "DP < ${MIN_DP} || DP > ${MAX_DP}" -Ov -o $CALLING"_perdataset"/${j}"_"${NM_COV}"_minmaxdepth_to_remove_"${TYPE}".lr_ann.vcf" $CALLING"_perdataset"/${j}"_"${NM_COV}"_perdataset_"${TYPE}".lr_ann.vcf"
+  sed -e 's/chr//' $CALLING"_perdataset"/${j}"_"${NM_COV}"_minmaxdepth_to_remove_"${TYPE}".lr_ann.vcf" | awk '{OFS="\t"; if (!/^#/){print $1,$2-1,$2}}' > $CALLING"_perdataset"/${j}"_"${NM_COV}"_minmaxdepth_to_remove_"${TYPE}".bed" #convert from VCF to BED
+  done
+cat $CALLING"_perdataset"/*"_"${NM_COV}"_minmaxdepth_to_remove_"${TYPE}".bed" | bedtools sort | uniq > ${CALLING}"_joined_minmaxdepth_to_remove_"${TYPE}".bed" #join all BEDs from each species (i.e. from each calling)
+for j in ${DATASETS[@]}
+  do
+  echo "${j}"
+  bedtools subtract -a $CALLING"_perdataset"/${j}"_"${NM_COV}"_perdataset_"${TYPE}".lr_ann.vcf" -b ${CALLING}"_joined_minmaxdepth_to_remove_"${TYPE}".bed" -header > $CALLING"_perdataset"/${j}"_"${NM_COV}"_perdataset_filtered_"${TYPE}".lr_ann.vcf"
+  done
+
+```
