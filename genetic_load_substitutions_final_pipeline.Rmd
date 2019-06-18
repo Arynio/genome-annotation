@@ -1143,7 +1143,7 @@ if [[ $CALLING == "c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3"* ]] #the doub
       bcftools query -l "${CALLING}"_polarized_filtered6_"$TYPE".lr_ann.vcf | cut -c1-12 | sort | uniq | grep "${s}" > "${s}"_samples.txt
       N_SAMPLES=$(cat "${s}"_samples.txt | wc -l)
       AF_THRES=$(echo "scale=4; ($N_SAMPLES*2-2)/($N_SAMPLES*2)" | bc)
-      bcftools view -S "${s}"_samples.txt "${CALLING}"_polarized_filtered6_"$TYPE".lr_ann.vcf | bcftools view -i "AC/AN = 0 | AC/AN > ${AF_THRES}" -Ov -o "${CALLING}"_"${s}"_1_and_0_positions_"$TYPE".vcf #grab only those positions that have AF=0 or AF~1 (more exactly, AF>(num_alleles-2)/num_alleles, i.e. at most one derived allele). Use AC/AN instead of AF since the latter isn't recalculated for the subset of samples
+      bcftools view -S "${s}"_samples.txt "${CALLING}"_polarized_filtered6_"$TYPE".lr_ann.vcf | bcftools view -i "AC/AN = 0 | AC/AN > ${AF_THRES}" -Ov -o "${CALLING}"_"${s}"_1_and_0_positions_"$TYPE".vcf #grab only those positions that have AF=0 or AF~1 (more exactly, AF>(num_alleles-2)/num_alleles, i.e. at most one ancestral allele). Use AC/AN instead of AF since the latter isn't recalculated for the subset of samples
       grep -v '#' "${CALLING}"_"${s}"_1_and_0_positions_"$TYPE".vcf | cut -f1,2 | awk '{printf ("%s\t%s\t%s\n", $1, $2-1, $2)}' >  "${CALLING}"_"${s}"_1_and_0_positions_"$TYPE".bed
       echo "${s} 1 and 0 positions retrieved"
       done
@@ -2276,5 +2276,347 @@ NSYN_ggplot <- ggplot(data=snpeff_filters_summary, aes(dataset,missense_V,colour
   )
   NSYN_ggplot
 ggsave("NSYN_subst_cov_filters.pdf", width=20, height=15, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
+
+```
+
+
+
+
+
+#EXTRA: Count variants+substitutions (ll vs lp) before applying coverage filters.
+##Get individual VCFs.
+```{r Split the population VCFs into per individual VCFs, eval=FALSE, engine='bash'}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov) #write down name of the calling
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+screen -S "${CALLING}-${TYPE}"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAM files path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING)
+SPECIES=$(echo $CALLING | fold -w8 | cut -c1-4 | head -n$N_POPS | sort | uniq)
+DATASETS=$(for i in ${SPECIES[@]}; do ls ${i}*_samples | cut -d'_' -f1,2,3; done)
+COVERAGE=$(echo "${CALLING}" | rev | cut -d'_' -f1 | rev)
+NM_COV=$(echo "${CALLING}" | rev | cut -d'_' -f1,2 | rev)
+cd $V_PATH/$CALLING/annotation
+mkdir -p ./testing_variant_numbers/
+INDIVIDUALS=$(bcftools query -l ${CALLING}"_polarized_substitutions_"$TYPE".lr_ann.vcf" | sort | uniq)
+for k in ${INDIVIDUALS[@]}
+  do
+  echo "${k}"
+  ID=$(echo "${k}")
+  java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+  -T SelectVariants \
+  -R $REF \
+  -V ${CALLING}"_polarized_substitutions_"$TYPE".lr_ann.vcf" \
+  -o testing_variant_numbers/${k}"_"${NM_COV}"_individual_"${TYPE}".lr_ann.vcf" \
+  -env \
+  -sn $ID
+  done
+
+```
+
+##Get counts.
+```{r Get annotation statistics, eval=FALSE, engine='bash'}
+
+CALLING=(c_lp_sm_c_lp_do_nm2_origcov) #c_lp_sm_c_lp_do_nm2_origcov #c_ll_ki_c_ll_no_c_ll_po_nm3_origcov #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/testing_variant_numbers
+screen -S "${CALLING}-${TYPE}"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+script "${CALLING}_ann_individual_summary_${TYPE}.lr_ann.log"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAM files path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+cd $V_PATH/$CALLING/annotation/testing_variant_numbers
+rm ${CALLING}"_ann_individual_summary_"${TYPE}".lr_ann.txt"
+echo -e "species\tpopulation\tdataset\tsample\ttotal_V\ttotal_A\tintergenic_V\tintergenic_A\tintronic_V\tintronic_A\tcoding_V\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tUCNE_V\tUCNE_A\tmissense/synonymous_V\tmissense/synonymous_A\tsynonymous/intronic_V\tmissense/intronic_V" > ${CALLING}"_ann_individual_summary_"${TYPE}".lr_ann.txt"
+INDLIST=($(ls *"_individual_"${TYPE}".lr_ann.vcf"))
+for i in "${INDLIST[@]}"
+  do
+  echo "${i}"
+  ind=$(echo "${i}" | cut -c1-12)
+  echo "${ind}"
+  SPECIES=$(echo "${ind}" | cut -c3-4)
+  POPULATION=$(echo "${ind}" | cut -c6-7)
+  DATASET=$(if [ $ind = "c_lp_sm_0221" ]; then echo "REF"; elif [ $ind = "c_ll_ki_0090" ]; then echo "MG"; elif [ $ind = "h_ll_pv_0223" ]; then echo "LD"; elif grep -Fxq $ind /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/c_lp_5x_samples || [ $SPECIES = "ll" ]; then echo "5x"; else echo "GP"; fi)
+  SAMPLE=$(echo "${ind}" | cut -c9-12)
+  TOTAL_V=$(grep -v '#' ${i} | wc -l)
+  TOTAL_A=$(grep -v '#' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  INTERGENIC_V=$(grep 'intergenic' ${i} | wc -l)
+  INTERGENIC_A=$(grep 'intergenic' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  INTRONIC_V=$(grep 'intron_variant' ${i} | wc -l)
+  INTRONIC_A=$(grep 'intron_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  CODING_V=$(grep 'CDS' ${i} | wc -l)
+  SYNONYMOUS_V=$(grep 'synonymous_variant' ${i} | wc -l)
+  SYNONYMOUS_A=$(grep 'synonymous_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_V=$(grep 'missense_variant' ${i} | wc -l)
+  MISSENSE_A=$(grep 'missense_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  NONSENSE_V=$(grep '|HIGH|' ${i} | wc -l)
+  NONSENSE_A=$(grep '|HIGH|' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  UCNE_V=$(grep 'UCNE' ${i} | wc -l)
+  UCNE_A=$(grep 'UCNE' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_SYNONYMOUS_V=$(echo "scale=4; $MISSENSE_V/$SYNONYMOUS_V" | bc)
+  MISSENSE_SYNONYMOUS_A=$(echo "scale=4; $MISSENSE_A/$SYNONYMOUS_A" | bc)
+  SYNONYMOUS_INTRONIC_V=$(echo "scale=4; $SYNONYMOUS_V/$INTRONIC_V" | bc)
+  MISSENSE_INTRONIC_V=$(echo "scale=4; $MISSENSE_V/$INTRONIC_V" | bc)
+  echo -e "$SPECIES\t$POPULATION\t$DATASET\t$SAMPLE\t$TOTAL_V\t$TOTAL_A\t$INTERGENIC_V\t$INTERGENIC_A\t$INTRONIC_V\t$INTRONIC_A\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$UCNE_V\t$UCNE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A\t$SYNONYMOUS_INTRONIC_V\t$MISSENSE_INTRONIC_V" >> ${CALLING}"_ann_individual_summary_"${TYPE}".lr_ann.txt"
+  done
+
+#From outside the server:
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov) #c_lp_sm_c_lp_do_nm2_origcov #c_ll_ki_c_ll_no_c_ll_po_nm3_origcov #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov
+scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/testing_variant_numbers/*_ann_individual_summary_SNP.lr_ann.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/testing_variant_numbers/
+
+```
+
+##Visualise derived allele counts.
+```{r Plot variant count results}
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+
+wd_path <- ("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/testing_variant_numbers/")
+variant_files <- grep(list.files("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/testing_variant_numbers/", pattern="*origcov_ann_individual_summary_SNP.lr_ann.txt"),pattern='wrong|nm2nm3',inv=T,value=T)
+substitution_files <- grep(list.files("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/testing_variant_numbers/", pattern="*nm2nm3_origcov_ann_individual_summary_SNP.lr_ann.txt"),pattern='wrong',inv=T,value=T)
+variants_wg <- rbind(read_tsv(paste0(wd_path,grep(variant_files,pattern='c_ll',value=T))),read_tsv(paste0(wd_path,grep(variant_files,pattern='c_lp',value=T))))
+subst_wg <- read_tsv(paste0(wd_path,substitution_files))
+variants_and_subst_wg <- cbind(variants_wg[c(1:4)],variants_wg[-c(1:4,20:23)]+subst_wg[-c(1:4,20:23)])
+
+variants_and_subst_wg$dataset <- as.factor(variants_and_subst_wg$dataset)
+variants_and_subst_wg$dataset = factor(variants_and_subst_wg$dataset,levels=c("REF","GP","5x","MG")) #Reorder factor levels to: REF, GP, 5x, MG
+variants_and_subst_wg$population = factor(variants_and_subst_wg$population,levels=c("ki","no","po","sm","do"))
+print.data.frame(variants_and_subst_wg)
+
+variants_and_subst_wg_varN <- variants_and_subst_wg %>% select(c(1:5,9,12,14,16,18)) %>% gather(feature,N,-species,-population,-dataset,-sample,factor_key=T)
+variants_and_subst_wg_varN
+
+derived_allele_variant_counts_ggplot <- ggplot(data=variants_and_subst_wg_varN, aes(population,N,colour=population)) +
+  facet_grid(feature ~ .,scales="free") +
+  geom_boxplot(width=0.5) +
+  #ggtitle("Proportion of reads at different NM") +
+  ylab("N variants") +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+        rect=element_rect(size=1),
+        axis.line=element_line(colour="black"),
+        axis.title=element_text(size=16),
+        #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+        #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+        #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+        panel.background=element_blank(),
+        panel.border=element_rect(colour="black"),
+        #panel.grid=element_blank(),
+        #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+        plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+        #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+        legend.background=element_rect(linetype="solid", colour="black", size=.5),
+        #legend.justification=c(0,0),
+        legend.key=element_rect(colour="white"),
+        #legend.key.size=unit(1.3,"cm"),
+        #legend.position=c(0.07,0.84),
+        legend.title=element_blank()
+  )
+  derived_allele_variant_counts_ggplot
+ggsave("derived_allele_variant_counts.pdf", width=15, height=20, units="cm", device="pdf", path=wd_path)
+
+
+variants_and_subst_wg_alleleN <- variants_and_subst_wg %>% select(c(1:4,6,10,13,15,17,19)) %>% gather(feature,N,-species,-population,-dataset,-sample,factor_key=T)
+variants_and_subst_wg_alleleN
+
+derived_allele_allele_counts_ggplot <- ggplot(data=variants_and_subst_wg_alleleN, aes(population,N,colour=population)) +
+  #facet_wrap(feature ~ species,nrow=6,ncol=2,scales="free") +
+  facet_grid(feature ~ .,scales="free") +
+  geom_boxplot(width=0.5) +
+  #ggtitle("Proportion of reads at different NM") +
+  ylab("N alleles") +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+        rect=element_rect(size=1),
+        axis.line=element_line(colour="black"),
+        axis.title=element_text(size=16),
+        #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+        #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+        #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+        panel.background=element_blank(),
+        panel.border=element_rect(colour="black"),
+        #panel.grid=element_blank(),
+        #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+        plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+        #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+        legend.background=element_rect(linetype="solid", colour="black", size=.5),
+        #legend.justification=c(0,0),
+        legend.key=element_rect(colour="white"),
+        #legend.key.size=unit(1.3,"cm"),
+        #legend.position=c(0.07,0.84),
+        legend.title=element_blank()
+  )
+  derived_allele_allele_counts_ggplot
+ggsave("derived_allele_allele_counts.pdf", width=15, height=20, units="cm", device="pdf", path=wd_path)
+
+derived_allele_allele_counts_sep_ggplot <- ggplot(data=variants_and_subst_wg_alleleN, aes(population,N,colour=population)) +
+  facet_wrap(feature ~ species,nrow=6,ncol=2,scales="free") +
+  #facet_grid(feature ~ .,scales="free") +
+  geom_boxplot(width=0.5) +
+  #ggtitle("Proportion of reads at different NM") +
+  ylab("N alleles") +
+  theme_bw() +
+  theme(strip.text.x = element_blank(),
+        text=element_text(size=12,face="bold"),
+        rect=element_rect(size=1),
+        axis.line=element_line(colour="black"),
+        axis.title=element_text(size=16),
+        #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+        #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+        #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+        panel.background=element_blank(),
+        panel.border=element_rect(colour="black"),
+        #panel.grid=element_blank(),
+        #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+        plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+        #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+        legend.background=element_rect(linetype="solid", colour="black", size=.5),
+        #legend.justification=c(0,0),
+        legend.key=element_rect(colour="white"),
+        #legend.key.size=unit(1.3,"cm"),
+        #legend.position=c(0.07,0.84),
+        legend.title=element_blank()
+  )
+  derived_allele_allele_counts_sep_ggplot
+ggsave("derived_allele_allele_counts_sep.pdf", width=15, height=20, units="cm", device="pdf", path=wd_path)
+
+variants_and_subst_wg_alleleN <- variants_and_subst_wg %>% select(c(1:4,6,10,13,15,17,19)) %>% gather(feature,N,-species,-population,-dataset,-sample,factor_key=T)
+variants_and_subst_wg_alleleN
+
+
+variants_and_subst_wg_alleleR <- variants_and_subst_wg %>% mutate(syn_intr_R=synonymous_A/intronic_A,mis_intr_R=missense_A/intronic_A,non_intr_R=nonsense_A/intronic_A,UCNE_intr_R=UCNE_A/intronic_A) %>% select(c(1:4,20:23)) %>% gather(ratio,value,-species,-population,-dataset,-sample,factor_key=T)
+variants_and_subst_wg_alleleR
+
+derived_allele_allele_ratio_ggplot <- ggplot(data=variants_and_subst_wg_alleleR, aes(population,value,colour=population)) +
+  #facet_wrap(feature ~ species,nrow=6,ncol=2,scales="free") +
+  facet_grid(ratio ~ .,scales="free") +
+  geom_boxplot(width=0.5) +
+  #ggtitle("Proportion of reads at different NM") +
+  ylab("ratio") +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+        rect=element_rect(size=1),
+        axis.line=element_line(colour="black"),
+        axis.title=element_text(size=16),
+        #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+        #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+        #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+        panel.background=element_blank(),
+        panel.border=element_rect(colour="black"),
+        #panel.grid=element_blank(),
+        #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+        plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+        #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+        legend.background=element_rect(linetype="solid", colour="black", size=.5),
+        #legend.justification=c(0,0),
+        legend.key=element_rect(colour="white"),
+        #legend.key.size=unit(1.3,"cm"),
+        #legend.position=c(0.07,0.84),
+        legend.title=element_blank()
+  )
+  derived_allele_allele_ratio_ggplot
+ggsave("derived_allele_allele_ratio.pdf", width=15, height=15, units="cm", device="pdf", path=wd_path)
+
+
+```
+#EXTRA: Rescue derived positions that were AF=0 (within one species) before polarisation.
+```{r Split the population VCFs into per individual VCFs, eval=FALSE, engine='bash'}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov) #write down name of the calling
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAM files path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+#Obtain list of sites from the joint lp+ll calling that were eventually polarised (AA==ALT).
+$BCF view -i 'INFO/AA==ALT' ${CALLING}"_aafilled.vcf" | grep -v '#' | awk '{printf ("%s\t%s\t%s\n", $1, $2-1, $2)}' > ${CALLING}"_aafilled_polarisable_sites.bed"
+
+#Now intersect it with the file where true variants previously identified through the separate callings have been removed. Thus, only polarised substitutions and polarised sites that are fixed in one species but variable in the other will remain.
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+bedtools intersect -a ${CALLING}"_polarized_filtered6_"$TYPE".lr_ann.vcf" -b ./../${CALLING}"_aafilled_polarisable_sites.bed" -header > ${CALLING}"_polarized_filtered6_polarisable_"$TYPE".lr_ann.vcf"
+
+#Now obtain the AF in each subset (in order to keep only those positions that are fixed in one species but variable in the other).
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING)
+SPECIES=$(echo $CALLING | fold -w8 | cut -c1-4 | head -n$N_POPS | sort | uniq)
+DATASETS=$(for i in ${SPECIES[@]}; do ls ${i}*_samples | cut -d'_' -f1,2,3; done)
+COVERAGE=$(echo "${CALLING}" | rev | cut -d'_' -f1 | rev)
+NM_COV=$(echo "${CALLING}" | rev | cut -d'_' -f1,2 | rev)
+cd $V_PATH/$CALLING/annotation
+for i in ${SPECIES[@]}
+  do
+  echo ${i}
+  rm ${i}"_id_list_to_remove.txt"
+  bcftools query -l ${CALLING}_polarized_filtered6_polarisable_SNP.lr_ann.vcf | cut -c1-12 | sort | uniq | grep ${i} > ${i}"_id_list_to_remove.txt"
+  java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+  -T SelectVariants \
+  -R $REF \
+  -V ${CALLING}_polarized_filtered6_polarisable_SNP.lr_ann.vcf \
+  -o ${CALLING}_polarized_filtered6_polarisable_${i}_SNP.lr_ann.vcf \
+  --sample_file ${i}"_id_list_to_remove.txt"
+  rm ${i}"_id_list_to_remove.txt"
+  grep -v '#' ${CALLING}_polarized_filtered6_polarisable_${i}_SNP.lr_ann.vcf | wc -l #
+  done
+
+#Now create a file that shows each site's AF in each population.
+paste <(grep -v '#' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filtered6_polarisable_c_lp_SNP.lr_ann.vcf | awk -F"\t|;|=" '{printf ("%s\t%s\t%s\t%s\n", $1, $2-1, $2, $13)}') <(grep -v '#' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filtered6_polarisable_c_ll_SNP.lr_ann.vcf | awk -F"\t|;|=" '{printf ("%s\n", $13)}') > c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filtered6_polarisable_SNP.lr_ann.bed
+echo "Iberian lynx has the following amount of lost fixed variants:"
+awk '$4==1.00 && $5>0' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filtered6_polarisable_SNP.lr_ann.bed | wc -l #4541
+#awk '$4==1.00 && $5==0' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filtered6_polarisable_SNP.lr_ann.bed | wc -l #763377 (sustituciones polarizables. Casi todas irán en este sentido, porque el contrario implica errores de referencia... ver más abajo)
+echo "Eurasian lynx has the following amount of lost fixed variants:"
+awk '$5==1.00 && $4>0' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filtered6_polarisable_SNP.lr_ann.bed | wc -l #884
+#awk '$5==1.00 && $4==0' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filtered6_polarisable_SNP.lr_ann.bed | wc -l #6 (tiene sentido que haya pocos, son errores de referencia, ya que esto implica que originalmente lp tenía AF=1)
 
 ```
