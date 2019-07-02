@@ -1267,7 +1267,7 @@ fi
 ```{r Filter the annotated VCF, eval=FALSE, engine='bash'}
 
 CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov) #write down name of the calling
-TYPE=(INDEL) #write down SNP or INDEL
+TYPE=(SNP) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
 screen -S "${CALLING}-${TYPE}"
 CALLING=${STY#*.}
@@ -1648,8 +1648,8 @@ for POP in ${POPS[@]}
 
 #For each dataset obtain the list of positions that have lower (higher) depth than the minimum (maximum) within 0.95 of the distribution, as calculated in the previous section, and join them to later remove them:
 
-CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov) #write down name of the calling
-TYPE=(INDEL) #write down SNP or INDEL
+CALLING=(c_lp_sm_c_lp_do_nm2_origcov) #c_ll_ki_c_ll_no_c_ll_po_nm3_origcov #c_lp_sm_c_lp_do_nm2_origcov
+TYPE=(SNP) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
 screen -S "${CALLING}-${TYPE}"
 CALLING=${STY#*.}
@@ -2594,10 +2594,10 @@ scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dan
 
 
 #EXTRA: Generate a VCF for each individual from data that is less filtered.
-##Whole-genome.
+##Whole-genome, separate calling.
 ```{r Split the population VCFs into per individual VCFs, eval=FALSE, engine='bash'}
 
-CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov) #c_ll_ki_c_ll_no_c_ll_po_nm3_origcov #c_lp_sm_c_lp_do_nm2_origcov
+CALLING=(c_lp_sm_c_lp_do_nm2_origcov) #c_ll_ki_c_ll_no_c_ll_po_nm3_origcov #c_lp_sm_c_lp_do_nm2_origcov
 TYPE=(SNP) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
 screen -S "${CALLING}-${TYPE}"
@@ -2627,7 +2627,7 @@ COVERAGE=$(echo "${CALLING}" | rev | cut -d'_' -f1 | rev)
 NM_COV=$(echo "${CALLING}" | rev | cut -d'_' -f1,2 | rev)
 cd $V_PATH/$CALLING/annotation
 mkdir -p ./testing_variant_numbers/
-INDIVIDUALS=$(bcftools query -l ${CALLING}"_polarized_filtered5_"${TYPE}".lr_ann.vcf" | sort | uniq)
+INDIVIDUALS=$(bcftools query -l ${CALLING}"_polarized_filtered3_"${TYPE}".lr_ann.vcf" | sort | uniq)
 for k in ${INDIVIDUALS[@]}
   do
   echo "${k}"
@@ -2635,10 +2635,58 @@ for k in ${INDIVIDUALS[@]}
   java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
   -T SelectVariants \
   -R $REF \
-  -V ${CALLING}"_polarized_filtered5_"${TYPE}".lr_ann.vcf" \
+  -V ${CALLING}"_polarized_filtered3_"${TYPE}".lr_ann.vcf" \
   -o testing_variant_numbers/${k}"_"${NM_COV}"_individual_"${TYPE}".lr_ann.vcf" \
   -env \
   -sn $ID
+  done
+
+```
+
+##Whole-genome, joint calling.
+```{r Split the population VCFs into per individual VCFs, eval=FALSE, engine='bash'}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov) #write down name of the calling
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+screen -S "${CALLING}-${TYPE}"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAM files path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING)
+SPECIES=$(echo $CALLING | fold -w8 | cut -c1-4 | head -n$N_POPS | sort | uniq)
+DATASETS=$(for i in ${SPECIES[@]}; do ls ${i}*_samples | cut -d'_' -f1,2,3; done)
+COVERAGE=$(echo "${CALLING}" | rev | cut -d'_' -f1 | rev)
+NM_COV=$(echo "${CALLING}" | rev | cut -d'_' -f1,2 | rev)
+cd $V_PATH/$CALLING/annotation
+declare INDIVIDUALS=$(bcftools query -l ${CALLING}"_polarized_filtered3_"${TYPE}".lr_ann.vcf" | cut -c1-12 | sort | uniq)
+for i in ${INDIVIDUALS[@]}
+  do
+  echo "${k}"
+  ID=$(echo "${k}")
+  java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+  -T SelectVariants \
+  -R $REF \
+  -V ${CALLING}"_polarized_filtered3_"${TYPE}".lr_ann.vcf" \
+  -o "testing_variant_numbers/"${i}"_"${NM_COV}"_individual_varssubs_"${TYPE}".lr_ann.vcf" \
+  -env \
+  -sn ${i}
   done
 
 ```
