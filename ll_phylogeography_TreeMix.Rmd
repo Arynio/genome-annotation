@@ -9,8 +9,8 @@ output: html_document
 
 ```{r Define paths, eval=FALSE, engine='bash'}
 
-V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
-O_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/TreeMix #TreeMix analyses output path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+O_PATH=/GRUPOS/grupolince/lynx_genomes_5x/TreeMix #TreeMix analyses output path
 T_PATH=/opt/treemix-1.12/src #TreeMix software path
 REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
 GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
@@ -243,8 +243,8 @@ grep -v ' 0,0 ' SNP_names_treemix_input_intergenic_rooted_wout_ba_w_mo.txt | gre
 
 ```{r Run TreeMix, eval=FALSE, engine='bash'}
 
-V_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
-O_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/TreeMix #TreeMix analyses output path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani #VCFs path
+O_PATH=/GRUPOS/grupolince/lynx_genomes_5x/TreeMix #TreeMix analyses output path
 T_PATH=/opt/treemix-1.12/src #TreeMix software path
 
 #Basic command to build a ML tree
@@ -317,6 +317,20 @@ scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/Tre
 #Copy files for intergenic positions trees:
 scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/TreeMix/intergenic_plus_1000/eurasian_lynx_intergenic_rooted_wout_ba_w_mo_out_stem*migration* /Users/Dani/ownCloud/backup/annotation/TreeMix/intergenic/rooted/wout_ba_w_mo/
 scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/lynx_genomes_5x/TreeMix/intergenic_plus_1000/eurasian_lynx_intergenic_rooted_wout_ba_w_mo_out_stem_2_migration_run* /Users/Dani/ownCloud/backup/annotation/TreeMix/intergenic/rooted/wout_ba_w_mo/independent_m_2_runs
+
+
+#Basic command to build a rooted ML tree, followed by a loop that runs TreeMix with different number of migration events, with a bigger block size
+cd $O_PATH/test_block_size
+screen -S treemix_block_size_test
+script treemix_block_size_test.log
+
+#Basic command to build a rooted ML tree without Balkans and with Mongolia, followed by a loop that runs TreeMix with different number of migration events
+cd $O_PATH/test_block_size
+END=6
+for i in $(seq 0 $END)
+  do echo "migration events number = " $i
+  $T_PATH/treemix -i ./../intergenic_plus_1000/treemix_input_intergenic_rooted_wout_ba_w_mo.txt.gz -root Bobcat -k 1000 -m ${i} -se -o eurasian_lynx_intergenic_rooted_wout_ba_w_mo_out_stem_"${i}"_migration
+  done
 
 ```
 
