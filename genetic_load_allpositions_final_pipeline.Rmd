@@ -1003,14 +1003,14 @@ mv ${CALLING}"_polarized_filtered5_renamed_"${TYPE}".lr_ann.vcf" ${CALLING}"_pol
 #6: Tally sites. Count the number of positions for each category, before and after estimating the depth filter:
 ```{r Filter the annotated VCF, eval=FALSE, engine='bash'}
 
-CALLING=(c_ll_ki_c_ll_no_c_ll_po_all) #c_ll_ki_c_ll_no_c_ll_po_all #c_lp_sm_c_lp_do_all
+CALLING=(c_lp_sm_c_lp_do_all) #c_ll_ki_c_ll_no_c_ll_po_all #c_lp_sm_c_lp_do_all
 TYPE=(SNP) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation
 screen -S "${CALLING}-${TYPE}"
 CALLING=${STY#*.}
 CALLING=${CALLING%-*}
 TYPE=${STY#*-}
-script "${CALLING}_polarized_filtered_${TYPE}.lr_ann.log"
+script "${CALLING}_polarized_filtered_tally_sites_${TYPE}.lr_ann.log"
 CALLING=${STY#*.}
 CALLING=${CALLING%-*}
 TYPE=${STY#*-}
