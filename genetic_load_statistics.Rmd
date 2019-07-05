@@ -2097,17 +2097,18 @@ ggsave("NSYN_SYN_ratio.pdf", width=15, height=10, units="cm", device="pdf", path
 ####Get counts.
 ```{r Get annotation statistics, eval=FALSE, engine='bash'}
 
-CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov) #c_lp_sm_c_lp_do_nm2_origcov #c_ll_ki_c_ll_no_c_ll_po_nm3_origcov #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+VAR=(variants) #varssubs #variants #substitutions
 TYPE=(SNP) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
-screen -S "${CALLING}-${TYPE}"
-CALLING=${STY#*.}
-CALLING=${CALLING%-*}
-TYPE=${STY#*-}
-script "${CALLING}_ann_individual_summary_varssubs_${TYPE}.lr_ann.log"
-CALLING=${STY#*.}
-CALLING=${CALLING%-*}
-TYPE=${STY#*-}
+screen -S "${CALLING}-${VAR}-${TYPE}"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+script "${CALLING}_ann_individual_summary_${VAR}_${TYPE}.lr_ann.log"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
 
 S_PATH=/opt/snpEff #software path
 C_PATH=/home/dkleinman/datos/snpEff #config file path
@@ -2121,9 +2122,9 @@ GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
 BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
 
 cd $V_PATH/$CALLING/annotation
-rm ${CALLING}"_ann_individual_summary_varssubs_"${TYPE}".lr_ann.txt"
-echo -e "species\tpopulation\tdataset\tsample\ttotal_V\ttotal_A\tintergenic_V\tintergenic_A\tintronic_V\tintronic_A\tcoding_V\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tUCNE_V\tUCNE_A\tmissense/synonymous_V\tmissense/synonymous_A\tsynonymous/intronic_V\tmissense/intronic_V" > ${CALLING}"_ann_individual_summary_varssubs_"${TYPE}".lr_ann.txt"
-INDLIST=($(ls `find . -name *"_individual_varssubs_"${TYPE}".lr_ann.vcf" -print`))
+rm ${CALLING}"_ann_individual_summary_"${VAR}"_"${TYPE}".lr_ann.txt"
+echo -e "species\tpopulation\tdataset\tsample\ttotal_V\ttotal_A\tintergenic_V\tintergenic_A\tintronic_V\tintronic_A\tcoding_V\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tUCNE_V\tUCNE_A\tmissense/synonymous_V\tmissense/synonymous_A\tsynonymous/intronic_V\tmissense/intronic_V" > ${CALLING}"_ann_individual_summary_"${VAR}"_"${TYPE}".lr_ann.txt"
+INDLIST=($(ls `find . -name *"_individual_"${VAR}"_"${TYPE}".lr_ann.vcf" ! -path '*testing_variant_numbers*' -print`))
 for i in "${INDLIST[@]}"
   do
   echo "${i}"
@@ -2152,12 +2153,12 @@ for i in "${INDLIST[@]}"
   MISSENSE_SYNONYMOUS_A=$(echo "scale=4; $MISSENSE_A/$SYNONYMOUS_A" | bc)
   SYNONYMOUS_INTRONIC_V=$(echo "scale=4; $SYNONYMOUS_V/$INTRONIC_V" | bc)
   MISSENSE_INTRONIC_V=$(echo "scale=4; $MISSENSE_V/$INTRONIC_V" | bc)
-  echo -e "$SPECIES\t$POPULATION\t$DATASET\t$SAMPLE\t$TOTAL_V\t$TOTAL_A\t$INTERGENIC_V\t$INTERGENIC_A\t$INTRONIC_V\t$INTRONIC_A\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$UCNE_V\t$UCNE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A\t$SYNONYMOUS_INTRONIC_V\t$MISSENSE_INTRONIC_V" >> ${CALLING}"_ann_individual_summary_varssubs_"${TYPE}".lr_ann.txt"
+  echo -e "$SPECIES\t$POPULATION\t$DATASET\t$SAMPLE\t$TOTAL_V\t$TOTAL_A\t$INTERGENIC_V\t$INTERGENIC_A\t$INTRONIC_V\t$INTRONIC_A\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$UCNE_V\t$UCNE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A\t$SYNONYMOUS_INTRONIC_V\t$MISSENSE_INTRONIC_V" >> ${CALLING}"_ann_individual_summary_"${VAR}"_"${TYPE}".lr_ann.txt"
   done
 
 #From outside the server:
-CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov) #c_lp_sm_c_lp_do_nm2_origcov #c_ll_ki_c_ll_no_c_ll_po_nm3_origcov #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov
-scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/*_ann_individual_summary_varssubs_SNP.lr_ann.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/*_ann_individual_summary_*_SNP.lr_ann.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/
 
 ```
 
@@ -2190,7 +2191,8 @@ BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
 cd $V_PATH/$CALLING/annotation/testing_variant_numbers
 rm ${CALLING}"_ann_individual_summary_varssubs_"${TYPE}".lr_ann.txt"
 echo -e "species\tpopulation\tdataset\tsample\ttotal_V\ttotal_A\tintergenic_V\tintergenic_A\tintronic_V\tintronic_A\tcoding_V\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tUCNE_V\tUCNE_A\tmissense/synonymous_V\tmissense/synonymous_A\tsynonymous/intronic_V\tmissense/intronic_V" > ${CALLING}"_ann_individual_summary_varssubs_"${TYPE}".lr_ann.txt"
-INDLIST=($(ls `find . -name *"_individual_varssubs_"${TYPE}".lr_ann.vcf" -print`))
+cd $V_PATH/$CALLING/annotation/
+INDLIST=($(ls `find . -name *"_individual_varssubs_"${TYPE}".lr_ann.vcf" -path '*testing_variant_numbers*' -print`))
 for i in "${INDLIST[@]}"
   do
   echo "${i}"
@@ -2219,7 +2221,7 @@ for i in "${INDLIST[@]}"
   MISSENSE_SYNONYMOUS_A=$(echo "scale=4; $MISSENSE_A/$SYNONYMOUS_A" | bc)
   SYNONYMOUS_INTRONIC_V=$(echo "scale=4; $SYNONYMOUS_V/$INTRONIC_V" | bc)
   MISSENSE_INTRONIC_V=$(echo "scale=4; $MISSENSE_V/$INTRONIC_V" | bc)
-  echo -e "$SPECIES\t$POPULATION\t$DATASET\t$SAMPLE\t$TOTAL_V\t$TOTAL_A\t$INTERGENIC_V\t$INTERGENIC_A\t$INTRONIC_V\t$INTRONIC_A\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$UCNE_V\t$UCNE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A\t$SYNONYMOUS_INTRONIC_V\t$MISSENSE_INTRONIC_V" >> ${CALLING}"_ann_individual_summary_varssubs_"${TYPE}".lr_ann.txt"
+  echo -e "$SPECIES\t$POPULATION\t$DATASET\t$SAMPLE\t$TOTAL_V\t$TOTAL_A\t$INTERGENIC_V\t$INTERGENIC_A\t$INTRONIC_V\t$INTRONIC_A\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$UCNE_V\t$UCNE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A\t$SYNONYMOUS_INTRONIC_V\t$MISSENSE_INTRONIC_V" >> ./testing_variant_numbers/${CALLING}"_ann_individual_summary_varssubs_"${TYPE}".lr_ann.txt"
   done
 
 #From outside the server:
