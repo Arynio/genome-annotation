@@ -341,52 +341,52 @@ for i in $(seq 0 $END)
 library(readr)
 library(ggtree)
 
-local_repo <- file.path("/Users/Dani/ownCloud/backup/annotation/TreeMix/")
+local_repo <- file.path("/Users/Dani/ownCloud/backup/g-w_analysis/TreeMix/")
 #poporder <- c("Balkans","Carpathians","Norway","Bialowieza","Latvia","Kirov","Urals","Tuva","Ömnögovi","Töv","Khentii","Mongolia","Yakutia","Vladivostok","Rufus")
 
-source("/Users/Dani/ownCloud/backup/annotation/TreeMix/plotting_funcs.R")
+source("/Users/Dani/ownCloud/backup/g-w_analysis/TreeMix/plotting_funcs.R")
 pdf(paste0(local_repo,"toy/ll_toy_basic_tree.pdf"),width=20,height=10)
-toy_out_stem <- plot_tree("/Users/Dani/ownCloud/backup/annotation/TreeMix/toy/toy_out_stem")
+toy_out_stem <- plot_tree("/Users/Dani/ownCloud/backup/g-w_analysis/TreeMix/toy/toy_out_stem")
 toy_out_stem
 dev.off()
 
-toy_wout_ba_out_stem <- plot_tree("/Users/Dani/ownCloud/backup/annotation/TreeMix/toy/toy_wout_ba_out_stem")
+toy_wout_ba_out_stem <- plot_tree("/Users/Dani/ownCloud/backup/g-w_analysis/TreeMix/toy/toy_wout_ba_out_stem")
 toy_wout_ba_out_stem
 
 #all Eurasian lynx populations
-source("/Users/Dani/ownCloud/backup/annotation/TreeMix/plotting_funcs.R")
+source("/Users/Dani/ownCloud/backup/g-w_analysis/TreeMix/plotting_funcs.R")
 pdf(paste0(local_repo,"eurasian_lynx_out_stem.pdf"),width=20,height=10)
-eurasian_lynx_out_stem <- plot_tree("/Users/Dani/ownCloud/backup/annotation/TreeMix/all_positions/unrooted/all_pops/eurasian_lynx_out_stem")
+eurasian_lynx_out_stem <- plot_tree("/Users/Dani/ownCloud/backup/g-w_analysis/TreeMix/all_positions/unrooted/all_pops/eurasian_lynx_out_stem")
 eurasian_lynx_out_stem
 dev.off()
 plot_resid(eurasian_lynx_out_stem, poporder)
 
 #all Eurasian lynx populations except for Balkans
-source("/Users/Dani/ownCloud/backup/annotation/TreeMix/plotting_funcs.R")
+source("/Users/Dani/ownCloud/backup/g-w_analysis/TreeMix/plotting_funcs.R")
 pdf(paste0(local_repo,"eurasian_lynx_wout_ba_out_stem.pdf"),width=20,height=10)
-eurasian_lynx_wout_ba_out_stem <- plot_tree("/Users/Dani/ownCloud/backup/annotation/TreeMix/all_positions/unrooted/wout_ba/eurasian_lynx_wout_ba_out_stem")
+eurasian_lynx_wout_ba_out_stem <- plot_tree("/Users/Dani/ownCloud/backup/g-w_analysis/TreeMix/all_positions/unrooted/wout_ba/eurasian_lynx_wout_ba_out_stem")
 eurasian_lynx_wout_ba_out_stem
 dev.off()
 
 #all Eurasian lynx populations, rooted with Lynx rufus, with 0-6 migration events
-source("/Users/Dani/ownCloud/backup/annotation/TreeMix/plotting_funcs.R")
+source("/Users/Dani/ownCloud/backup/g-w_analysis/TreeMix/plotting_funcs.R")
 pdf(paste0(local_repo,"rooted/all_pops/eurasian_lynx_rooted_out_stem_tree.pdf"),width=20,height=10)
-eurasian_lynx_rooted_out_stem <- plot_tree("/Users/Dani/ownCloud/backup/annotation/TreeMix/all_positions/rooted/all_pops/eurasian_lynx_rooted_out_stem")
+eurasian_lynx_rooted_out_stem <- plot_tree("/Users/Dani/ownCloud/backup/g-w_analysis/TreeMix/all_positions/rooted/all_pops/eurasian_lynx_rooted_out_stem")
 eurasian_lynx_rooted_out_stem
 dev.off()
-source("/Users/Dani/ownCloud/backup/annotation/TreeMix/plotting_funcs.R")
+source("/Users/Dani/ownCloud/backup/g-w_analysis/TreeMix/plotting_funcs.R")
 pdf(paste0(local_repo,"all_positions/rooted/all_pops/eurasian_lynx_rooted_out_stem_residuals.pdf"),width=20,height=10)
-eurasian_lynx_rooted_out_stem <- plot_resid("/Users/Dani/ownCloud/backup/annotation/TreeMix/all_positions/rooted/all_pops/eurasian_lynx_rooted_out_stem",paste0(local_repo,"all_positions/rooted/all_pops/migration/pop_order"))
+eurasian_lynx_rooted_out_stem <- plot_resid("/Users/Dani/ownCloud/backup/g-w_analysis/TreeMix/all_positions/rooted/all_pops/eurasian_lynx_rooted_out_stem",paste0(local_repo,"all_positions/rooted/all_pops/migration/pop_order"))
 eurasian_lynx_rooted_out_stem
 dev.off()
 
 for (i in 1:6) {
-  source("/Users/Dani/ownCloud/backup/annotation/TreeMix/plotting_funcs.R")
+  source("/Users/Dani/ownCloud/backup/g-w_analysis/TreeMix/plotting_funcs.R")
   pdf(paste0(local_repo,"all_positions/rooted/all_pops/migration/eurasian_lynx_rooted_out_stem_",i,"_migration_tree.pdf"),width=20,height=10)
   eurasian_lynx_rooted_migration <- plot_tree(paste0(local_repo,"all_positions/rooted/all_pops/migration/eurasian_lynx_rooted_out_stem_",i,"_migration"))
   eurasian_lynx_rooted_migration
   dev.off()
-  source("/Users/Dani/ownCloud/backup/annotation/TreeMix/plotting_funcs.R")
+  source("/Users/Dani/ownCloud/backup/g-w_analysis/TreeMix/plotting_funcs.R")
   pdf(paste0(local_repo,"all_positions/rooted/all_pops/migration/eurasian_lynx_rooted_out_stem_",i,"_migration_residuals.pdf"),width=20,height=10)
   eurasian_lynx_rooted_migration <- plot_resid(paste0(local_repo,"all_positions/rooted/all_pops/migration/eurasian_lynx_rooted_out_stem_",i,"_migration"),paste0(local_repo,"all_positions/rooted/all_pops/migration/pop_order"))
   eurasian_lynx_rooted_migration
@@ -394,31 +394,31 @@ for (i in 1:6) {
 }
 
 # #all Eurasian lynx populations except for Balkans, rooted with Lynx rufus
-# source("/Users/Dani/ownCloud/backup/annotation/TreeMix/plotting_funcs.R")
+# source("/Users/Dani/ownCloud/backup/g-w_analysis/TreeMix/plotting_funcs.R")
 # pdf(paste0(local_repo,"eurasian_lynx_rooted_wout_ba_out_stem.pdf"),width=20,height=10)
-# eurasian_lynx_rooted_wout_ba_out_stem <- plot_tree("/Users/Dani/ownCloud/backup/annotation/TreeMix/eurasian_lynx_rooted_wout_ba_out_stem")
+# eurasian_lynx_rooted_wout_ba_out_stem <- plot_tree("/Users/Dani/ownCloud/backup/g-w_analysis/TreeMix/eurasian_lynx_rooted_wout_ba_out_stem")
 # eurasian_lynx_rooted_wout_ba_out_stem
 # dev.off()
 
 #all Eurasian lynx populations except for Balkans, with Mongolia grouped, rooted with Lynx rufus, with 0-6 migration events
-source("/Users/Dani/ownCloud/backup/annotation/TreeMix/plotting_funcs.R")
+source("/Users/Dani/ownCloud/backup/g-w_analysis/TreeMix/plotting_funcs.R")
 pdf(paste0(local_repo,"all_positions/rooted/wout_ba_w_mo/eurasian_lynx_rooted_wout_ba_w_mo_out_stem_tree.pdf"),width=20,height=10)
-eurasian_lynx_rooted_out_stem <- plot_tree("/Users/Dani/ownCloud/backup/annotation/TreeMix/all_positions/rooted/wout_ba_w_mo/eurasian_lynx_rooted_wout_ba_w_mo_out_stem")
+eurasian_lynx_rooted_out_stem <- plot_tree("/Users/Dani/ownCloud/backup/g-w_analysis/TreeMix/all_positions/rooted/wout_ba_w_mo/eurasian_lynx_rooted_wout_ba_w_mo_out_stem")
 eurasian_lynx_rooted_out_stem
 dev.off()
-source("/Users/Dani/ownCloud/backup/annotation/TreeMix/plotting_funcs.R")
+source("/Users/Dani/ownCloud/backup/g-w_analysis/TreeMix/plotting_funcs.R")
 pdf(paste0(local_repo,"all_positions/rooted/wout_ba_w_mo/eurasian_lynx_rooted_wout_ba_w_mo_out_stem_residuals.pdf"),width=20,height=10)
-eurasian_lynx_rooted_out_stem <- plot_resid("/Users/Dani/ownCloud/backup/annotation/TreeMix/all_positions/rooted/wout_ba_w_mo/eurasian_lynx_rooted_wout_ba_w_mo_out_stem",paste0(local_repo,"all_positions/rooted/wout_ba_w_mo/migration/pop_order"))
+eurasian_lynx_rooted_out_stem <- plot_resid("/Users/Dani/ownCloud/backup/g-w_analysis/TreeMix/all_positions/rooted/wout_ba_w_mo/eurasian_lynx_rooted_wout_ba_w_mo_out_stem",paste0(local_repo,"all_positions/rooted/wout_ba_w_mo/migration/pop_order"))
 eurasian_lynx_rooted_out_stem
 dev.off()
 
 for (i in 1:6) {
-  source("/Users/Dani/ownCloud/backup/annotation/TreeMix/plotting_funcs.R")
+  source("/Users/Dani/ownCloud/backup/g-w_analysis/TreeMix/plotting_funcs.R")
   pdf(paste0(local_repo,"all_positions/rooted/wout_ba_w_mo/migration/eurasian_lynx_rooted_wout_ba_w_mo_out_stem_",i,"_migration_tree.pdf"),width=20,height=10)
   eurasian_lynx_rooted_migration <- plot_tree(paste0(local_repo,"all_positions/rooted/wout_ba_w_mo/migration/eurasian_lynx_rooted_wout_ba_w_mo_out_stem_",i,"_migration"))
   eurasian_lynx_rooted_migration
   dev.off()
-  source("/Users/Dani/ownCloud/backup/annotation/TreeMix/plotting_funcs.R")
+  source("/Users/Dani/ownCloud/backup/g-w_analysis/TreeMix/plotting_funcs.R")
   pdf(paste0(local_repo,"all_positions/rooted/wout_ba_w_mo/migration/eurasian_lynx_rooted_wout_ba_w_mo_out_stem_",i,"_migration_residuals.pdf"),width=20,height=10)
   eurasian_lynx_rooted_migration <- plot_resid(paste0(local_repo,"all_positions/rooted/wout_ba_w_mo/migration/eurasian_lynx_rooted_wout_ba_w_mo_out_stem_",i,"_migration"),paste0(local_repo,"all_positions/rooted/wout_ba_w_mo/migration/pop_order"))
   eurasian_lynx_rooted_migration
@@ -427,24 +427,24 @@ for (i in 1:6) {
 
 
 #intergenic for all Eurasian lynx populations except for Balkans, with Mongolia grouped, rooted with Lynx rufus, with 0-6 migration events
-source("/Users/Dani/ownCloud/backup/annotation/TreeMix/plotting_funcs.R")
+source("/Users/Dani/ownCloud/backup/g-w_analysis/TreeMix/plotting_funcs.R")
 pdf(paste0(local_repo,"intergenic/rooted/wout_ba_w_mo/eurasian_lynx_intergenic_rooted_wout_ba_w_mo_out_stem_tree.pdf"),width=20,height=10)
-eurasian_lynx_rooted_out_stem <- plot_tree("/Users/Dani/ownCloud/backup/annotation/TreeMix/intergenic/rooted/wout_ba_w_mo/eurasian_lynx_intergenic_rooted_wout_ba_w_mo_out_stem")
+eurasian_lynx_rooted_out_stem <- plot_tree("/Users/Dani/ownCloud/backup/g-w_analysis/TreeMix/intergenic/rooted/wout_ba_w_mo/eurasian_lynx_intergenic_rooted_wout_ba_w_mo_out_stem")
 eurasian_lynx_rooted_out_stem
 dev.off()
-source("/Users/Dani/ownCloud/backup/annotation/TreeMix/plotting_funcs.R")
+source("/Users/Dani/ownCloud/backup/g-w_analysis/TreeMix/plotting_funcs.R")
 pdf(paste0(local_repo,"intergenic/rooted/wout_ba_w_mo/eurasian_lynx_intergenic_rooted_wout_ba_w_mo_out_stem_residuals.pdf"),width=20,height=10)
-eurasian_lynx_rooted_out_stem <- plot_resid("/Users/Dani/ownCloud/backup/annotation/TreeMix/intergenic/rooted/wout_ba_w_mo/eurasian_lynx_intergenic_rooted_wout_ba_w_mo_out_stem",paste0(local_repo,"intergenic/rooted/wout_ba_w_mo/migration/pop_order"))
+eurasian_lynx_rooted_out_stem <- plot_resid("/Users/Dani/ownCloud/backup/g-w_analysis/TreeMix/intergenic/rooted/wout_ba_w_mo/eurasian_lynx_intergenic_rooted_wout_ba_w_mo_out_stem",paste0(local_repo,"intergenic/rooted/wout_ba_w_mo/migration/pop_order"))
 eurasian_lynx_rooted_out_stem
 dev.off()
 
 for (i in 0:6) {
-  source("/Users/Dani/ownCloud/backup/annotation/TreeMix/plotting_funcs.R")
+  source("/Users/Dani/ownCloud/backup/g-w_analysis/TreeMix/plotting_funcs.R")
   pdf(paste0(local_repo,"intergenic/rooted/wout_ba_w_mo/eurasian_lynx_intergenic_rooted_wout_ba_w_mo_out_stem_",i,"_migration_tree.pdf"),width=20,height=10)
   eurasian_lynx_rooted_migration <- plot_tree(paste0(local_repo,"intergenic/rooted/wout_ba_w_mo/eurasian_lynx_intergenic_rooted_wout_ba_w_mo_out_stem_",i,"_migration"))
   eurasian_lynx_rooted_migration
   dev.off()
-  source("/Users/Dani/ownCloud/backup/annotation/TreeMix/plotting_funcs.R")
+  source("/Users/Dani/ownCloud/backup/g-w_analysis/TreeMix/plotting_funcs.R")
   pdf(paste0(local_repo,"intergenic/rooted/wout_ba_w_mo/eurasian_lynx_intergenic_rooted_wout_ba_w_mo_out_stem_",i,"_migration_residuals.pdf"),width=20,height=10)
   eurasian_lynx_rooted_migration <- plot_resid(paste0(local_repo,"intergenic/rooted/wout_ba_w_mo/eurasian_lynx_intergenic_rooted_wout_ba_w_mo_out_stem_",i,"_migration"),paste0(local_repo,"intergenic/rooted/wout_ba_w_mo/pop_order"))
   eurasian_lynx_rooted_migration
@@ -452,12 +452,12 @@ for (i in 0:6) {
 }
 
 for (i in 2:10) {
-  source("/Users/Dani/ownCloud/backup/annotation/TreeMix/plotting_funcs.R")
+  source("/Users/Dani/ownCloud/backup/g-w_analysis/TreeMix/plotting_funcs.R")
   pdf(paste0(local_repo,"intergenic/rooted/wout_ba_w_mo/independent_m_2_runs/eurasian_lynx_intergenic_rooted_wout_ba_w_mo_out_stem_2_migration_run_",i,"_tree.pdf"),width=20,height=10)
   eurasian_lynx_rooted_migration <- plot_tree(paste0(local_repo,"intergenic/rooted/wout_ba_w_mo/independent_m_2_runs/eurasian_lynx_intergenic_rooted_wout_ba_w_mo_out_stem_2_migration_run_",i))
   eurasian_lynx_rooted_migration
   dev.off()
-  source("/Users/Dani/ownCloud/backup/annotation/TreeMix/plotting_funcs.R")
+  source("/Users/Dani/ownCloud/backup/g-w_analysis/TreeMix/plotting_funcs.R")
   pdf(paste0(local_repo,"intergenic/rooted/wout_ba_w_mo/independent_m_2_runs/eurasian_lynx_intergenic_rooted_wout_ba_w_mo_out_stem_2_migration_run_",i,"_residuals.pdf"),width=20,height=10)
   eurasian_lynx_rooted_migration <- plot_resid(paste0(local_repo,"intergenic/rooted/wout_ba_w_mo/independent_m_2_runs/eurasian_lynx_intergenic_rooted_wout_ba_w_mo_out_stem_2_migration_run_",i),paste0(local_repo,"intergenic/rooted/wout_ba_w_mo/independent_m_2_runs/pop_order"))
   eurasian_lynx_rooted_migration
@@ -465,9 +465,35 @@ for (i in 2:10) {
 }
 
 
+#intergenic for all Eurasian lynx populations except for Balkans, with Mongolia grouped, rooted with Lynx rufus, with 1000k SNP blocks, with 0-6 migration events
+source("/Users/Dani/ownCloud/backup/g-w_analysis/TreeMix/plotting_funcs.R")
+pdf(paste0(local_repo,"intergenic/rooted/wout_ba_w_mo_1kSNPs/eurasian_lynx_intergenic_rooted_wout_ba_w_mo_out_stem_tree.pdf"),width=20,height=10)
+eurasian_lynx_rooted_out_stem <- plot_tree("/Users/Dani/ownCloud/backup/g-w_analysis/TreeMix/intergenic/rooted/wout_ba_w_mo_1kSNPs/eurasian_lynx_intergenic_rooted_wout_ba_w_mo_out_stem")
+eurasian_lynx_rooted_out_stem
+dev.off()
+source("/Users/Dani/ownCloud/backup/g-w_analysis/TreeMix/plotting_funcs.R")
+pdf(paste0(local_repo,"intergenic/rooted/wout_ba_w_mo_1kSNPs/eurasian_lynx_intergenic_rooted_wout_ba_w_mo_out_stem_residuals.pdf"),width=20,height=10)
+eurasian_lynx_rooted_out_stem <- plot_resid("/Users/Dani/ownCloud/backup/g-w_analysis/TreeMix/intergenic/rooted/wout_ba_w_mo_1kSNPs/eurasian_lynx_intergenic_rooted_wout_ba_w_mo_out_stem",paste0(local_repo,"intergenic/rooted/wout_ba_w_mo_1kSNPs/migration/pop_order"))
+eurasian_lynx_rooted_out_stem
+dev.off()
+
+for (i in 0:6) {
+  source("/Users/Dani/ownCloud/backup/g-w_analysis/TreeMix/plotting_funcs.R")
+  pdf(paste0(local_repo,"intergenic/rooted/wout_ba_w_mo_1kSNPs/eurasian_lynx_intergenic_rooted_wout_ba_w_mo_out_stem_",i,"_migration_tree.pdf"),width=20,height=10)
+  eurasian_lynx_rooted_migration <- plot_tree(paste0(local_repo,"intergenic/rooted/wout_ba_w_mo_1kSNPs/eurasian_lynx_intergenic_rooted_wout_ba_w_mo_out_stem_",i,"_migration"))
+  eurasian_lynx_rooted_migration
+  dev.off()
+  source("/Users/Dani/ownCloud/backup/g-w_analysis/TreeMix/plotting_funcs.R")
+  pdf(paste0(local_repo,"intergenic/rooted/wout_ba_w_mo_1kSNPs/eurasian_lynx_intergenic_rooted_wout_ba_w_mo_out_stem_",i,"_migration_residuals.pdf"),width=20,height=10)
+  eurasian_lynx_rooted_migration <- plot_resid(paste0(local_repo,"intergenic/rooted/wout_ba_w_mo_1kSNPs/eurasian_lynx_intergenic_rooted_wout_ba_w_mo_out_stem_",i,"_migration"),paste0(local_repo,"intergenic/rooted/wout_ba_w_mo_1kSNPs/pop_order"))
+  eurasian_lynx_rooted_migration
+  dev.off()
+}
+
+
 #Visualize trees with ggtree (NOT).
 
-import_tree <- read.tree("/Users/Dani/ownCloud/backup/annotation/TreeMix/intergenic/rooted/wout_ba_w_mo/eurasian_lynx_intergenic_rooted_wout_ba_w_mo_out_stem_3_migration.treeout.gz")
+import_tree <- read.tree("/Users/Dani/ownCloud/backup/g-w_analysis/TreeMix/intergenic/rooted/wout_ba_w_mo/eurasian_lynx_intergenic_rooted_wout_ba_w_mo_out_stem_3_migration.treeout.gz")
 
 basic_ggtree <- ggplot(import_tree) + geom_tree() + theme_tree() + theme_tree2() + geom_tiplab(size=3)
 basic_ggtree
