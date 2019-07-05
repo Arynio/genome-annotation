@@ -2678,8 +2678,7 @@ cd $V_PATH/$CALLING/annotation
 declare INDIVIDUALS=$(bcftools query -l ${CALLING}"_polarized_filtered3_"${TYPE}".lr_ann.vcf" | cut -c1-12 | sort | uniq)
 for i in ${INDIVIDUALS[@]}
   do
-  echo "${k}"
-  ID=$(echo "${k}")
+  echo "${i}"
   java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
   -T SelectVariants \
   -R $REF \
@@ -2691,7 +2690,75 @@ for i in ${INDIVIDUALS[@]}
 
 ```
 
-#Test VEP:
+###Get counts.
+```{r Get annotation statistics, eval=FALSE, engine='bash'}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov) #c_lp_sm_c_lp_do_nm2_origcov #c_ll_ki_c_ll_no_c_ll_po_nm3_origcov #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/testing_variant_numbers
+screen -S "${CALLING}-${TYPE}"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+script "${CALLING}_ann_individual_varssubs_summary_${TYPE}.lr_ann.log"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAM files path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+cd $V_PATH/$CALLING/annotation/testing_variant_numbers
+rm ${CALLING}"_ann_individual_varssubs_summary_"${TYPE}".lr_ann.txt"
+echo -e "species\tpopulation\tdataset\tsample\ttotal_V\ttotal_A\tintergenic_V\tintergenic_A\tintronic_V\tintronic_A\tcoding_V\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tUCNE_V\tUCNE_A\tmissense/synonymous_V\tmissense/synonymous_A\tsynonymous/intronic_V\tmissense/intronic_V" > ${CALLING}"_ann_individual_varssubs_summary_"${TYPE}".lr_ann.txt"
+cd $V_PATH/$CALLING/annotation/
+INDLIST=($(ls `find . -name *"_individual_varssubs_"${TYPE}".lr_ann.vcf" -print`))
+for i in "${INDLIST[@]}"
+  do
+  echo "${i}"
+  ind=$(echo "${i}" | awk -F'[/]' '{print $3}' | cut -c1-12)
+  echo "${ind}"
+  SPECIES=$(echo "${ind}" | cut -c3-4)
+  POPULATION=$(echo "${ind}" | cut -c6-7)
+  DATASET=$(if [ $ind = "c_lp_sm_0221" ]; then echo "REF"; elif [ $ind = "c_ll_ki_0090" ]; then echo "MG"; elif [ $ind = "h_ll_pv_0223" ]; then echo "LD"; elif grep -Fxq $ind /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/c_lp_5x_samples || [ $SPECIES = "ll" ]; then echo "5x"; else echo "GP"; fi)
+  SAMPLE=$(echo "${ind}" | cut -c9-12)
+  TOTAL_V=$(grep -v '#' ${i} | wc -l)
+  TOTAL_A=$(grep -v '#' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  INTERGENIC_V=$(grep 'intergenic' ${i} | wc -l)
+  INTERGENIC_A=$(grep 'intergenic' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  INTRONIC_V=$(grep 'intron_variant' ${i} | wc -l)
+  INTRONIC_A=$(grep 'intron_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  CODING_V=$(grep 'CDS' ${i} | wc -l)
+  SYNONYMOUS_V=$(grep 'synonymous_variant' ${i} | wc -l)
+  SYNONYMOUS_A=$(grep 'synonymous_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_V=$(grep 'missense_variant' ${i} | wc -l)
+  MISSENSE_A=$(grep 'missense_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  NONSENSE_V=$(grep '|HIGH|' ${i} | wc -l)
+  NONSENSE_A=$(grep '|HIGH|' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  UCNE_V=$(grep 'UCNE' ${i} | wc -l)
+  UCNE_A=$(grep 'UCNE' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_SYNONYMOUS_V=$(echo "scale=4; $MISSENSE_V/$SYNONYMOUS_V" | bc)
+  MISSENSE_SYNONYMOUS_A=$(echo "scale=4; $MISSENSE_A/$SYNONYMOUS_A" | bc)
+  SYNONYMOUS_INTRONIC_V=$(echo "scale=4; $SYNONYMOUS_V/$INTRONIC_V" | bc)
+  MISSENSE_INTRONIC_V=$(echo "scale=4; $MISSENSE_V/$INTRONIC_V" | bc)
+  echo -e "$SPECIES\t$POPULATION\t$DATASET\t$SAMPLE\t$TOTAL_V\t$TOTAL_A\t$INTERGENIC_V\t$INTERGENIC_A\t$INTRONIC_V\t$INTRONIC_A\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$UCNE_V\t$UCNE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A\t$SYNONYMOUS_INTRONIC_V\t$MISSENSE_INTRONIC_V" >> ./testing_variant_numbers/${CALLING}"_ann_individual_varssubs_summary_"${TYPE}".lr_ann.txt"
+  done
+
+#From outside the server:
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov) #c_lp_sm_c_lp_do_nm2_origcov #c_ll_ki_c_ll_no_c_ll_po_nm3_origcov #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov
+scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/*_ann_individual_summary_SNP.lr_ann.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/
+
+```
+
+#EXTRA: Test VEP:
 ```{bash}
 
 #It works but we need to build first the SIFT scores database.
@@ -2699,3 +2766,440 @@ docker run -t -i -v $HOME/vep_data:/opt/vep/.vep ensemblorg/ensembl-vep ./vep -i
 
 ```
 
+#EXTRA: Test hard-filters.
+##Joint.
+###Retrieve values for the statistics from the VCFs:
+```{r Split the population VCFs into per individual VCFs, eval=FALSE, engine='bash'}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov) #c_ll_ki_c_ll_no_c_ll_po_nm3_origcov #c_lp_sm_c_lp_do_nm2_origcov #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+mkdir -p testing_hard_filters
+cd testing_hard_filters
+screen -S "${CALLING}-${TYPE}"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+script "${CALLING}_testing_hard_filters_${TYPE}.lr_ann.log"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAM files path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+rm ${CALLING}_testing_hard_filters_${TYPE}.lr_ann.txt
+echo "QUAL"
+grep -v '#' ../${CALLING}_polarized_filtered3_${TYPE}.lr_ann.vcf | awk -F"\t" '{printf ("%s\t%s\t%s\n", "QUAL",$6,"pre")}' >> ${CALLING}_testing_hard_filters_${TYPE}.lr_ann.txt
+echo "pre-filter complete"
+grep -v '#' ../${CALLING}_polarized_filtered4_${TYPE}.lr_ann.vcf | awk -F"\t" '{printf ("%s\t%s\t%s\n", "QUAL",$6,"post")}' >> ${CALLING}_testing_hard_filters_${TYPE}.lr_ann.txt
+echo "post-filter complete"
+ANNOTATIONS=(QD FS MQ MQRankSum ReadPosRankSum)
+for a in ${ANNOTATIONS[@]}
+  do
+  echo "${a}"
+  grep -v '#' ../${CALLING}_polarized_filtered3_${TYPE}.lr_ann.vcf | awk -F"${a}=" '{print $2}' | awk -v ann="$a" -F";" '{printf ("%s\t%s\t%s\n", ann,$1,"pre")}' >> ${CALLING}_testing_hard_filters_${TYPE}.lr_ann.txt
+  echo "pre-filter complete"
+  grep -v '#' ../${CALLING}_polarized_filtered4_${TYPE}.lr_ann.vcf | awk -F"${a}=" '{print $2}' | awk -v ann="$a" -F";" '{printf ("%s\t%s\t%s\n", ann,$1,"post")}' >> ${CALLING}_testing_hard_filters_${TYPE}.lr_ann.txt
+  echo "post-filter complete"
+  done
+echo "SOR"
+grep -v '#' ../${CALLING}_polarized_filtered3_${TYPE}.lr_ann.vcf | awk -F"SOR=" '{print $2}' | awk -F"\t" '{printf ("%s\t%s\t%s\n", "SOR",$1,"pre")}' >> ${CALLING}_testing_hard_filters_${TYPE}.lr_ann.txt
+echo "pre-filter complete"
+grep -v '#' ../${CALLING}_polarized_filtered4_${TYPE}.lr_ann.vcf | awk -F"SOR=" '{print $2}' | awk -F"\t" '{printf ("%s\t%s\t%s\n", "SOR",$1,"post")}' >> ${CALLING}_testing_hard_filters_${TYPE}.lr_ann.txt
+echo "post-filter complete"
+echo "DONE"
+
+#From outside the server:
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov) #c_ll_ki_c_ll_no_c_ll_po_nm3_origcov #c_lp_sm_c_lp_do_nm2_origcov #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov
+scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/testing_hard_filters/${CALLING}_testing_hard_filters*.txt /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/testing_hard_filters
+
+```
+
+###Draw distributions of the statistics.
+```{r Other stuff}
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+
+#Load data from each calling
+lp_distributions <- read_tsv("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/testing_hard_filters/c_lp_sm_c_lp_do_nm2_origcov_testing_hard_filters_SNP.lr_ann.txt",col_names=c("ANN","value","filter"))
+lp_distributions
+
+ll_distributions <- read_tsv("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/testing_hard_filters/c_ll_ki_c_ll_no_c_ll_po_nm3_origcov_testing_hard_filters_SNP.lr_ann.txt",col_names=c("ANN","value","filter"))
+ll_distributions
+
+joint_distributions <- read_tsv("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/testing_hard_filters/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_testing_hard_filters_SNP.lr_ann.txt",col_names=c("ANN","value","filter"))
+joint_distributions
+  
+#Change the following variable to detect the calling and construct the plots:
+calling = "c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov" #c_lp_sm_c_lp_do_nm2_origcov #c_ll_ki_c_ll_no_c_ll_po_nm3_origcov #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov
+if (calling=="c_lp_sm_c_lp_do_nm2_origcov") {
+  distribution_file <- lp_distributions
+} else if (calling=="c_ll_ki_c_ll_no_c_ll_po_nm3_origcov") {
+  distribution_file <- ll_distributions
+} else if (calling=="c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov") {
+  distribution_file <- joint_distributions
+}
+distribution_file$filter = factor(distribution_file$filter,levels=c("pre","post"))
+for (ann in grep("FS|QUAL",unique(distribution_file$ANN),value=TRUE,invert=TRUE)) {
+  distribution_ann <- distribution_file %>% filter(ANN==ann)
+  distribution_ann_ggplot <- ggplot(data=distribution_ann, aes(x=value,colour=filter)) +
+  geom_density() +
+  #scale_x_log10() +
+  xlab(ann) +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+        rect=element_rect(size=1),
+        axis.line=element_line(colour="black"),
+        axis.title=element_text(size=16),
+        #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+        #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+        #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+        panel.background=element_blank(),
+        panel.border=element_rect(colour="black"),
+        #panel.grid=element_blank(),
+        #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+        plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+        #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+        legend.background=element_rect(linetype="solid", colour="black", size=.5),
+        #legend.justification=c(0,0),
+        legend.key=element_rect(colour="white"),
+        #legend.key.size=unit(1.3,"cm"),
+        legend.position=c(0.9,0.9),
+        legend.title=element_blank()
+  )
+  distribution_ann_ggplot
+  ggsave(paste0(calling,"_testing_hard_filters_",ann,".pdf"), width=16, height=14, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/testing_hard_filters/")
+}
+for (ann in grep("FS|QUAL",unique(distribution_file$ANN),value=TRUE)) {
+  distribution_ann <- distribution_file %>% filter(ANN==ann)
+  distribution_ann_ggplot <- ggplot(data=distribution_ann, aes(x=value,colour=filter)) +
+  geom_density() +
+  scale_x_log10() +
+  xlab(ann) +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+        rect=element_rect(size=1),
+        axis.line=element_line(colour="black"),
+        axis.title=element_text(size=16),
+        #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+        #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+        #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+        panel.background=element_blank(),
+        panel.border=element_rect(colour="black"),
+        #panel.grid=element_blank(),
+        #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+        plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+        #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+        legend.background=element_rect(linetype="solid", colour="black", size=.5),
+        #legend.justification=c(0,0),
+        legend.key=element_rect(colour="white"),
+        #legend.key.size=unit(1.3,"cm"),
+        legend.position=c(0.9,0.9),
+        legend.title=element_blank()
+  )
+  distribution_ann_ggplot
+  ggsave(paste0(calling,"_testing_hard_filters_",ann,".pdf"), width=16, height=14, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/testing_hard_filters/")
+}
+
+```
+
+##Separate:
+###Apply separated filters:
+```{r Filter the annotated VCF, eval=FALSE, engine='bash'}
+
+CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov) #write down name of the calling
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+screen -S "${CALLING}-${TYPE}"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome (first eight scaffolds only)
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+echo "Filtering out low QUAL variants"
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T SelectVariants \
+-select "QUAL >= 30" \
+-R $REF \
+-V ${CALLING}"_polarized_filtered3_"${TYPE}".lr_ann.vcf" \
+-o ./testing_hard_filters/${CALLING}"_polarized_filtered4_QUAL_"${TYPE}".lr_ann.vcf"
+
+---
+
+CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov) #write down name of the calling
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+screen -S "${CALLING}-${TYPE}"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome (first eight scaffolds only)
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+echo "Filtering out low QD variants"
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T SelectVariants \
+-select "QD >= 2.0" \
+-R $REF \
+-V ${CALLING}"_polarized_filtered3_"${TYPE}".lr_ann.vcf" \
+-o ./testing_hard_filters/${CALLING}"_polarized_filtered4_QD_"${TYPE}".lr_ann.vcf"
+
+---
+
+CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov) #write down name of the calling
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+screen -S "${CALLING}-${TYPE}"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome (first eight scaffolds only)
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+echo "Filtering out high FS variants"
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T SelectVariants \
+-select "FS <= 60.0" \
+-R $REF \
+-V ${CALLING}"_polarized_filtered3_"${TYPE}".lr_ann.vcf" \
+-o ./testing_hard_filters/${CALLING}"_polarized_filtered4_FS_"${TYPE}".lr_ann.vcf"
+
+---
+
+CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov) #write down name of the calling
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+screen -S "${CALLING}-${TYPE}"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome (first eight scaffolds only)
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+$BCF view -e 'INFO/MQ<40.0' ${CALLING}"_polarized_filtered3_"${TYPE}".lr_ann.vcf" > ./testing_hard_filters/${CALLING}"_polarized_filtered4_MQ_"${TYPE}".lr_ann.vcf"
+
+---
+
+CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov) #write down name of the calling
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+screen -S "${CALLING}-${TYPE}"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome (first eight scaffolds only)
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+echo "Filtering out low MQRankSum variants"
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T SelectVariants \
+-select "MQRankSum >= -12.5" \
+-R $REF \
+-V ${CALLING}"_polarized_filtered3_"${TYPE}".lr_ann.vcf" \
+-o ./testing_hard_filters/${CALLING}"_polarized_filtered4_MQRankSum_"${TYPE}".lr_ann.vcf"
+
+---
+
+CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov) #write down name of the calling
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+screen -S "${CALLING}-${TYPE}"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome (first eight scaffolds only)
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+echo "Filtering out low ReadPosRankSum variants"
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T SelectVariants \
+-select "ReadPosRankSum >= -8.0" \
+-R $REF \
+-V ${CALLING}"_polarized_filtered3_"${TYPE}".lr_ann.vcf" \
+-o ./testing_hard_filters/${CALLING}"_polarized_filtered4_ReadPosRankSum_"${TYPE}".lr_ann.vcf"
+
+---
+
+
+CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov) #write down name of the calling
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+screen -S "${CALLING}-${TYPE}"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome (first eight scaffolds only)
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+echo "Filtering out low quality and unreliable variants"
+$BCF view -e 'QUAL < 30.0 | INFO/QD<2.0 | INFO/FS>60.0 | INFO/MQ<40.0 | INFO/MQRankSum<-12.5 | INFO/ReadPosRankSum<-8.0' ${CALLING}"_polarized_filtered3_"${TYPE}".lr_ann.vcf" > ${CALLING}"_polarized_filtered4bis_"${TYPE}".lr_ann.vcf"
+
+```
+
+###Retrieve values for the statistics from the VCFs:
+```{r Split the population VCFs into per individual VCFs, eval=FALSE, engine='bash'}
+
+CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov) #c_ll_ki_c_ll_no_c_ll_po_nm3_origcov #c_lp_sm_c_lp_do_nm2_origcov #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+mkdir -p testing_hard_filters
+cd testing_hard_filters
+screen -S "${CALLING}-${TYPE}"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+script "${CALLING}_testing_hard_filters_separate_${TYPE}.lr_ann.log"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAM files path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+FILES=$(ls ${CALLING}_polarized_filtered4_*_${TYPE}.lr_ann.vcf)
+for f in ${FILES[@]}
+  do
+  FILTER=$(echo ${f} | cut -d'_' -f14)
+  echo "working with filter:" ${FILTER}
+  rm ${CALLING}_testing_hard_filters_${FILTER}_${TYPE}.lr_ann.txt
+  echo "QUAL"
+  grep -v '#' ../${CALLING}_polarized_filtered3_${TYPE}.lr_ann.vcf | awk -F"\t" '{printf ("%s\t%s\t%s\n", "QUAL",$6,"pre")}' >> ${CALLING}_testing_hard_filters_${FILTER}_${TYPE}.lr_ann.txt
+  echo "pre-filter complete"
+  grep -v '#' ${f} | awk -F"\t" '{printf ("%s\t%s\t%s\n", "QUAL",$6,"post")}' >> ${CALLING}_testing_hard_filters_${FILTER}_${TYPE}.lr_ann.txt
+  echo "post-filter complete"
+  ANNOTATIONS=(QD FS MQ MQRankSum ReadPosRankSum)
+  for a in ${ANNOTATIONS[@]}
+    do
+    echo "${a}"
+    grep -v '#' ../${CALLING}_polarized_filtered3_${TYPE}.lr_ann.vcf | awk -F"${a}=" '{print $2}' | awk -v ann="$a" -F";" '{printf ("%s\t%s\t%s\n", ann,$1,"pre")}' >> ${CALLING}_testing_hard_filters_${FILTER}_${TYPE}.lr_ann.txt
+    echo "pre-filter complete"
+    grep -v '#' ${f} | awk -F"${a}=" '{print $2}' | awk -v ann="$a" -F";" '{printf ("%s\t%s\t%s\n", ann,$1,"post")}' >> ${CALLING}_testing_hard_filters_${FILTER}_${TYPE}.lr_ann.txt
+    echo "post-filter complete"
+    done
+  echo "SOR"
+  grep -v '#' ../${CALLING}_polarized_filtered3_${TYPE}.lr_ann.vcf | awk -F"SOR=" '{print $2}' | awk -F"\t" '{printf ("%s\t%s\t%s\n", "SOR",$1,"pre")}' >> ${CALLING}_testing_hard_filters_${FILTER}_${TYPE}.lr_ann.txt
+  echo "pre-filter complete"
+  grep -v '#' ${f} | awk -F"SOR=" '{print $2}' | awk -F"\t" '{printf ("%s\t%s\t%s\n", "SOR",$1,"post")}' >> ${CALLING}_testing_hard_filters_${FILTER}_${TYPE}.lr_ann.txt
+  echo "post-filter complete"
+  echo ${FILTER} "DONE"
+  done
+
+#From outside the server:
+CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov) #c_ll_ki_c_ll_no_c_ll_po_nm3_origcov #c_lp_sm_c_lp_do_nm2_origcov #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov
+scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/testing_hard_filters/${CALLING}_testing_hard_filters_*_SNP.lr_ann.txt /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/testing_hard_filters
+
+```
+
+###Draw distributions of the statistics.
+```{r Other stuff}
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+
+#Load data from each calling
+distributions <- grep(list.files("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/testing_hard_filters",full.names=T,pattern="*testing_hard_filters*"),pattern="*_SNP.lr_ann.txt",value=T)
+distributions
+for (file in distributions) {
+  distribution_file <- read_tsv(file,col_names=c("ANN","value","statistic"))
+  calling <- strsplit(file,"/|_testing_hard_filters_")[[1]][9]
+  filter <- strsplit(file,"/|_")[[1]][27]
+  distribution_file$statistic = factor(distribution_file$statistic,levels=c("pre","post"))
+  for (ann in grep("FS|QUAL",unique(distribution_file$ANN),value=TRUE,invert=TRUE)) {
+    distribution_ann <- distribution_file %>% filter(ANN==ann)
+    distribution_ann_ggplot <- ggplot(data=distribution_ann, aes(x=value,colour=statistic)) +
+    geom_density() +
+    ggtitle(paste("filtered by",filter)) +
+    xlab(ann) +
+    theme_bw() +
+    theme(text=element_text(size=12,face="bold"),
+          rect=element_rect(size=1),
+          axis.line=element_line(colour="black"),
+          axis.title=element_text(size=16),
+          #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+          #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+          #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+          panel.background=element_blank(),
+          panel.border=element_rect(colour="black"),
+          #panel.grid=element_blank(),
+          #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+          plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+          #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+          legend.background=element_rect(linetype="solid", colour="black", size=.5),
+          #legend.justification=c(0,0),
+          legend.key=element_rect(colour="white"),
+          #legend.key.size=unit(1.3,"cm"),
+          legend.position=c(0.9,0.9),
+          legend.title=element_blank()
+    )
+    distribution_ann_ggplot
+    ggsave(paste0(calling,"_testing_hard_filters_by_",filter,"_showing_",ann,".pdf"), width=16, height=14, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/testing_hard_filters/")
+  }
+  for (ann in grep("FS|QUAL",unique(distribution_file$ANN),value=TRUE)) {
+    distribution_ann <- distribution_file %>% filter(ANN==ann)
+    distribution_ann_ggplot <- ggplot(data=distribution_ann, aes(x=value,colour=statistic)) +
+    geom_density() +
+    scale_x_log10() +
+    ggtitle(paste("filtered by",filter)) +
+    xlab(ann) +
+    theme_bw() +
+    theme(text=element_text(size=12,face="bold"),
+          rect=element_rect(size=1),
+          axis.line=element_line(colour="black"),
+          axis.title=element_text(size=16),
+          #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+          #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+          #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+          panel.background=element_blank(),
+          panel.border=element_rect(colour="black"),
+          #panel.grid=element_blank(),
+          #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+          plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+          #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+          legend.background=element_rect(linetype="solid", colour="black", size=.5),
+          #legend.justification=c(0,0),
+          legend.key=element_rect(colour="white"),
+          #legend.key.size=unit(1.3,"cm"),
+          legend.position=c(0.9,0.9),
+          legend.title=element_blank()
+    )
+    distribution_ann_ggplot
+    ggsave(paste0(calling,"_testing_hard_filters_by_",filter,"_showing_",ann,".pdf"), width=16, height=14, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/testing_hard_filters/")
+  }
+}
+
+```
