@@ -3650,6 +3650,201 @@ for (pop in pops) {
 
 ```
 
+#EXTRA: Test hard-filters.
+##Retrieve values for the statistics from the VCFs:
+```{r Split the population VCFs into per individual VCFs, eval=FALSE, engine='bash'}
+
+CALLING=(c_ll_lp_plus_h_ll)
+/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation
+mkdir -p testing_hard_filters
+cd testing_hard_filters
+screen -S "${CALLING}"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+script "${CALLING}_testing_hard_filters.lr_ann.log"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAM files path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+rm ${CALLING}_testing_hard_filters.lr_ann.txt
+echo "QUAL"
+grep -v '#' ../${CALLING}_polarized_filtered3.lr_ann.vcf | awk -F"\t" '{printf ("%s\t%s\t%s\n", "QUAL",$6,"pre")}' >> ${CALLING}_testing_hard_filters.lr_ann.txt
+echo "pre-filter complete"
+grep -v '#' ../${CALLING}_polarized_filtered4.lr_ann.vcf | awk -F"\t" '{printf ("%s\t%s\t%s\n", "QUAL",$6,"post")}' >> ${CALLING}_testing_hard_filters.lr_ann.txt
+echo "post-filter complete"
+ANNOTATIONS=(QD FS MQ MQRankSum ReadPosRankSum)
+for a in ${ANNOTATIONS[@]}
+  do
+  echo "${a}"
+  grep -v '#' ../${CALLING}_polarized_filtered3.lr_ann.vcf | awk -F"${a}=" '{print $2}' | awk -v ann="$a" -F";" '{printf ("%s\t%s\t%s\n", ann,$1,"pre")}' >> ${CALLING}_testing_hard_filters.lr_ann.txt
+  echo "pre-filter complete"
+  grep -v '#' ../${CALLING}_polarized_filtered4.lr_ann.vcf | awk -F"${a}=" '{print $2}' | awk -v ann="$a" -F";" '{printf ("%s\t%s\t%s\n", ann,$1,"post")}' >> ${CALLING}_testing_hard_filters.lr_ann.txt
+  echo "post-filter complete"
+  done
+echo "SOR"
+grep -v '#' ../${CALLING}_polarized_filtered3.lr_ann.vcf | awk -F"SOR=" '{print $2}' | awk -F"\t" '{printf ("%s\t%s\t%s\n", "SOR",$1,"pre")}' >> ${CALLING}_testing_hard_filters.lr_ann.txt
+echo "pre-filter complete"
+grep -v '#' ../${CALLING}_polarized_filtered4.lr_ann.vcf | awk -F"SOR=" '{print $2}' | awk -F"\t" '{printf ("%s\t%s\t%s\n", "SOR",$1,"post")}' >> ${CALLING}_testing_hard_filters.lr_ann.txt
+echo "post-filter complete"
+echo "DONE"
+
+#From outside the server:
+CALLING=(c_ll_lp_plus_h_ll)
+scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/testing_hard_filters/${CALLING}_testing_hard_filters.lr_ann.txt /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/testing_hard_filters
+
+```
+
+##Draw distributions of the statistics.
+```{r Other stuff}
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+
+#Load data from each calling
+distribution_file <- read_tsv("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/testing_hard_filters/c_ll_lp_plus_h_ll_testing_hard_filters.lr_ann.txt",col_names=c("ANN","value","filter"))
+calling <- "c_ll_lp_plus_h_ll"
+
+#Construct the plots:
+distribution_file$filter = factor(distribution_file$filter,levels=c("pre","post"))
+for (ann in grep("FS|QUAL",unique(distribution_file$ANN),value=TRUE,invert=TRUE)) {
+  distribution_ann <- distribution_file %>% filter(ANN==ann)
+  distribution_ann_ggplot <- ggplot(data=distribution_ann, aes(x=value,colour=filter)) +
+  geom_density() +
+  #scale_x_log10() +
+  xlab(ann) +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+        rect=element_rect(size=1),
+        axis.line=element_line(colour="black"),
+        axis.title=element_text(size=16),
+        #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+        #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+        #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+        panel.background=element_blank(),
+        panel.border=element_rect(colour="black"),
+        #panel.grid=element_blank(),
+        #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+        plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+        #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+        legend.background=element_rect(linetype="solid", colour="black", size=.5),
+        #legend.justification=c(0,0),
+        legend.key=element_rect(colour="white"),
+        #legend.key.size=unit(1.3,"cm"),
+        legend.position=c(0.9,0.9),
+        legend.title=element_blank()
+  )
+  distribution_ann_ggplot
+  ggsave(paste0(calling,"_testing_hard_filters_",ann,".pdf"), width=16, height=14, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/testing_hard_filters/")
+}
+for (ann in grep("FS|QUAL",unique(distribution_file$ANN),value=TRUE)) {
+  distribution_ann <- distribution_file %>% filter(ANN==ann)
+  distribution_ann_ggplot <- ggplot(data=distribution_ann, aes(x=value,colour=filter)) +
+  geom_density() +
+  scale_x_log10() +
+  xlab(ann) +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+        rect=element_rect(size=1),
+        axis.line=element_line(colour="black"),
+        axis.title=element_text(size=16),
+        #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+        #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+        #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+        panel.background=element_blank(),
+        panel.border=element_rect(colour="black"),
+        #panel.grid=element_blank(),
+        #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+        plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+        #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+        legend.background=element_rect(linetype="solid", colour="black", size=.5),
+        #legend.justification=c(0,0),
+        legend.key=element_rect(colour="white"),
+        #legend.key.size=unit(1.3,"cm"),
+        legend.position=c(0.9,0.9),
+        legend.title=element_blank()
+  )
+  distribution_ann_ggplot
+  ggsave(paste0(calling,"_testing_hard_filters_",ann,".pdf"), width=16, height=14, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/testing_hard_filters/")
+}
+
+```
+
+##Apply separated filters:
+```{r Filter the annotated VCF, eval=FALSE, engine='bash'}
+
+CALLING=(c_ll_lp_plus_h_ll)
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation
+mkdir -p testing_hard_filters
+cd testing_hard_filters
+screen -S "${CALLING}"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome (first eight scaffolds only)
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+echo "Filtering out low MQRankSum variants"
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T SelectVariants \
+-select "MQRankSum >= -12.5" \
+-R $REF \
+-V ../${CALLING}"_polarized_filtered3.lr_ann.vcf" \
+-o ${CALLING}"_polarized_filtered4_MQRankSum.lr_ann.vcf"
+
+---
+
+CALLING=(c_ll_lp_plus_h_ll)
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation
+mkdir -p testing_hard_filters
+cd testing_hard_filters
+screen -S "${CALLING}"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome (first eight scaffolds only)
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+echo "Filtering out low ReadPosRankSum variants"
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T SelectVariants \
+-select "ReadPosRankSum >= -8.0" \
+-R $REF \
+-V ../${CALLING}"_polarized_filtered3.lr_ann.vcf" \
+-o ${CALLING}"_polarized_filtered4_ReadPosRankSum.lr_ann.vcf"
+
+---
+
+
+CALLING=(c_ll_ki_c_ll_no_c_ll_po_nm3_origcov) #write down name of the calling
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+screen -S "${CALLING}-${TYPE}"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome (first eight scaffolds only)
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+echo "Filtering out low quality and unreliable variants"
+$BCF view -e 'QUAL < 30.0 | INFO/QD<2.0 | INFO/FS>60.0 | INFO/MQ<40.0 | INFO/MQRankSum<-12.5 | INFO/ReadPosRankSum<-8.0' ${CALLING}"_polarized_filtered3_"${TYPE}".lr_ann.vcf" > ${CALLING}"_polarized_filtered4bis_"${TYPE}".lr_ann.vcf"
+
+```
+
 
 #Old & obsolete code:
 ##Split the VCF into per population VCFs. Generate a VCF for each population.
