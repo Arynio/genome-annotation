@@ -1,5 +1,5 @@
 ---
-title: "genetic_load_variants_final_pipeline"
+title: "genetic_load_substitutions_final_pipeline"
 author: "Dani"
 date: "14 de enero de 2019"
 output: html_document
@@ -1007,7 +1007,7 @@ grep -v '#' "${CALLING}_polarized.lr_ann.vcf" | wc -l
 ```{r Filter the annotated VCF, eval=FALSE, engine='bash'}
 
 CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov) #write down name of the calling
-TYPE=(INDEL) #write down SNP or INDEL
+TYPE=(SNP) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
 screen -S "${CALLING}-${TYPE}"
 CALLING=${STY#*.}
@@ -1049,7 +1049,7 @@ if [ $TYPE != "SNP" ] && [ $TYPE != "INDEL" ] #Don't apply filters if $TYPE is i
     
     grep -v '#' ${CALLING}"_polarized_filtered1.lr_ann.vcf" | wc -l
     #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov (XL nr filtered) 5671908
-    #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov (XL nr filtered) 5784144
+    #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov 5783764
     #It has more than the unfiltered one due to some weird behaviour of bedtools subtract with some INDELs that become duplicated. These will be removed in the subsequent step.
 
   fi
@@ -1081,7 +1081,7 @@ if [ $TYPE != "SNP" ] && [ $TYPE != "INDEL" ] #Don't apply filters if $TYPE is i
   -T SelectVariants \
   -select "QUAL >= 30 && QD >= 2.0 && FS <= 60.0 && MQ >= 40.0 && MQRankSum >= -12.5 && ReadPosRankSum >= -8.0" \
   -R $REF \
-  -V ${CALLING}"_polarized_filtered3_"${TYPE}"L.lr_ann.vcf" \
+  -V ${CALLING}"_polarized_filtered3_"${TYPE}".lr_ann.vcf" \
   -o ${CALLING}"_polarized_filtered4_"${TYPE}".lr_ann.vcf"
   
   grep -v '#' ${CALLING}"_polarized_filtered4_"${TYPE}".lr_ann.vcf" | wc -l 
