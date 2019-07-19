@@ -1,0 +1,25 @@
+---
+title: "provean_database"
+author: "Dani"
+date: "8 de julio de 2019"
+output: html_document
+---
+
+
+
+#0: Set up.
+##Define variables
+```{bash}
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation
+grep '#' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filtered5_SNP.lr_ann.vcf > kaka.vcf
+grep 'missense_variant' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filtered5_SNP.lr_ann.vcf | tail -n1 >> kaka.vcf
+
+bedtools intersect -wa -a /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.all.fix.nr.gff3 -b kaka.vcf | grep 'CDS' > cds_kaka.bed
+bedtools getfasta -fi /GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa -bed cds_kaka.bed -fo cds_kaka.fa
+
+curl -s -d "dna_sequence=ATCGGGGATATTGCCGACATCACTGGT&output_format=fasta" https://web.expasy.org/cgi-bin/translate/dna2aa.cgi > web_kaka.fasta
+#Then GREP 5'3' if strand is + and 3'5' if strand is -. GREP Frame 1 if frame is 0, Frame 2 if frame is 1, and Frame 3 if frame is 2.
+
+
+```
