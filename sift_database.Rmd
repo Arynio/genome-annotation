@@ -1,42 +1,90 @@
 ---
 title: "sift_database"
 author: "Dani"
-date: "14 de enero de 2019"
+date: "8 de julio de 2019"
 output: html_document
 ---
 
-To install and configure the SIFT database builder, I'll follow instructions from here: https://github.com/pauline-ng/SIFT4G_Create_Genomic_DB/blob/master/README.md
+This script should be run in the ubuntu virtual machine that the informaticians built for me (IP: 10.50.0.65). The bioinformatician installed the SIFT algorithm and SIFT database for me following these links:
+To install and configure the SIFT database builder: https://github.com/pauline-ng/SIFT4G_Create_Genomic_DB/blob/master/README.md
+To install the SIFT algorithm:
+https://github.com/rvaser/sift4g
 
-#1:
+#0: Set up.
+##Define variables
 ```{bash}
 
-#1. First install the SIFT algorithm and the SIFT database builder, and make the parent directory for the Lynx pardinus database:
-git clone --recursive https://github.com/rvaser/sift4g.git /Users/dani/opt/sift4g
-cd /Users/dani/opt/sift4g/
-make release #fails. It needs a gcc+ compiler which is not present in mac. I'll have to move to the server if possible...
-git clone https://github.com/pauline-ng/SIFT4G_Create_Genomic_DB.git /Users/dani/opt/scripts_to_build_SIFT_db
-mkdir /Users/dani/opt/scripts_to_build_SIFT_db/lynx_pardinus
+ssh dkleinman@10.50.0.65
 
-#2. Then follow the instructions in the section called "Making a SIFT database from genomic DNA (.fa.gz) and gene annotation file (.gff)".
-##2A. The first step involves installing gffread to convert from .gff3 to .gtf:
+W_PATH=/home/dkleinman/scripts_to_build_SIFT_db/lynx_pardinus
+mkdir $W_PATH
+mkdir -p $W_PATH/gene-annotation-src
+mkdir -p $W_PATH/chr-src
+
+```
+
+##Check the installation of the SIFT algorithm programme.
+```{bash}
+
+#Test SIFT 4G:
+cd /home/dkleinman/sift4g
+./bin/sift4g -q ./test_files/query.fasta --subst ./test_files/ -d ./test_files/sample_protein_database.fa
+
+#To get all 20 amino acid predictions for every position, don't pass in a substitution file::
+cd /home/dkleinman/sift4g
+./bin/sift4g -q ./test_files/query.fasta -d ./test_files/sample_protein_database.fa
+
+#It works fine!
+
+wget ftp://ftp.uniprot.org/pub/databases/uniprot/uniref/uniref90/uniref90.fasta.gz
+
+```
+
+##Download the protein database.
+```{bash}
+
+#The SIFT4G manual recommends UniProt 90, so I download that one from the website:
+cd /home/dkleinman/sift4g
+wget ftp://ftp.uniprot.org/pub/databases/uniprot/uniref/uniref90/uniref90.fasta.gz
+
+```
+
+##Prepare the annotation and the fasta files. Follow the instructions in the SIFT database manual, section "Making a SIFT database from genomic DNA (.fa.gz) and gene annotation file (.gff)".
+```{bash}
+
+W_PATH=/home/dkleinman/scripts_to_build_SIFT_db/lynx_pardinus
+
+#The first step involves installing (in local) gffread to convert from .gff3 to .gtf:
 /Users/dani/opt
 git clone https://github.com/gpertea/gclib
 git clone https://github.com/gpertea/gffread
 cd gffread
 make release
 
-##2B. Next, obtain the annotation .gtf file:
-cd /Users/dani/opt/scripts_to_build_SIFT_db/lynx_pardinus
-scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.all.fix.nr.gff3 /Users/dani/opt/scripts_to_build_SIFT_db/lynx_pardinus #first download the .gff3 from the server
+#Next, obtain the annotation .gtf file and upload it to the server:
+scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.all.fix.nr.gff3 /Users/dani/opt/scripts_to_build_SIFT_db/lynx_pardinus #first download the .gff3 from the server to local
 /Users/dani/opt/gffread/gffread LYPA23C.all.fix.nr.gff3 -T -o LYPA23C.all.fix.nr.gene.gtf #convert it to .gtf using gffread
 awk -F'\t' -v OFS='\t' '$3 == "exon" || $4 == "CDS" { $9=$9 "gene_biotype \"protein_coding\";" }1' < LYPA23C.all.fix.nr.gene.gtf > LYPA23C.all.fix.nr.gtf #add the text 'gene_biotype " protein_coding";' to the 9th column, as the guide indicates
 gzip LYPA23C.all.fix.nr.gtf
+scp LYPA23C.all.fix.nr.gtf.gz dkleinman@10.50.0.65:/$W_PATH/gene-annotation-src #upload from local to the virtual box
 
-#3. Then follow the instructions in the section called "Making a SIFT database from local genomic and gene annotation file (.gtf)".
-##3A. First create a config file, manually editing the fields with nano.
-cd /Users/dani/opt/scripts_to_build_SIFT_db/test_files/
-cp homo_sapiens-test.txt lynx_pardinus-test.txt
-nano lynx_pardinus-test.txt #substitute the contents of the file with the following variables:
+#Finally, copy the reference fasta:
+scp dkleinman@genomics-b.ebd.csic.es:/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa $W_PATH/chr-src
+gzip lp23.fa
+
+```
+
+##Prepare the config file. Follow the instructions in the SIFT database manual, section "Making a SIFT database from local genomic and gene annotation file (.gtf)".
+```{bash}
+
+#First create a config file, manually editing the fields with nano.
+W_PATH=/home/dkleinman/scripts_to_build_SIFT_db/lynx_pardinus
+cd $W_PATH
+cp /home/dkleinman/scripts_to_build_SIFT_db/test_files/homo_sapiens-test.txt lynx_pardinus-config.txt
+
+#Then substitute the contents of the file using nano with the following variables:
+nano lynx_pardinus-config.txt 
+#General fields
 GENETIC_CODE_TABLE=1
 GENETIC_CODE_TABLENAME=Standard
 MITO_GENETIC_CODE_TABLE=2
@@ -48,11 +96,11 @@ ORG_VERSION=lp23
 DBSNP_VCF_FILE=
 
 #Running SIFT 4G
-SIFT4G_PATH=PENDIENTE!
-PROTEIN_DB=
+SIFT4G_PATH=/home/dkleinman/sift4g/bin/sift4g
+PROTEIN_DB=/home/dkleinman/sift4g/uniref90.fasta.gz
 COMPUTER=Dani
 
-# Sub-directories, don't need to change
+#Sub-directories, don't need to change
 GENE_DOWNLOAD_DEST=gene-annotation-src
 CHR_DOWNLOAD_DEST=chr-src
 LOGFILE=Log.txt
@@ -65,13 +113,33 @@ SINGLE_REC_BY_CHR_DIR=singleRecords
 SINGLE_REC_WITH_SIFTSCORE_DIR=singleRecords_with_scores
 DBSNP_DIR=dbSNP
 
-# Doesn't need to change
+#Doesn't need to change
 FASTA_LOG=fasta.log
 INVALID_LOG=invalid.log
 PEPTIDE_LOG=peptide.log
 ENS_PATTERN=ENS
 SINGLE_RECORD_PATTERN=:change:_aa1valid_dbsnp.singleRecord
 
+```
+
+##Check the installation of the SIFT database builder by running the test example.
+```{bash}
+
+W_PATH=/home/dkleinman/scripts_to_build_SIFT_db/lynx_pardinus
+cd $W_PATH/../
+screen -S make-SIFT-db-all-homo_sapiens-test.log
+script make-SIFT-db-all-homo_sapiens-test.log
+perl make-SIFT-db-all.pl -config test_files/homo_sapiens-test.txt
 
 ```
 
+##Build the Iberian lynx SIFT database.
+```{bash}
+
+W_PATH=/home/dkleinman/scripts_to_build_SIFT_db/lynx_pardinus
+cd $W_PATH/../
+screen -S make-SIFT-db-all-lynx_pardinus-db.log
+script make-SIFT-db-all-lynx_pardinus-db.log
+perl make-SIFT-db-all.pl -config lynx_pardinus/lynx_pardinus-config.txt
+
+```
