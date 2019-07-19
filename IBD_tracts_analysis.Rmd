@@ -422,3 +422,98 @@ for i in ${INDIVIDUALS[@]}
 
 ```
 
+##Generate the distribution of IBD tracts.
+
+```{bash}
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/ngsF-HMM
+screen -S ibdtract_interval_counts.log
+script ibdtract_interval_counts.log
+
+rm ibdtract_interval_counts.txt
+echo "tract_length\tn\tind" > ibdtract_interval_counts.txt
+INDIVIDUALS=$(ls `find . -name '*.ibdtract.bed' -path '*_ibdtracts/*' -print`)
+for i in ${INDIVIDUALS[@]}
+  do
+  ind=$(echo ${i} | cut -d'/' -f3 | cut -d'.' -f1)
+  echo "processing individual" ${ind}
+  cat ${i} | cut -f4 | sort -n | uniq -c > ${i/.ibdtract.bed/.ibdtract_counts.bed}
+  awk -v ind=$ind '{ 
+   if      ($2 < 1000) first+=$1
+   else if ($2 >= 1000 && $2 < 10000)
+   second+=$1
+   else if ($2 >= 10000 && $2 < 100000)      
+   third+=$1
+   else if ($2 >= 100000 && $2 < 1000000)
+   fourth+=$1
+   else if ($2 >= 1000000)
+   fifth+=$1
+   } END {
+   printf "%s\t%d\t%s\n%s\t%d\t%s\n%s\t%d\t%s\n%s\t%d\t%s\n%s\t%d\t%s\n", "<1000",first,ind,"<10000",second,ind,"<100000",third,ind,"<1000000",fourth,ind,">1000000",fifth,ind
+   }' ${i/.ibdtract.bed/.ibdtract_counts.bed} >> ibdtract_interval_counts.txt
+   done
+
+#From outside the server:
+scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/ngsF-HMM/ibdtract_interval_counts.txt /Users/dani/ownCloud/backup/g-w_analysis/IBD_analysis/ngsF-HMM/
+
+
+```
+
+##Plot tract length distribution.
+
+```{r}
+
+library("readr")
+library("ggplot2")
+library("dplyr")
+library("ggrepel")
+
+ibd_tract <- read_tsv ("/Users/dani/ownCloud/backup/g-w_analysis/IBD_analysis/ngsF-HMM/ibdtract_interval_counts.txt", col_names = T)
+
+PENSAR CÓMO DIBUJARLO
+
+#First draw the NM distribution for each individual:
+sample_files <- list.files("/Users/Dani/ownCloud/backup/contamination/edit_distance_tests/", pattern="*distr.genes.txt")
+for (file in sample_files) {
+  edit_distance_distribution <- read_tsv(paste0("/Users/Dani/ownCloud/backup/contamination/edit_distance_tests/",file),col_names=c("NM"))
+  edit_distance_distribution
+  sample <- strsplit(file,"_")[[1]][4]
+  print(sample)
+  plot_data <- edit_distance_distribution %>% group_by(NM) %>% tally()
+  plot_data
+  #edit_distance_distribution$pop <- as.factor(edit_distance_distribution$pop)
+  #plot_data <- edit_distance_distribution %>% filter(edit_distance_distribution$pop == !!pop) #the two !! allow R to evaluate the text and distinguish looping variables from col_names
+  #plot_data
+  NM_distr_ggplot <- ggplot(data=plot_data, aes(NM,n)) +
+  #geom_histogram(aes(NM),binwidth=1) +
+  geom_col() +
+  ggtitle(paste0("NM distribution for ",sample)) +
+  ylab("count") +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+        rect=element_rect(size=1),
+        axis.line=element_line(colour="black"),
+        axis.title=element_text(size=16),
+        #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+        #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+        #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+        panel.background=element_blank(),
+        panel.border=element_rect(colour="black"),
+        #panel.grid=element_blank(),
+        #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+        plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+        #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+        legend.background=element_rect(linetype="solid", colour="black", size=.5),
+        #legend.justification=c(0,0),
+        legend.key=element_rect(colour="white"),
+        #legend.key.size=unit(1.3,"cm"),
+        legend.position=c(0.92,0.86),
+        legend.title=element_blank()
+  )
+  NM_distr_ggplot
+  ggsave(paste0("c_lp_do_",sample,"_NM_distribution.genes.pdf"), width=30, height=20, units="cm", device="pdf", path="/Users/Dani/ownCloud/backup/contamination/edit_distance_tests")
+}
+rm(edit_distance_distribution)
+
+
+```
