@@ -5,64 +5,48 @@ date: "8 de julio de 2019"
 output: html_document
 ---
 
-
-
-
+#1: Build Provean database.
+##Generate for each gene a file with its aminoacid changes (in the format required by Provean).
 ```{bash}
 
 mkdir -p /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean
 
------------ Adapt coordinates to exon approach:
+#Create library with aminoacid codes
+echo -e "Ala\tA\nCys\tC\nAsp\tD\nGlu\tE\nPhe\tF\nGly\tG\nHis\tH\nIle\tI\nLys\tK\nLeu\tL\nMet\tM\nAsn\tN\nPro\tP\nGln\tQ\nArg\tR\nSer\tS\nThr\tT\nVal\tV\nTrp\tW\nTyr\tY" > aminoacid_codes.txt
 
-#Retrieve all missense variants
-grep '#' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filtered5_SNP.lr_ann.vcf > missense_variants.vcf
-grep 'missense_variant' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filtered5_SNP.lr_ann.vcf >> missense_variants.vcf
+#Obtain from the VCF the list of genes with missense variants, and their aminoacid changes
+grep -v '#' missense_variants.vcf | awk -F"\t|\\\\|" '{printf ("%s\t%s\t%s\t%s\n", $1,$2,$11,$18)}' | awk -F"\t" '{OFS = FS} { gsub(/p\./,"", $4); print }' > missense_variants_gene_names.txt
 
-#Obtain their exon's coordinates
-bedtools intersect -a /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.all.fix.nr.gff3 -b missense_variants.vcf -wa -wb | cut -f -9,11 | grep 'CDS' > missense_variants_cds.bed
+#Replace three-letter codes with one-letter ones
+TRI_CODES=$(cut aminoacid_codes.txt -f 1)
+for aatri in ${TRI_CODES[@]}
+  do
+  aamono=$(grep ${aatri} aminoacid_codes.txt | cut -f 2)
+  echo "${aatri} -> ${aamono}"
+  sed -i -e "s/$aatri/$aamono/g" missense_variants_gene_names.txt
+  done
 
-bedtools intersect -a /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.all.fix.nr.gff3 -b missense_variants.vcf -wa -wb | cut -f -9,11,17 | awk -F"\t|\\\\|" '{printf ("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$21)}' | grep 'CDS' > missense_variants_cds.bed
+#Extract all variants from each gene and store them in variant files
+GENES=$(cat missense_variants_gene_names.txt | cut -f 3 | uniq)
+for gen in ${GENES[@]}
+  do
+  echo "$gen"
+  grep "$gen" missense_variants_gene_names.txt | cut -f 4 > genes_variants/"$gen".var
+  done
 
-bedtools intersect -a /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.all.fix.nr.gff3 -b missense_variants.vcf -wa -wb | cut -f -9,11,17 | awk -F"\t|\\\\|" '{printf ("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$21)}' | grep 'CDS' | less -S
+```
 
-#Obtain the exons' sequences from the reference
-bedtools getfasta -fi /GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa -bed missense_variants_cds.bed -fo missense_variants_cds.fa
+##Generate for each gene a fasta file with its protein sequence.
+```{bash}
 
-curl -s -d "dna_sequence=ATCGGGGATATTGCCGACATCACTGGT&output_format=fasta" https://web.expasy.org/cgi-bin/translate/dna2aa.cgi > web_kaka.fasta
-#Then GREP 5'3' if strand is + and 3'5' if strand is -. GREP Frame 1 if frame is 0, Frame 2 if frame is 1, and Frame 3 if frame is 2.
-
-
-#Posición 10:
-#
-#AAG.AAG.AAG.AAG Pauta 0: aa4. (10-0)/3=3.33 -> 4
-#A.AGA.AGA.AGA.AG Pauta 1: aa3. (10-1)/3=3 -> 3
-#AA.GAA.GAA.GAA.G Pauta 2: aa3. (10-2)/3=2.66 -> 3
-#
-#Posición 9:
-#
-#AAG.AAG.AAG.AAG Pauta 0: aa3. (9-0)/3=3 -> 3
-#A.AGA.AGA.AGA.AG Pauta 1: aa3. (9-1)/3=2.66 -> 3
-#AA.GAA.GAA.GAA.G Pauta 2: aa3. (9-2)/3=2.33 -> 3
-#
-#Posición 8:
-#
-#AAG.AAG.AAG.AAG Pauta 0: aa3. (8-0)/3=2.66 -> 3
-#A.AGA.AGA.AGA.AG Pauta 1: aa3. (8-1)/3=2.33 -> 3
-#AA.GAA.GAA.GAA.G Pauta 2: aa2. (8-2)/3=2 -> 2
-
-
------------- Fuse exons approach:
-
-#Obtain list of genes
-grep -v '#' missense_variants.vcf | awk -F"\t|\\\\|" '{printf ("%s\t%s\t%s\n", $1,$2,$11)}' > missense_variants_gene_names.txt
-
-#Obtain coordinates of all CDS from all genes in the list
+#Obtain coordinates for all CDS from all genes in the list
 GENES=$(cat missense_variants_gene_names.txt | cut -f 3 | uniq)
 COUNTER=0
 rm missense_variants_cds_list.gff3
 for gen in ${GENES[@]}
   do
+  #echo "${gen}"
   grep "$gen" /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.all.fix.nr.gff3 | awk -v gene_name=$gen '$3 == "CDS" {printf ("%s\t%s\n", $0,gene_name)}' >> missense_variants_cds_list.gff3
   ((COUNTER++))
   if [ $(( $COUNTER % 10 )) == 0 ]
@@ -71,40 +55,30 @@ for gen in ${GENES[@]}
   fi
   done
 
-#Obtain sequences from all CDS
+#Retrieve reference sequences for all CDS (from the rufus reference fasta to account for polarisation)
 bedtools getfasta -fi /GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa -bed missense_variants_cds_list.gff3 -fo missense_variants_cds_sequence.fa
 
-#Paste each row's sequence to the rest of the information in the gff
+#Paste each CDS' sequence with the rest of the information in the gff
 paste missense_variants_cds_list.gff3 <(grep -v '>' missense_variants_cds_sequence.fa) > missense_variants_cds_list_and_sequence.gff3
-
-#Remove the non-coding SNPs (to account for the reading frame)
-#rm missense_variants_cds_list_and_sequence_clean.gff3
-#while read -r row; do
-#  CUT_N=$(echo "$row" | cut -f 8)
-#  CUT_N=$((CUT_N+1))
-#  STRAND=$(echo "$row" | cut -f 7)
-#  if [ $STRAND == "+" ]
-#    then
-#    CODING_SEQUENCE=$(echo "$row" | cut -f 11 | cut -c $CUT_N-)
-#  elif [ $STRAND == "-" ]
-#    then
-#    CODING_SEQUENCE=$(echo "$row" | cut -f 11 | rev | cut -c $CUT_N- | rev)
-#  fi
-#  echo "$row" | awk -v coding=$CODING_SEQUENCE '{printf ("%s\t%s\n",$0,coding)}' >> missense_variants_cds_list_and_sequence_clean.gff3
-#done < missense_variants_cds_list_and_sequence.gff3
 
 #Fuse all exons from each gene and store them in a file together with the gene name and the strand information
 GENES=$(cat missense_variants_cds_list_and_sequence.gff3 | cut -f 10 | uniq)
+COUNTER=0
 rm missense_variants_cds_list_and_sequence_combined.txt
 for gen in ${GENES[@]}
   do
-  echo "${gen}"
+  #echo "${gen}"
   STRAND=$(awk -F"\t" -v gen=$gen '$10 == gen' missense_variants_cds_list_and_sequence.gff3 | shuf -n1 | cut -f 7)
   CODING_SEQUENCE=$(awk -F"\t" -v gen=$gen '$10 == gen {print $11}' missense_variants_cds_list_and_sequence.gff3 | tr -d '\n')
   echo -e "$gen\t$STRAND\t$CODING_SEQUENCE" >> missense_variants_cds_list_and_sequence_combined.txt
+  ((COUNTER++))
+  if [ $(( $COUNTER % 10 )) == 0 ]
+    then
+    echo "processed $COUNTER genes out of $(echo "$GENES" | wc -l)"
+  fi
   done
 
-#Translate the exons to proteins and store each protein in a fasta file
+#Translate the exons to proteins using an external website and store each protein in a fasta file
 while read -r entry; do
   GENE=$(echo "$entry" | cut -f 1)
   echo $GENE
@@ -114,12 +88,29 @@ while read -r entry; do
   #echo $CODING_SEQUENCE
   if [ $STRAND == "+" ]
     then
-    curl -s -d "dna_sequence=$CODING_SEQUENCE&output_format=fasta" https://web.expasy.org/cgi-bin/translate/dna2aa.cgi | awk '/:5'\''3'\'' Frame 1$/,/:5'\''3'\'' Frame 2$/' | head -n-1 > genes_fasta/"$GENE".fa
+    curl -s -d "dna_sequence=$CODING_SEQUENCE&output_format=fasta" https://web.expasy.org/cgi-bin/translate/dna2aa.cgi | awk '/:5'\''3'\'' Frame 1$/,/:5'\''3'\'' Frame 2$/' | head -n-1 | sed -r '/^\s*$/d' | sed '$ s/.$//' | sed 's/-/X/g' > genes_fasta/"$GENE".fa #sends the DNA sequence to the expasy website, then selects the lines for the proper strand (here: +) between the header for Frame 1 and the header for Frame 2, then removes the header for Frame 2, then removes any empty line that may exist, then removes the last character (the hyphen that marks the end of the protein), then replaces any other existing hyphen by an X (unknown aminoacid) so that Provean doesn't crash
   elif [ $STRAND == "-" ]
     then
-    curl -s -d "dna_sequence=$CODING_SEQUENCE&output_format=fasta" https://web.expasy.org/cgi-bin/translate/dna2aa.cgi | awk '/:3'\''5'\'' Frame 1$/,/:3'\''5'\'' Frame 2$/' | head -n-1 > genes_fasta/"$GENE".fa
+    curl -s -d "dna_sequence=$CODING_SEQUENCE&output_format=fasta" https://web.expasy.org/cgi-bin/translate/dna2aa.cgi | awk '/:3'\''5'\'' Frame 1$/,/:3'\''5'\'' Frame 2$/' | head -n-1 | sed -r '/^\s*$/d' | sed '$ s/.$//' | sed 's/-/X/g' > genes_fasta/"$GENE".fa #sends the DNA sequence to the expasy website, then selects the lines for the proper strand (here: -) between the header for Frame 1 and the header for Frame 2, then removes the header for Frame 2, then removes any empty line that may exist, then removes the last character (the hyphen that marks the end of the protein), then replaces any other existing hyphen by an X (unknown aminoacid) so that Provean doesn't crash
   fi
-  sleep 5
+  sleep 4
   done < missense_variants_cds_list_and_sequence_combined.txt
-  
+
+```
+
+
+#2: Run Provean.
+```{bash}
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean
+
+GENES=$(ls -rth genes_fasta/* | xargs -n 1 basename | cut -d'.' -f 1)
+rm missense_variants_provean_scores.txt
+for gen in ${GENES[@]}
+  do
+  echo "${gen}"
+  /home/dkleinman/provean-1.1.5/bin/provean.sh -q genes_fasta/"$gen".fa -v genes_variants/"$gen".var --num_threads 20 > provean_output/"$gen".provean
+  join -1 4 -2 1 <(grep "$gen" missense_variants_gene_names.txt) <(grep -Ev '#|\[' provean_output/"$gen".provean) | awk '{printf ("%s\t%s\t%s\t%s\t%s\n", $2,$3,$4,$1,$5)}' >> missense_variants_provean_scores.txt
+  done
+
 ```
