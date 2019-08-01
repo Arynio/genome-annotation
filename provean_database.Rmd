@@ -7,19 +7,119 @@ output: html_document
 
 
 
-#0: Set up.
-##Define variables
+
 ```{bash}
 
-cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation
-grep '#' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filtered5_SNP.lr_ann.vcf > kaka.vcf
-grep 'missense_variant' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filtered5_SNP.lr_ann.vcf | tail -n1 >> kaka.vcf
+mkdir -p /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean
 
-bedtools intersect -wa -a /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.all.fix.nr.gff3 -b kaka.vcf | grep 'CDS' > cds_kaka.bed
-bedtools getfasta -fi /GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa -bed cds_kaka.bed -fo cds_kaka.fa
+----------- Adapt coordinates to exon approach:
+
+#Retrieve all missense variants
+grep '#' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filtered5_SNP.lr_ann.vcf > missense_variants.vcf
+grep 'missense_variant' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filtered5_SNP.lr_ann.vcf >> missense_variants.vcf
+
+#Obtain their exon's coordinates
+bedtools intersect -a /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.all.fix.nr.gff3 -b missense_variants.vcf -wa -wb | cut -f -9,11 | grep 'CDS' > missense_variants_cds.bed
+
+bedtools intersect -a /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.all.fix.nr.gff3 -b missense_variants.vcf -wa -wb | cut -f -9,11,17 | awk -F"\t|\\\\|" '{printf ("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$21)}' | grep 'CDS' > missense_variants_cds.bed
+
+bedtools intersect -a /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.all.fix.nr.gff3 -b missense_variants.vcf -wa -wb | cut -f -9,11,17 | awk -F"\t|\\\\|" '{printf ("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$21)}' | grep 'CDS' | less -S
+
+#Obtain the exons' sequences from the reference
+bedtools getfasta -fi /GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa -bed missense_variants_cds.bed -fo missense_variants_cds.fa
 
 curl -s -d "dna_sequence=ATCGGGGATATTGCCGACATCACTGGT&output_format=fasta" https://web.expasy.org/cgi-bin/translate/dna2aa.cgi > web_kaka.fasta
 #Then GREP 5'3' if strand is + and 3'5' if strand is -. GREP Frame 1 if frame is 0, Frame 2 if frame is 1, and Frame 3 if frame is 2.
 
 
+#Posición 10:
+#
+#AAG.AAG.AAG.AAG Pauta 0: aa4. (10-0)/3=3.33 -> 4
+#A.AGA.AGA.AGA.AG Pauta 1: aa3. (10-1)/3=3 -> 3
+#AA.GAA.GAA.GAA.G Pauta 2: aa3. (10-2)/3=2.66 -> 3
+#
+#Posición 9:
+#
+#AAG.AAG.AAG.AAG Pauta 0: aa3. (9-0)/3=3 -> 3
+#A.AGA.AGA.AGA.AG Pauta 1: aa3. (9-1)/3=2.66 -> 3
+#AA.GAA.GAA.GAA.G Pauta 2: aa3. (9-2)/3=2.33 -> 3
+#
+#Posición 8:
+#
+#AAG.AAG.AAG.AAG Pauta 0: aa3. (8-0)/3=2.66 -> 3
+#A.AGA.AGA.AGA.AG Pauta 1: aa3. (8-1)/3=2.33 -> 3
+#AA.GAA.GAA.GAA.G Pauta 2: aa2. (8-2)/3=2 -> 2
+
+
+------------ Fuse exons approach:
+
+#Obtain list of genes
+grep -v '#' missense_variants.vcf | awk -F"\t|\\\\|" '{printf ("%s\t%s\t%s\n", $1,$2,$11)}' > missense_variants_gene_names.txt
+
+#Obtain coordinates of all CDS from all genes in the list
+GENES=$(cat missense_variants_gene_names.txt | cut -f 3 | uniq)
+COUNTER=0
+rm missense_variants_cds_list.gff3
+for gen in ${GENES[@]}
+  do
+  grep "$gen" /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.all.fix.nr.gff3 | awk -v gene_name=$gen '$3 == "CDS" {printf ("%s\t%s\n", $0,gene_name)}' >> missense_variants_cds_list.gff3
+  ((COUNTER++))
+  if [ $(( $COUNTER % 10 )) == 0 ]
+    then
+    echo "processed $COUNTER genes out of $(echo "$GENES" | wc -l)"
+  fi
+  done
+
+#Obtain sequences from all CDS
+bedtools getfasta -fi /GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa -bed missense_variants_cds_list.gff3 -fo missense_variants_cds_sequence.fa
+
+#Paste each row's sequence to the rest of the information in the gff
+paste missense_variants_cds_list.gff3 <(grep -v '>' missense_variants_cds_sequence.fa) > missense_variants_cds_list_and_sequence.gff3
+
+#Remove the non-coding SNPs (to account for the reading frame)
+#rm missense_variants_cds_list_and_sequence_clean.gff3
+#while read -r row; do
+#  CUT_N=$(echo "$row" | cut -f 8)
+#  CUT_N=$((CUT_N+1))
+#  STRAND=$(echo "$row" | cut -f 7)
+#  if [ $STRAND == "+" ]
+#    then
+#    CODING_SEQUENCE=$(echo "$row" | cut -f 11 | cut -c $CUT_N-)
+#  elif [ $STRAND == "-" ]
+#    then
+#    CODING_SEQUENCE=$(echo "$row" | cut -f 11 | rev | cut -c $CUT_N- | rev)
+#  fi
+#  echo "$row" | awk -v coding=$CODING_SEQUENCE '{printf ("%s\t%s\n",$0,coding)}' >> missense_variants_cds_list_and_sequence_clean.gff3
+#done < missense_variants_cds_list_and_sequence.gff3
+
+#Fuse all exons from each gene and store them in a file together with the gene name and the strand information
+GENES=$(cat missense_variants_cds_list_and_sequence.gff3 | cut -f 10 | uniq)
+rm missense_variants_cds_list_and_sequence_combined.txt
+for gen in ${GENES[@]}
+  do
+  echo "${gen}"
+  STRAND=$(awk -F"\t" -v gen=$gen '$10 == gen' missense_variants_cds_list_and_sequence.gff3 | shuf -n1 | cut -f 7)
+  CODING_SEQUENCE=$(awk -F"\t" -v gen=$gen '$10 == gen {print $11}' missense_variants_cds_list_and_sequence.gff3 | tr -d '\n')
+  echo -e "$gen\t$STRAND\t$CODING_SEQUENCE" >> missense_variants_cds_list_and_sequence_combined.txt
+  done
+
+#Translate the exons to proteins and store each protein in a fasta file
+while read -r entry; do
+  GENE=$(echo "$entry" | cut -f 1)
+  echo $GENE
+  STRAND=$(echo "$entry" | cut -f 2)
+  #echo $STRAND
+  CODING_SEQUENCE=$(echo "$entry" | cut -f 3)
+  #echo $CODING_SEQUENCE
+  if [ $STRAND == "+" ]
+    then
+    curl -s -d "dna_sequence=$CODING_SEQUENCE&output_format=fasta" https://web.expasy.org/cgi-bin/translate/dna2aa.cgi | awk '/:5'\''3'\'' Frame 1$/,/:5'\''3'\'' Frame 2$/' | head -n-1 > genes_fasta/"$GENE".fa
+  elif [ $STRAND == "-" ]
+    then
+    curl -s -d "dna_sequence=$CODING_SEQUENCE&output_format=fasta" https://web.expasy.org/cgi-bin/translate/dna2aa.cgi | awk '/:3'\''5'\'' Frame 1$/,/:3'\''5'\'' Frame 2$/' | head -n-1 > genes_fasta/"$GENE".fa
+  fi
+  sleep 5
+  done < missense_variants_cds_list_and_sequence_combined.txt
+  
 ```
