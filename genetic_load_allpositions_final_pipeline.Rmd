@@ -1001,6 +1001,7 @@ mv ${CALLING}"_polarized_filtered5_renamed_"${TYPE}".lr_ann.vcf" ${CALLING}"_pol
 ```
 
 #6: Tally sites. Count the number of positions for each category, before and after estimating the depth filter:
+##Separate callings:
 ```{r Filter the annotated VCF, eval=FALSE, engine='bash'}
 
 CALLING=(c_lp_sm_c_lp_do_all) #c_ll_ki_c_ll_no_c_ll_po_all #c_lp_sm_c_lp_do_all
@@ -1052,6 +1053,61 @@ for category in ${CATEGORIES[@]}
   echo -e "$CALLING\t$CATEGORY_NAME\t$SITES_COUNT\t$SITES_DEPTH_CORRECTED" >> ${CALLING}"_category_sites_total_counts_"${TYPE}".lr_ann.txt"
   rm ${CALLING}"_"${CATEGORY_NAME}"_"${TYPE}".lr_ann.vcf"
   done
+
+```
+
+##Joint calling:
+```{r Filter the annotated VCF, eval=FALSE, engine='bash'}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+screen -S "${CALLING}-${TYPE}"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+script "${CALLING}_polarized_filtered_tally_sites_${TYPE}.lr_ann.log"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+
+#Define paths:
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome (first eight scaffolds only)
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+CATEGORIES=$(realpath /home/dkleinman/datos/snpEff/data/*.bed | grep -v 'nr')
+N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING)
+SPECIES=$(echo $CALLING | fold -w8 | cut -c1-4 | head -n$N_POPS | sort | uniq)
+
+#Obtain the proportion of variants that were dropped due to low or high depth with the variants-only pipeline.
+echo "calculating proportion of variants filtered due to depth"
+PRE_DEPTH_FILTER_N=$(grep -v '#' /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/*"_filtered5_SNP.lr_ann.vcf" | wc -l)
+DEPTH_FILTER_N=$(cat /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/*_joined_minmaxdepth_to_remove_varssubs_SNP.bed | wc -l)
+DEPTH_FILTER_PROP=$(echo "scale=6; $DEPTH_FILTER_N/$PRE_DEPTH_FILTER_N" | bc | awk '{printf "%3.4f", $0}')
+
+#Prepare output file:
+rm ${CALLING}"_category_sites_total_counts_"${TYPE}".lr_ann.txt"
+echo -e "calling\tcategory\ttotal_N\ttotal_N_depth_correction" > ${CALLING}"_category_sites_total_counts_"${TYPE}".lr_ann.txt"
+
+#Subset the VCF for each category of interest, then count the number of sites, then estimate the number that would remain after applying the depth filter, then store all the information in the output file, and finally remove the (heavy) VCF:
+for s in ${SPECIES[@]}
+  do
+  echo $s
+  FILE=$(ls /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/$s*"_polarized_filtered5_"${TYPE}".lr_ann.vcf")
+  echo $FILE
+  for category in ${CATEGORIES[@]}
+    do
+    CATEGORY_NAME=$(echo $category | cut -d'.' -f2)
+    echo "extracting" $CATEGORY_NAME "sites"
+    bedtools intersect -a $FILE -b $category -header > ${CALLING}"_"${CATEGORY_NAME}"_"${TYPE}".lr_ann.vcf"
+    echo "calculating number of" $CATEGORY_NAME "sites that would result from applying the depth filtering"
+    SITES_COUNT=$(grep -v '#' ${CALLING}"_"${CATEGORY_NAME}"_"${TYPE}".lr_ann.vcf" | wc -l)
+    DEPTH_FILTER_SITES=$(echo "scale=6; $DEPTH_FILTER_PROP*$SITES_COUNT" | bc | awk '{printf "%d", $0}')
+    SITES_DEPTH_CORRECTED=$((SITES_COUNT-DEPTH_FILTER_SITES))
+    echo -e "$s\t$CATEGORY_NAME\t$SITES_COUNT\t$SITES_DEPTH_CORRECTED" >> ${CALLING}"_category_sites_total_counts_"${TYPE}".lr_ann.txt"
+    rm ${CALLING}"_"${CATEGORY_NAME}"_"${TYPE}".lr_ann.vcf"
+    done
+done
 
 ```
 
