@@ -820,6 +820,7 @@ derived_freq_ratios_errors_ggplot <-
 derived_freq_ratios_errors_ggplot
 ggsave("c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_ALL_vars_subs_derived_freq_ratio_errors.pdf", width=15, height=10, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_ratio")
 
+
 ```
 
 ###Study the distribution of the derived allele frequency ratio.
