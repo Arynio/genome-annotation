@@ -1396,6 +1396,7 @@ for POP in ${POPS[@]}
 ```    
 
 #11: Perform depth filtering. Obtain list of sites with very low or high depth within each dataset, join them, and remove those sites as well as those with high missingness.
+##At the dataset level:
 ```{r Perform depth filtering, eval=FALSE, engine='bash'}
 
 #For each dataset obtain the list of positions that have lower (higher) depth than the minimum (maximum) within 0.95 of the distribution, as calculated in the previous section, and join them to later remove all of them from all datasets:
@@ -1407,7 +1408,7 @@ screen -S "${CALLING}-${VAR}-${TYPE}"
 CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
 VAR=$(echo ${STY#*.} | cut -d'-' -f2)
 TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
-script "${CALLING}_depth_filter_${VAR}_${TYPE}.lr_ann.log"
+script "${CALLING}_depth_filter_datasets_${VAR}_${TYPE}.lr_ann.log"
 CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
 VAR=$(echo ${STY#*.} | cut -d'-' -f2)
 TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
@@ -1434,12 +1435,39 @@ for j in ${DATASETS[@]}
   $BCF filter -i "DP < ${MIN_DP} || DP > ${MAX_DP}" -Ov -o ${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_minmaxdepth_to_remove_"${VAR}"_"${TYPE}".lr_ann.vcf" ${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_perdataset_"${VAR}"_"${TYPE}".lr_ann.vcf"
   sed -e 's/chr//' ${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_minmaxdepth_to_remove_"${VAR}"_"${TYPE}".lr_ann.vcf" | awk '{OFS="\t"; if (!/^#/){print $1,$2-1,$2}}' > ${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_minmaxdepth_to_remove_"${VAR}"_"${TYPE}".bed" #convert from VCF to BED
   done
-cat *"_"${NM_COV}"_perdataset/"*"_"${NM_COV}"_minmaxdepth_to_remove_"${VAR}"_"${TYPE}".bed" | bedtools sort | uniq > ${CALLING}"_joined_minmaxdepth_to_remove_"${VAR}"_"${TYPE}".bed" #join all BEDs from each species (i.e. from each calling)
+cat *"_"${NM_COV}"_perdataset/"*"_"${NM_COV}"_minmaxdepth_to_remove_"${VAR}"_"${TYPE}".bed" | bedtools sort | uniq > ${CALLING}"_joined_minmaxdepth_to_remove_"${VAR}"_"${TYPE}".bed" #join all BEDs
 for j in ${DATASETS[@]}
   do
   echo "${j}"
   bedtools subtract -a ${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_perdataset_"${VAR}"_"${TYPE}".lr_ann.vcf" -b ${CALLING}"_joined_minmaxdepth_to_remove_"${VAR}"_"${TYPE}".bed" -header > ${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_perdataset_filtered_"${VAR}"_"${TYPE}".lr_ann.vcf"
   done
+
+```
+
+##At the global level (run the dataset level code first):
+```{r Perform depth filtering, eval=FALSE, engine='bash'}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+VAR=(substitutions) #varssubs #variants #substitutions
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+screen -S "${CALLING}-${VAR}-${TYPE}"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+script "${CALLING}_depth_filter_global_${VAR}_${TYPE}.lr_ann.log"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+
+if [ $VAR == "varssubs" ]
+  then
+  echo $VAR
+  bedtools subtract -a ${CALLING}"_polarized_filtered5_"${TYPE}".lr_ann.vcf" -b ${CALLING}"_joined_minmaxdepth_to_remove_"${VAR}"_"${TYPE}".bed" -header > ${CALLING}"_polarized_filteredall_"${VAR}"_"${TYPE}".lr_ann.vcf"
+  else
+  echo $VAR
+  bedtools subtract -a ${CALLING}"_polarized_"${VAR}"_"${TYPE}".lr_ann.vcf" -b ${CALLING}"_joined_minmaxdepth_to_remove_"${VAR}"_"${TYPE}".bed" -header > ${CALLING}"_polarized_filteredall_"${VAR}"_"${TYPE}".lr_ann.vcf"
+fi
 
 ```
 
