@@ -1,0 +1,118 @@
+---
+title: "rvis_database"
+author: "Dani"
+date: "8 de julio de 2019"
+output: html_document
+---
+
+#1: Prepare RVIS database.
+
+```{bash}
+
+mkdir -p /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/rvis
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/rvis
+
+#Download the database with the RVIS scores:
+curl http://genic-intolerance.org/data/RVIS_Unpublished_ExACv2_March2017.txt --output rvis_database.txt
+
+#Extract gene names from the RVIS database:
+tail -n +2 rvis_database.txt | cut -f1 > rvis_gene_names.txt
+
+#Since genes in the database are registered with their gene name, but our own Lynx pardinus database uses the UniProt ID codes, we need to convert them first. The UniProt website has a tool for this. First, download rvis_gene_names.txt to local. Next, upload it to https://www.uniprot.org/uploadlists/, select "from gene names to UniProtKB", insert Homo sapiens as the species, and submit the search. Once it finishes (17505 out of 17518 Gene name identifiers were successfully mapped to 17564 UniProtKB IDs), filter in only the reviewed results, and select the desired columns (in mycase I included my input list as the 6th column). Then download the file as rvis_gene_names_uniprot_codes_dirty.txt and upload it to the working folder inside the server.
+
+#Separate comma-separated entries into new lines to clean the gene_names_uniprot_codes_dirty.txt file:
+tail -n +2 rvis_gene_names_uniprot_codes_dirty.txt | awk -F"\t" '{printf ("%s\t%s\n", $6,$1)}' | grep ',' > rvis_gene_names_uniprot_codes_dirty_rows.txt
+rm rvis_gene_names_uniprot_codes_clean.txt
+while read row;
+  do
+  #echo ${row}
+  GENE_NAMES=$(echo "$row" | cut -f1 | tr , '\n')
+  #echo $GENE_NAMES
+  UNIPROT=$(echo "$row" | cut -f2)
+  #echo $UNIPROT
+  for GENE in ${GENE_NAMES[@]}
+    do
+    #echo $GENE
+    echo -e "$GENE\t$UNIPROT" >> rvis_gene_names_uniprot_codes_clean.txt
+    done
+  done < rvis_gene_names_uniprot_codes_dirty_rows.txt
+tail -n +2 rvis_gene_names_uniprot_codes_dirty.txt | awk -F"\t" '{printf ("%s\t%s\n", $6,$1)}' | grep -v ',' >> rvis_gene_names_uniprot_codes_clean.txt
+
+#Join the RVIS database and the UniProt codes file:
+join -t $'\t' <(sort -k 1b,1 rvis_gene_names_uniprot_codes_clean.txt) <(tail -n +2 rvis_database.txt | sort -k 1b,1) > rvis_database_uniprot_joined.txt
+
+#Extract the Lynx pardinus genes (change LYPA23B for LYPA23C) and their UniProt codes from the proper file that was generated as part of the Genome Project:
+tail -n +2 /backup/grupolince/Lynx_annotation/Protein\ annotation/Funtional_annotation_140305/Reactome_pathway_annotations.txt | grep "Homo sapiens" | awk -F"\t|," '{printf ("%s\t%s\t%s\n", $1,$3,$5)}' | awk -F"\t|]" '{printf ("%s\t%s\n", $1,$3)}' | awk 'BEGIN{FS=OFS=";"} {gsub("B", "C", $1)} 1' | sort -k 2,2 | uniq > lypa_gene_names_uniprot_codes.txt
+
+#Join the Lynx pardinus and the RVIS databases, and sort genes from most deleterious (most negative score in column 5) to least:
+join -1 2 -2 2 -t $'\t' <(sort -k 2b,2 lypa_gene_names_uniprot_codes.txt) <(tail -n +2 rvis_database_uniprot_joined.txt | sort -k 2b,2) | awk 'BEGIN{FS=OFS="\t"} {$2 = substr($2, 1, length($2)-2)}1' | sort -n -k 5,5 > lypa_rvis_database_uniprot_joined.txt
+
+```
+
+#2: Explore RVIS scores.
+
+```{bash}
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/rvis
+
+#awk -v FS="|" 'NR==FNR{rows[$1]++;next}(substr($NF,1,length($NF)-1) in rows)' /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.lr_ann.vcf <(head -n 100 lypa_rvis_database_uniprot_joined.txt | cut -f 2) | less -S
+
+#Count number of deleterious variants within low tolerance (deleterious) high tolerance (tolerant) genes:
+AÑADIR AF PROMEDIO!
+
+DEL_GENES=$(awk '$6 < 3' lypa_rvis_database_uniprot_joined.txt | cut -f 2) #91
+COUNTER_MIS=0
+COUNTER_LOF=0
+rm c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.lr_ann.del.af
+for gen in ${DEL_GENES[@]}
+  do
+  echo ${gen}
+  GREP="\|${gen}\|"
+  GREP_MIS=$(grep -E "missense_variant.*${GREP}" /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.lr_ann.vcf)
+  N_MIS=$(echo "$GREP_MIS" | wc -l)
+  echo $N_MIS
+  echo "$GREP_MIS" | awk -F"\t|;|=" '{printf ("%s\n", $13)}' >> c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.lr_ann.del.af
+  N_LOF=$(grep -E "\|HIGH\|.*${GREP}" /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.lr_ann.vcf | wc -l)
+  COUNTER_MIS=$((COUNTER_MIS+N_MIS))
+  COUNTER_LOF=$((COUNTER_LOF+N_LOF))
+  done
+echo "total of MIS is" $COUNTER_MIS #109
+SUM_AF_MIS=$(awk NF c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.lr_ann.del.af | paste -sd+ | bc)
+AVG_AF_MIS=$(echo "scale=4; $SUM_AF_MIS/$COUNTER_MIS" | bc)
+echo "average AF of MIS is" $AVG_AF_MIS #0.1348
+echo "total of LOF is" $COUNTER_LOF #5
+
+
+TOL_GENES=$(awk '$6 > 94' lypa_rvis_database_uniprot_joined.txt | cut -f 2) #92
+COUNTER_MIS=0
+COUNTER_LOF=0
+for gen in ${TOL_GENES[@]}
+  do
+  echo ${gen}
+  GREP="\|${gen}\|"
+  GREP_MIS=$(grep -E "missense_variant.*${GREP}" /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.lr_ann.vcf)
+  N_MIS=$(echo "$GREP_MIS" | wc -l)
+  echo $N_MIS
+  echo "$GREP_MIS" | awk -F"\t|;|=" '{printf ("%s\n", $13)}' >> c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.lr_ann.tol.af
+  N_LOF=$(grep -E "\|HIGH\|.*${GREP}" /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.lr_ann.vcf | wc -l)
+  COUNTER_MIS=$((COUNTER_MIS+N_MIS))
+  COUNTER_LOF=$((COUNTER_LOF+N_LOF))
+  done
+echo "total of MIS is" $COUNTER_MIS #265
+SUM_AF_MIS=$(awk NF c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.lr_ann.tol.af | paste -sd+ | bc)
+AVG_AF_MIS=$(echo "scale=4; $SUM_AF_MIS/$COUNTER_MIS" | bc)
+echo "average AF of MIS is" $AVG_AF_MIS #0.2468
+echo "total of LOF is" $COUNTER_LOF #2
+
+
+
+
+DEL_GENES=$(awk '$6 < 3' lypa_rvis_database_uniprot_joined.txt | cut -f 2) #91
+for gen in ${DEL_GENES[@]}
+  do
+  echo ${gen}
+  GREP="\|${gen}\|"
+  grep -E "\|HIGH\|.*${GREP}" /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.lr_ann.vcf
+  done
+
+```
