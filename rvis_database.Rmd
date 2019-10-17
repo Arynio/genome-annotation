@@ -47,6 +47,8 @@ tail -n +2 /backup/grupolince/Lynx_annotation/Protein\ annotation/Funtional_anno
 #Join the Lynx pardinus and the RVIS databases, and sort genes from most deleterious (most negative score in column 5) to least:
 join -1 2 -2 2 -t $'\t' <(sort -k 2b,2 lypa_gene_names_uniprot_codes.txt) <(tail -n +2 rvis_database_uniprot_joined.txt | sort -k 2b,2) | awk 'BEGIN{FS=OFS="\t"} {$2 = substr($2, 1, length($2)-2)}1' | sort -n -k 5,5 > lypa_rvis_database_uniprot_joined.txt
 
+MIRAR ESTO sort -n -k 3,3 rvis_database.txt Y VER VARIANTES DELETÉREAS
+
 ```
 
 #2: Explore RVIS scores.
@@ -57,8 +59,7 @@ cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c
 
 #awk -v FS="|" 'NR==FNR{rows[$1]++;next}(substr($NF,1,length($NF)-1) in rows)' /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.lr_ann.vcf <(head -n 100 lypa_rvis_database_uniprot_joined.txt | cut -f 2) | less -S
 
-#Count number of deleterious variants within low tolerance (deleterious) high tolerance (tolerant) genes:
-AÑADIR AF PROMEDIO!
+#Count number of deleterious variants within low tolerance (deleterious) or high tolerance (tolerant) genes, and calculate the average AF:
 
 DEL_GENES=$(awk '$6 < 3' lypa_rvis_database_uniprot_joined.txt | cut -f 2) #91
 COUNTER_MIS=0
