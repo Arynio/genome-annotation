@@ -1056,7 +1056,7 @@ for category in ${CATEGORIES[@]}
 
 ```
 
-##Joint calling:
+##Joint calling (estimate the filter5 proportion):
 ```{r Filter the annotated VCF, eval=FALSE, engine='bash'}
 
 CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
@@ -1108,6 +1108,64 @@ for s in ${SPECIES[@]}
     rm ${CALLING}"_"${CATEGORY_NAME}"_"${TYPE}".lr_ann.vcf"
     done
 done
+
+```
+
+##Joint calling (estimate all filters proportion):
+```{r Filter the annotated VCF, eval=FALSE, engine='bash'}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+TYPE=(all) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+screen -S "${CALLING}-${TYPE}"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+script "${CALLING}_polarized_filtered_tally_sites_${TYPE}.lr_ann.log"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+
+#Define paths:
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome (first eight scaffolds only)
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+CATEGORIES=$(realpath /home/dkleinman/datos/snpEff/data/*.bed | grep -v 'nr')
+#N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING)
+#SPECIES=$(echo $CALLING | fold -w8 | cut -c1-4 | head -n$N_POPS | sort | uniq)
+
+#Obtain the proportion of variants that were dropped due to all filters with the variants-only pipeline.
+echo "calculating proportion of variants filtered due to depth"
+PRE_FILTER_N=$(grep -v '#' /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/${CALLING}_polarized.lr_ann.vcf | wc -l)
+POST_FILTER_N=$(grep -v '#' /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/${CALLING}_polarized_filteredall_varssubs_SNP.lr_ann.vcf | wc -l)
+FILTER_N=$((PRE_FILTER_N-POST_FILTER_N))
+FILTER_PROP=$(echo "scale=6; $FILTER_N/$PRE_FILTER_N" | bc | awk '{printf "%3.4f", $0}')
+
+#Prepare output file:
+rm "category_sites_total_counts_all.lr_ann.txt"
+echo -e "category\ttotal_N\ttotal_N_postfilter" > "category_sites_total_counts_all.lr_ann.txt"
+
+#Subset the VCF for each category of interest, then count the number of sites, then estimate the number that would remain after applying the filters, then store all the information in the output file, and finally remove the (heavy) VCF:
+FILE=$(ls /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/annotation/c_lp_sm_c_lp_do_all_polarized.lr_ann.vcf)
+echo $FILE
+for category in ${CATEGORIES[@]}
+  do
+  CATEGORY_NAME=$(echo $category | cut -d'.' -f2)
+  echo "extracting" $CATEGORY_NAME "sites"
+  bedtools intersect -a $FILE -b $category -header > ${CALLING}"_"${CATEGORY_NAME}"_all.lr_ann.vcf"
+  echo "calculating number of" $CATEGORY_NAME "sites that would result from applying the depth filtering"
+  SITES_COUNT=$(grep -v '#' ${CALLING}"_"${CATEGORY_NAME}"_all.lr_ann.vcf" | wc -l)
+  FILTER_SITES=$(echo "scale=6; $FILTER_PROP*$SITES_COUNT" | bc | awk '{printf "%d", $0}')
+  SITES_POSTFILTER=$((SITES_COUNT-FILTER_SITES))
+  echo -e "$CATEGORY_NAME\t$SITES_COUNT\t$SITES_POSTFILTER" >> "category_sites_total_counts_all.lr_ann.txt"
+  rm ${CALLING}"_"${CATEGORY_NAME}"_all.lr_ann.vcf"
+  done
+
+#From outside the server:
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov) 
+export SSHPASS=$(cat /Users/dani/Documents/genomics_pass.txt)
+sshpass -e scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/${CALLING}"_category_sites_total_counts_all.lr_ann.txt" /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/whole_genome_counts/
+unset SSHPASS
 
 ```
 
