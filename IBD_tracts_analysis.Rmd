@@ -398,8 +398,8 @@ ggplot (ibd_tract3, aes(x=length_category, y=n, colour=pop, fill=pop)) +
 
 ```
 
-##Retrieve IBD tract coordinates for each individual. Generate BAM files with coordinates for each IBD tract (in scaffolds bigger than 1.6Mb).
-
+##Retrieve IBD tract coordinates for each individual. Generate BED files with coordinates for each IBD tract (in scaffolds bigger than 1.6Mb).
+###Good coordinates (nm_filtered):
 ```{bash}
 
 #El archivo de entrada es un .bed con las coordenadas de los IBD tracts de todos los individuos del dataset, y se genera en la sección "Count number of large IBD tracts". En esta sección partimos ese archivo por individuo.
@@ -411,13 +411,36 @@ INPUT_FILE=${STY#*.}
 script "per_individual-${INPUT_FILE}.log"
 INPUT_FILE=${STY#*.}
 
-INDIVIDUALS=$(cut -f5 c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060.ibdtract.bed | uniq | tail -n +2)
+INDIVIDUALS=$(cut -f5 $INPUT_FILE | uniq | tail -n +2)
 for i in ${INDIVIDUALS[@]}
   do
   echo "processing individual" ${i}
   POP=$(echo ${i} | cut -c1-7)
   mkdir -p ./$POP"_ibdtracts"
   grep ${i} $INPUT_FILE > $POP"_ibdtracts"/${i}".ibdtract.bed"
+  done
+
+```
+
+###Bad coordinates (not nm_filtered):
+```{bash}
+
+#El archivo de entrada es un .bed con las coordenadas de los IBD tracts de todos los individuos del dataset, y se genera en la sección "Count number of large IBD tracts". En esta sección partimos ese archivo por individuo.
+
+INPUT_FILE=(c_ll_ki-c_ll_no-c_ll_po-c_lp_do-c_lp_sm_n060_woutnm.ibdtract.bed)
+cd /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/ngsF-HMM
+screen -S "${INPUT_FILE}"
+INPUT_FILE=${STY#*.}
+script "per_individual-${INPUT_FILE}.log"
+INPUT_FILE=${STY#*.}
+
+INDIVIDUALS=$(cut -f5 $INPUT_FILE | uniq | tail -n +2)
+for i in ${INDIVIDUALS[@]}
+  do
+  echo "processing individual" ${i}
+  POP=$(echo ${i} | cut -c1-7)
+  mkdir -p ./$POP"_ibdtracts"
+  grep ${i} $INPUT_FILE > $POP"_ibdtracts"/${i}".woutnm.ibdtract.bed"
   done
 
 ```
