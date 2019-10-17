@@ -1814,6 +1814,7 @@ for i in ${POP[@]}
 ```
 
 ##IBD and non-IBD tracts.
+###Good coordinates (nm_filtered):
 ```{r Split the population VCFs into per individual VCFs, eval=FALSE, engine='bash'}
 
 #This code will only work if the whole-genome individual VCFs have been generated before.
@@ -1842,24 +1843,67 @@ GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
 BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
 
 cd $V_PATH/$CALLING/annotation
-INDLIST=($(ls `find . -name *"_individual_"${VAR}"_"${TYPE}".lr_ann.vcf" -print`))
+INDLIST=($(ls `find . -name *"_individual_"${VAR}"_"${TYPE}".lr_ann.vcf" ! -path '*testing_variant_numbers*' -print`))
 for i in "${INDLIST[@]}"
   do
   echo "${i}"
   ind=$(echo "${i}" | awk -F'[/]' '{print $3}' | cut -c1-12)
   echo "${ind}"
-  bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/ngsF-HMM/*/${ind}.ibdtract.bed > ${i/_individual_${VAR}_${TYPE}.lr_ann.vcf/_individual_IBD_${VAR}_${TYPE}.lr_ann.vcf}
+  bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/ngsF-HMM/*/${ind}.ibdtract.bed -header > ${i/_individual_${VAR}_${TYPE}.lr_ann.vcf/_individual_IBD_${VAR}_${TYPE}.lr_ann.vcf}
   bedtools intersect -a ${i} -b <(awk '$4 >= 1000000' /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/ngsF-HMM/*/${ind}.ibdtract.bed) -header > ${i/_individual_${VAR}_${TYPE}.lr_ann.vcf/_individual_IBD1000k_${VAR}_${TYPE}.lr_ann.vcf}
   bedtools intersect -a ${i} -b <(awk '$4 >= 100000 && $4 < 1000000' /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/ngsF-HMM/*/${ind}.ibdtract.bed) -header > ${i/_individual_${VAR}_${TYPE}.lr_ann.vcf/_individual_IBD100k_${VAR}_${TYPE}.lr_ann.vcf}
   bedtools intersect -a ${i} -b <(awk '$4 >= 10000 && $4 < 100000' /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/ngsF-HMM/*/${ind}.ibdtract.bed) -header > ${i/_individual_${VAR}_${TYPE}.lr_ann.vcf/_individual_IBD10k_${VAR}_${TYPE}.lr_ann.vcf}
-  bedtools subtract -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/ngsF-HMM/*/${ind}.ibdtract.bed > ${i/_individual_${VAR}_${TYPE}.lr_ann.vcf/_individual_notIBD_${VAR}_${TYPE}.lr_ann.vcf}
+  bedtools subtract -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/ngsF-HMM/*/${ind}.ibdtract.bed -header > ${i/_individual_${VAR}_${TYPE}.lr_ann.vcf/_individual_notIBD_${VAR}_${TYPE}.lr_ann.vcf}
+  done
+
+```
+
+###Bad coordinates (not nm_filtered):
+```{r Split the population VCFs into per individual VCFs, eval=FALSE, engine='bash'}
+
+#This code will only work if the whole-genome individual VCFs have been generated before.
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+VAR=(variants) #varssubs #variants #substitutions
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+screen -S "${CALLING}-${VAR}-${TYPE}"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+script "individual_IBD_notIBD_${VAR}_${CALLING}_${TYPE}.woutnm.lr_ann.log"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAM files path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+cd $V_PATH/$CALLING/annotation
+INDLIST=($(ls `find . -name *"_individual_"${VAR}"_"${TYPE}".lr_ann.vcf" ! -path '*testing_variant_numbers*' -print`))
+for i in "${INDLIST[@]}"
+  do
+  echo "${i}"
+  ind=$(echo "${i}" | awk -F'[/]' '{print $3}' | cut -c1-12)
+  echo "${ind}"
+  bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/ngsF-HMM/*/${ind}.woutnm.ibdtract.bed -header > ${i/_individual_${VAR}_${TYPE}.lr_ann.vcf/_individual_IBD_${VAR}_${TYPE}.woutnm.lr_ann.vcf}
+  bedtools intersect -a ${i} -b <(awk '$4 >= 1000000' /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/ngsF-HMM/*/${ind}.woutnm.ibdtract.bed) -header > ${i/_individual_${VAR}_${TYPE}.lr_ann.vcf/_individual_IBD1000k_${VAR}_${TYPE}.woutnm.lr_ann.vcf}
+  bedtools intersect -a ${i} -b <(awk '$4 >= 100000 && $4 < 1000000' /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/ngsF-HMM/*/${ind}.woutnm.ibdtract.bed) -header > ${i/_individual_${VAR}_${TYPE}.lr_ann.vcf/_individual_IBD100k_${VAR}_${TYPE}.woutnm.lr_ann.vcf}
+  bedtools intersect -a ${i} -b <(awk '$4 >= 10000 && $4 < 100000' /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/ngsF-HMM/*/${ind}.woutnm.ibdtract.bed) -header > ${i/_individual_${VAR}_${TYPE}.lr_ann.vcf/_individual_IBD10k_${VAR}_${TYPE}.woutnm.lr_ann.vcf}
+  bedtools subtract -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/ngsF-HMM/*/${ind}.woutnm.ibdtract.bed -header > ${i/_individual_${VAR}_${TYPE}.lr_ann.vcf/_individual_notIBD_${VAR}_${TYPE}.woutnm.lr_ann.vcf}
   done
 
 ```
 
 #16: Get annotation statistics.
 ##At the individual level.
-
 ```{r Get annotation statistics, eval=FALSE, engine='bash'}
 
 CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
