@@ -4,39 +4,213 @@ output: html_document
 ---
 
 #Generate fast count files using BCFtools.
-##Missense variants:
+##Intergenic varssubs:
 ```{bash}
 
-#Missense filtered5
+#intergenic filtered2
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation
 
-grep '#' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filtered5_SNP.lr_ann.vcf > filtered5_missense.borrar.vcf
-grep 'missense_variant' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filtered5_SNP.lr_ann.vcf >> filtered5_missense.borrar.vcf
-echo -e "individual\tvar_N\tallele_N" > filtered5_missense_var_counts.borrar.txt
-echo -e "individual\tvar_N\tallele_N" > filtered5_missense_homo_counts.borrar.txt
-INDIVIDUALS=$(bcftools query -l c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filtered5_SNP.lr_ann.vcf)
+grep '#' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filtered2_SNP.lr_ann.vcf > filtered2_intergenic.borrar.vcf
+grep 'intergenic_region' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filtered2_SNP.lr_ann.vcf >> filtered2_intergenic.borrar.vcf
+echo -e "individual\tvar_N\tallele_N" > filtered2_intergenic_var_counts.borrar.txt
+echo -e "individual\tvar_N\tallele_N" > filtered2_intergenic_homo_counts.borrar.txt
+INDIVIDUALS=$(bcftools query -l c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filtered2_SNP.lr_ann.vcf)
 for i in ${INDIVIDUALS[@]}
   do
   echo "${i}"
-  bcftools view -Ou -s "${i}" filtered5_missense.borrar.vcf | bcftools query -f '%INFO/AC\t%INFO/AN[\t%GT]\n' > filtered5_all_counts.borrar.txt
-  awk '$1 >= 1' filtered5_all_counts.borrar.txt > filtered5_var_counts.borrar.txt
-  awk '$1 == 2' filtered5_all_counts.borrar.txt > filtered5_homo_counts.borrar.txt
-  VAR_N=$(<filtered5_var_counts.borrar.txt wc -l)  
-  VAR_H=$(<filtered5_homo_counts.borrar.txt wc -l)
-  ALLELE_N=$(cut -f 1 filtered5_var_counts.borrar.txt | paste -sd+ | bc)
-  ALLELE_H=$(cut -f 1 filtered5_homo_counts.borrar.txt | paste -sd+ | bc)
-  echo -e "$i\t$VAR_N\t$ALLELE_N" >> filtered5_missense_var_counts.borrar.txt
-  echo -e "$i\t$VAR_H\t$ALLELE_H" >> filtered5_missense_homo_counts.borrar.txt
+  bcftools view -Ou -s "${i}" filtered2_intergenic.borrar.vcf | bcftools query -f '%INFO/AC\t%INFO/AN[\t%GT]\n' > filtered2_all_counts.borrar.txt
+  awk '$1 >= 1' filtered2_all_counts.borrar.txt > filtered2_var_counts.borrar.txt
+  awk '$1 == 2' filtered2_all_counts.borrar.txt > filtered2_homo_counts.borrar.txt
+  VAR_N=$(<filtered2_var_counts.borrar.txt wc -l)  
+  VAR_H=$(<filtered2_homo_counts.borrar.txt wc -l)
+  ALLELE_N=$(cut -f 1 filtered2_var_counts.borrar.txt | paste -sd+ | bc)
+  ALLELE_H=$(cut -f 1 filtered2_homo_counts.borrar.txt | paste -sd+ | bc)
+  echo -e "$i\t$VAR_N\t$ALLELE_N" >> filtered2_intergenic_var_counts.borrar.txt
+  echo -e "$i\t$VAR_H\t$ALLELE_H" >> filtered2_intergenic_homo_counts.borrar.txt
   done
-  rm filtered5_var_counts.borrar.txt
-  rm filtered5_homo_counts.borrar.txt
+  rm filtered2_var_counts.borrar.txt
+  rm filtered2_homo_counts.borrar.txt
+
+#intergenic filteredall
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation
+
+grep '#' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.lr_ann.vcf > filteredall_intergenic.borrar.vcf
+grep 'intergenic_region' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.lr_ann.vcf >> filteredall_intergenic.borrar.vcf
+echo -e "individual\tvar_N\tallele_N" > filteredall_intergenic_var_counts.borrar.txt
+echo -e "individual\tvar_N\tallele_N" > filteredall_intergenic_homo_counts.borrar.txt
+INDIVIDUALS=$(bcftools query -l c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.lr_ann.vcf)
+for i in ${INDIVIDUALS[@]}
+  do
+  echo "${i}"
+  bcftools view -Ou -s "${i}" filteredall_intergenic.borrar.vcf | bcftools query -f '%INFO/AC\t%INFO/AN[\t%GT]\n' > filteredall_all_counts.borrar.txt
+  awk '$1 >= 1' filteredall_all_counts.borrar.txt > filteredall_var_counts.borrar.txt
+  awk '$1 == 2' filteredall_all_counts.borrar.txt > filteredall_homo_counts.borrar.txt
+  VAR_N=$(<filteredall_var_counts.borrar.txt wc -l)  
+  VAR_H=$(<filteredall_homo_counts.borrar.txt wc -l)
+  ALLELE_N=$(cut -f 1 filteredall_var_counts.borrar.txt | paste -sd+ | bc)
+  ALLELE_H=$(cut -f 1 filteredall_homo_counts.borrar.txt | paste -sd+ | bc)
+  echo -e "$i\t$VAR_N\t$ALLELE_N" >> filteredall_intergenic_var_counts.borrar.txt
+  echo -e "$i\t$VAR_H\t$ALLELE_H" >> filteredall_intergenic_homo_counts.borrar.txt
+  done
+  rm filteredall_var_counts.borrar.txt
+  rm filteredall_homo_counts.borrar.txt
+  
+#From outside the server:
+export SSHPASS=$(cat /Users/dani/Documents/genomics_pass.txt)
+sshpass -e scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/filteredall_intergenic_var_counts.borrar.txt /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios
+sshpass -e scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/filteredall_intergenic_homo_counts.borrar.txt /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios
+
+```
+
+##Intronic varssubs:
+```{bash}
+
+#intron filtered2
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation
+
+grep '#' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filtered2_SNP.lr_ann.vcf > filtered2_intron.borrar.vcf
+grep 'intron_variant' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filtered2_SNP.lr_ann.vcf >> filtered2_intron.borrar.vcf
+echo -e "individual\tvar_N\tallele_N" > filtered2_intron_var_counts.borrar.txt
+echo -e "individual\tvar_N\tallele_N" > filtered2_intron_homo_counts.borrar.txt
+INDIVIDUALS=$(bcftools query -l c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filtered2_SNP.lr_ann.vcf)
+for i in ${INDIVIDUALS[@]}
+  do
+  echo "${i}"
+  bcftools view -Ou -s "${i}" filtered2_intron.borrar.vcf | bcftools query -f '%INFO/AC\t%INFO/AN[\t%GT]\n' > filtered2_all_counts.borrar.txt
+  awk '$1 >= 1' filtered2_all_counts.borrar.txt > filtered2_var_counts.borrar.txt
+  awk '$1 == 2' filtered2_all_counts.borrar.txt > filtered2_homo_counts.borrar.txt
+  VAR_N=$(<filtered2_var_counts.borrar.txt wc -l)  
+  VAR_H=$(<filtered2_homo_counts.borrar.txt wc -l)
+  ALLELE_N=$(cut -f 1 filtered2_var_counts.borrar.txt | paste -sd+ | bc)
+  ALLELE_H=$(cut -f 1 filtered2_homo_counts.borrar.txt | paste -sd+ | bc)
+  echo -e "$i\t$VAR_N\t$ALLELE_N" >> filtered2_intron_var_counts.borrar.txt
+  echo -e "$i\t$VAR_H\t$ALLELE_H" >> filtered2_intron_homo_counts.borrar.txt
+  done
+  rm filtered2_var_counts.borrar.txt
+  rm filtered2_homo_counts.borrar.txt
+
+#intron filteredall
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation
+
+grep '#' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.lr_ann.vcf > filteredall_intron.borrar.vcf
+grep 'intron_variant' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.lr_ann.vcf >> filteredall_intron.borrar.vcf
+echo -e "individual\tvar_N\tallele_N" > filteredall_intron_var_counts.borrar.txt
+echo -e "individual\tvar_N\tallele_N" > filteredall_intron_homo_counts.borrar.txt
+INDIVIDUALS=$(bcftools query -l c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.lr_ann.vcf)
+for i in ${INDIVIDUALS[@]}
+  do
+  echo "${i}"
+  bcftools view -Ou -s "${i}" filteredall_intron.borrar.vcf | bcftools query -f '%INFO/AC\t%INFO/AN[\t%GT]\n' > filteredall_all_counts.borrar.txt
+  awk '$1 >= 1' filteredall_all_counts.borrar.txt > filteredall_var_counts.borrar.txt
+  awk '$1 == 2' filteredall_all_counts.borrar.txt > filteredall_homo_counts.borrar.txt
+  VAR_N=$(<filteredall_var_counts.borrar.txt wc -l)  
+  VAR_H=$(<filteredall_homo_counts.borrar.txt wc -l)
+  ALLELE_N=$(cut -f 1 filteredall_var_counts.borrar.txt | paste -sd+ | bc)
+  ALLELE_H=$(cut -f 1 filteredall_homo_counts.borrar.txt | paste -sd+ | bc)
+  echo -e "$i\t$VAR_N\t$ALLELE_N" >> filteredall_intron_var_counts.borrar.txt
+  echo -e "$i\t$VAR_H\t$ALLELE_H" >> filteredall_intron_homo_counts.borrar.txt
+  done
+  rm filteredall_var_counts.borrar.txt
+  rm filteredall_homo_counts.borrar.txt
+  
+#From outside the server:
+export SSHPASS=$(cat /Users/dani/Documents/genomics_pass.txt)
+sshpass -e scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/filteredall_intron_var_counts.borrar.txt /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios
+sshpass -e scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/filteredall_intron_homo_counts.borrar.txt /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios
+```
+
+##Synonymous varssubs:
+```{bash}
+
+#Synonymous filtered2
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation
+
+grep '#' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filtered2_SNP.lr_ann.vcf > filtered2_synonymous.borrar.vcf
+grep 'synonymous_variant' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filtered2_SNP.lr_ann.vcf >> filtered2_synonymous.borrar.vcf
+echo -e "individual\tvar_N\tallele_N" > filtered2_synonymous_var_counts.borrar.txt
+echo -e "individual\tvar_N\tallele_N" > filtered2_synonymous_homo_counts.borrar.txt
+INDIVIDUALS=$(bcftools query -l c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filtered2_SNP.lr_ann.vcf)
+for i in ${INDIVIDUALS[@]}
+  do
+  echo "${i}"
+  bcftools view -Ou -s "${i}" filtered2_synonymous.borrar.vcf | bcftools query -f '%INFO/AC\t%INFO/AN[\t%GT]\n' > filtered2_all_counts.borrar.txt
+  awk '$1 >= 1' filtered2_all_counts.borrar.txt > filtered2_var_counts.borrar.txt
+  awk '$1 == 2' filtered2_all_counts.borrar.txt > filtered2_homo_counts.borrar.txt
+  VAR_N=$(<filtered2_var_counts.borrar.txt wc -l)  
+  VAR_H=$(<filtered2_homo_counts.borrar.txt wc -l)
+  ALLELE_N=$(cut -f 1 filtered2_var_counts.borrar.txt | paste -sd+ | bc)
+  ALLELE_H=$(cut -f 1 filtered2_homo_counts.borrar.txt | paste -sd+ | bc)
+  echo -e "$i\t$VAR_N\t$ALLELE_N" >> filtered2_synonymous_var_counts.borrar.txt
+  echo -e "$i\t$VAR_H\t$ALLELE_H" >> filtered2_synonymous_homo_counts.borrar.txt
+  done
+  rm filtered2_var_counts.borrar.txt
+  rm filtered2_homo_counts.borrar.txt
+
+#Synonymous filteredall
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation
+
+grep '#' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.lr_ann.vcf > filteredall_synonymous.borrar.vcf
+grep 'synonymous_variant' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.lr_ann.vcf >> filteredall_synonymous.borrar.vcf
+echo -e "individual\tvar_N\tallele_N" > filteredall_synonymous_var_counts.borrar.txt
+echo -e "individual\tvar_N\tallele_N" > filteredall_synonymous_homo_counts.borrar.txt
+INDIVIDUALS=$(bcftools query -l c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.lr_ann.vcf)
+for i in ${INDIVIDUALS[@]}
+  do
+  echo "${i}"
+  bcftools view -Ou -s "${i}" filteredall_synonymous.borrar.vcf | bcftools query -f '%INFO/AC\t%INFO/AN[\t%GT]\n' > filteredall_all_counts.borrar.txt
+  awk '$1 >= 1' filteredall_all_counts.borrar.txt > filteredall_var_counts.borrar.txt
+  awk '$1 == 2' filteredall_all_counts.borrar.txt > filteredall_homo_counts.borrar.txt
+  VAR_N=$(<filteredall_var_counts.borrar.txt wc -l)  
+  VAR_H=$(<filteredall_homo_counts.borrar.txt wc -l)
+  ALLELE_N=$(cut -f 1 filteredall_var_counts.borrar.txt | paste -sd+ | bc)
+  ALLELE_H=$(cut -f 1 filteredall_homo_counts.borrar.txt | paste -sd+ | bc)
+  echo -e "$i\t$VAR_N\t$ALLELE_N" >> filteredall_synonymous_var_counts.borrar.txt
+  echo -e "$i\t$VAR_H\t$ALLELE_H" >> filteredall_synonymous_homo_counts.borrar.txt
+  done
+  rm filteredall_var_counts.borrar.txt
+  rm filteredall_homo_counts.borrar.txt
+  
+#From outside the server:
+export SSHPASS=$(cat /Users/dani/Documents/genomics_pass.txt)
+sshpass -e scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/filteredall_synonymous_var_counts.borrar.txt /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios
+sshpass -e scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/filteredall_synonymous_homo_counts.borrar.txt /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios
+```
+
+##Missense varssubs:
+```{bash}
+
+#Missense filtered2
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation
+
+grep '#' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filtered2_SNP.lr_ann.vcf > filtered2_missense.borrar.vcf
+grep 'missense_variant' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filtered2_SNP.lr_ann.vcf >> filtered2_missense.borrar.vcf
+echo -e "individual\tvar_N\tallele_N" > filtered2_missense_var_counts.borrar.txt
+echo -e "individual\tvar_N\tallele_N" > filtered2_missense_homo_counts.borrar.txt
+INDIVIDUALS=$(bcftools query -l c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filtered2_SNP.lr_ann.vcf)
+for i in ${INDIVIDUALS[@]}
+  do
+  echo "${i}"
+  bcftools view -Ou -s "${i}" filtered2_missense.borrar.vcf | bcftools query -f '%INFO/AC\t%INFO/AN[\t%GT]\n' > filtered2_all_counts.borrar.txt
+  awk '$1 >= 1' filtered2_all_counts.borrar.txt > filtered2_var_counts.borrar.txt
+  awk '$1 == 2' filtered2_all_counts.borrar.txt > filtered2_homo_counts.borrar.txt
+  VAR_N=$(<filtered2_var_counts.borrar.txt wc -l)  
+  VAR_H=$(<filtered2_homo_counts.borrar.txt wc -l)
+  ALLELE_N=$(cut -f 1 filtered2_var_counts.borrar.txt | paste -sd+ | bc)
+  ALLELE_H=$(cut -f 1 filtered2_homo_counts.borrar.txt | paste -sd+ | bc)
+  echo -e "$i\t$VAR_N\t$ALLELE_N" >> filtered2_missense_var_counts.borrar.txt
+  echo -e "$i\t$VAR_H\t$ALLELE_H" >> filtered2_missense_homo_counts.borrar.txt
+  done
+  rm filtered2_var_counts.borrar.txt
+  rm filtered2_homo_counts.borrar.txt
 
 #Missense filteredall
-grep '#' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_variants_SNP.lr_ann.vcf > filteredall_missense.borrar.vcf
-grep 'missense_variant' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_variants_SNP.lr_ann.vcf >> filteredall_missense.borrar.vcf
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation
+
+grep '#' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.lr_ann.vcf > filteredall_missense.borrar.vcf
+grep 'missense_variant' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.lr_ann.vcf >> filteredall_missense.borrar.vcf
 echo -e "individual\tvar_N\tallele_N" > filteredall_missense_var_counts.borrar.txt
 echo -e "individual\tvar_N\tallele_N" > filteredall_missense_homo_counts.borrar.txt
-INDIVIDUALS=$(bcftools query -l c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_variants_SNP.lr_ann.vcf)
+INDIVIDUALS=$(bcftools query -l c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.lr_ann.vcf)
 for i in ${INDIVIDUALS[@]}
   do
   echo "${i}"
@@ -59,18 +233,16 @@ sshpass -e scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_
 sshpass -e scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/filteredall_missense_homo_counts.borrar.txt /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios
 ```
 
-##Misdel variants:
+##Misdel varssubs:
 ```{bash}
 
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation
 
 #Misdel filteredall
-#grep '#' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_variants_SNP.lr_ann.vcf > filteredall_missense.borrar.vcf
-#grep 'missense_variant' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_variants_SNP.lr_ann.vcf >> filteredall_missense.borrar.vcf
 bedtools intersect -a filteredall_missense.borrar.vcf -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean/missense_variants_provean_scores_deleterious.txt -header > filteredall_misdel.borrar.vcf
 echo -e "individual\tvar_N\tallele_N" > filteredall_misdel_var_counts.borrar.txt
 echo -e "individual\tvar_N\tallele_N" > filteredall_misdel_homo_counts.borrar.txt
-INDIVIDUALS=$(bcftools query -l c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_variants_SNP.lr_ann.vcf)
+INDIVIDUALS=$(bcftools query -l c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.lr_ann.vcf)
 for i in ${INDIVIDUALS[@]}
   do
   echo "${i}"
@@ -86,7 +258,30 @@ for i in ${INDIVIDUALS[@]}
   done
 rm filteredall_var_counts.borrar.txt
 rm filteredall_homo_counts.borrar.txt
-  
+
+#Misdel filtered2
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation
+
+bedtools intersect -a filtered2_missense.borrar.vcf -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean/missense_variants_provean_scores_deleterious.txt -header > filtered2_misdel.borrar.vcf
+echo -e "individual\tvar_N\tallele_N" > filtered2_misdel_var_counts.borrar.txt
+echo -e "individual\tvar_N\tallele_N" > filtered2_misdel_homo_counts.borrar.txt
+INDIVIDUALS=$(bcftools query -l c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filtered2_SNP.lr_ann.vcf)
+for i in ${INDIVIDUALS[@]}
+  do
+  echo "${i}"
+  bcftools view -Ou -s "${i}" filtered2_misdel.borrar.vcf | bcftools query -f '%INFO/AC\t%INFO/AN[\t%GT]\n' > filtered2_all_counts.borrar.txt
+  awk '$1 >= 1' filtered2_all_counts.borrar.txt > filtered2_var_counts.borrar.txt
+  awk '$1 == 2' filtered2_all_counts.borrar.txt > filtered2_homo_counts.borrar.txt
+  VAR_N=$(<filtered2_var_counts.borrar.txt wc -l)  
+  VAR_H=$(<filtered2_homo_counts.borrar.txt wc -l)
+  ALLELE_N=$(cut -f 1 filtered2_var_counts.borrar.txt | paste -sd+ | bc)
+  ALLELE_H=$(cut -f 1 filtered2_homo_counts.borrar.txt | paste -sd+ | bc)
+  echo -e "$i\t$VAR_N\t$ALLELE_N" >> filtered2_misdel_var_counts.borrar.txt
+  echo -e "$i\t$VAR_H\t$ALLELE_H" >> filtered2_misdel_homo_counts.borrar.txt
+  done
+rm filtered2_var_counts.borrar.txt
+rm filtered2_homo_counts.borrar.txt
+
 #From outside the server:
 export SSHPASS=$(cat /Users/dani/Documents/genomics_pass.txt)
 sshpass -e scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/filteredall_misdel_var_counts.borrar.txt /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios
@@ -94,18 +289,16 @@ sshpass -e scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_
 
 ```
 
-##Mistol variants:
+##Mistol varssubs:
 ```{bash}
 
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation
 
 #Mistol filteredall
-#grep '#' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_variants_SNP.lr_ann.vcf > filteredall_missense.borrar.vcf
-#grep 'missense_variant' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_variants_SNP.lr_ann.vcf >> filteredall_missense.borrar.vcf
 bedtools intersect -a filteredall_missense.borrar.vcf -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean/missense_variants_provean_scores_tolerated.txt -header > filteredall_mistol.borrar.vcf
 echo -e "individual\tvar_N\tallele_N" > filteredall_mistol_var_counts.borrar.txt
 echo -e "individual\tvar_N\tallele_N" > filteredall_mistol_homo_counts.borrar.txt
-INDIVIDUALS=$(bcftools query -l c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_variants_SNP.lr_ann.vcf)
+INDIVIDUALS=$(bcftools query -l c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.lr_ann.vcf)
 for i in ${INDIVIDUALS[@]}
   do
   echo "${i}"
@@ -121,6 +314,27 @@ for i in ${INDIVIDUALS[@]}
   done
 rm filteredall_var_counts.borrar.txt
 rm filteredall_homo_counts.borrar.txt
+
+#Mistol filtered2
+bedtools intersect -a filtered2_missense.borrar.vcf -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean/missense_variants_provean_scores_tolerated.txt -header > filtered2_mistol.borrar.vcf
+echo -e "individual\tvar_N\tallele_N" > filtered2_mistol_var_counts.borrar.txt
+echo -e "individual\tvar_N\tallele_N" > filtered2_mistol_homo_counts.borrar.txt
+INDIVIDUALS=$(bcftools query -l c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filtered2_SNP.lr_ann.vcf)
+for i in ${INDIVIDUALS[@]}
+  do
+  echo "${i}"
+  bcftools view -Ou -s "${i}" filtered2_mistol.borrar.vcf | bcftools query -f '%INFO/AC\t%INFO/AN[\t%GT]\n' > filtered2_all_counts.borrar.txt
+  awk '$1 >= 1' filtered2_all_counts.borrar.txt > filtered2_var_counts.borrar.txt
+  awk '$1 == 2' filtered2_all_counts.borrar.txt > filtered2_homo_counts.borrar.txt
+  VAR_N=$(<filtered2_var_counts.borrar.txt wc -l)  
+  VAR_H=$(<filtered2_homo_counts.borrar.txt wc -l)
+  ALLELE_N=$(cut -f 1 filtered2_var_counts.borrar.txt | paste -sd+ | bc)
+  ALLELE_H=$(cut -f 1 filtered2_homo_counts.borrar.txt | paste -sd+ | bc)
+  echo -e "$i\t$VAR_N\t$ALLELE_N" >> filtered2_mistol_var_counts.borrar.txt
+  echo -e "$i\t$VAR_H\t$ALLELE_H" >> filtered2_mistol_homo_counts.borrar.txt
+  done
+rm filtered2_var_counts.borrar.txt
+rm filtered2_homo_counts.borrar.txt
   
 #From outside the server:
 export SSHPASS=$(cat /Users/dani/Documents/genomics_pass.txt)
@@ -129,17 +343,17 @@ sshpass -e scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_
 
 ```
 
-##Nonsense variants:
+##Nonsense varssubs:
 ```{bash}
 
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation
 
 #Nonsense filteredall
-grep '#' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_variants_SNP.lr_ann.vcf > filteredall_nonsense.borrar.vcf
-grep '|HIGH|' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_variants_SNP.lr_ann.vcf >> filteredall_nonsense.borrar.vcf
+grep '#' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.lr_ann.vcf > filteredall_nonsense.borrar.vcf
+grep '|HIGH|' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.lr_ann.vcf >> filteredall_nonsense.borrar.vcf
 echo -e "individual\tvar_N\tallele_N" > filteredall_nonsense_var_counts.borrar.txt
 echo -e "individual\tvar_N\tallele_N" > filteredall_nonsense_homo_counts.borrar.txt
-INDIVIDUALS=$(bcftools query -l c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_variants_SNP.lr_ann.vcf)
+INDIVIDUALS=$(bcftools query -l c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.lr_ann.vcf)
 for i in ${INDIVIDUALS[@]}
   do
   echo "${i}"
@@ -155,7 +369,31 @@ for i in ${INDIVIDUALS[@]}
   done
   rm filteredall_var_counts.borrar.txt
   rm filteredall_homo_counts.borrar.txt
-  
+
+#Nonsense filtered2
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation
+
+grep '#' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filtered2_SNP.lr_ann.vcf > filtered2_nonsense.borrar.vcf
+grep '|HIGH|' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filtered2_SNP.lr_ann.vcf >> filtered2_nonsense.borrar.vcf
+echo -e "individual\tvar_N\tallele_N" > filtered2_nonsense_var_counts.borrar.txt
+echo -e "individual\tvar_N\tallele_N" > filtered2_nonsense_homo_counts.borrar.txt
+INDIVIDUALS=$(bcftools query -l c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filtered2_SNP.lr_ann.vcf)
+for i in ${INDIVIDUALS[@]}
+  do
+  echo "${i}"
+  bcftools view -Ou -s "${i}" filtered2_nonsense.borrar.vcf | bcftools query -f '%INFO/AC\t%INFO/AN[\t%GT]\n' > filtered2_all_counts.borrar.txt
+  awk '$1 >= 1' filtered2_all_counts.borrar.txt > filtered2_var_counts.borrar.txt
+  awk '$1 == 2' filtered2_all_counts.borrar.txt > filtered2_homo_counts.borrar.txt
+  VAR_N=$(<filtered2_var_counts.borrar.txt wc -l)  
+  VAR_H=$(<filtered2_homo_counts.borrar.txt wc -l)
+  ALLELE_N=$(cut -f 1 filtered2_var_counts.borrar.txt | paste -sd+ | bc)
+  ALLELE_H=$(cut -f 1 filtered2_homo_counts.borrar.txt | paste -sd+ | bc)
+  echo -e "$i\t$VAR_N\t$ALLELE_N" >> filtered2_nonsense_var_counts.borrar.txt
+  echo -e "$i\t$VAR_H\t$ALLELE_H" >> filtered2_nonsense_homo_counts.borrar.txt
+  done
+  rm filtered2_var_counts.borrar.txt
+  rm filtered2_homo_counts.borrar.txt
+
 #From outside the server:
 export SSHPASS=$(cat /Users/dani/Documents/genomics_pass.txt)
 sshpass -e scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/filteredall_nonsense_var_counts.borrar.txt /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios
@@ -163,7 +401,65 @@ sshpass -e scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_
 
 ```
 
-#Plot results.
+##UCNE varssubs:
+```{bash}
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation
+
+#UCNE filteredall
+grep '#' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.lr_ann.vcf > filteredall_UCNE.borrar.vcf
+grep 'UCNE' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.lr_ann.vcf >> filteredall_UCNE.borrar.vcf
+echo -e "individual\tvar_N\tallele_N" > filteredall_UCNE_var_counts.borrar.txt
+echo -e "individual\tvar_N\tallele_N" > filteredall_UCNE_homo_counts.borrar.txt
+INDIVIDUALS=$(bcftools query -l c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.lr_ann.vcf)
+for i in ${INDIVIDUALS[@]}
+  do
+  echo "${i}"
+  bcftools view -Ou -s "${i}" filteredall_UCNE.borrar.vcf | bcftools query -f '%INFO/AC\t%INFO/AN[\t%GT]\n' > filteredall_all_counts.borrar.txt
+  awk '$1 >= 1' filteredall_all_counts.borrar.txt > filteredall_var_counts.borrar.txt
+  awk '$1 == 2' filteredall_all_counts.borrar.txt > filteredall_homo_counts.borrar.txt
+  VAR_N=$(<filteredall_var_counts.borrar.txt wc -l)  
+  VAR_H=$(<filteredall_homo_counts.borrar.txt wc -l)
+  ALLELE_N=$(cut -f 1 filteredall_var_counts.borrar.txt | paste -sd+ | bc)
+  ALLELE_H=$(cut -f 1 filteredall_homo_counts.borrar.txt | paste -sd+ | bc)
+  echo -e "$i\t$VAR_N\t$ALLELE_N" >> filteredall_UCNE_var_counts.borrar.txt
+  echo -e "$i\t$VAR_H\t$ALLELE_H" >> filteredall_UCNE_homo_counts.borrar.txt
+  done
+  rm filteredall_var_counts.borrar.txt
+  rm filteredall_homo_counts.borrar.txt
+
+#UCNE filtered2
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation
+
+grep '#' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filtered2_SNP.lr_ann.vcf > filtered2_UCNE.borrar.vcf
+grep 'UCNE' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filtered2_SNP.lr_ann.vcf >> filtered2_UCNE.borrar.vcf
+echo -e "individual\tvar_N\tallele_N" > filtered2_UCNE_var_counts.borrar.txt
+echo -e "individual\tvar_N\tallele_N" > filtered2_UCNE_homo_counts.borrar.txt
+INDIVIDUALS=$(bcftools query -l c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filtered2_SNP.lr_ann.vcf)
+for i in ${INDIVIDUALS[@]}
+  do
+  echo "${i}"
+  bcftools view -Ou -s "${i}" filtered2_UCNE.borrar.vcf | bcftools query -f '%INFO/AC\t%INFO/AN[\t%GT]\n' > filtered2_all_counts.borrar.txt
+  awk '$1 >= 1' filtered2_all_counts.borrar.txt > filtered2_var_counts.borrar.txt
+  awk '$1 == 2' filtered2_all_counts.borrar.txt > filtered2_homo_counts.borrar.txt
+  VAR_N=$(<filtered2_var_counts.borrar.txt wc -l)  
+  VAR_H=$(<filtered2_homo_counts.borrar.txt wc -l)
+  ALLELE_N=$(cut -f 1 filtered2_var_counts.borrar.txt | paste -sd+ | bc)
+  ALLELE_H=$(cut -f 1 filtered2_homo_counts.borrar.txt | paste -sd+ | bc)
+  echo -e "$i\t$VAR_N\t$ALLELE_N" >> filtered2_UCNE_var_counts.borrar.txt
+  echo -e "$i\t$VAR_H\t$ALLELE_H" >> filtered2_UCNE_homo_counts.borrar.txt
+  done
+  rm filtered2_var_counts.borrar.txt
+  rm filtered2_homo_counts.borrar.txt
+
+#From outside the server:
+export SSHPASS=$(cat /Users/dani/Documents/genomics_pass.txt)
+sshpass -e scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/filteredall_UCNE_var_counts.borrar.txt /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios
+sshpass -e scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/filteredall_UCNE_homo_counts.borrar.txt /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios
+
+```
+
+#Plot variant counts.
 ```{r}
 
 feature <- "mistol" #missense #mistol #misdel #nonsense
@@ -206,3 +502,85 @@ counts_ggplot <- ggplot(data=brute_counts, aes_string("population",paste0(var_al
 ggsave(paste0("brute_",feature,"_derived_allele_",var_homo,"_",var_allele,"_counts.pdf"), width=15, height=10, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
 
 ```
+
+#Combine variants in a single file.
+```{bash}
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation
+
+FILTER=("filtered5") #filteredall #filtered5 #filtered2
+echo -e "species\tpopulation\tsample\tintergenic_V\tintergenic_A\tintronic_V\tintronic_A\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tmistol_V\tmistol_A\tmisdel_V\tmisdel_A\tnonsense_V\tnonsense_A\tUCNE_V\tUCNE_A" > ${FILTER}_combined_var_counts.borrar.txt
+paste ${FILTER}_intergenic_var_counts.borrar.txt <(cut -f2,3 ${FILTER}_intron_var_counts.borrar.txt) <(cut -f2,3 ${FILTER}_synonymous_var_counts.borrar.txt) <(cut -f2,3 ${FILTER}_missense_var_counts.borrar.txt) <(cut -f2,3 ${FILTER}_mistol_var_counts.borrar.txt) <(cut -f2,3 ${FILTER}_misdel_var_counts.borrar.txt) <(cut -f2,3 ${FILTER}_nonsense_var_counts.borrar.txt) <(cut -f2,3 ${FILTER}_UCNE_var_counts.borrar.txt) | tail -n +2 | awk -F"\t|_" '{printf ("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", $2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)}' >> ${FILTER}_combined_var_counts.borrar.txt
+
+#From outside the server:
+FILTER=("filtered5") #filteredall #filtered5 #filtered2
+export SSHPASS=$(cat /Users/dani/Documents/genomics_pass.txt)
+sshpass -e scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/${FILTER}_combined_var_counts.borrar.txt /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios
+
+```
+
+#Visualise relativised derived allele counts.
+##Relative to introns.
+```{r Plot variant count results}
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+
+type="filtered5" #filteredall #filtered5
+
+wd_path <- ("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
+variants_and_subst_wg <- read_tsv(paste0(wd_path,type,"_combined_var_counts.borrar.txt"))
+
+variants_and_subst_wg$population = factor(variants_and_subst_wg$population,levels=c("ki","no","po","sm","do"))
+print.data.frame(variants_and_subst_wg)
+
+variants_and_subst_wg_alleleR <- variants_and_subst_wg %>% mutate(synonymous=synonymous_A/intronic_A,missense=missense_A/intronic_A,mistol=mistol_A/intronic_A,misdel=misdel_A/intronic_A,nonsense=nonsense_A/intronic_A,UCNE=UCNE_A/intronic_A) %>% select(c(1:3,20:25)) %>% gather(ratio,value,-species,-population,-sample,factor_key=T)
+variants_and_subst_wg_alleleR
+
+r_average_vector <- c()
+for (r in unique(variants_and_subst_wg_alleleR$ratio)) {
+  print(r)
+  r_average <- filter(variants_and_subst_wg_alleleR,r==ratio & population=="ki") %>% select(value) %>% unlist(.,use.names=F) %>% mean()
+  r_average_vector <- c(r_average_vector,rep(r_average,nrow(filter(variants_and_subst_wg_alleleR,r==ratio))))
+}
+print(r_average_vector)
+
+relativised_variants_and_subst_wg_alleleR <- mutate(variants_and_subst_wg_alleleR, ki_relative_value=value/r_average_vector)
+
+relativised_derived_allele_allele_ratio_ggplot <- ggplot(data=relativised_variants_and_subst_wg_alleleR, aes(population,ki_relative_value,colour=population)) +
+  #facet_wrap(feature ~ species,nrow=6,ncol=2,scales="free") +
+  facet_grid(ratio ~ .,scales="fixed") +
+  geom_boxplot(width=0.5) +
+  #ggtitle("Proportion of reads at different NM") +
+  ylab("ratio") +
+  scale_y_continuous(breaks = seq(0.5, 1.2, by = 0.2)) +
+  ylim(0.5,1.2) +
+  ggtitle("ratio of variants relative to intronic and Kirov") +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+        rect=element_rect(size=1),
+        axis.line=element_line(colour="black"),
+        axis.title=element_text(size=16),
+        #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+        #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+        #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+        panel.background=element_blank(),
+        panel.border=element_rect(colour="black"),
+        #panel.grid=element_blank(),
+        #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+        plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+        #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+        legend.background=element_rect(linetype="solid", colour="black", size=.5),
+        #legend.justification=c(0,0),
+        legend.key=element_rect(colour="white"),
+        #legend.key.size=unit(1.3,"cm"),
+        #legend.position=c(0.07,0.84),
+        legend.title=element_blank()
+  )
+  relativised_derived_allele_allele_ratio_ggplot
+ggsave(paste0(type,"_derived_allele_allele_ratio_relative2introns_methodB.pdf"), width=15, height=15, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
+
+```
+
