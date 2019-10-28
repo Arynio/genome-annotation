@@ -3042,7 +3042,7 @@ relativised_derived_allele_allele_ratio_ggplot <- ggplot(data=relativised_varian
   ylab("ratio") +
   scale_y_continuous(breaks = seq(0.5, 1.2, by = 0.2)) +
   ylim(0.5,1.2) +
-  ggtitle("ratio of variants relative to intronic and Kirov") +
+  ggtitle(paste0("ratio of ",type," relative to intronic and Kirov")) +
   theme_bw() +
   theme(text=element_text(size=12,face="bold"),
         rect=element_rect(size=1),
@@ -3108,7 +3108,7 @@ relativised_derived_allele_allele_ratio_ggplot <- ggplot(data=relativised_varian
   ylab("ratio") +
   scale_y_continuous(breaks = seq(0.5, 1.2, by = 0.2)) +
   ylim(0.5,1.2) +
-  ggtitle("ratio of variants relative to intergenic and Kirov") +
+  ggtitle(paste0("ratio of ",type," relative to intergenic and Kirov")) +
   theme_bw() +
   theme(text=element_text(size=12,face="bold"),
         rect=element_rect(size=1),
@@ -3143,7 +3143,7 @@ library(dplyr)
 library(ggplot2)
 library(tidyr)
 
-type="varssubs" #varssubs #variants
+type="variants" #varssubs #variants
 
 wd_path <- ("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
 variants_and_subst_wg <- read_tsv(paste0(wd_path,"c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_ann_individual_summary_",type,"_SNP.lr_ann.txt"))
@@ -3174,7 +3174,7 @@ relativised_derived_allele_allele_ratio_ggplot <- ggplot(data=relativised_varian
   ylab("ratio") +
   scale_y_continuous(breaks = seq(0.5, 1.2, by = 0.2)) +
   ylim(0.5,1.2) +
-  ggtitle("ratio of variants relative to synonymous and Kirov") +
+  ggtitle(paste0("ratio of ",type," relative to synonymous and Kirov")) +
   theme_bw() +
   theme(text=element_text(size=12,face="bold"),
         rect=element_rect(size=1),
