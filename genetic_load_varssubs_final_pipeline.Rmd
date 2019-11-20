@@ -376,7 +376,7 @@ cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
 screen -S c_lp_do_nm2_BAMs.log
 script c_lp_do_nm2_BAMs.log
 
-cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
 declare SAMPLES=$(ls c_lp_do_*_recal_round-1.bam | cut -c9-12 | sort | uniq)
 for i in ${SAMPLES[@]}
   do
@@ -394,7 +394,7 @@ cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
 screen -S c_lp_do_nm2_BAMs_25x.log
 script c_lp_do_nm2_BAMs_25x.log
 
-cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/genome_project_samples_25x
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/genome_project_samples_25x
 declare SAMPLES=$(ls c_lp_do_*_recal_round-1_25x.bam | cut -c9-12 | sort | uniq)
 for i in ${SAMPLES[@]}
   do
@@ -412,7 +412,7 @@ cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
 screen -S c_lp_sm_nm2_BAMs.log
 script c_lp_sm_nm2_BAMs.log
 
-cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
 declare SAMPLES=$(ls c_lp_sm_*_recal_round-1.bam | cut -c9-12 | sort | uniq)
 for i in ${SAMPLES[@]}
   do
@@ -430,7 +430,7 @@ cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
 screen -S c_lp_sm_nm2_BAMs_25x.log
 script c_lp_sm_nm2_BAMs_25x.log
 
-cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/genome_project_samples_25x
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/genome_project_samples_25x
 declare SAMPLES=$(ls c_lp_sm_*_recal_round-1_25x.bam | cut -c9-12 | sort | uniq)
 for i in ${SAMPLES[@]}
   do
@@ -449,7 +449,7 @@ cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
 screen -S c_ll_ki_nm3_BAMs.log
 script c_ll_ki_nm3_BAMs.log
 
-cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
 declare SAMPLES=$(ls c_ll_ki_*_recal_round-1.bam | cut -c9-12 | sort | uniq)
 for i in ${SAMPLES[@]}
   do
@@ -467,7 +467,7 @@ cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
 screen -S c_ll_ki_nm3_BAMs_25x.log
 script c_ll_ki_nm3_BAMs_25x.log
 
-cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/MACROGEN_samples_25x
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/MACROGEN_samples_25x
 declare SAMPLES=$(ls c_ll_ki_*_recal_round-1_25x.bam | cut -c9-12 | sort | uniq)
 for i in ${SAMPLES[@]}
   do
@@ -486,7 +486,7 @@ cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
 screen -S c_ll_no_nm3_BAMs.log
 script c_ll_no_nm3_BAMs.log
 
-cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
 declare SAMPLES=$(ls c_ll_no_*_recal_round-1.bam | cut -c9-12 | sort | uniq)
 for i in ${SAMPLES[@]}
   do
@@ -505,7 +505,7 @@ cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
 screen -S c_ll_po_nm3_BAMs.log
 script c_ll_po_nm3_BAMs.log
 
-cd /home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
 declare SAMPLES=$(ls c_ll_po_*_recal_round-1.bam | cut -c9-12 | sort | uniq)
 for i in ${SAMPLES[@]}
   do
@@ -979,9 +979,7 @@ cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
 screen -S "${CALLING}_polarized.lr_ann.log"
 CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
 script "${CALLING}_polarized.lr_ann.log"
-
 CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
-
 
 S_PATH=/opt/snpEff #software path
 C_PATH=/home/dkleinman/datos/snpEff #config file path
@@ -1094,6 +1092,16 @@ if [ $TYPE != "SNP" ] && [ $TYPE != "INDEL" ] #Don't apply filters if $TYPE is i
   #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov 4332653
   #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov 4420467
 fi
+
+AÑADIR COBERTURA MIN < 100 (excluir), luego dividir por dataset, aplicar cobertura máxima 3SD, Y APLICAR LA UNIÓN DE TODOS LOS DATASETS (IBÉRICO Y BOREAL)
+
+#Generate file with high missingness variants (those that were dropped with filter 5):
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov) #write down name of the calling
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+bcftools filter -i "F_MISSING > 0.15" -Ov -o ${CALLING}"_polarized_highmissingness_"${TYPE}".lr_ann.vcf" ${CALLING}"_polarized_filtered4_"${TYPE}".lr_ann.vcf"
+
+grep -v '#' ${CALLING}"_polarized_highmissingness_"${TYPE}".lr_ann.vcf" | wc -l 
 
 ```
 
@@ -1211,6 +1219,130 @@ for j in ${DATASETS[@]}
   -env \
   --sample_file /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered/${j}_samples
   grep -v '#' ${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_perdataset_"${VAR}"_"${TYPE}".lr_ann.vcf" | wc -l #
+  done
+
+
+#Without missingness filter:
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+VAR=(varssubs) #varssubs #variants #substitutions
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+screen -S "${CALLING}-${VAR}-${TYPE}"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+script "perdataset_${VAR}_${CALLING}_${TYPE}_alt.lr_ann.log"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAM files path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+#Define input variant:
+if [ $VAR == "varssubs" ]
+  then
+  INPUT_FILE=$(echo ${CALLING}"_polarized_filtered4_"${TYPE}".lr_ann.vcf")
+elif [ $VAR == "variants" ]
+  then
+  INPUT_FILE=$(echo ${CALLING}"_polarized_variants_"${TYPE}".lr_ann.vcf")
+elif [ $VAR == "substitutions" ]
+  then
+  INPUT_FILE=$(echo ${CALLING}"_polarized_substitutions_"${TYPE}".lr_ann.vcf")
+else
+  INPUT_FILE=()
+fi
+echo $INPUT_FILE
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING)
+SPECIES=$(echo $CALLING | fold -w8 | cut -c1-4 | head -n$N_POPS | sort | uniq)
+DATASETS=$(for i in ${SPECIES[@]}; do ls ${i}*_samples | cut -d'_' -f1,2,3; done)
+NM_COV=$(echo "${CALLING}" | rev | cut -d'_' -f1,2 | rev)
+cd $V_PATH/$CALLING/annotation
+for j in ${DATASETS[@]}
+  do
+  echo "${j}"
+  cat /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered/"${j}"_samples
+  mkdir -p "${j}"_"${NM_COV}"_perdataset
+  java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+  -T SelectVariants \
+  -R $REF \
+  -V $INPUT_FILE \
+  -o ${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_perdataset_"${VAR}"_"${TYPE}"_alt.lr_ann.vcf" \
+  -env \
+  --sample_file /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered/${j}_samples
+  grep -v '#' ${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_perdataset_"${VAR}"_"${TYPE}"_alt.lr_ann.vcf" | wc -l #
+  done
+
+
+#High missingness positions:
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+VAR=(varssubs) #varssubs #variants #substitutions
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+screen -S "${CALLING}-${VAR}-${TYPE}"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+script "perdataset_${VAR}_${CALLING}_${TYPE}_highmissingness.lr_ann.log"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAM files path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+#Define input variant:
+if [ $VAR == "varssubs" ]
+  then
+  INPUT_FILE=$(echo ${CALLING}"_polarized_highmissingness_"${TYPE}".lr_ann.vcf")
+elif [ $VAR == "variants" ]
+  then
+  INPUT_FILE=$(echo ${CALLING}"_polarized_variants_"${TYPE}".lr_ann.vcf")
+elif [ $VAR == "substitutions" ]
+  then
+  INPUT_FILE=$(echo ${CALLING}"_polarized_substitutions_"${TYPE}".lr_ann.vcf")
+else
+  INPUT_FILE=()
+fi
+echo $INPUT_FILE
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING)
+SPECIES=$(echo $CALLING | fold -w8 | cut -c1-4 | head -n$N_POPS | sort | uniq)
+DATASETS=$(for i in ${SPECIES[@]}; do ls ${i}*_samples | cut -d'_' -f1,2,3; done)
+NM_COV=$(echo "${CALLING}" | rev | cut -d'_' -f1,2 | rev)
+cd $V_PATH/$CALLING/annotation
+for j in ${DATASETS[@]}
+  do
+  echo "${j}"
+  cat /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered/"${j}"_samples
+  mkdir -p "${j}"_"${NM_COV}"_perdataset
+  java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+  -T SelectVariants \
+  -R $REF \
+  -V $INPUT_FILE \
+  -o ${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_perdataset_"${VAR}"_"${TYPE}"_highmissingness.lr_ann.vcf" \
+  -env \
+  --sample_file /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered/${j}_samples
+  grep -v '#' ${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_perdataset_"${VAR}"_"${TYPE}"_highmissingness.lr_ann.vcf" | wc -l #
   done
 
 ```
@@ -1343,16 +1475,22 @@ for (i in 1:length(my_files_depthGlobal)) {
   #Max and min depth:
   maxDepth_DF = my_mean_DF + (mean_folds * my_mean_DF)
   minDepth_DF  = my_mean_DF - (mean_folds * my_mean_DF)
-  maxDepth_truncated_DF = my_mean_truncated_DF + (mean_folds * my_sd_truncated_DF)
-  minDepth_truncated_DF  = my_mean_truncated_DF - (mean_folds * my_sd_truncated_DF)
+  #maxDepth_truncated_DF = my_mean_truncated_DF + (mean_folds * my_sd_truncated_DF)
+  maxDepth_truncated_DF = my_mean_truncated_DF + (4 * my_sd_truncated_DF)
+  #minDepth_truncated_DF  = my_mean_truncated_DF - (mean_folds * my_sd_truncated_DF)
+  minDepth_truncated_DF = (my_mean_truncated_DF - (1 * my_sd_truncated_DF))/2
   #Para una o más poblaciones:
   population=unlist(strsplit(my_files_depthGlobal[i],"[.]"))[1]
   depth_per_sample <- rbind(depth_per_sample, 
                             data.frame(pop = population,
-                                       mean = my_mean_DF, sd = my_sd_DF, 
-                                       mean_truncated =  my_mean_truncated_DF, sd_truncated = my_sd_truncated_DF,
-                                       maxDepth = maxDepth_DF, minDepth = minDepth_DF,
-                                       maxDepth_truncated = maxDepth_truncated_DF, minDepth_truncated = minDepth_truncated_DF)) 
+                                       mean = my_mean_DF,
+                                       sd = my_sd_DF, 
+                                       mean_truncated = my_mean_truncated_DF,
+                                       sd_truncated = my_sd_truncated_DF,
+                                       maxDepth = maxDepth_DF, 
+                                       minDepth = minDepth_DF,
+                                       maxDepth_truncated = maxDepth_truncated_DF,
+                                       minDepth_truncated = minDepth_truncated_DF)) 
   #Plotting:
   ggplot(freq_table_truncated_DF, aes(x = value, y = freq)) + 
     geom_bar(stat = "identity", color = "black") +
@@ -1365,14 +1503,14 @@ for (i in 1:length(my_files_depthGlobal)) {
     geom_vline(xintercept=minDepth_truncated_DF,colour ="grey",linetype="dashed", size=0.5) + 
     theme_classic() + 
     theme(text = element_text(size=10))
-  plot_name=paste0("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/depth_calculus/",calling,"/",my_files_depthGlobal[i],"_",mean_folds,".pdf",sep="")
+  plot_name=paste0("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/depth_calculus/",calling,"/",my_files_depthGlobal[i],"_",mean_folds,"_corrected.pdf",sep="")
   ggsave(filename = plot_name)
 }
 
 #When finished write the table
 
 #Results for all datasets within a calling are stored in one single dataframe:
-write.table(x = depth_per_sample,file = paste("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/depth_calculus/",calling,"/",calling,"_mean_sd_depthGlobal_nm_per_dataset_mean_folds_",mean_folds,".csv", sep= ""),quote=FALSE, col.names = FALSE, row.names = FALSE, sep= " ")
+write.table(x = depth_per_sample,file = paste("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/depth_calculus/",calling,"/",calling,"_mean_sd_depthGlobal_nm_per_dataset_mean_folds_",mean_folds,"_corrected.csv", sep= ""),quote=FALSE, col.names = FALSE, row.names = FALSE, sep= " ")
 
 ```
 
@@ -1381,19 +1519,19 @@ write.table(x = depth_per_sample,file = paste("/Users/Dani/ownCloud/backup/g-w_a
 
 #From outside the server, first upload the summary table to the server:
 CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
-scp /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/depth_calculus/$CALLING/"$CALLING"_mean_sd_depthGlobal_nm_per_dataset_mean_folds_0.95.csv dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/nm_depth_calculus/$CALLING
+scp /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/depth_calculus/$CALLING/"$CALLING"_mean_sd_depthGlobal_nm_per_dataset_mean_folds_0.95_corrected.csv dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/nm_depth_calculus/$CALLING
 
 #In the server, separate in populations:
 CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
 cd /home/dkleinman/datos/nm_depth_calculus/$CALLING
-POPS=$(cat /home/dkleinman/datos/nm_depth_calculus/$CALLING/"$CALLING"_mean_sd_depthGlobal_nm_per_dataset_mean_folds_0.95.csv | awk '{print $1}')
+POPS=$(cat /home/dkleinman/datos/nm_depth_calculus/$CALLING/"$CALLING"_mean_sd_depthGlobal_nm_per_dataset_mean_folds_0.95_corrected.csv | awk '{print $1}')
 for POP in ${POPS[@]}
   do
   echo $POP
-  grep "${POP}" /home/dkleinman/datos/nm_depth_calculus/$CALLING/"$CALLING"_mean_sd_depthGlobal_nm_per_dataset_mean_folds_0.95.csv > "$POP"_mean_sd_depthGlobal_nm_per_dataset_mean_folds_0.95.csv
+  grep "${POP}" /home/dkleinman/datos/nm_depth_calculus/$CALLING/"$CALLING"_mean_sd_depthGlobal_nm_per_dataset_mean_folds_0.95_corrected.csv > "$POP"_mean_sd_depthGlobal_nm_per_dataset_mean_folds_0.95_corrected.csv
   done
 
-```    
+```
 
 #11: Perform depth filtering. Obtain list of sites with very low or high depth within each dataset, join them, and remove those sites as well as those with high missingness.
 ##At the dataset level:
@@ -1401,14 +1539,58 @@ for POP in ${POPS[@]}
 
 #For each dataset obtain the list of positions that have lower (higher) depth than the minimum (maximum) within 0.95 of the distribution, as calculated in the previous section, and join them to later remove all of them from all datasets:
 CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
-VAR=(variants) #varssubs #variants #substitutions
+VAR=(varssubs) #varssubs #variants #substitutions
 TYPE=(SNP) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
 screen -S "${CALLING}-${VAR}-${TYPE}"
 CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
 VAR=$(echo ${STY#*.} | cut -d'-' -f2)
 TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
-script "${CALLING}_depth_filter_datasets_${VAR}_${TYPE}.lr_ann.log"
+script "${CALLING}_depth_filter_datasets_${VAR}_${TYPE}_corrected.lr_ann.log"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome (first eight scaffolds only)
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING)
+SPECIES=$(echo $CALLING | fold -w8 | cut -c1-4 | head -n$N_POPS | sort | uniq)
+DATASETS=$(for i in ${SPECIES[@]}; do ls ${i}*_samples | cut -d'_' -f1,2,3; done)
+COVERAGE=$(echo "${CALLING}" | rev | cut -d'_' -f1 | rev)
+NM_COV=$(echo "${CALLING}" | rev | cut -d'_' -f1,2 | rev)
+cd $V_PATH/$CALLING/annotation
+for j in ${DATASETS[@]}
+  do
+  echo "${j}"
+  MIN_DP=$(cat /home/dkleinman/datos/nm_depth_calculus/$CALLING/${j}_${COVERAGE}*_mean_sd_depthGlobal_nm_per_dataset_mean_folds_0.95_corrected.csv | awk '{print $9}') #Obtained in section 10
+  MAX_DP=$(cat /home/dkleinman/datos/nm_depth_calculus/$CALLING/${j}_${COVERAGE}*_mean_sd_depthGlobal_nm_per_dataset_mean_folds_0.95_corrected.csv | awk '{print $8}') #Obtained in section 10
+  echo $MIN_DP
+  echo $MAX_DP
+  $BCF filter -i "DP < ${MIN_DP} || DP > ${MAX_DP}" -Ov -o ${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_minmaxdepth_to_remove_"${VAR}"_"${TYPE}"_corrected.lr_ann.vcf" ${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_perdataset_"${VAR}"_"${TYPE}".lr_ann.vcf"
+  sed -e 's/chr//' ${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_minmaxdepth_to_remove_"${VAR}"_"${TYPE}"_corrected.lr_ann.vcf" | awk '{OFS="\t"; if (!/^#/){print $1,$2-1,$2}}' > ${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_minmaxdepth_to_remove_"${VAR}"_"${TYPE}"_corrected.bed" #convert from VCF to BED
+  done
+cat *"_"${NM_COV}"_perdataset/"*"_"${NM_COV}"_minmaxdepth_to_remove_"${VAR}"_"${TYPE}"_corrected.bed" | bedtools sort | uniq > ${CALLING}"_joined_minmaxdepth_to_remove_"${VAR}"_"${TYPE}"_corrected.bed" #join all BEDs
+for j in ${DATASETS[@]}
+  do
+  echo "${j}"
+  bedtools subtract -a ${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_perdataset_"${VAR}"_"${TYPE}".lr_ann.vcf" -b ${CALLING}"_joined_minmaxdepth_to_remove_"${VAR}"_"${TYPE}"_corrected.bed" -header > ${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_perdataset_filtered_"${VAR}"_"${TYPE}"_corrected.lr_ann.vcf"
+  done
+
+
+#Without missingness filter:
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+VAR=(varssubs) #varssubs #variants #substitutions
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+screen -S "${CALLING}-${VAR}-${TYPE}"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+script "${CALLING}_depth_filter_datasets_${VAR}_${TYPE}_alt.lr_ann.log"
 CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
 VAR=$(echo ${STY#*.} | cut -d'-' -f2)
 TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
@@ -1432,30 +1614,30 @@ for j in ${DATASETS[@]}
   MAX_DP=$(cat /home/dkleinman/datos/nm_depth_calculus/$CALLING/${j}_${COVERAGE}*_mean_sd_depthGlobal_nm_per_dataset_mean_folds_0.95.csv | awk '{print $8}') #Obtained in section 10
   echo $MIN_DP
   echo $MAX_DP
-  $BCF filter -i "DP < ${MIN_DP} || DP > ${MAX_DP}" -Ov -o ${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_minmaxdepth_to_remove_"${VAR}"_"${TYPE}".lr_ann.vcf" ${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_perdataset_"${VAR}"_"${TYPE}".lr_ann.vcf"
-  sed -e 's/chr//' ${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_minmaxdepth_to_remove_"${VAR}"_"${TYPE}".lr_ann.vcf" | awk '{OFS="\t"; if (!/^#/){print $1,$2-1,$2}}' > ${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_minmaxdepth_to_remove_"${VAR}"_"${TYPE}".bed" #convert from VCF to BED
+  $BCF filter -i "DP < ${MIN_DP} || DP > ${MAX_DP}" -Ov -o ${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_minmaxdepth_to_remove_"${VAR}"_"${TYPE}"_alt.lr_ann.vcf" ${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_perdataset_"${VAR}"_"${TYPE}"_alt.lr_ann.vcf"
+  sed -e 's/chr//' ${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_minmaxdepth_to_remove_"${VAR}"_"${TYPE}"_alt.lr_ann.vcf" | awk '{OFS="\t"; if (!/^#/){print $1,$2-1,$2}}' > ${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_minmaxdepth_to_remove_"${VAR}"_"${TYPE}"_alt.bed" #convert from VCF to BED
   done
-cat *"_"${NM_COV}"_perdataset/"*"_"${NM_COV}"_minmaxdepth_to_remove_"${VAR}"_"${TYPE}".bed" | bedtools sort | uniq > ${CALLING}"_joined_minmaxdepth_to_remove_"${VAR}"_"${TYPE}".bed" #join all BEDs
+cat *"_"${NM_COV}"_perdataset/"*"_"${NM_COV}"_minmaxdepth_to_remove_"${VAR}"_"${TYPE}"_alt.bed" | bedtools sort | uniq > ${CALLING}"_joined_minmaxdepth_to_remove_"${VAR}"_"${TYPE}"_alt.bed" #join all BEDs
 for j in ${DATASETS[@]}
   do
   echo "${j}"
-  bedtools subtract -a ${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_perdataset_"${VAR}"_"${TYPE}".lr_ann.vcf" -b ${CALLING}"_joined_minmaxdepth_to_remove_"${VAR}"_"${TYPE}".bed" -header > ${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_perdataset_filtered_"${VAR}"_"${TYPE}".lr_ann.vcf"
+  bedtools subtract -a ${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_perdataset_"${VAR}"_"${TYPE}"_alt.lr_ann.vcf" -b ${CALLING}"_joined_minmaxdepth_to_remove_"${VAR}"_"${TYPE}"_alt.bed" -header > ${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_perdataset_filtered_"${VAR}"_"${TYPE}"_alt.lr_ann.vcf"
   done
-
+  
 ```
 
 ##At the global level (run the dataset level code first):
 ```{r Perform depth filtering, eval=FALSE, engine='bash'}
 
 CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
-VAR=(substitutions) #varssubs #variants #substitutions
+VAR=(varssubs) #varssubs #variants #substitutions
 TYPE=(SNP) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
 screen -S "${CALLING}-${VAR}-${TYPE}"
 CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
 VAR=$(echo ${STY#*.} | cut -d'-' -f2)
 TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
-script "${CALLING}_depth_filter_global_${VAR}_${TYPE}.lr_ann.log"
+script "${CALLING}_depth_filter_global_${VAR}_${TYPE}_corrected.lr_ann.log"
 CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
 VAR=$(echo ${STY#*.} | cut -d'-' -f2)
 TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
@@ -1463,10 +1645,34 @@ TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
 if [ $VAR == "varssubs" ]
   then
   echo $VAR
-  bedtools subtract -a ${CALLING}"_polarized_filtered5_"${TYPE}".lr_ann.vcf" -b ${CALLING}"_joined_minmaxdepth_to_remove_"${VAR}"_"${TYPE}".bed" -header > ${CALLING}"_polarized_filteredall_"${VAR}"_"${TYPE}".lr_ann.vcf"
+  bedtools subtract -a ${CALLING}"_polarized_filtered5_"${TYPE}".lr_ann.vcf" -b ${CALLING}"_joined_minmaxdepth_to_remove_"${VAR}"_"${TYPE}"_corrected.bed" -header > ${CALLING}"_polarized_filteredall_"${VAR}"_"${TYPE}"_corrected.lr_ann.vcf"
   else
   echo $VAR
-  bedtools subtract -a ${CALLING}"_polarized_"${VAR}"_"${TYPE}".lr_ann.vcf" -b ${CALLING}"_joined_minmaxdepth_to_remove_"${VAR}"_"${TYPE}".bed" -header > ${CALLING}"_polarized_filteredall_"${VAR}"_"${TYPE}".lr_ann.vcf"
+  bedtools subtract -a ${CALLING}"_polarized_"${VAR}"_"${TYPE}".lr_ann.vcf" -b ${CALLING}"_joined_minmaxdepth_to_remove_"${VAR}"_"${TYPE}"_corrected.bed" -header > ${CALLING}"_polarized_filteredall_"${VAR}"_"${TYPE}"_corrected.lr_ann.vcf"
+fi
+
+
+#Without missingness filter:
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+VAR=(varssubs) #varssubs #variants #substitutions
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+screen -S "${CALLING}-${VAR}-${TYPE}"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+script "${CALLING}_depth_filter_global_${VAR}_${TYPE}_alt.lr_ann.log"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+
+if [ $VAR == "varssubs" ]
+  then
+  echo $VAR
+  bedtools subtract -a ${CALLING}"_polarized_filtered4_"${TYPE}".lr_ann.vcf" -b ${CALLING}"_joined_minmaxdepth_to_remove_"${VAR}"_"${TYPE}"_alt.bed" -header > ${CALLING}"_polarized_filteredall_"${VAR}"_"${TYPE}"_alt.lr_ann.vcf"
+  else
+  echo $VAR
+  bedtools subtract -a ${CALLING}"_polarized_"${VAR}"_"${TYPE}"_alt.lr_ann.vcf" -b ${CALLING}"_joined_minmaxdepth_to_remove_"${VAR}"_"${TYPE}"_alt.bed" -header > ${CALLING}"_polarized_filteredall_"${VAR}"_"${TYPE}"_alt.lr_ann.vcf"
 fi
 
 ```
@@ -1475,14 +1681,14 @@ fi
 ```{r Obtain per population VCFs, eval=FALSE, engine='bash'}
 
 CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
-VAR=(substitutions) #varssubs #variants #substitutions
+VAR=(varssubs) #varssubs #variants #substitutions
 TYPE=(SNP) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
 screen -S "${CALLING}-${VAR}-${TYPE}"
 CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
 VAR=$(echo ${STY#*.} | cut -d'-' -f2)
 TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
-script "perpop_${VAR}_${CALLING}_${TYPE}.lr_ann.log"
+script "perpop_${VAR}_${CALLING}_${TYPE}_corrected.lr_ann.log"
 CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
 VAR=$(echo ${STY#*.} | cut -d'-' -f2)
 TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
@@ -1508,23 +1714,23 @@ cd $V_PATH/$CALLING/annotation
 for i in ${DATASETS[@]}
   do
   echo "${i}"
-  declare POP=$(bcftools query -l ${i}"_"${NM_COV}"_perdataset/"${i}"_"${NM_COV}"_perdataset_filtered_"${VAR}"_"${TYPE}".lr_ann.vcf" | cut -c1-7 | sort | uniq)
+  declare POP=$(bcftools query -l ${i}"_"${NM_COV}"_perdataset/"${i}"_"${NM_COV}"_perdataset_filtered_"${VAR}"_"${TYPE}"_corrected.lr_ann.vcf" | cut -c1-7 | sort | uniq)
   for j in ${POP[@]}
     do
     echo "${j}"
     rm ${i}"_"${NM_COV}"_perdataset/"${i}"_"${j}"_pop_list_to_remove.txt"
-    $BCF query -l ${i}"_"${NM_COV}"_perdataset/"${i}"_"${NM_COV}"_perdataset_filtered_"${VAR}"_"${TYPE}".lr_ann.vcf" | grep "${j}" > ${i}"_"${NM_COV}"_perdataset/"${i}"_"${j}"_pop_list_to_remove.txt"
+    $BCF query -l ${i}"_"${NM_COV}"_perdataset/"${i}"_"${NM_COV}"_perdataset_filtered_"${VAR}"_"${TYPE}"_corrected.lr_ann.vcf" | grep "${j}" > ${i}"_"${NM_COV}"_perdataset/"${i}"_"${j}"_pop_list_to_remove.txt"
     cat ${i}"_"${NM_COV}"_perdataset/"${i}"_"${j}"_pop_list_to_remove.txt"
     mkdir -p "${j}"_"${NM_COV}"_perpop
     java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
     -T SelectVariants \
     -R $REF \
-    -V ${i}"_"${NM_COV}"_perdataset/"${i}"_"${NM_COV}"_perdataset_filtered_"${VAR}"_"${TYPE}".lr_ann.vcf" \
-    -o ${j}"_"${NM_COV}"_perpop/"${i}"_"${j}"_"${NM_COV}"_perpop_"${VAR}"_"${TYPE}".lr_ann.vcf" \
+    -V ${i}"_"${NM_COV}"_perdataset/"${i}"_"${NM_COV}"_perdataset_filtered_"${VAR}"_"${TYPE}"_corrected.lr_ann.vcf" \
+    -o ${j}"_"${NM_COV}"_perpop/"${i}"_"${j}"_"${NM_COV}"_perpop_"${VAR}"_"${TYPE}"_corrected.lr_ann.vcf" \
     -env \
     --sample_file ${i}"_"${NM_COV}"_perdataset/"${i}"_"${j}"_pop_list_to_remove.txt"
     rm ${i}"_"${NM_COV}"_perdataset/"${i}"_"${j}"_pop_list_to_remove.txt"
-    grep -v '#' ${j}"_"${NM_COV}"_perpop/"${i}"_"${j}"_"${NM_COV}"_perpop_"${VAR}"_"${TYPE}".lr_ann.vcf" | wc -l #
+    grep -v '#' ${j}"_"${NM_COV}"_perpop/"${i}"_"${j}"_"${NM_COV}"_perpop_"${VAR}"_"${TYPE}"_corrected.lr_ann.vcf" | wc -l #
     done
   done
 
@@ -1757,14 +1963,14 @@ for pop in ${POPS[@]}
 ```{r Split the population VCFs into per individual VCFs, eval=FALSE, engine='bash'}
 
 CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
-VAR=(substitutions) #varssubs #variants #substitutions
+VAR=(variants) #varssubs #variants #substitutions
 TYPE=(SNP) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
 screen -S "${CALLING}-${VAR}-${TYPE}"
 CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
 VAR=$(echo ${STY#*.} | cut -d'-' -f2)
 TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
-script "individual_${VAR}_${CALLING}_${TYPE}.lr_ann.log"
+script "individual_${VAR}_${CALLING}_${TYPE}_corrected.lr_ann.log"
 CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
 VAR=$(echo ${STY#*.} | cut -d'-' -f2)
 TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
@@ -1792,7 +1998,7 @@ for i in ${POP[@]}
   do
   echo "${i}"
   mkdir -p "${i}"_"${NM_COV}"_individuals
-  VCF_LIST=$(ls ${i}"_"${NM_COV}"_perpop/"*"_"${i}"_"${NM_COV}"_perpop_"${VAR}"_"${TYPE}".lr_ann.vcf")
+  VCF_LIST=$(ls ${i}"_"${NM_COV}"_perpop/"*"_"${i}"_"${NM_COV}"_perpop_"${VAR}"_"${TYPE}"_corrected.lr_ann.vcf")
   for j in ${VCF_LIST[@]}
     do 
     INDIVIDUALS=$(bcftools query -l "${j}" | sort | uniq)
@@ -1804,7 +2010,7 @@ for i in ${POP[@]}
       -T SelectVariants \
       -R $REF \
       -V "${j}" \
-      -o ${i}"_"${NM_COV}"_individuals/"${k}"_"${NM_COV}"_individual_"${VAR}"_"${TYPE}".lr_ann.vcf" \
+      -o ${i}"_"${NM_COV}"_individuals/"${k}"_"${NM_COV}"_individual_"${VAR}"_"${TYPE}"_corrected.lr_ann.vcf" \
       -env \
       -sn $ID
       done
