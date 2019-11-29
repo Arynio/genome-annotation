@@ -1030,7 +1030,7 @@ for (f in unique(all_plot_data$feat)) {
 ```{r Calculate derived allele frequency ratio, eval=FALSE, engine='bash'}
 
 CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
-VAR=(varssubs) #varssubs #variants #substitutions
+VAR=(variants) #varssubs #variants #substitutions
 TYPE=(SNP) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
 screen -S "${CALLING}-${VAR}-${TYPE}"
@@ -1135,7 +1135,7 @@ for f in ${DEL_FEATURES[@]}
 
 #From outside the server:
 CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
-VAR=(varssubs) #varssubs #variants #substitutions
+VAR=(variants) #varssubs #variants #substitutions
 TYPE=(SNP) #write down SNP or INDEL
 scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/derived_allele_freq_ratio/${CALLING}_ALL_derived_freq_ratio_${VAR}_${TYPE}.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_ratio/
 
@@ -1221,7 +1221,7 @@ for FILE in ${FILES[@]}
     DEL_RATIO_SUBSAMPLE_NORM=$(echo "scale=6; $DEL_RATIO_SUBSAMPLE/$SYN_RATIO_ALL" | bc | awk '{printf "%f", $0}')
     echo $DEL_RATIO_SUBSAMPLE_NORM >> ${FILE/.bed/.jack1.temp} #store all subsample ratios in a file
     done
-  echo "Computing jackknife pseudovalues and variance"
+  echo "Computing jackknife variance"
   #Compute the subsamples average ratio:
   DEL_RATIO_SUBSAMPLE_SUM=$(cut -f1 ${FILE/.bed/.jack1.temp} | paste -sd+ | bc)
   DEL_RATIO_SUBSAMPLE_MEAN=$(echo "scale=6; $DEL_RATIO_SUBSAMPLE_SUM/$BLOCK_N" | bc | awk '{printf "%f", $0}')
@@ -1468,9 +1468,9 @@ library(dplyr)
 library(ggplot2)
 library(tidyr)
 
-global_derived_freq_ratios <- read_tsv("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_ratio/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_ALL_derived_freq_ratio_variants_SNP.txt",col_names=T,col_types=c("ffddddddddd")) %>% dplyr::filter(., grepl('5x', population_1),grepl('5x', population_2))
+global_derived_freq_ratios <- read_tsv("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_ratio/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_ALL_derived_freq_ratio_varssubs_SNP.txt",col_names=T,col_types=c("ffddddddddd")) %>% dplyr::filter(., grepl('5x', population_1),grepl('5x', population_2))
 
-global_derived_freq_ratios_errors <- read_tsv("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_ratio/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_variants_derived_freq_ratio_2SD_SNP.lr_ann.txt",col_names=T,col_types=c("ffdddd")) %>% dplyr::filter(., grepl('5x', population_1),grepl('5x', population_2))
+global_derived_freq_ratios_errors <- read_tsv("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_ratio/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_varssubs_derived_freq_ratio_2SD_SNP.lr_ann.txt",col_names=T,col_types=c("ffdddd")) %>% dplyr::filter(., grepl('5x', population_1),grepl('5x', population_2))
 
 global_derived_freq_ratios <- left_join(global_derived_freq_ratios,global_derived_freq_ratios_errors,by=c("population_1","population_2"))
 global_derived_freq_ratios$population_1 <- factor(global_derived_freq_ratios$population_1,levels=unique(global_derived_freq_ratios$population_1))
@@ -1536,7 +1536,7 @@ derived_freq_ratios_simple_ggplot <- ggplot(data=tidy_derived_freq_ratios_simple
       legend.position=c(0.12,0.12),
       legend.title=element_blank()) 
 derived_freq_ratios_simple_ggplot
-ggsave("c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_ALL_derived_freq_ratio_variants_SNP.simple.pdf", width=15, height=10, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_ratio")
+ggsave("c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_ALL_derived_freq_ratio_varssubs_SNP.simple.pdf", width=15, height=10, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_ratio")
 
 derived_freq_ratios_simple_errors_ggplot <-
   ggplot(data=tidy_derived_freq_ratios_simple,aes(x=populations,y=ratio_value_from1,fill=ratio_type)) +
@@ -1569,7 +1569,7 @@ derived_freq_ratios_simple_errors_ggplot <-
       legend.title=element_blank()
   )
 derived_freq_ratios_simple_errors_ggplot
-ggsave("c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_ALL_derived_freq_ratio_variants_SNP.simple_errors.pdf", width=15, height=10, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_ratio")
+ggsave("c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_ALL_derived_freq_ratio_varssubs_SNP.simple_errors.pdf", width=15, height=10, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_ratio")
 
 
 derived_freq_ratios_complete_ggplot <- ggplot(data=tidy_derived_freq_ratios_complete,aes(x=populations,y=ratio_value_from1,fill=ratio_type)) +
@@ -1600,7 +1600,7 @@ derived_freq_ratios_complete_ggplot <- ggplot(data=tidy_derived_freq_ratios_comp
       legend.position=c(0.12,0.12),
       legend.title=element_blank()) 
 derived_freq_ratios_complete_ggplot
-ggsave("c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_ALL_derived_freq_ratio_variants_SNP.complete.pdf", width=15, height=10, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_ratio")
+ggsave("c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_ALL_derived_freq_ratio_varssubs_SNP.complete.pdf", width=15, height=10, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_ratio")
 
 derived_freq_ratios_complete_errors_ggplot <-
   ggplot(data=tidy_derived_freq_ratios_complete,aes(x=populations,y=ratio_value_from1,fill=ratio_type)) +
@@ -1633,7 +1633,7 @@ derived_freq_ratios_complete_errors_ggplot <-
       legend.title=element_blank()
   )
 derived_freq_ratios_complete_errors_ggplot
-ggsave("c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_ALL_derived_freq_ratio_variants_SNP.complete_errors.pdf", width=15, height=10, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_ratio")
+ggsave("c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_ALL_derived_freq_ratio_varssubs_SNP.complete_errors.pdf", width=15, height=10, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_ratio")
 
 ```
 
@@ -1642,7 +1642,7 @@ ggsave("c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_ALL_derived_freq_
 ```{r Calculate derived allele frequency ratio, eval=FALSE, engine='bash'}
 
 CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
-VAR=(substitutions) #varssubs #variants #substitutions
+VAR=(variants) #varssubs #variants #substitutions
 TYPE=(SNP) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
 screen -S "${CALLING}-${VAR}-${TYPE}"
