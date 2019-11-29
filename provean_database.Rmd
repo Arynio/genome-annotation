@@ -16,6 +16,8 @@ cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c
 echo -e "Ala\tA\nCys\tC\nAsp\tD\nGlu\tE\nPhe\tF\nGly\tG\nHis\tH\nIle\tI\nLys\tK\nLeu\tL\nMet\tM\nAsn\tN\nPro\tP\nGln\tQ\nArg\tR\nSer\tS\nThr\tT\nVal\tV\nTrp\tW\nTyr\tY" > aminoacid_codes.txt
 
 #Obtain from the VCF the list of genes with missense variants, and their aminoacid changes
+grep '#' ./../c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filtered5_SNP.lr_ann.vcf > missense_variants.vcf
+grep 'missense_variant' ./../c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filtered5_SNP.lr_ann.vcf >> missense_variants.vcf
 grep -v '#' missense_variants.vcf | awk -F"\t|\\\\|" '{printf ("%s\t%s\t%s\t%s\n", $1,$2,$11,$18)}' | awk -F"\t" '{OFS = FS} { gsub(/p\./,"", $4); print }' > missense_variants_gene_names.txt
 
 #Replace three-letter codes with one-letter ones
