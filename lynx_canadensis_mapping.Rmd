@@ -1,0 +1,142 @@
+---
+title: "lynx_canadensis_mapping"
+output: html_document
+---
+
+#1: Overview:
+```{bash}
+
+This is the pipeline (originally written by Maria Lucena, and adapted by Daniel Kleinman) for Illumina read merging and bwa mapping (here, to Lynx canadensis reference genome) of modern libraries generated using the double stranded protocol. Merged and unmerged PE reads are mapped.
+
+In order to keep samples reasonably sorted and facilitate coding each sample has a unique prefix (this should be filename for the file filename.fastq.gz) each step in the pipeline then has a suffix.
+
+```
+
+#2: Mapping with BWA-MEM:
+##BARCODES LYNX_06_08:
+```{bash}
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/lynx_canadensis_BAM_files
+screen -S mapping_LYNX_06_08
+script mapping_LYNX_06_08.log
+
+#VARIABLES:
+RAW_PATH=/backup/grupolince/raw_data/LYNX_06_08/LYNX_06_08_not_trimmed
+REF=/GRUPOS/grupolince/reference_genomes/lynx_canadensis/lc4.fa #downloaded from https://vgp.github.io/genomeark/Lynx_canadensis/ (it's the individual 4 primary assembly, version assembly_curated from 10 January 2019), and then decompressed using gunzip -c
+THREADS=10 #number of computer cores used by bwa and samtools.
+ARRAY=($(ls $RAW_PATH/*.fastq.gz | xargs -n 1 basename | cut -d'_' -f1-3 | uniq)) #the array will contain the names of all the samples and we'll loop through it to process all the samples.
+
+#BARCODE LYNX_06_08:
+declare -A BARCODEID=(["C5RR4ACXX_7_14nf"]="c_ll_no_0075" ["C5T3DACXX_1_14nf"]="c_ll_no_0075" ["C3553ACXX_4_15nf"]="c_ll_no_0076" ["C5TMDACXX_5_15nf"]="c_ll_no_0076" ["C4592ACXX_3_16nf"]="c_ll_no_0077" ["C5TMDACXX_3_16nf"]="c_ll_no_0077" ["C3553ACXX_4_18nf"]="c_ll_no_0078" ["C5TMDACXX_1_18nf"]="c_ll_no_0078" ["C3553ACXX_4_19nf"]="c_ll_no_0079" ["C5TMDACXX_1_19nf"]="c_ll_no_0079" ["C3553ACXX_5_20nf"]="c_ll_no_0080" ["C5TMDACXX_2_20nf"]="c_ll_no_0080" ["C4592ACXX_3_21nf"]="c_ll_no_0081" ["C5TMDACXX_2_21nf"]="c_ll_no_0081" ["C3553ACXX_5_22nf"]="c_ll_no_0082" ["C5TMDACXX_3_22nf"]="c_ll_no_0082" ["C3553ACXX_5_23nf"]="c_ll_ki_0091" ["C5TMDACXX_5_23nf"]="c_ll_ki_0091" ["C3553ACXX_6_25nf"]="c_ll_ki_0092" ["C5TMDACXX_4_25nf"]="c_ll_ki_0092" ["C3553ACXX_6_27nf"]="c_ll_ki_0093" ["C5TMDACXX_4_27nf"]="c_ll_ki_0093" ["C3553ACXX_6_1nf"]="c_ll_ki_0094" ["C5T3DACXX_4_1nf"]="c_ll_ki_0094" ["C5RRAACXX_6_8nf"]="c_ll_ki_0095" ["C5RRAACXX_6_9nf"]="c_ll_ki_0096" ["C5TMDACXX_8_9nf"]="c_ll_ki_0096" ["C5TMDACXX_4_10nf"]="c_ll_ki_0097" ["C5TMUACXX_4_10nf"]="c_ll_ki_0097" ["C5TMUACXX_4_11nf"]="c_ll_ki_0098" ["C5TN1ACXX_7_11nf"]="c_ll_ki_0098" ["C5TMDACXX_8_12nf"]="c_ll_ki_0099" ["C5TMUACXX_5_12nf"]="c_ll_ki_0099" ["C5TMDACXX_8_13nf"]="c_ll_ki_0100" ["C5TMUACXX_5_13nf"]="c_ll_ki_0100" ["C5TMDACXX_7_14nf"]="c_ll_ki_0101" ["C5TMTACXX_8_14nf"]="c_ll_ki_0101" ["C5TMDACXX_7_15nf"]="c_ll_ki_0102" ["C5TMTACXX_8_15nf"]="c_ll_ki_0102" ["C5TMUACXX_2_1nf"]="c_lp_sm_0134" ["C5TN1ACXX_7_1nf"]="c_lp_sm_0134" ["C5TMUACXX_2_2nf"]="c_lp_do_0141" ["C5RRAACXX_5_3nf"]="c_lp_do_0144" ["C5T3DACXX_2_3nf"]="c_lp_do_0144" ["C5RRAACXX_5_4nf"]="c_lp_sm_0155" ["C5TMUACXX_3_5nf"]="c_lp_sm_0156" ["C5TN1ACXX_7_5nf"]="c_lp_sm_0156" ["C5TMUACXX_3_6nf"]="c_lp_sm_0161" ["C5TMTACXX_6_7nf"]="c_lp_do_0162" ["C5TN1ACXX_7_7nf"]="c_lp_do_0162" ["C5RR4ACXX_1_1nf"]="c_lp_do_0163" ["C5TN1ACXX_8_1nf"]="c_lp_do_0163" ["C5RR4ACXX_1_2nf"]="c_lp_sm_0206" ["C5TN1ACXX_8_2nf"]="c_lp_sm_0206" ["C5RR4ACXX_2_3nf"]="c_lp_sm_0208" ["C5T3DACXX_1_3nf"]="c_lp_sm_0208" ["C5RR4ACXX_2_4nf"]="c_lp_sm_0213" ["C5T3DACXX_1_4nf"]="c_lp_sm_0213" ["C5RR4ACXX_3_5nf"]="c_lp_sm_0226" ["C5T3DACXX_1_5nf"]="c_lp_sm_0226" ["C5RR4ACXX_3_6nf"]="c_lp_sm_0276" ["C5T3DACXX_1_6nf"]="c_lp_sm_0276" ["C5RR4ACXX_4_7nf"]="c_lp_do_0300" ["C5T3DACXX_2_7nf"]="c_lp_do_0300" ["C5RR4ACXX_4_8nf"]="c_lp_sm_0320" ["C5T3DACXX_1_8nf"]="c_lp_sm_0320" ["C5RR4ACXX_5_9nf"]="c_lp_sm_0325" ["C5T3DACXX_2_9nf"]="c_lp_sm_0325" ["C5RR4ACXX_5_10nf"]="c_lp_do_0333" ["C5TMDACXX_5_10nf"]="c_lp_do_0333" ["C5RR4ACXX_6_11nf"]="c_lp_do_0335" ["C5T3DACXX_2_11nf"]="c_lp_do_0335" ["C5RR4ACXX_6_12nf"]="c_lp_do_0444" ["C5T3DACXX_2_12nf"]="c_lp_do_0444" ["C5RR4ACXX_7_13nf"]="c_lp_sm_0450" ["C5T3DACXX_2_13nf"]="c_lp_sm_0450")
+
+#Check whether you are using trimmed or untrimmed data. In my case, all samples are untrimmed (explanation taken from Maria's code: "LYNX_06 y LYNX_08_09 venían trimados. No los hemos trimado. Los del proyecto genómca concluimos que no merece la pena trimarlos, porque aunque tienen adaptadores la proporción es muy poca, y el tiempo de computación es mucho.")
+
+COUNTER=0
+ARRAY_LENGTH=$(echo "${#ARRAY[@]}")
+for i in ${ARRAY[@]}
+  do
+  ((COUNTER++))
+  echo "processing fastq" $COUNTER "out of" $ARRAY_LENGTH
+  echo $i
+  bwa mem $REF $RAW_PATH/${i}_1.fastq.gz $RAW_PATH/${i}_2.fastq.gz -t $THREADS > ${i}.sam
+  samtools view -hbS ${i}.sam -@ $THREADS | samtools sort -@ $THREADS -o ${i}_sorted.bam && rm ${i}.sam
+  done
+
+```
+
+##BARCODES LYNX_09:
+```{bash}
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/lynx_canadensis_BAM_files
+screen -S mapping_LYNX_09
+script mapping_LYNX_09.log
+
+#VARIABLES:
+RAW_PATH=/backup/grupolince/raw_data/LYNX_09/LYNX_09_not_trimmed
+REF=/GRUPOS/grupolince/reference_genomes/lynx_canadensis/lc4.fa #downloaded from https://vgp.github.io/genomeark/Lynx_canadensis/ (it's the individual 4 primary assembly, version assembly_curated from 10 January 2019), and then decompressed using gunzip -c
+THREADS=10 #number of computer cores used by bwa and samtools.
+ARRAY=($(ls $RAW_PATH/*.fastq.gz | xargs -n 1 basename | cut -d'_' -f1-3 | uniq)) #the array will contain the names of all the samples and we'll loop through it to process all the samples.
+
+#BARCODE LYNX_09:
+declare -A BARCODEID=(["C6DUUANXX_2_12nf"]="c_ll_po_0001" ["C6DV6ANXX_1_12nf"]="c_ll_po_0001" ["C6DUUANXX_3_13nf"]="c_ll_po_0002" ["C6DV6ANXX_1_13nf"]="c_ll_po_0002" ["C6DUUANXX_3_14nf"]="c_ll_po_0003" ["C6DV6ANXX_1_14nf"]="c_ll_po_0003" ["C6DUUANXX_3_15nf"]="c_ll_po_0011" ["C6DV6ANXX_1_15nf"]="c_ll_po_0011" ["C6DUUANXX_2_16nf"]="c_ll_po_0014" ["C6DV6ANXX_1_16nf"]="c_ll_po_0014" ["C6DUUANXX_3_18nf"]="c_ll_po_0019" ["C6DV6ANXX_1_18nf"]="c_ll_po_0019" ["C6DUUANXX_4_19nf"]="c_ll_po_0105" ["C6DV6ANXX_1_19nf"]="c_ll_po_0105" ["C6DUUANXX_4_20nf"]="c_ll_po_0106" ["C6DV6ANXX_1_20nf"]="c_ll_po_0106" ["C6DUUANXX_2_21nf"]="c_ll_vl_0107" ["C6DV6ANXX_1_21nf"]="c_ll_vl_0107" ["C6DV6ANXX_7_5nf"]="c_ll_vl_0108" ["C6DUUANXX_2_22nf"]="c_ll_vl_0109" ["C6DUUANXX_1_23nf"]="c_ll_vl_0110" ["C6DV6ANXX_1_23nf"]="c_ll_vl_0110")
+
+#Check whether you are using trimmed or untrimmed data. In my case, all samples are untrimmed (explanation taken from Maria's code: "LYNX_06 y LYNX_08_09 venían trimados. No los hemos trimado. Los del proyecto genómca concluimos que no merece la pena trimarlos, porque aunque tienen adaptadores la proporción es muy poca, y el tiempo de computación es mucho.")
+
+COUNTER=0
+ARRAY_LENGTH=$(echo "${#ARRAY[@]}")
+for i in ${ARRAY[@]}
+  do
+  ((COUNTER++))
+  echo "processing fastq" $COUNTER "out of" $ARRAY_LENGTH
+  echo $i
+  bwa mem $REF $RAW_PATH/${i}_1.fastq.gz $RAW_PATH/${i}_2.fastq.gz -t $THREADS > ${i}.sam
+  samtools view -hbS ${i}.sam -@ $THREADS | samtools sort -@ $THREADS -o ${i}_sorted.bam && rm ${i}.sam
+  done
+
+```
+
+##BARCODES LYNX_PROJECT:
+```{bash}
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/lynx_canadensis_BAM_files
+screen -S mapping_LYNX_PROJECT
+script mapping_LYNX_PROJECT.log
+
+#VARIABLES:
+RAW_PATH=/GRUPOS/grupolince/PGenoma_fastqs/fastqs/PGenoma
+REF=/GRUPOS/grupolince/reference_genomes/lynx_canadensis/lc4.fa #downloaded from https://vgp.github.io/genomeark/Lynx_canadensis/ (it's the individual 4 primary assembly, version assembly_curated from 10 January 2019), and then decompressed using gunzip -c
+THREADS=10 #number of computer cores used by bwa and samtools.
+ARRAY=($(ls $RAW_PATH/*.fastq.gz | xargs -n 1 basename | cut -d'_' -f1-3 | uniq)) #the array will contain the names of all the samples and we'll loop through it to process all the samples.
+
+#BARCODES LYNX_PROYECT:
+declare -A BARCODEID=(["B09HCABXX_2_0"]="c_lp_do_0153" ["B09HCABXX_1_0"]="c_lp_do_0153" ["B0B5KABXX_1_0"]="c_lp_do_0153" ["B0B5KABXX_2_0"]="c_lp_do_0153" ["B09HCABXX_5_0"]="c_lp_do_0173" ["B09HCABXX_6_0"]="c_lp_do_0173" ["B0B5KABXX_6_0"]="c_lp_do_0173" ["B0B5KABXX_5_0"]="c_lp_do_0173" ["D0D6JABXX_4_0"]="c_lp_do_0443" ["D0D6JABXX_3_0"]="c_lp_do_0443" ["B0999ABXX_3_0"]="c_lp_do_0443" ["B0999ABXX_4_0"]="c_lp_do_0443" ["B09HCABXX_3_0"]="c_lp_sm_0138" ["B09HCABXX_4_0"]="c_lp_sm_0138" ["B0B5KABXX_3_0"]="c_lp_sm_0138" ["B0B5KABXX_4_0"]="c_lp_sm_0138" ["C02CHABXX_1_0"]="c_lp_sm_0140" ["C02CHABXX_2_0"]="c_lp_sm_0140" ["C02CHABXX_4_0"]="c_lp_sm_0140" ["C02CHABXX_3_0"]="c_lp_sm_0140" ["D0D6JABXX_2_0"]="c_lp_sm_0185" ["D0D6JABXX_1_0"]="c_lp_sm_0185" ["B0999ABXX_2_0"]="c_lp_sm_0185" ["B0999ABXX_1_0"]="c_lp_sm_0185" ["D0D6JABXX_5_0"]="c_lp_sm_0186" ["D0D6JABXX_6_0"]="c_lp_sm_0186" ["B0999ABXX_6_0"]="c_lp_sm_0186" ["B0999ABXX_5_0"]="c_lp_sm_0186" ["D0D6JABXX_8_0"]="c_lp_sm_0298" ["D0D6JABXX_7_0"]="c_lp_sm_0298" ["B0999ABXX_7_0"]="c_lp_sm_0298" ["B0999ABXX_8_0"]="c_lp_sm_0298" ["C02CHABXX_6_0"]="c_lp_sm_0359" ["C02CHABXX_7_0"]="c_lp_sm_0359" ["C02CHABXX_5_0"]="c_lp_sm_0359" ["C02CHABXX_8_0"]="c_lp_sm_0359" ["B09HCABXX_8_0"]="c_lp_do_0007" ["B09HCABXX_7_0"]="c_lp_do_0007" ["B0B5KABXX_7_0"]="c_lp_do_0007" ["B0B5KABXX_8_0"]="c_lp_do_0007")
+
+#Check whether you are using trimmed or untrimmed data. In my case, all samples are untrimmed (explanation taken from Maria's code: "LYNX_06 y LYNX_08_09 venían trimados. No los hemos trimado. Los del proyecto genómca concluimos que no merece la pena trimarlos, porque aunque tienen adaptadores la proporción es muy poca, y el tiempo de computación es mucho.")
+
+COUNTER=0
+ARRAY_LENGTH=$(echo "${#ARRAY[@]}")
+for i in ${ARRAY[@]}
+  do
+  ((COUNTER++))
+  echo "processing fastq" $COUNTER "out of" $ARRAY_LENGTH
+  echo $i
+  bwa mem $REF $RAW_PATH/${i}_1.fastq.gz $RAW_PATH/${i}_2.fastq.gz -t $THREADS > ${i}.sam
+  samtools view -hbS ${i}.sam -@ $THREADS | samtools sort -@ $THREADS -o ${i}_sorted.bam && rm ${i}.sam
+  done
+
+```
+
+##BARCODES REFERENCE_GENOME:
+```{bash}
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/lynx_canadensis_BAM_files
+screen -S mapping_REFERENCE_GENOME
+script mapping_REFERENCE_GENOME.log
+
+#VARIABLES:
+RAW_PATH=/GRUPOS/grupolince/PGenoma_fastqs/fastqs/Candiles
+REF=/GRUPOS/grupolince/reference_genomes/lynx_canadensis/lc4.fa #downloaded from https://vgp.github.io/genomeark/Lynx_canadensis/ (it's the individual 4 primary assembly, version assembly_curated from 10 January 2019), and then decompressed using gunzip -c
+THREADS=10 #number of computer cores used by bwa and samtools.
+ARRAY=($(ls $RAW_PATH/*.fastq.gz | xargs -n 1 basename | cut -d'_' -f1-4 | uniq)) #the array will contain the names of all the samples and we'll loop through it to process all the samples.
+
+#BARCODES REFERENCE_GENOME:
+declare -A BARCODEID=(["6220RAAXX_lane1_sequence_0"]="c_lp_sm_0221"
+["6220RAAXX_lane2_sequence_0"]="c_lp_sm_0221"
+["6220RAAXX_lane3_sequence_0"]="c_lp_sm_0221" ["6220RAAXX_lane4_sequence_0"]="c_lp_sm_0221"
+["6220RAAXX_lane5_sequence_0"]="c_lp_sm_0221"
+["6220RAAXX_lane6_sequence_0"]="c_lp_sm_0221" ["6220RAAXX_lane7_sequence_0"]="c_lp_sm_0221" ["6220RAAXX_lane8_sequence_0"]="c_lp_sm_0221" ["62AHEAAXX_lane1_sequence_0"]="c_lp_sm_0221" ["621CYAAXX_lane1_sequence_0"]="c_lp_sm_0221")
+
+#Check whether you are using trimmed or untrimmed data. In my case, all samples are untrimmed (explanation taken from Maria's code: "LYNX_06 y LYNX_08_09 venían trimados. No los hemos trimado. Los del proyecto genómca concluimos que no merece la pena trimarlos, porque aunque tienen adaptadores la proporción es muy poca, y el tiempo de computación es mucho.")
+
+COUNTER=0
+ARRAY_LENGTH=$(echo "${#ARRAY[@]}")
+for i in ${ARRAY[@]}
+  do
+  ((COUNTER++))
+  echo "processing fastq" $COUNTER "out of" $ARRAY_LENGTH
+  echo $i
+  bwa mem $REF $RAW_PATH/${i}_1.fastq.gz $RAW_PATH/${i}_2.fastq.gz -t $THREADS > ${i}.sam
+  samtools view -hbS ${i}.sam -@ $THREADS | samtools sort -@ $THREADS -o ${i}_sorted.bam && rm ${i}.sam
+  done
+
+```
