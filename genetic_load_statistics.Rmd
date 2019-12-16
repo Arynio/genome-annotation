@@ -2856,7 +2856,7 @@ library(dplyr)
 library(ggplot2)
 library(tidyr)
 
-type="variants" #varssubs #variants
+type="substitutions" #varssubs #variants #substitutions
 
 wd_path <- ("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
 variants_and_subst_wg <- read_tsv(paste0(wd_path,"c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_ann_individual_summary_",type,"_SNP.lr_ann.txt"))
@@ -3011,7 +3011,7 @@ library(dplyr)
 library(ggplot2)
 library(tidyr)
 
-type="varssubs" #varssubs #variants
+type="substitutions" #varssubs #variants #substitutions
 
 wd_path <- ("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
 variants_and_subst_wg <- read_tsv(paste0(wd_path,"c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_ann_individual_summary_",type,"_SNP.lr_ann.txt"))
@@ -3077,7 +3077,7 @@ library(dplyr)
 library(ggplot2)
 library(tidyr)
 
-type="varssubs" #varssubs #variants
+type="substitutions" #varssubs #variants #substitutions
 
 wd_path <- ("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
 variants_and_subst_wg <- read_tsv(paste0(wd_path,"c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_ann_individual_summary_",type,"_SNP.lr_ann.txt"))
@@ -3143,7 +3143,7 @@ library(dplyr)
 library(ggplot2)
 library(tidyr)
 
-type="variants" #varssubs #variants
+type="substitutions" #varssubs #variants #substitutions
 
 wd_path <- ("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
 variants_and_subst_wg <- read_tsv(paste0(wd_path,"c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_ann_individual_summary_",type,"_SNP.lr_ann.txt"))
@@ -3198,6 +3198,166 @@ relativised_derived_allele_allele_ratio_ggplot <- ggplot(data=relativised_varian
   )
   relativised_derived_allele_allele_ratio_ggplot
 ggsave(paste0(type,"_derived_allele_allele_ratio_relative2synonymous.pdf"), width=15, height=15, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
+
+```
+
+######Relative to synonymous (per individual version for Aurora).
+```{r Plot variant count results}
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+
+type="varssubs" #varssubs #variants #substitutions
+
+wd_path <- ("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
+variants_and_subst_wg <- read_tsv(paste0(wd_path,"c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_ann_individual_summary_",type,"_SNP.lr_ann.txt"))
+
+variants_and_subst_wg$dataset <- as.factor(variants_and_subst_wg$dataset)
+variants_and_subst_wg$dataset = factor(variants_and_subst_wg$dataset,levels=c("REF","GP","5x","MG")) #Reorder factor levels to: REF, GP, 5x, MG
+variants_and_subst_wg$population = factor(variants_and_subst_wg$population,levels=c("ki","no","po","sm","do"))
+print.data.frame(variants_and_subst_wg)
+
+variants_and_subst_wg_alleleR <- variants_and_subst_wg %>% mutate(synonymous=synonymous_A/synonymous_A,missense=missense_A/synonymous_A,mistol=missense_tol_A/synonymous_A,misdel=missense_del_A/synonymous_A,nonsense=nonsense_A/synonymous_A,UCNE=UCNE_A/synonymous_A) %>% select(c(1:4,28:33)) %>% gather(ratio,value,-species,-population,-dataset,-sample,factor_key=T)
+variants_and_subst_wg_alleleR
+
+r_average_vector <- c()
+for (r in unique(variants_and_subst_wg_alleleR$ratio)) {
+  print(r)
+  r_average <- filter(variants_and_subst_wg_alleleR,r==ratio & population=="ki") %>% select(value) %>% unlist(.,use.names=F) %>% mean()
+  r_average_vector <- c(r_average_vector,rep(r_average,nrow(filter(variants_and_subst_wg_alleleR,r==ratio))))
+}
+print(r_average_vector)
+
+relativised_variants_and_subst_wg_alleleR <- mutate(variants_and_subst_wg_alleleR, ki_relative_value=value/r_average_vector)
+
+relativised_derived_allele_allele_ratio_ggplot <- ggplot(data=filter(relativised_variants_and_subst_wg_alleleR,ratio != "synonymous" & ratio != "missense"), aes(population,ki_relative_value,colour=population)) +
+  #facet_wrap(feature ~ species,nrow=6,ncol=2,scales="free") +
+  facet_grid(ratio ~ .) +
+  geom_boxplot(width=0.5) +
+  #ggtitle("Proportion of reads at different NM") +
+  ylab("ratio") +
+  scale_y_continuous(breaks = seq(0.5, 1.4, by = 0.2)) +
+  ylim(0.5,1.4) +
+  ggtitle(paste0("ratio of ",type," relative to synonymous and Kirov")) +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+        rect=element_rect(size=1),
+        axis.line=element_line(colour="black"),
+        axis.title=element_text(size=16),
+        #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+        #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+        #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+        panel.background=element_blank(),
+        panel.border=element_rect(colour="black"),
+        #panel.grid=element_blank(),
+        #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+        plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+        #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+        legend.background=element_rect(linetype="solid", colour="black", size=.5),
+        #legend.justification=c(0,0),
+        legend.key=element_rect(colour="white"),
+        #legend.key.size=unit(1.3,"cm"),
+        #legend.position=c(0.07,0.84),
+        legend.title=element_blank()
+  )
+  relativised_derived_allele_allele_ratio_ggplot
+ggsave(paste0(type,"_derived_allele_allele_ratio_relative2synonymous_short.pdf"), width=15, height=15, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
+
+```
+
+######Relative to synonymous (population average version for Aurora).
+```{r Plot variant count results}
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+
+type="substitutions" #varssubs #variants #substitutions
+
+wd_path <- ("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
+variants_and_subst_wg <- read_tsv(paste0(wd_path,"c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_ann_individual_summary_",type,"_SNP.lr_ann.txt"))
+
+variants_and_subst_wg$dataset <- as.factor(variants_and_subst_wg$dataset)
+variants_and_subst_wg$dataset = factor(variants_and_subst_wg$dataset,levels=c("REF","GP","5x","MG")) #Reorder factor levels to: REF, GP, 5x, MG
+variants_and_subst_wg$population = factor(variants_and_subst_wg$population,levels=c("ki","no","po","sm","do"))
+print.data.frame(variants_and_subst_wg)
+
+variants_and_subst_wg_alleleR <- variants_and_subst_wg %>% mutate(synonymous=synonymous_A/synonymous_A,missense=missense_A/synonymous_A,mistol=missense_tol_A/synonymous_A,misdel=missense_del_A/synonymous_A,nonsense=nonsense_A/synonymous_A,UCNE=UCNE_A/synonymous_A) %>% select(c(1:4,28:33)) %>% gather(ratio,value,-species,-population,-dataset,-sample,factor_key=T)
+variants_and_subst_wg_alleleR
+
+r_average_vector <- c()
+for (r in unique(variants_and_subst_wg_alleleR$ratio)) {
+  print(r)
+  r_average <- filter(variants_and_subst_wg_alleleR,r==ratio & population=="ki") %>% select(value) %>% unlist(.,use.names=F) %>% mean()
+  r_average_vector <- c(r_average_vector,rep(r_average,nrow(filter(variants_and_subst_wg_alleleR,r==ratio))))
+}
+print(r_average_vector)
+
+relativised_variants_and_subst_wg_alleleR <- mutate(variants_and_subst_wg_alleleR, ki_relative_value=value/r_average_vector)
+
+#Obtain per population averages and standard errors:
+se <- function(x) sqrt(var(x)/length(x)) #first define the standard error function
+
+average_relativised_variants_and_subst_wg_alleleR <- data_frame("species"=character(0),"population"=character(0),"ratio"=character(0),"avg_ki_relative_value"=character(0),"se_ki_relative_value"=character(0)) #next, create the empty dataframe
+
+for (pop in unique(relativised_variants_and_subst_wg_alleleR$population)) { #then loop over each population and feature to get the (relativised) mean and standard error, and feed the dataframe
+  print(pop)
+  species <- filter(relativised_variants_and_subst_wg_alleleR,ratio==r & population==pop) %>% select(species) %>% unlist(.,use.names=F) %>% unique()
+  for (r in unique(relativised_variants_and_subst_wg_alleleR$ratio)) {
+    print(r)
+    pop_mean <- filter(relativised_variants_and_subst_wg_alleleR,ratio==r & population==pop) %>% select(ki_relative_value) %>% unlist(.,use.names=F) %>% mean()
+    #print(paste0(pop," feature ",r," average is ",pop_mean))
+    pop_se <- filter(relativised_variants_and_subst_wg_alleleR,ratio==r & population==pop) %>% select(ki_relative_value) %>% unlist(.,use.names=F) %>% se()
+    #print(paste0(pop," feature ",r," std error is ",pop_se))
+    row_data <- cbind(species,pop,r,pop_mean,pop_se)
+    colnames(row_data) <- c("species","population","ratio","avg_ki_relative_value","se_ki_relative_value")
+    average_relativised_variants_and_subst_wg_alleleR <- rbind(average_relativised_variants_and_subst_wg_alleleR,row_data,stringsAsFactors=F)
+  }
+}
+average_relativised_variants_and_subst_wg_alleleR$population = factor(average_relativised_variants_and_subst_wg_alleleR$population,levels=c("ki","no","po","sm","do"))
+average_relativised_variants_and_subst_wg_alleleR$ratio = factor(average_relativised_variants_and_subst_wg_alleleR$ratio,levels=c("synonymous","missense","mistol","misdel","nonsense","UCNE"))
+average_relativised_variants_and_subst_wg_alleleR$avg_ki_relative_value <- as.numeric(average_relativised_variants_and_subst_wg_alleleR$avg_ki_relative_value)
+average_relativised_variants_and_subst_wg_alleleR$se_ki_relative_value <- as.numeric(average_relativised_variants_and_subst_wg_alleleR$se_ki_relative_value)
+average_relativised_variants_and_subst_wg_alleleR
+write_csv(average_relativised_variants_and_subst_wg_alleleR,paste0("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/",type,"_derived_allele_allele_ratio_relative2synonymous_mean.csv"))
+
+#Plot these means and standard errors:
+average_relativised_derived_allele_allele_ratio_ggplot <- ggplot(data=filter(average_relativised_variants_and_subst_wg_alleleR,ratio != "synonymous" & ratio != "missense"), aes(population,avg_ki_relative_value,colour=population)) +
+  #facet_wrap(feature ~ species,nrow=6,ncol=2,scales="free") +
+  facet_grid(ratio ~ .) +
+  geom_point() +
+  geom_errorbar(aes(ymin=avg_ki_relative_value-se_ki_relative_value, ymax=avg_ki_relative_value+se_ki_relative_value), position=position_dodge(), width=0.5) +
+  #ggtitle("Proportion of reads at different NM") +
+  ylab("population mean ratio") +
+  scale_y_continuous(breaks = seq(0.5, 1.8, by = 0.2)) +
+  ylim(0.5,1.8) +
+  ggtitle(paste0("ratio of ",type," relative to synonymous and Kirov")) +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+        rect=element_rect(size=1),
+        axis.line=element_line(colour="black"),
+        axis.title=element_text(size=16),
+        #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+        #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+        #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+        panel.background=element_blank(),
+        panel.border=element_rect(colour="black"),
+        #panel.grid=element_blank(),
+        #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+        plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+        #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+        legend.background=element_rect(linetype="solid", colour="black", size=.5),
+        #legend.justification=c(0,0),
+        legend.key=element_rect(colour="white"),
+        #legend.key.size=unit(1.3,"cm"),
+        #legend.position=c(0.07,0.84),
+        legend.title=element_blank()
+  )
+  average_relativised_derived_allele_allele_ratio_ggplot
+ggsave(paste0(type,"_derived_allele_allele_ratio_relative2synonymous_short_mean.pdf"), width=15, height=15, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
 
 ```
 
