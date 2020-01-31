@@ -562,6 +562,7 @@ for i in ${INDIVIDUALS[@]}
 export SSHPASS=$(cat /Users/dani/Documents/genomics_pass.txt)
 sshpass -e scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/filteredall_test_nonsense_var_counts.borrar.txt /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios
 sshpass -e scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/filteredall_test_nonsense_homo_counts.borrar.txt /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios
+unset SSHPASS
 
 ```
 
