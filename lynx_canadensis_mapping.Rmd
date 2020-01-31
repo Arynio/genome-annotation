@@ -6,9 +6,9 @@ output: html_document
 #1: Overview:
 ```{bash}
 
-This is the pipeline (originally written by Maria Lucena, and adapted by Daniel Kleinman) for Illumina read merging and bwa mapping (here, to Lynx canadensis reference genome) of modern libraries generated using the double stranded protocol. Merged and unmerged PE reads are mapped.
+This is the pipeline (in part originally written by Maria Lucena, and adapted by Daniel Kleinman) for Illumina read merging and bwa mapping (here, to Lynx canadensis reference genome) of modern libraries generated using the double stranded protocol. Merged and unmerged PE reads are mapped.
 
-In order to keep samples reasonably sorted and facilitate coding each sample has a unique prefix (this should be filename for the file filename.fastq.gz) each step in the pipeline then has a suffix.
+In order to keep samples reasonably sorted and facilitate coding each sample has a unique prefix (this should be filename for the file filename.fastq.gz). Each step in the pipeline then has a suffix.
 
 ```
 
@@ -201,7 +201,7 @@ screen -S mapping_LYNX_PROJECT
 script mapping_LYNX_PROJECT.log
 
 #VARIABLES:
-RAW_PATH=/GRUPOS/grupolince/PGenoma_fastqs/fastqs/PGenoma
+RAW_PATH=/backup/grupolince/raw_data/PROYECTO_GENOMA
 REF=/GRUPOS/grupolince/reference_genomes/lynx_canadensis/lc4.fa #downloaded from https://vgp.github.io/genomeark/Lynx_canadensis/ (it's the individual 4 primary assembly, version assembly_curated from 10 January 2019), and then decompressed using gunzip -c
 THREADS=10 #number of computer cores used by bwa and samtools.
 ARRAY=($(ls $RAW_PATH/*.fastq.gz | xargs -n 1 basename | cut -d'_' -f1-3 | uniq)) #the array will contain the names of all the samples and we'll loop through it to process all the samples.
@@ -266,7 +266,6 @@ for i in ${ARRAY_MERGED_BAM_SAMPLE_NAME[@]}
   samtools index ${i}_sorted_rmdup_sorted.bam
   samtools flagstat ${i}_sorted_rmdup_sorted.bam > ${i}_sorted_rmdup_sorted.stats
   done
-LAUNCHED
 
 #GATK Realignment:
 ARRAY_MERGED_BAM_SAMPLE_NAME=($(echo ${BARCODEID[@]} | tr ' ' '\n' | sort | uniq | tr ' ' '\n'))
@@ -280,6 +279,7 @@ for i in ${ARRAY_MERGED_BAM_SAMPLE_NAME[@]}
   # IndelRealigner
   java -jar /home/tmp/Software/GATK_3.4/GenomeAnalysisTK.jar -T IndelRealigner -R $REF -targetIntervals ${i}_realignertargetcreator.intervals -I ${i}_sorted_rmdup_sorted.bam -o ${i}_sorted_rmdup_sorted_indelrealigner.bam
   done
+LAUNCHED
 
 ```
 
@@ -291,7 +291,7 @@ screen -S mapping_REFERENCE_GENOME
 script mapping_REFERENCE_GENOME.log
 
 #VARIABLES:
-RAW_PATH=/GRUPOS/grupolince/PGenoma_fastqs/fastqs/Candiles
+RAW_PATH=/backup/grupolince/raw_data/CANDILES
 REF=/GRUPOS/grupolince/reference_genomes/lynx_canadensis/lc4.fa #downloaded from https://vgp.github.io/genomeark/Lynx_canadensis/ (it's the individual 4 primary assembly, version assembly_curated from 10 January 2019), and then decompressed using gunzip -c
 THREADS=10 #number of computer cores used by bwa and samtools.
 ARRAY=($(ls $RAW_PATH/*.fastq.gz | xargs -n 1 basename | cut -d'_' -f1-4 | uniq)) #the array will contain the names of all the samples and we'll loop through it to process all the samples.
@@ -467,7 +467,339 @@ LAUNCHED
 
 ```
 
-#3: Extract edit distance from BAMs.
+#3: Perform quality checks on the BAM files.
+##Insert size distribution:
+```{bash}
+
+#We'll use picard tools with the option H, that outputs an histogram. 
+cd /GRUPOS/grupolince/lynx_genomes_5x/lynx_canadensis_BAM_files
+screen -S quality_checks_insert_size.log
+script quality_checks_insert_size.log
+
+COUNTER=0
+SAMPLE_N=$(ls *_sorted_rmdup_sorted_indelrealigner.bam | wc -l)
+for sample in *_sorted_rmdup_sorted_indelrealigner.bam
+  do
+  ((COUNTER++))
+  echo "processing sample" $COUNTER "out of" $SAMPLE_N
+  echo $sample
+  java -Xms10g -Xmx40g -jar /home/tmp/Software/Picard/picard-tools-1.66/CollectInsertSizeMetrics.jar I=$sample H=./quality_checks/${sample/.bam/.histogram_length} O=./quality_checks/${sample/.bam/.picard_length}
+  done
+
+```
+
+##Coverage:
+```{bash}
+
+#We'll calculate it using samtools.
+cd /GRUPOS/grupolince/lynx_genomes_5x/lynx_canadensis_BAM_files
+screen -S quality_checks_coverage.log
+script quality_checks_coverage.log
+
+REF=/GRUPOS/grupolince/reference_genomes/lynx_canadensis/lc4.fa
+REF_LENGTH=$(cut -f2 ${REF}.fai | paste -sd+ | bc)
+
+SAMPLELIST=($(ls *_sorted_rmdup_sorted_indelrealigner.bam | sort | uniq))
+rm global_coverage.tsv
+SAMPLE_N=$(ls *_sorted_rmdup_sorted_indelrealigner.bam | sort | uniq | wc -l)
+COUNTER=0
+echo -e "sample_name\tcoverage_based_samtools\tstdev_based_samtools" > ./quality_checks/global_coverage.tsv
+for sample in "${SAMPLELIST[@]}"
+  do
+  ((COUNTER++))
+  echo "processing sample" $COUNTER "out of" $SAMPLE_N
+  echo $sample
+  DEPTH=$(samtools depth $sample | awk -v genome_length="$REF_LENGTH" '{sum+=$3; sumsq+=$3*$3} END {print sum/genome_length; print sqrt(sumsq/genome_length - (sum/genome_length)**2)}')
+  paste <(echo $sample) <(echo $DEPTH) | sed 's/ /\t/g' | sed 's/\t\+/\t/g' >> ./quality_checks/global_coverage.tsv
+  done
+#Modify the name so that it has a common field with the previous report:
+cat ./quality_checks/global_coverage.tsv | sed 's/_sorted_rmdup_sorted_indelrealigner.bam//g' | sed 's/\t/,/g' > ./quality_checks/coverage_samtools
+rm ./quality_checks/global_coverage.tsv
+
+
+```
+
+##FastQ stats:
+###Generate stats per fastQ:
+```{bash}
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/lynx_canadensis_BAM_files/quality_checks/
+PROJECT="REFERENCE_GENOME" #LYNX_06_08 #LYNX_09 #LYNX_PROJECT #REFERENCE_GENOME #MACROGEN
+screen -S "fastq_stats-${PROJECT}"
+PROJECT=${STY#*-}
+script "fastq_stats-${PROJECT}.log"
+PROJECT=${STY#*-}
+
+if [ $PROJECT = "LYNX_06_08" ]
+  then RAW_PATH=/backup/grupolince/raw_data/LYNX_06_08/LYNX_06_08_not_trimmed
+  cd $RAW_PATH
+  ARRAY=($(ls $RAW_PATH/*.fastq.gz | xargs -n 1 basename | cut -d'_' -f1-3 | uniq))
+  #BARCODE LYNX_06_08:
+  declare -A BARCODEID=(["C5RR4ACXX_7_14nf"]="c_ll_no_0075" ["C5T3DACXX_1_14nf"]="c_ll_no_0075" ["C3553ACXX_4_15nf"]="c_ll_no_0076" ["C5TMDACXX_5_15nf"]="c_ll_no_0076" ["C4592ACXX_3_16nf"]="c_ll_no_0077" ["C5TMDACXX_3_16nf"]="c_ll_no_0077" ["C3553ACXX_4_18nf"]="c_ll_no_0078" ["C5TMDACXX_1_18nf"]="c_ll_no_0078" ["C3553ACXX_4_19nf"]="c_ll_no_0079" ["C5TMDACXX_1_19nf"]="c_ll_no_0079" ["C3553ACXX_5_20nf"]="c_ll_no_0080" ["C5TMDACXX_2_20nf"]="c_ll_no_0080" ["C4592ACXX_3_21nf"]="c_ll_no_0081" ["C5TMDACXX_2_21nf"]="c_ll_no_0081" ["C3553ACXX_5_22nf"]="c_ll_no_0082" ["C5TMDACXX_3_22nf"]="c_ll_no_0082" ["C3553ACXX_5_23nf"]="c_ll_ki_0091" ["C5TMDACXX_5_23nf"]="c_ll_ki_0091" ["C3553ACXX_6_25nf"]="c_ll_ki_0092" ["C5TMDACXX_4_25nf"]="c_ll_ki_0092" ["C3553ACXX_6_27nf"]="c_ll_ki_0093" ["C5TMDACXX_4_27nf"]="c_ll_ki_0093" ["C3553ACXX_6_1nf"]="c_ll_ki_0094" ["C5T3DACXX_4_1nf"]="c_ll_ki_0094" ["C5RRAACXX_6_8nf"]="c_ll_ki_0095" ["C5RRAACXX_6_9nf"]="c_ll_ki_0096" ["C5TMDACXX_8_9nf"]="c_ll_ki_0096" ["C5TMDACXX_4_10nf"]="c_ll_ki_0097" ["C5TMUACXX_4_10nf"]="c_ll_ki_0097" ["C5TMUACXX_4_11nf"]="c_ll_ki_0098" ["C5TN1ACXX_7_11nf"]="c_ll_ki_0098" ["C5TMDACXX_8_12nf"]="c_ll_ki_0099" ["C5TMUACXX_5_12nf"]="c_ll_ki_0099" ["C5TMDACXX_8_13nf"]="c_ll_ki_0100" ["C5TMUACXX_5_13nf"]="c_ll_ki_0100" ["C5TMDACXX_7_14nf"]="c_ll_ki_0101" ["C5TMTACXX_8_14nf"]="c_ll_ki_0101" ["C5TMDACXX_7_15nf"]="c_ll_ki_0102" ["C5TMTACXX_8_15nf"]="c_ll_ki_0102" ["C5TMUACXX_2_1nf"]="c_lp_sm_0134" ["C5TN1ACXX_7_1nf"]="c_lp_sm_0134" ["C5TMUACXX_2_2nf"]="c_lp_do_0141" ["C5RRAACXX_5_3nf"]="c_lp_do_0144" ["C5T3DACXX_2_3nf"]="c_lp_do_0144" ["C5RRAACXX_5_4nf"]="c_lp_sm_0155" ["C5TMUACXX_3_5nf"]="c_lp_sm_0156" ["C5TN1ACXX_7_5nf"]="c_lp_sm_0156" ["C5TMUACXX_3_6nf"]="c_lp_sm_0161" ["C5TMTACXX_6_7nf"]="c_lp_do_0162" ["C5TN1ACXX_7_7nf"]="c_lp_do_0162" ["C5RR4ACXX_1_1nf"]="c_lp_do_0163" ["C5TN1ACXX_8_1nf"]="c_lp_do_0163" ["C5RR4ACXX_1_2nf"]="c_lp_sm_0206" ["C5TN1ACXX_8_2nf"]="c_lp_sm_0206" ["C5RR4ACXX_2_3nf"]="c_lp_sm_0208" ["C5T3DACXX_1_3nf"]="c_lp_sm_0208" ["C5RR4ACXX_2_4nf"]="c_lp_sm_0213" ["C5T3DACXX_1_4nf"]="c_lp_sm_0213" ["C5RR4ACXX_3_5nf"]="c_lp_sm_0226" ["C5T3DACXX_1_5nf"]="c_lp_sm_0226" ["C5RR4ACXX_3_6nf"]="c_lp_sm_0276" ["C5T3DACXX_1_6nf"]="c_lp_sm_0276" ["C5RR4ACXX_4_7nf"]="c_lp_do_0300" ["C5T3DACXX_2_7nf"]="c_lp_do_0300" ["C5RR4ACXX_4_8nf"]="c_lp_sm_0320" ["C5T3DACXX_1_8nf"]="c_lp_sm_0320" ["C5RR4ACXX_5_9nf"]="c_lp_sm_0325" ["C5T3DACXX_2_9nf"]="c_lp_sm_0325" ["C5RR4ACXX_5_10nf"]="c_lp_do_0333" ["C5TMDACXX_5_10nf"]="c_lp_do_0333" ["C5RR4ACXX_6_11nf"]="c_lp_do_0335" ["C5T3DACXX_2_11nf"]="c_lp_do_0335" ["C5RR4ACXX_6_12nf"]="c_lp_do_0444" ["C5T3DACXX_2_12nf"]="c_lp_do_0444" ["C5RR4ACXX_7_13nf"]="c_lp_sm_0450" ["C5T3DACXX_2_13nf"]="c_lp_sm_0450")
+  COUNTER=0
+  ARRAY_LENGTH=$(echo "${#ARRAY[@]}")
+  for i in ${ARRAY[@]}
+    do
+    ((COUNTER++))
+    echo "processing fastq" $COUNTER "out of" $ARRAY_LENGTH
+    echo $i
+    echo ${BARCODEID["${i}"]}_${i}
+    zcat ${i}_1.fastq.gz | wc -l | awk '{print $1/4}' > /GRUPOS/grupolince/lynx_genomes_5x/lynx_canadensis_BAM_files/quality_checks/${BARCODEID["${i}"]}_${i}.borrar1.rawseq
+    zcat ${i}_2.fastq.gz | wc -l | awk '{print $1/4}' > /GRUPOS/grupolince/lynx_genomes_5x/lynx_canadensis_BAM_files/quality_checks/${BARCODEID["${i}"]}_${i}.borrar2.rawseq
+    done
+  echo $PROJECT "project complete"
+  
+elif [ $PROJECT = "LYNX_09" ]
+  then RAW_PATH=/backup/grupolince/raw_data/LYNX_09/LYNX_09_not_trimmed
+  cd $RAW_PATH
+  ARRAY=($(ls $RAW_PATH/*.fastq.gz | xargs -n 1 basename | cut -d'_' -f1-3 | uniq))
+  #BARCODE LYNX_09:
+  declare -A BARCODEID=(["C6DUUANXX_2_12nf"]="c_ll_po_0001" ["C6DV6ANXX_1_12nf"]="c_ll_po_0001" ["C6DUUANXX_3_13nf"]="c_ll_po_0002" ["C6DV6ANXX_1_13nf"]="c_ll_po_0002" ["C6DUUANXX_3_14nf"]="c_ll_po_0003" ["C6DV6ANXX_1_14nf"]="c_ll_po_0003" ["C6DUUANXX_3_15nf"]="c_ll_po_0011" ["C6DV6ANXX_1_15nf"]="c_ll_po_0011" ["C6DUUANXX_2_16nf"]="c_ll_po_0014" ["C6DV6ANXX_1_16nf"]="c_ll_po_0014" ["C6DUUANXX_3_18nf"]="c_ll_po_0019" ["C6DV6ANXX_1_18nf"]="c_ll_po_0019" ["C6DUUANXX_4_19nf"]="c_ll_po_0105" ["C6DV6ANXX_1_19nf"]="c_ll_po_0105" ["C6DUUANXX_4_20nf"]="c_ll_po_0106" ["C6DV6ANXX_1_20nf"]="c_ll_po_0106")
+  COUNTER=0
+  ARRAY_LENGTH=$(echo "${#ARRAY[@]}")
+  for i in ${ARRAY[@]}
+    do
+    ((COUNTER++))
+    echo "processing fastq" $COUNTER "out of" $ARRAY_LENGTH
+    echo $i
+    echo ${BARCODEID["${i}"]}_${i}
+    zcat ${i}_1.fastq.gz | wc -l | awk '{print $1/4}' > /GRUPOS/grupolince/lynx_genomes_5x/lynx_canadensis_BAM_files/quality_checks/${BARCODEID["${i}"]}_${i}.borrar1.rawseq
+    zcat ${i}_2.fastq.gz | wc -l | awk '{print $1/4}' > /GRUPOS/grupolince/lynx_genomes_5x/lynx_canadensis_BAM_files/quality_checks/${BARCODEID["${i}"]}_${i}.borrar2.rawseq
+    done
+  echo $PROJECT "project complete"
+  
+elif [ $PROJECT = "LYNX_PROJECT" ]
+  then RAW_PATH=/backup/grupolince/raw_data/PROYECTO_GENOMA
+  cd $RAW_PATH
+  ARRAY=($(ls $RAW_PATH/*.fastq.gz | xargs -n 1 basename | cut -d'_' -f1-3 | uniq))
+  #BARCODES LYNX_PROYECT:
+  declare -A BARCODEID=(["B09HCABXX_2_0"]="c_lp_do_0153" ["B09HCABXX_1_0"]="c_lp_do_0153" ["B0B5KABXX_1_0"]="c_lp_do_0153" ["B0B5KABXX_2_0"]="c_lp_do_0153" ["B09HCABXX_5_0"]="c_lp_do_0173" ["B09HCABXX_6_0"]="c_lp_do_0173" ["B0B5KABXX_6_0"]="c_lp_do_0173" ["B0B5KABXX_5_0"]="c_lp_do_0173" ["D0D6JABXX_4_0"]="c_lp_do_0443" ["D0D6JABXX_3_0"]="c_lp_do_0443" ["B0999ABXX_3_0"]="c_lp_do_0443" ["B0999ABXX_4_0"]="c_lp_do_0443" ["B09HCABXX_3_0"]="c_lp_sm_0138" ["B09HCABXX_4_0"]="c_lp_sm_0138" ["B0B5KABXX_3_0"]="c_lp_sm_0138" ["B0B5KABXX_4_0"]="c_lp_sm_0138" ["C02CHABXX_1_0"]="c_lp_sm_0140" ["C02CHABXX_2_0"]="c_lp_sm_0140" ["C02CHABXX_4_0"]="c_lp_sm_0140" ["C02CHABXX_3_0"]="c_lp_sm_0140" ["D0D6JABXX_2_0"]="c_lp_sm_0185" ["D0D6JABXX_1_0"]="c_lp_sm_0185" ["B0999ABXX_2_0"]="c_lp_sm_0185" ["B0999ABXX_1_0"]="c_lp_sm_0185" ["D0D6JABXX_5_0"]="c_lp_sm_0186" ["D0D6JABXX_6_0"]="c_lp_sm_0186" ["B0999ABXX_6_0"]="c_lp_sm_0186" ["B0999ABXX_5_0"]="c_lp_sm_0186" ["D0D6JABXX_8_0"]="c_lp_sm_0298" ["D0D6JABXX_7_0"]="c_lp_sm_0298" ["B0999ABXX_7_0"]="c_lp_sm_0298" ["B0999ABXX_8_0"]="c_lp_sm_0298" ["C02CHABXX_6_0"]="c_lp_sm_0359" ["C02CHABXX_7_0"]="c_lp_sm_0359" ["C02CHABXX_5_0"]="c_lp_sm_0359" ["C02CHABXX_8_0"]="c_lp_sm_0359" ["B09HCABXX_8_0"]="c_lp_do_0007" ["B09HCABXX_7_0"]="c_lp_do_0007" ["B0B5KABXX_7_0"]="c_lp_do_0007" ["B0B5KABXX_8_0"]="c_lp_do_0007")
+  COUNTER=0
+  ARRAY_LENGTH=$(echo "${#ARRAY[@]}")
+  for i in ${ARRAY[@]}
+    do
+    ((COUNTER++))
+    echo "processing fastq" $COUNTER "out of" $ARRAY_LENGTH
+    echo $i
+    echo ${BARCODEID["${i}"]}_${i}
+    zcat ${i}_1.fastq.gz | wc -l | awk '{print $1/4}' > /GRUPOS/grupolince/lynx_genomes_5x/lynx_canadensis_BAM_files/quality_checks/${BARCODEID["${i}"]}_${i}.borrar1.rawseq
+    zcat ${i}_2.fastq.gz | wc -l | awk '{print $1/4}' > /GRUPOS/grupolince/lynx_genomes_5x/lynx_canadensis_BAM_files/quality_checks/${BARCODEID["${i}"]}_${i}.borrar2.rawseq
+    done
+  echo $PROJECT "project complete"
+
+elif [ $PROJECT = "REFERENCE_GENOME" ]
+  then RAW_PATH=/backup/grupolince/raw_data/CANDILES
+  cd $RAW_PATH
+  ARRAY=($(ls $RAW_PATH/*.fastq.gz | xargs -n 1 basename | cut -d'_' -f1-4 | uniq))
+  #BARCODES REFERENCE_GENOME:
+  declare -A BARCODEID=(["6220RAAXX_lane1_sequence_0"]="c_lp_sm_0221"
+["6220RAAXX_lane2_sequence_0"]="c_lp_sm_0221"
+["6220RAAXX_lane3_sequence_0"]="c_lp_sm_0221" ["6220RAAXX_lane4_sequence_0"]="c_lp_sm_0221"
+["6220RAAXX_lane5_sequence_0"]="c_lp_sm_0221"
+["6220RAAXX_lane6_sequence_0"]="c_lp_sm_0221" ["6220RAAXX_lane7_sequence_0"]="c_lp_sm_0221" ["6220RAAXX_lane8_sequence_0"]="c_lp_sm_0221" ["62AHEAAXX_lane1_sequence_0"]="c_lp_sm_0221" ["621CYAAXX_lane1_sequence_0"]="c_lp_sm_0221")
+  COUNTER=0
+  ARRAY_LENGTH=$(echo "${#ARRAY[@]}")
+  for i in ${ARRAY[@]}
+    do
+    ((COUNTER++))
+    echo "processing fastq" $COUNTER "out of" $ARRAY_LENGTH
+    echo $i
+    echo ${BARCODEID["${i}"]}_${i}
+    zcat ${i}_1.fastq.gz | wc -l | awk '{print $1/4}' > /GRUPOS/grupolince/lynx_genomes_5x/lynx_canadensis_BAM_files/quality_checks/${BARCODEID["${i}"]}_${i}.borrar1.rawseq
+    zcat ${i}_2.fastq.gz | wc -l | awk '{print $1/4}' > /GRUPOS/grupolince/lynx_genomes_5x/lynx_canadensis_BAM_files/quality_checks/${BARCODEID["${i}"]}_${i}.borrar2.rawseq
+    done
+  echo $PROJECT "project complete"
+  
+elif [ $PROJECT = "MACROGEN" ]
+  then RAW_PATH=/backup/grupolince/raw_data/MACROGEN/MACROGEN_not_trimmed
+  cd $RAW_PATH
+  ARRAY=($(ls $RAW_PATH/*.fastq.gz | xargs -n 1 basename | cut -d'_' -f1 | uniq))
+  #BARCODES MACROGEN:
+  declare -A BARCODEID=(["LC1"]="c_lc_zz_0001" ["LL90"]="c_ll_ki_0090" ["LR1"]="c_lr_zz_0001")
+  COUNTER=0
+  ARRAY_LENGTH=$(echo "${#ARRAY[@]}")
+  for i in ${ARRAY[@]}
+    do
+    ((COUNTER++))
+    echo "processing fastq" $COUNTER "out of" $ARRAY_LENGTH
+    echo $i
+    echo ${BARCODEID["${i}"]}_${i}
+    zcat ${i}_R1.fastq.gz | wc -l | awk '{print $1/4}' > /GRUPOS/grupolince/lynx_genomes_5x/lynx_canadensis_BAM_files/quality_checks/${BARCODEID["${i}"]}_${i}.borrar1.rawseq
+    zcat ${i}_R2.fastq.gz | wc -l | awk '{print $1/4}' > /GRUPOS/grupolince/lynx_genomes_5x/lynx_canadensis_BAM_files/quality_checks/${BARCODEID["${i}"]}_${i}.borrar2.rawseq
+    done
+  echo $PROJECT "project complete"
+fi
+
+```
+
+###Combine stats per sample:
+```{bash}
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/lynx_canadensis_BAM_files/quality_checks/
+SAMPLESLIST=($(ls c_*.borrar*.rawseq | cut -c 1-12 | sort | uniq))
+for sample in "${SAMPLESLIST[@]}"
+  do
+  echo "${sample}"
+  cat "${sample}"*.borrar1.rawseq | awk '{sum+=$1}END{print sum}' > "${sample}"_R1.rawseq
+  cat "${sample}"*.borrar2.rawseq | awk '{sum+=$1}END{print sum}' > "${sample}"_R2.rawseq
+  done
+rm *borrar*
+
+```
+
+##BAM stats:
+```{bash}
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/lynx_canadensis_BAM_files/quality_checks/
+PROJECT="MACROGEN" #LYNX_06_08 #LYNX_09 #LYNX_PROJECT #REFERENCE_GENOME #MACROGEN
+screen -S "bam_stats-${PROJECT}"
+PROJECT=${STY#*-}
+script "bam_stats-${PROJECT}.log"
+PROJECT=${STY#*-}
+
+if [ $PROJECT = "LYNX_06_08" ]
+  then
+  cd /GRUPOS/grupolince/lynx_genomes_5x/lynx_canadensis_BAM_files
+  #BARCODE LYNX_06_08:
+  declare -A BARCODEID=(["C5RR4ACXX_7_14nf"]="c_ll_no_0075" ["C5T3DACXX_1_14nf"]="c_ll_no_0075" ["C3553ACXX_4_15nf"]="c_ll_no_0076" ["C5TMDACXX_5_15nf"]="c_ll_no_0076" ["C4592ACXX_3_16nf"]="c_ll_no_0077" ["C5TMDACXX_3_16nf"]="c_ll_no_0077" ["C3553ACXX_4_18nf"]="c_ll_no_0078" ["C5TMDACXX_1_18nf"]="c_ll_no_0078" ["C3553ACXX_4_19nf"]="c_ll_no_0079" ["C5TMDACXX_1_19nf"]="c_ll_no_0079" ["C3553ACXX_5_20nf"]="c_ll_no_0080" ["C5TMDACXX_2_20nf"]="c_ll_no_0080" ["C4592ACXX_3_21nf"]="c_ll_no_0081" ["C5TMDACXX_2_21nf"]="c_ll_no_0081" ["C3553ACXX_5_22nf"]="c_ll_no_0082" ["C5TMDACXX_3_22nf"]="c_ll_no_0082" ["C3553ACXX_5_23nf"]="c_ll_ki_0091" ["C5TMDACXX_5_23nf"]="c_ll_ki_0091" ["C3553ACXX_6_25nf"]="c_ll_ki_0092" ["C5TMDACXX_4_25nf"]="c_ll_ki_0092" ["C3553ACXX_6_27nf"]="c_ll_ki_0093" ["C5TMDACXX_4_27nf"]="c_ll_ki_0093" ["C3553ACXX_6_1nf"]="c_ll_ki_0094" ["C5T3DACXX_4_1nf"]="c_ll_ki_0094" ["C5RRAACXX_6_8nf"]="c_ll_ki_0095" ["C5RRAACXX_6_9nf"]="c_ll_ki_0096" ["C5TMDACXX_8_9nf"]="c_ll_ki_0096" ["C5TMDACXX_4_10nf"]="c_ll_ki_0097" ["C5TMUACXX_4_10nf"]="c_ll_ki_0097" ["C5TMUACXX_4_11nf"]="c_ll_ki_0098" ["C5TN1ACXX_7_11nf"]="c_ll_ki_0098" ["C5TMDACXX_8_12nf"]="c_ll_ki_0099" ["C5TMUACXX_5_12nf"]="c_ll_ki_0099" ["C5TMDACXX_8_13nf"]="c_ll_ki_0100" ["C5TMUACXX_5_13nf"]="c_ll_ki_0100" ["C5TMDACXX_7_14nf"]="c_ll_ki_0101" ["C5TMTACXX_8_14nf"]="c_ll_ki_0101" ["C5TMDACXX_7_15nf"]="c_ll_ki_0102" ["C5TMTACXX_8_15nf"]="c_ll_ki_0102" ["C5TMUACXX_2_1nf"]="c_lp_sm_0134" ["C5TN1ACXX_7_1nf"]="c_lp_sm_0134" ["C5TMUACXX_2_2nf"]="c_lp_do_0141" ["C5RRAACXX_5_3nf"]="c_lp_do_0144" ["C5T3DACXX_2_3nf"]="c_lp_do_0144" ["C5RRAACXX_5_4nf"]="c_lp_sm_0155" ["C5TMUACXX_3_5nf"]="c_lp_sm_0156" ["C5TN1ACXX_7_5nf"]="c_lp_sm_0156" ["C5TMUACXX_3_6nf"]="c_lp_sm_0161" ["C5TMTACXX_6_7nf"]="c_lp_do_0162" ["C5TN1ACXX_7_7nf"]="c_lp_do_0162" ["C5RR4ACXX_1_1nf"]="c_lp_do_0163" ["C5TN1ACXX_8_1nf"]="c_lp_do_0163" ["C5RR4ACXX_1_2nf"]="c_lp_sm_0206" ["C5TN1ACXX_8_2nf"]="c_lp_sm_0206" ["C5RR4ACXX_2_3nf"]="c_lp_sm_0208" ["C5T3DACXX_1_3nf"]="c_lp_sm_0208" ["C5RR4ACXX_2_4nf"]="c_lp_sm_0213" ["C5T3DACXX_1_4nf"]="c_lp_sm_0213" ["C5RR4ACXX_3_5nf"]="c_lp_sm_0226" ["C5T3DACXX_1_5nf"]="c_lp_sm_0226" ["C5RR4ACXX_3_6nf"]="c_lp_sm_0276" ["C5T3DACXX_1_6nf"]="c_lp_sm_0276" ["C5RR4ACXX_4_7nf"]="c_lp_do_0300" ["C5T3DACXX_2_7nf"]="c_lp_do_0300" ["C5RR4ACXX_4_8nf"]="c_lp_sm_0320" ["C5T3DACXX_1_8nf"]="c_lp_sm_0320" ["C5RR4ACXX_5_9nf"]="c_lp_sm_0325" ["C5T3DACXX_2_9nf"]="c_lp_sm_0325" ["C5RR4ACXX_5_10nf"]="c_lp_do_0333" ["C5TMDACXX_5_10nf"]="c_lp_do_0333" ["C5RR4ACXX_6_11nf"]="c_lp_do_0335" ["C5T3DACXX_2_11nf"]="c_lp_do_0335" ["C5RR4ACXX_6_12nf"]="c_lp_do_0444" ["C5T3DACXX_2_12nf"]="c_lp_do_0444" ["C5RR4ACXX_7_13nf"]="c_lp_sm_0450" ["C5T3DACXX_2_13nf"]="c_lp_sm_0450")
+  COUNTER=0
+  SAMPLESLIST=($(echo ${BARCODEID[@]} | tr ' ' '\n' | sort | uniq | tr ' ' '\n'))
+  ARRAY_LENGTH=$(echo "${#SAMPLESLIST[@]}")
+  for sample in "${SAMPLESLIST[@]}"
+    do
+    ((COUNTER++))
+    echo "processing bam" $COUNTER "out of" $ARRAY_LENGTH
+    echo "${sample}"
+    samtools flagstat ${sample}_sorted_rmdup_sorted_indelrealigner.bam > quality_checks/${sample}_bam.stats
+    done
+  echo $PROJECT "project complete"
+  
+elif [ $PROJECT = "LYNX_09" ]
+  then
+  cd /GRUPOS/grupolince/lynx_genomes_5x/lynx_canadensis_BAM_files
+  #BARCODE LYNX_09:
+  declare -A BARCODEID=(["C6DUUANXX_2_12nf"]="c_ll_po_0001" ["C6DV6ANXX_1_12nf"]="c_ll_po_0001" ["C6DUUANXX_3_13nf"]="c_ll_po_0002" ["C6DV6ANXX_1_13nf"]="c_ll_po_0002" ["C6DUUANXX_3_14nf"]="c_ll_po_0003" ["C6DV6ANXX_1_14nf"]="c_ll_po_0003" ["C6DUUANXX_3_15nf"]="c_ll_po_0011" ["C6DV6ANXX_1_15nf"]="c_ll_po_0011" ["C6DUUANXX_2_16nf"]="c_ll_po_0014" ["C6DV6ANXX_1_16nf"]="c_ll_po_0014" ["C6DUUANXX_3_18nf"]="c_ll_po_0019" ["C6DV6ANXX_1_18nf"]="c_ll_po_0019" ["C6DUUANXX_4_19nf"]="c_ll_po_0105" ["C6DV6ANXX_1_19nf"]="c_ll_po_0105" ["C6DUUANXX_4_20nf"]="c_ll_po_0106" ["C6DV6ANXX_1_20nf"]="c_ll_po_0106")
+  COUNTER=0
+  SAMPLESLIST=($(echo ${BARCODEID[@]} | tr ' ' '\n' | sort | uniq | tr ' ' '\n'))
+  ARRAY_LENGTH=$(echo "${#SAMPLESLIST[@]}")
+  for sample in "${SAMPLESLIST[@]}"
+    do
+    ((COUNTER++))
+    echo "processing bam" $COUNTER "out of" $ARRAY_LENGTH
+    echo "${sample}"
+    samtools flagstat ${sample}_sorted_rmdup_sorted_indelrealigner.bam > quality_checks/${sample}_bam.stats
+    done
+  echo $PROJECT "project complete"
+  
+elif [ $PROJECT = "LYNX_PROJECT" ]
+  then
+  cd /GRUPOS/grupolince/lynx_genomes_5x/lynx_canadensis_BAM_files
+  #BARCODES LYNX_PROYECT:
+  declare -A BARCODEID=(["B09HCABXX_2_0"]="c_lp_do_0153" ["B09HCABXX_1_0"]="c_lp_do_0153" ["B0B5KABXX_1_0"]="c_lp_do_0153" ["B0B5KABXX_2_0"]="c_lp_do_0153" ["B09HCABXX_5_0"]="c_lp_do_0173" ["B09HCABXX_6_0"]="c_lp_do_0173" ["B0B5KABXX_6_0"]="c_lp_do_0173" ["B0B5KABXX_5_0"]="c_lp_do_0173" ["D0D6JABXX_4_0"]="c_lp_do_0443" ["D0D6JABXX_3_0"]="c_lp_do_0443" ["B0999ABXX_3_0"]="c_lp_do_0443" ["B0999ABXX_4_0"]="c_lp_do_0443" ["B09HCABXX_3_0"]="c_lp_sm_0138" ["B09HCABXX_4_0"]="c_lp_sm_0138" ["B0B5KABXX_3_0"]="c_lp_sm_0138" ["B0B5KABXX_4_0"]="c_lp_sm_0138" ["C02CHABXX_1_0"]="c_lp_sm_0140" ["C02CHABXX_2_0"]="c_lp_sm_0140" ["C02CHABXX_4_0"]="c_lp_sm_0140" ["C02CHABXX_3_0"]="c_lp_sm_0140" ["D0D6JABXX_2_0"]="c_lp_sm_0185" ["D0D6JABXX_1_0"]="c_lp_sm_0185" ["B0999ABXX_2_0"]="c_lp_sm_0185" ["B0999ABXX_1_0"]="c_lp_sm_0185" ["D0D6JABXX_5_0"]="c_lp_sm_0186" ["D0D6JABXX_6_0"]="c_lp_sm_0186" ["B0999ABXX_6_0"]="c_lp_sm_0186" ["B0999ABXX_5_0"]="c_lp_sm_0186" ["D0D6JABXX_8_0"]="c_lp_sm_0298" ["D0D6JABXX_7_0"]="c_lp_sm_0298" ["B0999ABXX_7_0"]="c_lp_sm_0298" ["B0999ABXX_8_0"]="c_lp_sm_0298" ["C02CHABXX_6_0"]="c_lp_sm_0359" ["C02CHABXX_7_0"]="c_lp_sm_0359" ["C02CHABXX_5_0"]="c_lp_sm_0359" ["C02CHABXX_8_0"]="c_lp_sm_0359" ["B09HCABXX_8_0"]="c_lp_do_0007" ["B09HCABXX_7_0"]="c_lp_do_0007" ["B0B5KABXX_7_0"]="c_lp_do_0007" ["B0B5KABXX_8_0"]="c_lp_do_0007")
+  COUNTER=0
+  SAMPLESLIST=($(echo ${BARCODEID[@]} | tr ' ' '\n' | sort | uniq | tr ' ' '\n'))
+  ARRAY_LENGTH=$(echo "${#SAMPLESLIST[@]}")
+  for sample in "${SAMPLESLIST[@]}"
+    do
+    ((COUNTER++))
+    echo "processing bam" $COUNTER "out of" $ARRAY_LENGTH
+    echo "${sample}"
+    samtools flagstat ${sample}_sorted_rmdup_sorted_indelrealigner.bam > quality_checks/${sample}_bam.stats
+    done
+  echo $PROJECT "project complete"
+
+elif [ $PROJECT = "REFERENCE_GENOME" ]
+  then
+  cd /GRUPOS/grupolince/lynx_genomes_5x/lynx_canadensis_BAM_files
+  #BARCODES REFERENCE_GENOME:
+  declare -A BARCODEID=(["6220RAAXX_lane1_sequence_0"]="c_lp_sm_0221"
+["6220RAAXX_lane2_sequence_0"]="c_lp_sm_0221"
+["6220RAAXX_lane3_sequence_0"]="c_lp_sm_0221" ["6220RAAXX_lane4_sequence_0"]="c_lp_sm_0221"
+["6220RAAXX_lane5_sequence_0"]="c_lp_sm_0221"
+["6220RAAXX_lane6_sequence_0"]="c_lp_sm_0221" ["6220RAAXX_lane7_sequence_0"]="c_lp_sm_0221" ["6220RAAXX_lane8_sequence_0"]="c_lp_sm_0221" ["62AHEAAXX_lane1_sequence_0"]="c_lp_sm_0221" ["621CYAAXX_lane1_sequence_0"]="c_lp_sm_0221")
+  COUNTER=0
+  SAMPLESLIST=($(echo ${BARCODEID[@]} | tr ' ' '\n' | sort | uniq | tr ' ' '\n'))
+  ARRAY_LENGTH=$(echo "${#SAMPLESLIST[@]}")
+  for sample in "${SAMPLESLIST[@]}"
+    do
+    ((COUNTER++))
+    echo "processing bam" $COUNTER "out of" $ARRAY_LENGTH
+    echo "${sample}"
+    samtools flagstat ${sample}_sorted_rmdup_sorted_indelrealigner.bam > quality_checks/${sample}_bam.stats
+    done
+  echo $PROJECT "project complete"
+  
+elif [ $PROJECT = "MACROGEN" ]
+  then
+  cd /GRUPOS/grupolince/lynx_genomes_5x/lynx_canadensis_BAM_files
+  #BARCODES MACROGEN:
+  declare -A BARCODEID=(["LC1"]="c_lc_zz_0001" ["LL90"]="c_ll_ki_0090" ["LR1"]="c_lr_zz_0001")
+  COUNTER=0
+  SAMPLESLIST=($(echo ${BARCODEID[@]} | tr ' ' '\n' | sort | uniq | tr ' ' '\n'))
+  ARRAY_LENGTH=$(echo "${#SAMPLESLIST[@]}")
+  for sample in "${SAMPLESLIST[@]}"
+    do
+    ((COUNTER++))
+    echo "processing bam" $COUNTER "out of" $ARRAY_LENGTH
+    echo "${sample}"
+    samtools flagstat ${sample}_sorted_rmdup_sorted_indelrealigner.bam > quality_checks/${sample}_bam.stats
+    done
+  echo $PROJECT "project complete"
+fi
+
+```
+
+##Summary report:
+```{bash}
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/lynx_canadensis_BAM_files/quality_checks
+screen -S summary_report.log
+script summary_report.log
+
+SAMPLELIST=($(ls ./../*_sorted_rmdup_sorted_indelrealigner.bam | xargs -n 1 basename | cut -d "_" -f1-4 | sort | uniq)) 
+echo "sample_name,total_seq,total_reads,duplicates,mapped,properly_pair,with_mat_to_another_chr,uniq_mapped,uniq_mapped_vs_total_reads,duplicates_vs_total_reads,mapped_vs_total_seq,properly_pair_vs_total_seq,with_mat_to_another_chr_vs_total_seq,coverage_based_distribution" > raw.stats 
+for sample in "${SAMPLELIST[@]}"
+  do
+  echo "${sample}"
+  NAME=${sample}
+  TOTAL_SEQ=$(cat "${sample}"*.rawseq | awk '{sum+=$1}END{print sum}')
+  TOTAL_READS=$(grep "in total" "${sample}"*.stats | cut -d "+" -f 1)
+  DUPLICATES=$(grep "duplicates" "${sample}"*.stats | cut -d "+" -f 1)
+  MAPPED=$(grep "0 mapped" "${sample}"*.stats | cut -d "+" -f 1)
+  PROPERLY_PAIR=$(grep "properly paired" "${sample}"*.stats | cut -d "+" -f 1)
+  WITH_MATE_TO_ANOTHER_CHR=$(grep "with mate mapped to a different chr$" "${sample}"*.stats | cut -d "+" -f 1)
+  UNIQ_MAPPED=$(echo "$MAPPED - $DUPLICATES" | bc)
+  UNIQ_MAPPED_vs_TOTAL_READS=$(echo "scale=5; $UNIQ_MAPPED *100 / $TOTAL_READS" | bc -l)
+  DUPLICATES_vs_TOTAL_READS=$(echo "scale=5; $DUPLICATES / $TOTAL_READS" | bc -l)
+  MAPPED_vs_TOTAL_SEQ=$(echo "scale=5; $MAPPED *100 / $TOTAL_SEQ" | bc )
+  PROPERLY_PAIR_vs_TOTAL_SEQ=$(echo "scale=5; $PROPERLY_PAIR *100 / $TOTAL_SEQ" | bc )
+  WITH_MATE_TO_ANOTHER_CHR_vs_TOTAL_SEQ=$(echo "scale=5; $WITH_MATE_TO_ANOTHER_CHR *100 / $TOTAL_SEQ" | bc)
+  COVERAGE_BASED_DISTRIBUTION=$(tail -n+12 "${sample}"*.picard_length  | awk '($1 > 30) {print $1*$2}' | paste -sd+ | bc | awk '{print $1/2413209059}')
+  echo "$NAME,$TOTAL_SEQ,$TOTAL_READS,$DUPLICATES,$MAPPED,$PROPERLY_PAIR,$WITH_MATE_TO_ANOTHER_CHR,$UNIQ_MAPPED,$UNIQ_MAPPED_vs_TOTAL_READS,$DUPLICATES_vs_TOTAL_READS,$MAPPED_vs_TOTAL_SEQ,$PROPERLY_PAIR_vs_TOTAL_SEQ,$WITH_MATE_TO_ANOTHER_CHR_vs_TOTAL_SEQ,$COVERAGE_BASED_DISTRIBUTION" | sed 's/ //g' >> raw.stats 
+  done
+LANG=en_EN join -1 1 -2 1 -t"," <(head -n 1 raw.stats && tail -n +2 raw.stats | LANG=en_EN sort -k 1,1) <(head -n 1 coverage_samtools && tail -n +2 coverage_samtools | LANG=en_EN sort -k 1,1 ) | sed 's/,/;/g' | sed 's/\./,/g' > global_stats_all_samples.csv # de esta manera tiene en cuenta el header. 
+ 
+# 138732275 + 0 in total (QC-passed reads + QC-failed reads)
+# 301702 + 0 duplicates
+# 135997388 + 0 mapped (98.03%:-nan%)
+# 138732275 + 0 paired in sequencing
+# 69315360 + 0 read1
+# 69416915 + 0 read2
+# 132686988 + 0 properly paired (95.64%:-nan%)
+# 135464480 + 0 with itself and mate mapped
+# 532908 + 0 singletons (0.38%:-nan%)
+# 2667465 + 0 with mate mapped to a different chr
+# 1511516 + 0 with mate mapped to a different chr (mapQ>=5)
+
+
+#From outside the server:
+export SSHPASS=$(cat /Users/dani/Documents/genomics_pass.txt)
+sshpass -e scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/lynx_canadensis_BAM_files/quality_checks/global_stats_all_samples.csv /Users/dani/Dropbox/tablas_lince/SEQUENCING/2019-12-20_global_stats_all_samples_lcrefmapping.csv
+unset SSHPASS
+
+```
+
+#4: Extract edit distance from BAMs.
 ##BARCODES LYNX_06_08:
 ```{r Obtain distribution of edit distance, eval=FALSE, engine='bash'}
 
@@ -488,8 +820,6 @@ for i in ${ARRAY_MERGED_BAM_SAMPLE_NAME[@]}
   echo "${i}"
   samtools view "${i}"_sorted_rmdup_sorted_indelrealigner.bam | grep -o '\bNM:i:\w*' | cut -d':' -f3 > edit_distance_distr/"${i}"_NM_distr.txt
   done
-  
-scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/lynx_canadensis_BAM_files/edit_distance_distr/*_NM_distr.txt /Users/dani/ownCloud/backup/g-w_analysis_lcref/edit_distance_tests
 
 ```
 
@@ -513,8 +843,6 @@ for i in ${ARRAY_MERGED_BAM_SAMPLE_NAME[@]}
   echo "${i}"
   samtools view "${i}"_sorted_rmdup_sorted_indelrealigner.bam | grep -o '\bNM:i:\w*' | cut -d':' -f3 > edit_distance_distr/"${i}"_NM_distr.txt
   done
-  
-scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/lynx_canadensis_BAM_files/edit_distance_distr/*_NM_distr.txt /Users/dani/ownCloud/backup/g-w_analysis_lcref/edit_distance_tests
 
 ```
 
@@ -538,8 +866,6 @@ for i in ${ARRAY_MERGED_BAM_SAMPLE_NAME[@]}
   echo "${i}"
   samtools view "${i}"_sorted_rmdup_sorted_indelrealigner.bam | grep -o '\bNM:i:\w*' | cut -d':' -f3 > edit_distance_distr/"${i}"_NM_distr.txt
   done
-  
-scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/lynx_canadensis_BAM_files/edit_distance_distr/*_NM_distr.txt /Users/dani/ownCloud/backup/g-w_analysis_lcref/edit_distance_tests
 
 ```
 
@@ -567,8 +893,6 @@ for i in ${ARRAY_MERGED_BAM_SAMPLE_NAME[@]}
   echo "${i}"
   samtools view "${i}"_sorted_rmdup_sorted_indelrealigner.bam | grep -o '\bNM:i:\w*' | cut -d':' -f3 > edit_distance_distr/"${i}"_NM_distr.txt
   done
-  
-scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/lynx_canadensis_BAM_files/edit_distance_distr/*_NM_distr.txt /Users/dani/ownCloud/backup/g-w_analysis_lcref/edit_distance_tests
 
 ```
 
@@ -592,7 +916,259 @@ for i in ${ARRAY_MERGED_BAM_SAMPLE_NAME[@]}
   echo "${i}"
   samtools view "${i}"_sorted_rmdup_sorted_indelrealigner.bam | grep -o '\bNM:i:\w*' | cut -d':' -f3 > edit_distance_distr/"${i}"_NM_distr.txt
   done
-  
-scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/lynx_canadensis_BAM_files/edit_distance_distr/*_NM_distr.txt /Users/dani/ownCloud/backup/g-w_analysis_lcref/edit_distance_tests
 
 ```
+
+##Download the edit distance files to local:
+```{bash}
+
+#From outside the server:
+export SSHPASS=$(cat /Users/dani/Documents/genomics_pass.txt)
+sshpass -e scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/lynx_canadensis_BAM_files/edit_distance_distr/*_NM_distr.txt /Users/dani/ownCloud/backup/g-w_analysis_lcref/edit_distance_tests
+unset SSHPASS
+
+#For additional files:
+export SSHPASS=$(cat /Users/dani/Documents/genomics_pass.txt)
+FILES=$(sshpass -e ssh dkleinman@genomics-b.ebd.csic.es ls /GRUPOS/grupolince/lynx_genomes_5x/lynx_canadensis_BAM_files/edit_distance_distr/*_NM_distr.txt | xargs -n 1 basename)
+
+cd /Users/dani/ownCloud/backup/g-w_analysis_lcref/edit_distance_tests/
+for f in ${FILES[@]}
+  do
+  echo "${f}"
+  if test -f "$f"
+    then echo "$f exists; skipping download"
+    else echo "$f doesn't exist; downloading"
+    sshpass -e scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/lynx_canadensis_BAM_files/edit_distance_distr/$f ./
+  fi
+  done
+unset SSHPASS
+    
+```
+
+#5: Draw edit distance distributions.
+
+```{r Other stuff}
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+
+#####First draw the NM distribution for each individual:
+sample_files <- list.files("/Users/dani/ownCloud/backup/g-w_analysis_lcref/edit_distance_tests/", pattern="*distr.txt")
+for (file in sample_files) {
+  edit_distance_distribution <- read_tsv(paste0("/Users/dani/ownCloud/backup/g-w_analysis_lcref/edit_distance_tests/",file),col_names=c("NM"))
+  edit_distance_distribution
+  sample <- substr(file,1,12)
+  print(sample)
+  plot_data <- edit_distance_distribution %>% group_by(NM) %>% tally()
+  plot_data
+  #edit_distance_distribution$pop <- as.factor(edit_distance_distribution$pop)
+  #plot_data <- edit_distance_distribution %>% filter(edit_distance_distribution$pop == !!pop) #the two !! allow R to evaluate the text and distinguish looping variables from col_names
+  #plot_data
+  NM_distr_ggplot <- ggplot(data=plot_data, aes(NM,n)) +
+  #geom_histogram(aes(NM),binwidth=1) +
+  geom_col() +
+  ggtitle(paste0("NM distribution for ",sample)) +
+  ylab("count") +
+  #xlab("heritability") +
+  scale_x_continuous(breaks=seq(0,nrow(plot_data),2)) +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+        rect=element_rect(size=1),
+        axis.line=element_line(colour="black"),
+        axis.title=element_text(size=16),
+        #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+        #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+        #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+        panel.background=element_blank(),
+        panel.border=element_rect(colour="black"),
+        #panel.grid=element_blank(),
+        #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+        plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+        #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+        legend.background=element_rect(linetype="solid", colour="black", size=.5),
+        #legend.justification=c(0,0),
+        legend.key=element_rect(colour="white"),
+        #legend.key.size=unit(1.3,"cm"),
+        legend.position=c(0.92,0.86),
+        legend.title=element_blank()
+  )
+  NM_distr_ggplot
+  ggsave(paste0(sample,"_NM_distribution.lr_ann.pdf"), width=20, height=20, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis_lcref/edit_distance_tests/")
+}
+rm(edit_distance_distribution)
+
+
+#####Draw proportion of reads at different NMs:
+
+#First generate the dataframe:
+#all_together <- data_frame() #run this only the first time
+'%!in%' <- function(x,y)!('%in%'(x,y)) #define "not in" function
+already_included_samples <- unique(all_together$sample) #retrieve the already extracted samples
+sample_files <- list.files("/Users/dani/ownCloud/backup/g-w_analysis_lcref/edit_distance_tests/", pattern="*distr.txt")[which(substr(list.files("/Users/dani/ownCloud/backup/g-w_analysis_lcref/edit_distance_tests/", pattern="*distr.txt"),1,12) %!in% already_included_samples)] #keep only the unextracted samples
+
+for (file in sample_files) {
+  edit_distance_distribution <- read_tsv(paste0("/Users/dani/ownCloud/backup/g-w_analysis_lcref/edit_distance_tests/",file),col_names=c("NM"))
+  edit_distance_distribution
+  sample <- substr(file,1,12)
+  print(sample)
+  plot_data <- edit_distance_distribution %>% group_by(NM) %>% tally()
+  plot_data
+  reads_totales <- sum(plot_data$n)
+  plot_bis <- mutate(plot_data,prop=as.numeric(100*n/reads_totales))
+  plot_bis$cum_prop <- cumsum(plot_bis$prop)
+  plot_bis$sample <- c(sample)
+  plot_bis$dataset <- ifelse(plot_bis$sample=="c_lp_sm_0221", "REF", ifelse(plot_bis$sample=="c_ll_ki_0090" | plot_bis$sample=="c_lc_zz_0001" | plot_bis$sample=="c_lr_zz_0001", "MG", ifelse(plot_bis$sample=="c_lp_do_0153" | plot_bis$sample=="c_lp_do_0173" | plot_bis$sample=="c_lp_do_0443" | plot_bis$sample=="c_lp_sm_0138" | plot_bis$sample=="c_lp_sm_0140" | plot_bis$sample=="c_lp_sm_0185" | plot_bis$sample=="c_lp_sm_0186" | plot_bis$sample=="c_lp_sm_0298" | plot_bis$sample=="c_lp_sm_0359" | plot_bis$sample=="c_lp_do_0007","GP", "5x")))
+  plot_bis
+  all_together <- rbind(all_together,plot_bis[c(1:11),])
+  all_together
+}
+
+#Now plot per dataset the proportion (and then the cumulative proportion) of reads between NM=0 and NM=10:
+NM_freq_ggplot <- ggplot(data=all_together, aes(NM,prop,colour=dataset)) +
+#geom_histogram(aes(NM),binwidth=1) +
+geom_jitter(width=0.3) +
+ggtitle("Proportion of reads at different NM") +
+ylab("percentage") +
+scale_x_continuous(breaks=seq(0,10,1)) +
+theme_bw() +
+theme(text=element_text(size=12,face="bold"),
+      rect=element_rect(size=1),
+      axis.line=element_line(colour="black"),
+      axis.title=element_text(size=16),
+      #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+      #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+      #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+      panel.background=element_blank(),
+      panel.border=element_rect(colour="black"),
+      #panel.grid=element_blank(),
+      #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+      plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+      #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+      legend.background=element_rect(linetype="solid", colour="black", size=.5),
+      #legend.justification=c(0,0),
+      legend.key=element_rect(colour="white"),
+      #legend.key.size=unit(1.3,"cm"),
+      legend.position=c(0.94,0.76),
+      legend.title=element_blank()
+)
+NM_freq_ggplot
+ggsave("proportion_of_reads_at_different_NM_perdataset.pdf", width=20, height=10, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis_lcref/edit_distance_tests")
+
+NM_cum_freq_ggplot <- ggplot(data=all_together, aes(NM,cum_prop,colour=dataset)) +
+#geom_histogram(aes(NM),binwidth=1) +
+geom_jitter(width=0.3) +
+ggtitle("Proportion (cumulative) of reads at different NM") +
+ylab("percentage") +
+scale_x_continuous(breaks=seq(0,10,1)) +
+scale_y_continuous(breaks=seq(20,100,5)) +
+theme_bw() +
+theme(text=element_text(size=12,face="bold"),
+      rect=element_rect(size=1),
+      axis.line=element_line(colour="black"),
+      axis.title=element_text(size=16),
+      #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+      #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+      #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+      panel.background=element_blank(),
+      panel.border=element_rect(colour="black"),
+      #panel.grid=element_blank(),
+      #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+      plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+      #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+      legend.background=element_rect(linetype="solid", colour="black", size=.5),
+      #legend.justification=c(0,0),
+      legend.key=element_rect(colour="white"),
+      #legend.key.size=unit(1.3,"cm"),
+      legend.position=c(0.94,0.22),
+      legend.title=element_blank()
+)
+NM_cum_freq_ggplot
+ggsave("proportion_cum_of_reads_at_different_NM_perdataset.pdf", width=20, height=10, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis_lcref/edit_distance_tests")
+
+#Now plot per species the proportion (and then the cumulative proportion) of reads between NM=0 and NM=10:
+NM_freq_ggplot <- ggplot(data=all_together, aes(NM,prop,colour=substr(sample,3,4))) +
+#geom_histogram(aes(NM),binwidth=1) +
+geom_jitter(width=0.3) +
+ggtitle("Proportion of reads at different NM") +
+ylab("percentage") +
+scale_x_continuous(breaks=seq(0,10,1)) +
+theme_bw() +
+theme(text=element_text(size=12,face="bold"),
+      rect=element_rect(size=1),
+      axis.line=element_line(colour="black"),
+      axis.title=element_text(size=16),
+      #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+      #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+      #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+      panel.background=element_blank(),
+      panel.border=element_rect(colour="black"),
+      #panel.grid=element_blank(),
+      #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+      plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+      #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+      legend.background=element_rect(linetype="solid", colour="black", size=.5),
+      #legend.justification=c(0,0),
+      legend.key=element_rect(colour="white"),
+      #legend.key.size=unit(1.3,"cm"),
+      legend.position=c(0.94,0.76),
+      legend.title=element_blank()
+)
+NM_freq_ggplot
+ggsave("proportion_of_reads_at_different_NM_persp.pdf", width=20, height=10, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis_lcref/edit_distance_tests")
+
+NM_cum_freq_ggplot <- ggplot(data=all_together, aes(NM,cum_prop,colour=substr(sample,3,4))) +
+#geom_histogram(aes(NM),binwidth=1) +
+geom_jitter(width=0.3) +
+ggtitle("Proportion (cumulative) of reads at different NM") +
+ylab("percentage") +
+scale_x_continuous(breaks=seq(0,10,1)) +
+scale_y_continuous(breaks=seq(20,100,5)) +
+theme_bw() +
+theme(text=element_text(size=12,face="bold"),
+      rect=element_rect(size=1),
+      axis.line=element_line(colour="black"),
+      axis.title=element_text(size=16),
+      #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+      #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+      #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+      panel.background=element_blank(),
+      panel.border=element_rect(colour="black"),
+      #panel.grid=element_blank(),
+      #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+      plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+      #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+      legend.background=element_rect(linetype="solid", colour="black", size=.5),
+      #legend.justification=c(0,0),
+      legend.key=element_rect(colour="white"),
+      #legend.key.size=unit(1.3,"cm"),
+      legend.position=c(0.94,0.22),
+      legend.title=element_blank()
+)
+NM_cum_freq_ggplot
+ggsave("proportion_cum_of_reads_at_different_NM_persp.pdf", width=20, height=10, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis_lcref/edit_distance_tests")
+
+```
+
+#6: Perform NM-based BAM filterings.
+```{r Perform NM-based BAM filterings, eval=FALSE, engine='bash'}
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/lynx_canadensis_BAM_files/BAM_nm_filtered
+RUN=6 #change number (from 1 to 6)
+screen -S "nm3_filtering_RUN-${RUN}"
+RUN=${STY#*-}
+script "nm3_filtering_RUN-${RUN}.log"
+RUN=${STY#*-}
+
+HEAD=$(($RUN * 10))
+cd /GRUPOS/grupolince/lynx_genomes_5x/lynx_canadensis_BAM_files/
+declare SAMPLES=$(ls *_sorted_rmdup_sorted_indelrealigner.bam | grep -Ev 'c_lc_zz|c_lr_zz' | head -n$HEAD | tail -n10)
+for i in ${SAMPLES[@]}
+  do
+  echo "${i}"
+  bamtools filter -tag "NM:<=3" -in ${i} -out BAM_nm_filtered/${i/_sorted_rmdup_sorted_indelrealigner.bam/.nm3.bam}
+  samtools index BAM_nm_filtered/${i/_sorted_rmdup_sorted_indelrealigner.bam/.nm3.bam}
+  done
+
+```
+
