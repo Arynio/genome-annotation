@@ -1914,7 +1914,7 @@ for i in "${INDLIST[@]}"
 
 ```
 
-#16: Get annotation statistics.
+#Obsolete16 (go to statistics script): Get annotation statistics.
 ##At the individual level.
 ```{r Get annotation statistics, eval=FALSE, engine='bash'}
 
@@ -2031,7 +2031,7 @@ scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dan
 
 ```
 
-#17: Plot variant count results.
+#Obsolete17 (go to statistics script): Plot variant count results.
 ##Compare NM filtering results.
 
 ```{r Plot variant count results}
