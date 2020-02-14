@@ -1,0 +1,440 @@
+---
+title: "ucne_database"
+author: "Dani"
+date: "8 de julio de 2019"
+output: html_document
+---
+
+#Obtain UCNE variants for every individual:
+```{bash}
+
+mkdir -p /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database
+
+awk '{printf ("%s\t%s\t%s\t%s\n", $1,$2,$3,$3-$2)}' /home/datos_usuarios/dkleinman/snpEff/data/LYPA23C.UCNE.bed > ucne_coordinates.bed
+
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+VAR=(varssubs) #varssubs #variants #substitutions
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/ucne_database
+screen -S "${CALLING}-${VAR}-${TYPE}"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+script "${CALLING}_ucne_database_${VAR}_${TYPE}.lr_ann.log"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAM files path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/
+INDLIST=($(ls `find . -name *"_individual_"${VAR}"_"${TYPE}".lr_ann.vcf" ! -path '*testing_variant_numbers*' -print`))
+for i in "${INDLIST[@]}"
+  do
+  echo "${i}"
+  ind=$(echo "${i}" | awk -F'[/]' '{print $3}' | cut -c1-12)
+  echo "${ind}"
+  SPECIES=$(echo "${ind}" | cut -c3-4)
+  POPULATION=$(echo "${ind}" | cut -c6-7)
+  DATASET=$(if [ $ind = "c_lp_sm_0221" ]; then echo "REF"; elif [ $ind = "c_ll_ki_0090" ]; then echo "MG"; elif [ $ind = "h_ll_pv_0223" ]; then echo "LD"; elif grep -Fxq $ind /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/c_lp_5x_samples || [ $SPECIES = "ll" ]; then echo "5x"; else echo "GP"; fi)
+  SAMPLE=$(echo "${ind}" | cut -c9-12)
+  grep 'UCNE' ${i} | cut -f1,2 | awk -v ind=$ind -v population=$POPULATION -v dataset=$DATASET '{printf ("%s\t%s\t%s\t%s\t%s\t%s\n", $1, $2-1, $2, population, dataset, ind)}' > ./ucne_database/ucne_variants_${ind}.bed
+  done
+
+```
+
+#Analyse density and distribution of variants:
+##Obtain density and distribution of variants
+```{bash}
+
+#Obtain variant density per UCNE region:
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database
+
+screen -S ucne_coordinates_complete_info
+FILES=($(ls ucne_variants*.bed))
+for f in "${FILES[@]}"
+  do
+  #echo "${f}"
+  POPULATION=$(cut -f 4 "${f}" | head -n1)
+  DATASET=$(cut -f 5 "${f}" | head -n1)
+  IND=$(cut -f 6 "${f}" | head -n1)
+  echo $IND
+  echo -e "scaffold\tposition_start\tposition_end\tlength\tvariant_N\tvariant_density\tpopulation\tdataset\tindividual" > ${f/ucne_variants/ucne_coordinates_complete_info}
+  while read -r entry; do
+    echo "$entry" > row.bed
+    bedtools intersect -a row.bed -b "${f}" > temp.bed
+    VARIANT_N=$(wc -l < temp.bed)
+    SITES_N=$(echo "$entry" | cut -f 4)
+    DENSITY=$(echo "scale=3; $VARIANT_N/$SITES_N" | bc)
+    echo -e "$entry\t$VARIANT_N\t$DENSITY\t$POPULATION\t$DATASET\t$IND" >> ${f/ucne_variants/ucne_coordinates_complete_info}
+    done < ucne_coordinates.bed
+  done
+
+#Obtain variants distribution within the UCNE regions:
+screen -S ucne_variants_distribution_info
+FILES=($(ls ucne_variants_c*.bed))
+for f in "${FILES[@]}"
+  do
+  echo "${f}"
+  POPULATION=$(cut -f 4 "${f}" | head -n1)
+  DATASET=$(cut -f 5 "${f}" | head -n1)
+  IND=$(cut -f 6 "${f}" | head -n1)
+  echo $IND
+  echo -e "scaffold\tposition_start\tposition_end\tpopulation\tdataset\tindividual\tregion_start\tregion_end\tstart_distance_prop" > ${f/ucne_variants/ucne_variants_distribution_info}
+  while read -r entry; do
+    echo "$entry" | cut -f1,2,3 > row.bed
+    bedtools intersect -wa -wb -a row.bed -b ucne_coordinates.bed > temp.bed
+    VARIANT_POS=$(cut -f 3 temp.bed)
+    START_POS=$(cut -f 5 temp.bed)
+    END_POS=$(cut -f 6 temp.bed)
+    START_DISTANCE=$((VARIANT_POS-START_POS))
+    REGION_LENGTH=$(cut -f 7 temp.bed)
+    PROP_DISTANCE=$(echo "scale=3; $START_DISTANCE/$REGION_LENGTH" | bc) 
+    echo -e "$entry\t$START_POS\t$END_POS\t$PROP_DISTANCE" >> ${f/ucne_variants/ucne_variants_distribution_info}
+    done < ${f}
+  done
+
+rm ucne_variants_distribution_info_allsamples.bed
+FILES=($(ls ucne_variants_distribution_info_c*.bed))
+for f in "${FILES[@]}"
+  do
+  echo "${f}"
+  tail -n+2 "${f}" | cut -f6,9 >> ucne_variants_distribution_info_allsamples.bed
+  done
+
+#From outside the server:
+scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/ucne_variants_distribution_info_allsamples.bed /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db
+
+```
+
+##Plot distribution of variants:
+```{r}
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+
+
+ucne_variants_distribution <- read_tsv("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db/ucne_variants_distribution_info_allsamples.bed",col_names=c("sample","start_distance_prop")) 
+
+!!!GROUP VARIANTS IN TEN GROUPS (DECATILES) AND PLOT COUNTS
+
+for (s in unique(ucne_variants_distribution$sample)) {
+  ucne_variants_distribution_sample <- arrange(filter(ucne_variants_distribution,ucne_variants_distribution$sample==s),start_distance_prop) %>% group_by(start_distance_prop) %>% tally() %>% mutate(n_cum=cumsum(n), avg=start_distance_prop*n)
+  average_start_distance_prop <- mean(ucne_variants_distribution_sample$avg)
+  total_n_cum <- tail(ucne_variants_distribution_sample,1)$n_cum
+  ucne_variants_distribution_sample_top <- filter(ucne_variants_distribution_sample,start_distance_prop>=0.8)
+  top_proportion <- 1-sum(ucne_variants_distribution_sample_top$n)/total_n_cum
+  ucne_variants_distribution_sample_bottom <- filter(ucne_variants_distribution_sample,start_distance_prop<=0.2)
+  bottom_proportion <- sum(ucne_variants_distribution_sample_bottom$n)/total_n_cum
+  ucne_variants_distribution_sample_plot <- ggplot(data=ucne_variants_distribution_sample,aes(x=start_distance_prop,y=n_cum*100/total_n_cum)) +
+    geom_line() +
+    geom_vline(xintercept=average_start_distance_prop,colour="red") +
+    geom_vline(xintercept=top_proportion,colour="blue") +
+    geom_vline(xintercept=bottom_proportion,colour="green") +
+    ggtitle(s) +
+    xlab("distance from region start (proportion)") +
+    ylab("cumulative variants (proportion)")
+  ucne_variants_distribution_sample_plot
+  ggsave(paste0("ucne_variants_distribution_",s,".pdf"), width=15, height=10, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db")
+}
+
+```
+
+#Analyse conservation status (GERP).
+```{bash}
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/test
+#Split the UCNE coordinates across chromosomes, and then retrieve the GERP scores for each chromosome (otherwise there's a limit to the number of regions allowed) from here: https://genome.ucsc.edu/cgi-bin/hgTables. Don't forget to manually change the name of each output file.
+#Detailed explanation: http://mendel.stanford.edu/SidowLab/downloads/gerp/Readme.txt.
+CHR=$(cut -f1 /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db/UCNE_beds/hg19_UCNE_coord.bed | uniq)
+for chr in ${CHR[@]}
+  do
+  echo ${chr}
+  awk -v chr=$chr '{if ($1 == chr) printf ("%s\t%s\t%s\t%s_%s\n", $1, $2-1, $3, $4, $5)}' /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db/UCNE_beds/hg19_UCNE_coord.bed > /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db/UCNE_beds/hg19_UCNE_coord_${chr}.bed
+  done
+
+#Once all .gerp files have been downloaded and placed in the proper folder, convert them to .bed format.
+CHR=$(cut -f1 /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db/UCNE_beds/hg19_UCNE_coord.bed | uniq)
+for chr in ${CHR[@]}
+  do
+  echo ${chr}
+  grep -vE '#|variableStep|track' /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db/UCNE_beds/hg19_GERP_coord_${chr}.gerp | awk -v chr=$chr '{printf ("%s\t%s\t%s\t%s\n", chr, $1-1, $1, $2)}' > /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db/UCNE_beds/hg19_GERP_coord_${chr}.bed
+  done
+
+
+#In the server (to use bedtools):
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/test
+
+#Intersect human UCNE and GERP information:
+bedtools intersect -wa -wb -a hg19_GERP_coord_${chr}.bed -b hg19_UCNE_coord_${chr}.bed | awk '{printf ("%s\t%s\t%s\t%s\t%s\n", $1, $2, $3, $4, $8)}' > hg19_GERP_coord_${chr}_complete.bed
+
+
+
+Run LiftOver:
+/Applications/LiftOver/liftOver -minMatch=0.1 /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db/UCNE_beds/hg19_GERP_coord_chr1_complete.bed /Applications/LiftOver/hg19ToFelCat5.over.chain.gz /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db/UCNE_beds/cat_GERP_coord_chr1_complete.bed /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db/UCNE_beds/cat_GERP_coord_chr1_unlifted.bed
+
+
+
+Run LiftOver:
+head -n 100 /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db/UCNE_beds/hg19_GERP_coord_chr1.bed > /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db/UCNE_beds/kaka.bed
+
+/Applications/LiftOver/liftOver -minMatch=0.1 /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db/UCNE_beds/kaka.bed /Applications/LiftOver/hg19ToFelCat5.over.chain.gz /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db/UCNE_beds/kaka_out.bed /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db/UCNE_beds/kaka_unlifted.bed
+
+
+
+```
+
+#Obsolete (I thought I could join cat and human coordinates based on the UCNE name, but I don't know the nucleotide correspondence so GERP values won't make sense).
+```{bash}
+
+#Get file with cat coordinates, and then split the regions to the nucleotide level:
+awk '{printf ("%s\t%s\t%s\t%s_%s\n", $1, $2, $3, $4, $5)}' /home/GRUPOS/grupolince/ultra_conserved_regions/cat_conversion_UCNE_coord_from_hg19_sorted.bed > cat_conversion_UCNE_coord_from_hg19_sorted.bed
+
+screen -S cat_conversion_UCNE_coord_from_hg19_sorted_detailed.log
+
+rm cat_conversion_UCNE_coord_from_hg19_sorted_detailed.bed
+touch cat_conversion_UCNE_coord_from_hg19_sorted_detailed.bed
+FILE=cat_conversion_UCNE_coord_from_hg19_sorted.bed
+COUNTER=0
+TOTAL=$(wc -l < $FILE)
+while read -r chr start end info
+  do
+  if [ $(( $COUNTER % 10 )) == 0 ]
+    then
+    echo "processed $COUNTER regions out of $TOTAL"
+  fi
+  while [ $start -lt $end ]
+    do
+    stop=$((start+1))
+    echo -e "$chr\t$start\t$stop\t$info" >> ${FILE/.bed/_detailed.bed}
+    ((start++))
+    done
+  ((COUNTER++))
+  done < $FILE
+
+
+
+#Join cat coordinates with human UCNE and GERP information:
+join -1 4 -2 5 <(sort -k4 test.bed) <(sort -k5 hg19_GERP_coord_${chr}_complete.bed) | awk '{printf ("%s\t%s\t%s\t%s\t%s\n", $2, $3, $4, $1, $8)}' | bedtools sort > cat_GERP_coord_${chr}_complete.bed
+
+```
+
+#Use BLAST to get lynx-human coordinate equivalences.
+##Make local database for human GRCH37:
+```{bash}
+
+#I need to retrieve the coordinate equivalence between human GRCH37/hg19 (where GERP scores are defined) and lynx. I wasn't able to find the GRCH37/hg19 database in the ncbi web, but I found a link with all GRCH37/hg19 fastas and a guide on how to build my own GRCH37/hg19 database from those fastas. This is the link with the GRCH37/hg19 fastas: http://hgdownload.soe.ucsc.edu/goldenPath/hg19/bigZips/chromFa.tar.gz. This is the link with the explanation: https://www.biostars.org/p/233113/
+
+#I copied all files in chromFa.tar.gz (after uncompressing) to the following genomics folder:
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/GRCH37_blast_database
+
+#Then I placed them all in a single file:
+cat chr* > GRCH37.fa
+
+#Then I built the BLAST database:
+/GRUPOS/grupolince/ncbi-blast-2.6.0+/bin/makeblastdb -in GRCH37.fa -parse_seqids -title "GRCH37" -dbtype nucl
+
+```
+
+##Blast lynx UCNE regions against human GRCH37:
+```{bash}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov) #write down name of the calling
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/ucne_database/gerp_analysis
+
+#First, obtain the multifasta for the UCNE region:
+bedtools getfasta -fi /GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa -bed /home/datos_usuarios/dkleinman/snpEff/data/LYPA23C.UCNE.bed -fo ${CALLING}.UCNE.fa
+
+#Then, use BLAST to obtain the alignments against human GRCH37 in two useful formats: tabular (format 6) with basic information, and xml (format 5), which is necessary to then obtain gap information.
+/GRUPOS/grupolince/ncbi-blast-2.6.0+/bin/blastn -db ./GRCH37_blast_database/GRCH37.fa -query ${CALLING}.UCNE.fa -out ${CALLING}.UCNE.blast.txt -outfmt "6 qseqid sseqid pident length mismatch gapopen qstart qend sstrand sstart send evalue bitscore"
+
+/GRUPOS/grupolince/ncbi-blast-2.6.0+/bin/blastn -db ./GRCH37_blast_database/GRCH37.fa -query ${CALLING}.UCNE.fa -out ${CALLING}.UCNE.blast.xml -outfmt 5
+
+#Remove suboptimal alignments:
+sort -u -k1,1 ${CALLING}.UCNE.blast.txt > ${CALLING}.UCNE.blast_uniq.txt
+mv ${CALLING}.UCNE.blast_uniq.txt ${CALLING}.UCNE.blast.txt
+
+```
+
+##Obtain gap coordinates using BlastNToSnp:
+###Install BlastNToSnp:
+```{bash}
+
+#Gaps break the 1:1 equivalence of coordinates in many alignments, so a workaround is needed. BlastNToSnp (http://lindenb.github.io/jvarkit/BlastNToSnp.html) takes the xml output of blast and retrieves information on mismatches and gaps.
+
+#I installed the programme in my local environment:
+cd /Applications/
+
+git clone "https://github.com/lindenb/jvarkit.git"
+cd jvarkit
+./gradlew blastn2snp
+
+```
+
+###Run BlastNToSnp:
+```{bash}
+
+#First, I copy the BLAST xml output to the local folder:
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov) #write down name of the calling
+mkdir -p /Applications/jvarkit/$CALLING
+cd /Applications/jvarkit/$CALLING
+
+scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/ucne_database/gerp_analysis/${CALLING}.UCNE.blast.xml /Applications/jvarkit/$CALLING
+
+#Then I run the programme:
+java -jar ./../dist/blastn2snp.jar -n -1 ${CALLING}.UCNE.blast.xml > ${CALLING}.UCNE.blast.gaps
+
+#Then I remove data from suboptimal alignments and columns 8 & 9 (which contain empty data):
+head -n1 ${CALLING}.UCNE.blast.gaps | cut -f-7,10- > ${CALLING}.UCNE.blast_uniq.gaps
+awk -F"\t" '($3 == "1") && ($4 == "1") {print $0}' ${CALLING}.UCNE.blast.gaps | cut -f-7,10- >> ${CALLING}.UCNE.blast_uniq.gaps
+
+#Then I remove data relative to mismatches, leaving only the gap information:
+head -n1 ${CALLING}.UCNE.blast_uniq.gaps > ${CALLING}.UCNE.blast_uniq_filtered.gaps
+awk -F"\t" '$9~/-/ || $10~/-/' ${CALLING}.UCNE.blast_uniq.gaps >> ${CALLING}.UCNE.blast_uniq_filtered.gaps
+
+mv ${CALLING}.UCNE.blast_uniq_filtered.gaps ${CALLING}.UCNE.blast.gaps
+rm ${CALLING}.UCNE.blast_uniq.gaps
+
+#And I move the file back to the server:
+scp /Applications/jvarkit/$CALLING/${CALLING}.UCNE.blast.gaps dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/ucne_database/gerp_analysis/
+
+```
+
+#Generate bed with human coordinates:
+```{bash}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+
+rm GRCH37.$CALLING.UCNE.equivalence.bed
+FILE=$(echo $CALLING.UCNE.blast.txt)
+while IFS=$'\t' read -r qseqid sseqid pident length mismatch gapopen qstart qend sstrand sstart send evalue bitscore
+  do
+  echo $qseqid "qseqid"
+  lp23scaffold=$(echo $qseqid | cut -d':' -f1)
+  echo $lp23scaffold "lp23scaffold"
+  lp23start=$(echo ${qseqid#*:} | cut -d'-' -f1)
+  echo $lp23start "lp23start"
+  alignstart=$((lp23start+qstart))
+  echo $alignstart "alignstart"
+  #lp23end=$(echo ${qseqid#*:} | cut -d'-' -f2)
+  alignend=$((lp23start+qend))
+  echo $alignend "alignend"
+  if [ $gapopen == 0 ] && [ $sstrand == "plus" ]
+    then
+    echo -e "$sseqid\t$((sstart-1))\t$send\t$lp23scaffold:$((alignstart-1))-$alignend\t$qseqid" >> GRCH37.$CALLING.UCNE.equivalence.bed
+    #Minus 1 to convert from 1-based to 0-based
+  elif [ $gapopen == 0 ] && [ $sstrand == "minus" ]
+    then
+    echo -e "$sseqid\t$((send-1))\t$sstart\t$lp23scaffold:$alignend-$((alignstart-1))\t$qseqid" >> GRCH37.$CALLING.UCNE.equivalence.bed
+    #Minus 1 to convert from 1-based to 0-based
+  elif [ $gapopen -ge 1 ] && [ $sstrand == "plus" ]
+    then
+    grep $qseqid ${FILE/blast.txt/blast.gaps} > working.grep.borrar
+    row_counter=0
+    nrow=$(wc -l < working.grep.borrar)
+    while IFS=$'\t' read -r query hit hitindex hspindex querypos hitpos strand alignlength hitvar queryvar midvar
+      do
+      ((row_counter++))
+      if [ $row_counter == 1 ] #Before the first gap, define region start as the alignment start
+        then
+        hitstart=$sstart
+        echo $hitstart "hitstart"
+        querystart=$alignstart
+        echo $querystart "querystart"
+      else #Before other gaps, define region start as the position after the previous gap
+        hitstart=$((hitend+querygap+1))
+        querystart=$((queryend+hitgap+1))
+      fi #Define region end as the position before the current gap
+      hitgap=$(echo $hitvar | tr -cd '-' | wc -c)
+      echo $hitvar "hitvar"
+      echo $hitgap "hitgap"
+      querygap=$(echo $queryvar | tr -cd '-' | wc -c)
+      echo $queryvar "queryvar"
+      echo $querygap "querygap"
+      hitend=$((hitpos-1))
+      echo $hitend "hitend"
+      queryend=$((lp23start+querypos-1))
+      echo $queryend "queryend"
+      echo -e "$sseqid\t$((hitstart-1))\t$hitend\t$lp23scaffold:$((querystart-1))-$queryend\t$qseqid" >> GRCH37.$CALLING.UCNE.equivalence.bed
+      if [ $row_counter == $nrow ] #After the last gap, define region end as the alignment end
+        then
+        lasthitstart=$((hitend+querygap+1))
+        echo $lasthitstart "lasthitstart"
+        lastquerystart=$((queryend+hitgap+1))
+        echo $lastquerystart "lastquerystart"
+        lasthitend=$send
+        echo $lasthitend "lasthitend"
+        lastqueryend=$alignend
+        echo $lastqueryend "lastqueryend"
+        echo -e "$sseqid\t$((lasthitstart-1))\t$lasthitend\t$lp23scaffold:$((lastquerystart-1))-$lastqueryend\t$qseqid" >> GRCH37.$CALLING.UCNE.equivalence.bed
+      fi
+      done < working.grep.borrar
+  elif [ $gapopen -ge 1 ] && [ $sstrand == "minus" ]
+    then
+    grep $qseqid ${FILE/blast.txt/blast.gaps} > working.grep.borrar
+    row_counter=0
+    nrow=$(wc -l < working.grep.borrar)
+    while IFS=$'\t' read -r query hit hitindex hspindex querypos hitpos strand alignlength hitvar queryvar midvar
+      do
+      ((row_counter++))
+      if [ $row_counter == 1 ] #Before the first gap, define region start as the alignment start
+        then
+        hitstart=$sstart
+        echo $hitstart "hitstart"
+        querystart=$alignstart
+        echo $querystart "querystart"
+      else #Before other gaps, define region start as the position after the previous gap
+        hitstart=$((hitend-querygap-1))
+        querystart=$((queryend+hitgap+1))
+      fi #Define region end as the position before the current gap
+      hitgap=$(echo $hitvar | tr -cd '-' | wc -c)
+      echo $hitvar "hitvar"
+      echo $hitgap "hitgap"
+      querygap=$(echo $queryvar | tr -cd '-' | wc -c)
+      echo $queryvar "queryvar"
+      echo $querygap "querygap"
+      hitend=$((hitpos+1))
+      echo $hitend "hitend"
+      queryend=$((lp23start+querypos-1))
+      echo $queryend "queryend"
+      echo -e "$sseqid\t$((hitend-1))\t$hitstart\t$lp23scaffold:$queryend-$((querystart-1))\t$qseqid" >> GRCH37.$CALLING.UCNE.equivalence.bed
+      if [ $row_counter == $nrow ] #After the last gap, define region end as the alignment end
+        then
+        lasthitstart=$((hitend-querygap-1))
+        echo $lasthitstart "lasthitstart"
+        lastquerystart=$((queryend+hitgap+1))
+        echo $lastquerystart "lastquerystart"
+        lasthitend=$send
+        echo $lasthitend "lasthitend"
+        lastqueryend=$alignend
+        echo $lastqueryend "lastqueryend"
+        echo -e "$sseqid\t$((lasthitend-1))\t$lasthitstart\t$lp23scaffold:$lastqueryend-$((lastquerystart-1))\t$qseqid" >> GRCH37.$CALLING.UCNE.equivalence.bed
+      fi
+      done < working.grep.borrar
+  fi
+  done < $FILE
+rm working.grep.borrar
+
+#Now remove the useless rows that were generated when deletions were consecutive, and sort the bed:
+awk -F"\t|:|-" '($2 != $3) || ($5 != $6) {print $0}' GRCH37.$CALLING.UCNE.equivalence.bed | sort -k1,1 -k2,2n -k3,3n > GRCH37.$CALLING.UCNE.equivalence_sorted_uniq.bed
+mv GRCH37.$CALLING.UCNE.equivalence_sorted_uniq.bed GRCH37.$CALLING.UCNE.equivalence.bed
+
+
+#From outside the server:
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/ucne_database/gerp_analysis/GRCH37.$CALLING.UCNE.equivalence.bed /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db/
+
+```
+
