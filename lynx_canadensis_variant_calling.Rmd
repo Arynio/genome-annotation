@@ -1,0 +1,372 @@
+---
+title: "lynx_canadensis_variant_calling"
+output: html_document
+---
+
+#0: Overview.
+```{bash}
+
+This is the pipeline (originally written by Daniel Kleinman) for calling variants against a Lynx canadensis reference genome, using previously generated BAM files (see lynx_canadensis_mapping script), and eventually for filtering those variants.
+
+```
+
+#1: Prepare repetitive regions file.
+```{bash}
+
+#First, download all repetitive regions bed files from https://genome-euro.ucsc.edu/cgi-bin/hgTables?hgsid=234538950_1bHvFuCBAAi2APGIvaUS4D7kBOu3&clade=hub_29682&org=hub_29682_Lynx+canadensis&db=hub_29682_GCA_007474595.1_mLynCan4_v1.p&hgta_group=varRep&hgta_track=hub_29682_repeatMasker&hgta_table=hub_29682_repeatMaskerRNA&hgta_regionType=range&position=chrA1%3A239%2C200%2C001-239%2C300%2C000&hgta_outputType=bed&hgta_outFileName=lc_rep_LOWCOMPLEX.bed (changing tracks and selecting the whole genome option before downloading each bed file) as lc_ref_TYPE.bed (change the word TYPE for each type of repetitive region)
+
+#Then, scp them to the server:
+scp lc_rep*.bed dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/reference_genomes/lynx_canadensis/repetitive_regions/
+
+#And combine them into a single file:
+cd /GRUPOS/grupolince/reference_genomes/lynx_canadensis/repetitive_regions/
+cat *.bed | bedtools sort | bedtools merge > lc_rep_ALL_chrom_coord.bed
+sed -i '/chrM/d' ./lc_rep_ALL_chrom_coord.bed #remove chrM lines, as this region doesn't appear in the reference fasta.
+
+#Since this file uses chromosome names, but the reference genome uses scaffolds, a conversion is necessary. I downloaded the assembly structure report from https://www.ncbi.nlm.nih.gov/assembly/GCF_007474595.1/ and saved the chromosome-scaffold equivalence in /GRUPOS/grupolince/reference_genomes/lynx_canadensis/lc_ref_coordinates_equivalence.txt
+
+#The following code replaces all chromosome names in the repetitive regions file with their respective scaffold names:
+cd /GRUPOS/grupolince/reference_genomes/lynx_canadensis/repetitive_regions
+scp lc_rep_ALL_chrom_coord.bed lc_rep_ALL_scaffold_coord.bed
+CHROMOSOMES=$(cat /GRUPOS/grupolince/reference_genomes/lynx_canadensis/lc_ref_coordinates_equivalence.txt | cut -f2)
+for chr in ${CHROMOSOMES[@]}
+  do
+  SCAFFOLD=$(grep "${chr}" /GRUPOS/grupolince/reference_genomes/lynx_canadensis/lc_ref_coordinates_equivalence.txt | cut -f1)
+  echo $chr "is scaffold" $SCAFFOLD
+  sed -i "s/$chr/$SCAFFOLD/g" lc_rep_ALL_scaffold_coord.bed
+  done
+
+```
+
+
+#2: Perform variant calling. Both Lynx pardinus and Lynx lynx together, all samples at their original cov (~6-25x). A joint calling allows the tracking of substitutions, as monomorphic positions (incl. substitutions) are NOT included/polarized in the separate callings.
+##All positions:
+```{r Perform variant calling, eval=FALSE, engine='bash'}
+
+#Perform direct variant calling (without gVCFs) on the NM≤3 filtered BAMs.
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_lcnm3_origcov)
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/lynx_canadensis_VCFs/
+mkdir -p $CALLING
+cd $CALLING
+
+screen -S "varcalling-${CALLING}"
+CALLING=${STY#*-}
+script "varcalling-${CALLING}.log"
+CALLING=${STY#*-}
+
+REF=/GRUPOS/grupolince/reference_genomes/lynx_canadensis/lc4.fa #downloaded from https://vgp.github.io/genomeark/Lynx_canadensis/ (it's the individual 4 primary assembly, version assembly_curated from 10 January 2019), and then decompressed using gunzip -c
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/lynx_canadensis_BAM_files/BAM_nm_filtered
+SAMPLES=$(ls *.nm3.bam | cut -c1-12 | sort | uniq)
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
+-T HaplotypeCaller \
+-R $REF \
+$(for sample in $SAMPLES; do echo -I ${sample}.nm3.bam" "; done) \
+-o /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/lynx_canadensis_VCFs/$CALLING/${CALLING}.vcf
+
+grep -v '#' /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/lynx_canadensis_VCFs/$CALLING/${CALLING}.vcf | wc -l 
+
+
+
+
+!!!#Rename the samples with wrong names.
+cd $V_PATH/$CALLING
+bcftools query -l c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.vcf #check sample names
+#!/bin/bash
+#cat << "EOF" > lp_ll_rename.txt #Unmark this line when running it (I marked it in R because it doesn't understand it and messes the colours of subsequent lines). It should include all incorrect names.
+h_lp_do_0007 c_lp_do_0007
+LL90_rgsm c_ll_ki_0090
+EOF
+cat lp_ll_rename.txt
+bcftools reheader -s lp_ll_rename.txt -o c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_renamed.vcf c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.vcf #copy the VCF and rename the wrong named samples in the new VCF
+#rm lp_ll_rename.txt
+mv c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_renamed.vcf c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.vcf
+
+grep -v '#' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.vcf | wc -l #5783764
+
+```
+
+##Non-repetitive positions:
+```{r Perform variant calling, eval=FALSE, engine='bash'}
+
+#Perform direct variant calling (without gVCFs) on the NM≤3 filtered BAMs.
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_lcnm3_origcov)
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/lynx_canadensis_VCFs/
+mkdir -p $CALLING
+cd $CALLING
+
+screen -S "varcalling_nr-${CALLING}"
+CALLING=${STY#*-}
+script "varcalling_nr-${CALLING}.log"
+CALLING=${STY#*-}
+
+REF=/GRUPOS/grupolince/reference_genomes/lynx_canadensis/lc4.fa #downloaded from https://vgp.github.io/genomeark/Lynx_canadensis/ (it's the individual 4 primary assembly, version assembly_curated from 10 January 2019), and then decompressed using gunzip -c
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/lynx_canadensis_BAM_files/BAM_nm_filtered
+SAMPLES=$(ls *.nm3.bam | cut -c1-12 | sort | uniq)
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
+-T HaplotypeCaller \
+-R $REF \
+$(for sample in $SAMPLES; do echo -I ${sample}.nm3.bam" "; done) \
+-XL /GRUPOS/grupolince/reference_genomes/lynx_canadensis/repetitive_regions/lc_rep_ALL_scaffold_coord.bed \
+-o /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/lynx_canadensis_VCFs/$CALLING/${CALLING}_nr.vcf
+
+grep -v '#' /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/lynx_canadensis_VCFs/$CALLING/${CALLING}_nr.vcf | wc -l #9185795
+
+#Rename the samples with wrong names.
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/lynx_canadensis_VCFs/$CALLING
+bcftools query -l ${CALLING}_nr.vcf #check sample names... yes, they are all correct!
+
+```
+
+#3: Prepare annotation file.
+```{bash}
+
+#The annotation file was downloaded from: "https://www.ncbi.nlm.nih.gov/genome/?term=lynx+canadensis" in GFF format and stored as /GRUPOS/grupolince/reference_genomes/lynx_canadensis/GCF_007474595.1_mLynCan4_v1.p_genomic.gff3
+
+#Since this annotation file uses RefSeq names, but the reference genome uses scaffolds, a conversion is necessary. I downloaded the assembly definition from https://www.ncbi.nlm.nih.gov/assembly/GCA_007474595.1 and saved the chromosome-refseq equivalence in /GRUPOS/grupolince/reference_genomes/lynx_canadensis/lc_ref_refseq_equivalence.txt
+
+#The following code replaces all refsew names in the annotation file with their respective scaffold names:
+cd /GRUPOS/grupolince/reference_genomes/lynx_canadensis/
+scp GCF_007474595.1_mLynCan4_v1.p_genomic.gff3 lc4.gff3
+REFSEQ=$(cat lc_ref_refseq_equivalence.txt | cut -f3)
+for seq in ${REFSEQ[@]}
+  do
+  SCAFFOLD=$(grep "${seq}" lc_ref_refseq_equivalence.txt | cut -f1)
+  echo $seq "is scaffold" $SCAFFOLD
+  sed -i "s/$seq/$SCAFFOLD/g" lc4.gff3
+  done
+
+#Then remove the annotation for unassigned chromosomes (from row 1264033 onwards):
+head lc4.gff3 -n1264032 > lc4_final.gff3
+
+```
+
+#4: Polarize contemporary VCFs. Use VCFtools in order to polarize (ancestral vs. derived) the contemporary ll & lp VCFs. The ancestral state was inferred by Maria.
+
+##Prepare ancestral genome fasta (Lynx rufus genome based on the Lynx canadensis reference genome).
+```{bash}
+
+#First, obtain a fasta of the Lynx rufus sample with the Lynx canadensis reference genome coordinates:
+cd /GRUPOS/grupolince/reference_genomes/lynx_canadensis
+INBAM="/GRUPOS/grupolince/lynx_genomes_5x/lynx_canadensis_BAM_files/c_lr_zz_0001_sorted_rmdup_sorted_indelrealigner.bam"
+screen -S lr1_based_on_lc4.fa
+REF="lc4.fa"
+INBAM="/GRUPOS/grupolince/lynx_genomes_5x/lynx_canadensis_BAM_files/c_lr_zz_0001_sorted_rmdup_sorted_indelrealigner.bam"
+OUTFASTA="lr1_based_on_lc4.fa"
+cut -f1-2 lc4.fa.fai > length_scaffolds_lc4.txt
+SCAFFOLDS="length_scaffolds_lc4.txt"
+MAX_COV=45
+
+rm $OUTFASTA
+while read SCAFFOLD END_ZERO; 
+do
+echo "---------------------------------------------------$SCAFFOLD---------------------------------------------------"
+END=$(expr $END_ZERO + 1)
+samtools mpileup -s -q30 -f $REF $INBAM -r $SCAFFOLD | /GRUPOS/grupolince/reference_genomes/Chrom-Compare-master/pu2fa -c $SCAFFOLD -s 1 -e $END -C $MAX_COV >> $OUTFASTA
+done < $SCAFFOLDS
+
+#The programme emmited several two-line warnings such as the following:
+#Incorrect number of bases read in: Super_Scaffold_14    115715863
+#T       0       *       *       *
+#I verified that this is outputted for every position where the BAM has no coverage. Each of these positions will be assigned an N in the resulting fasta (also checked), so this shouldn't be an issue.
+
+
+#Next, the ancestral alleles file should be bgzipped (according to the documentation, they should be gzipped, but later on when trying to run faidx I got an error stating that files should be gzipped in order to build a fai index):
+bgzip -c lr1_based_on_lc4.fa > lr1_based_on_lc4.fa.gz
+
+#Finally, it should be fai indexed:
+/opt/samtools-1.6/samtools faidx lr1_based_on_lc4.fa.gz
+
+```
+
+##Use vcftools to add Ancestral Allele annotation to the VCF.
+```{r Polarize contemporary VCF, eval=FALSE, engine='bash'}
+
+#Code to annotate the AA (ancestral alleles) subfield from the INFO field in the VCF. I keep getting the following error: "Can't locate Vcf.pm in @INC". I look it up and apparently it's easy to solve: an environment variable PERL5LIB should be defined as the path to perl.
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_lcnm3_origcov)
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/lynx_canadensis_VCFs/$CALLING/
+screen -S "${CALLING}_aafilled.log"
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_lcnm3_origcov)
+script "${CALLING}_aafilled.log"
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_lcnm3_origcov)
+export PERL5LIB=/opt/vcftools_0.1.13/perl/ #set required environmental variable
+
+cat "${CALLING}_nr.vcf" | /opt/vcftools_0.1.13/perl/fill-aa -a /GRUPOS/grupolince/reference_genomes/lynx_canadensis/lr1_based_on_lc4.fa.gz | bgzip -c > "${CALLING}_aafilled.vcf.gz" #I tried to run this first without bgzipping it, and it was increasingly slow. Each day it did around half the previous day. When the server crashed, I relaunched it adding the bgzip command and it finished in a little over 24h.
+
+gzip -d -c "${CALLING}_aafilled.vcf.gz" > "${CALLING}_aafilled.vcf" #Get decompressed version. I ran md5sum for both the gzipped and the unzipped versions and there were no differences.
+
+grep -v '#' "${CALLING}_aafilled.vcf" | wc -l #9185795
+
+```
+
+##Use VcfFilterJdk to polarize the AA-filled VCF.
+```{r Polarize contemporary VCF, eval=FALSE, engine='bash'}
+
+#Polarize the AA-filled VCF based on the new INFO/AA column. Alleles will be switched whenever the ancestral allele matches the alternative one, and genotypes will be properly recoded as well. The following code was originally provided by Pierre Lindenbaum and modified by José Luis Castro.
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_lcnm3_origcov)
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/lynx_canadensis_VCFs/$CALLING/
+screen -S "${CALLING}_polarized.log"
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_lcnm3_origcov)
+script "${CALLING}_polarized.log"
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_lcnm3_origcov)
+
+java -jar /opt/jvarkit/dist/vcffilterjdk.jar -e 'if(variant.getNAlleles()!=2 || !variant.hasAttribute("AA")) return true; 
+final String aa = variant.getAttributeAsString("AA",""); 
+if(!variant.getAlleles().get(1).getDisplayString().equalsIgnoreCase(aa)) return true; 
+VariantContextBuilder vb=new VariantContextBuilder(variant); 
+
+Allele oldalt = variant.getAlleles().get(1);
+Allele oldref = variant.getAlleles().get(0); 
+Allele ref= Allele.create(oldalt.getDisplayString(),true); 
+Allele alt= Allele.create(oldref.getDisplayString(),false);
+
+vb.alleles(Arrays.asList(ref,alt)); 
+
+List genotypes= new ArrayList<>(); 
+for(Genotype g: variant.getGenotypes()) 
+  { 
+  if(!g.isCalled()) 
+  { genotypes.add(g); continue;} 
+  GenotypeBuilder gb = new GenotypeBuilder(g); 
+  List alleles = new ArrayList<>(); 
+  for(Allele a:g.getAlleles()) { 
+    if(a.equals(oldalt)) { a=ref;} 
+    else if(a.equals(oldref)) { a=alt;} 
+    alleles.add(a); 
+    } 
+  if(g.hasPL()) { 
+    int pl[] = g.getPL(); 
+    int pl2[] = new int[pl.length]; 
+    for(int i=0;i< pl.length;i++) pl2[i]=pl[(pl.length-1)-i]; 
+    gb.PL(pl2); 
+    } 
+  if(g.hasAD()) 
+    { int ad[] = g.getAD(); 
+    int ad2[] = new int[ad.length]; 
+    for(int i=0;i< ad.length;i++) ad2[i]=ad[(ad.length-1)-i];
+    gb.AD(ad2); 
+  } 
+  genotypes.add(gb.alleles(alleles).make()); 
+  }
+
+vb.attribute("AF",1.0d - Double.parseDouble(variant.getAttributeAsString("AF",""))); vb.attribute("AC",variant.getGenotypes().stream().flatMap(G->G.getAlleles().stream()).filter(A->A.equals(oldref)).count()); 
+vb.genotypes(genotypes); 
+return vb.make();' -o "${CALLING}_polarized.vcf" "${CALLING}_aafilled.vcf"
+
+grep -v '#' "${CALLING}_polarized.vcf" | wc -l
+
+```
+
+
+#5: Set up SnpEff. I'll be following this manual for all SnpEff configuration purposes: http://snpeff.sourceforge.net/SnpEff_manual.html
+##Search for the Lynx canadensis database. 
+Search for the Lynx canadensis assembly database in the program's pre-built database. As of January the 10th, 2020, the Lynx canadensis genome isn't included in the snpEff database. A second option would be building our own Lynx canadensis database.
+```{r Set up SnpEff, eval=FALSE, engine='bash'}
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+java -jar /opt/snpEff/snpEff.jar databases | grep -i canadensis
+#No matches
+
+```
+
+##Build the Lynx rufus genome database.
+In the end we opt to build our own database since we don't know when they will get themselves to add it. This step should be omitted if the desired database was found in the previous step. Annotating against the Lynx rufus genome is the correct option if the VCF has been polarized based on that genome.
+
+###Add entry to the config file
+```{r Set up SnpEff, eval=FALSE, engine='bash'}
+
+#Originally the config was just in the software folder and I didn't have writing permission. If this is the only config file available, writing permission is required, and when annotating later on, the file should be called using the -c command followed by the path to the file.
+#However, in my case I believe the tech group created a copy of the file in my folder after I sent them an e-mail, and this is the one that I was able to edit.
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+
+cd $C_PATH
+#mv snpEff.config $C_PATH #I move the config file that appeared in my folder to a subfolder that I created for snpEff
+vi snpEff.config  #initiate the editing process
+
+#Following the manual, I added the following two lines (use :o to start editing -watch out for the current line- and :wq to save and exit):
+
+# Lynx_rufus (Lynx canadensis coordinates)
+LYRU.LYCA4.genome : Bobcat #from now on, LYRU.LYCA4 is the code (in snpEff) for the Lynx rufus genome based on the Lynx canadensis reference genome
+
+```
+
+###Create directory and move files
+```{r Set up SnpEff, eval=FALSE, engine='bash'}
+
+#First for the regular annotation:
+mkdir $C_PATH/data/LYRU.LYCA4 #create a directory inside the software's dependencies whose name matches the code
+cd $C_PATH/data/LYRU.LYCA4
+
+scp /GRUPOS/grupolince/reference_genomes/lynx_canadensis/lc4_final.gff3 $C_PATH/data/LYRU.LYCA4/ #copy the annotation file (can be gff or gtf) to the newly created directory. This gff file includes CDS, introns, exons and genes, so it's very basic. A more complex version that Maria created which includes lncRNAs, etc., will be considered as custom annotation.
+mv lc4_final.gff3 genes.gff #rename the file as the tutorial indicates
+
+mkdir $C_PATH/data/genomes #create a directory inside the software's dependencies called genomes
+cd $C_PATH/data/genomes
+scp /GRUPOS/grupolince/reference_genomes/lynx_canadensis/lr1_based_on_lc4.fa $C_PATH/data/genomes #copy the reference genome fasta to the new genomes directory
+mv lr1_based_on_lc4.fa LYRU.LYCA4.fa #rename the file so that it matches the code
+
+```
+
+###Build the database
+```{r Set up SnpEff, eval=FALSE, engine='bash'}
+
+cd $C_PATH
+screen -S build_LYRU.LYCA4_snpEff_db #open a dettachable screen in case the database building takes too long
+script build_LYRU.LYCA4_snpEff_db.txt #initiate the log file
+
+S_PATH=/opt/snpEff #redefine the variable, since we're inside a script
+C_PATH=/home/dkleinman/datos/snpEff #redefine the variable, since we're inside a script
+
+cd $S_PATH
+java -jar snpEff.jar build -gff3 -v LYRU.LYCA4 -c $C_PATH/snpEff.config -dataDir $C_PATH/data #build the database. Use the -gff3 command for gff files and -gtf22 for gtf files. Use -v for verbose (expanded information on the processes and the warnings/errors that may appear). Use -c to indicate the path to my own config file. Then use -dataDir to override the data directory from the config file (by default the software thinks that the data folder with the genome and the genes files is located where config is, so it's necessary to give it the correct path).
+
+ctrl + D #terminate the script
+ctrl + D #terminate the screen
+
+```
+
+#6: Annotate using SnpEff.
+##Create custom annotation bed file
+
+```{r Annotate using SnpEff, eval=FALSE, engine='bash'}
+
+
+```
+
+##Annotate the VCF with custom annotation
+
+```{r Annotate using SnpEff, eval=FALSE, engine='bash'}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_lcnm3_origcov)
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/lynx_canadensis_VCFs/$CALLING/
+screen -S "${CALLING}_polarized.lr_ann.log"
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_lcnm3_origcov)
+script "${CALLING}_polarized.lr_ann.log"
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_lcnm3_origcov)
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/lynx_canadensis_VCFs/ #VCFs path
+
+cd $O_PATH #run this code from the directory where the config is located.
+java -Xmx16g -jar $S_PATH/snpEff.jar LYRU.LYCA4 -v -s $V_PATH/$CALLING/annotation/"${CALLING}_polarized.lr_ann.html" -csvStats $V_PATH/$CALLING/annotation/"${CALLING}_polarized.lr_ann.csv" $V_PATH/$CALLING/"${CALLING}_polarized.vcf" > $V_PATH/$CALLING/annotation/"${CALLING}_polarized.lr_ann.vcf" #run this code from the directory where the config is located.
+
+cd $V_PATH/$CALLING/annotation
+grep -v '#' "${CALLING}_polarized.lr_ann.vcf" | wc -l 
+
+
+```
