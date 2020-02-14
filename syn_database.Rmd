@@ -1,0 +1,202 @@
+---
+title: "syn_database"
+author: "Dani"
+date: "8 de julio de 2019"
+output: html_document
+---
+
+#1: Build Syn pref database.
+##Generate for each gene a file with its aminoacid changes (in the format required by Provean).
+```{bash}
+
+mkdir -p /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/syn_pref
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/syn_pref
+
+#Create library with aminoacid codes
+echo -e "Ala\tA\nCys\tC\nAsp\tD\nGlu\tE\nPhe\tF\nGly\tG\nHis\tH\nIle\tI\nLys\tK\nLeu\tL\nMet\tM\nAsn\tN\nPro\tP\nGln\tQ\nArg\tR\nSer\tS\nThr\tT\nVal\tV\nTrp\tW\nTyr\tY" > aminoacid_codes.txt
+
+#Obtain from the VCF the list of genes with synonymous variants, and their aminoacid changes
+grep '#' ./../c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filtered5_SNP.lr_ann.vcf > synonymous_variants.vcf
+grep 'synonymous_variant' ./../c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filtered5_SNP.lr_ann.vcf >> synonymous_variants.vcf
+grep -v '#' synonymous_variants.vcf | awk -F"\t|\\\\|" '{printf ("%s\t%s\t%s\t%s\t%s\n", $1,$2,$11,$18,$17)}' | awk -F"\t" '{OFS = FS} { gsub(/p\./,"", $4); gsub(/c\./,"", $5); print }' > synonymous_variants_gene_names.txt
+
+#Replace three-letter codes with one-letter ones
+TRI_CODES=$(cut aminoacid_codes.txt -f 1)
+for aatri in ${TRI_CODES[@]}
+  do
+  aamono=$(grep ${aatri} aminoacid_codes.txt | cut -f 2)
+  echo "${aatri} -> ${aamono}"
+  sed -i -e "s/$aatri/$aamono/g" synonymous_variants_gene_names.txt
+  done
+
+#Extract all variants from each gene and store them in variant files
+GENES=$(cat synonymous_variants_gene_names.txt | cut -f 3 | uniq)
+for gen in ${GENES[@]}
+  do
+  echo "$gen"
+  grep "$gen" synonymous_variants_gene_names.txt | cut -f 4 | sed 's/[A-Za-z]*//g' > genes_variants/"$gen".var
+  done
+
+```
+
+##Generate for each gene a fasta file with its protein sequence.
+```{bash}
+
+mkdir -p /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/syn_pref
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/syn_pref
+
+#Obtain coordinates for all CDS from all genes in the list.
+GENES=$(cat synonymous_variants_gene_names.txt | cut -f 3 | uniq)
+COUNTER=0
+rm synonymous_variants_cds_list.gff3
+for gen in ${GENES[@]}
+  do
+  #echo "${gen}"
+  grep "$gen" /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.all.fix.nr.gff3 | awk -v gene_name=$gen '$3 == "CDS" {printf ("%s\t%s\n", $0,gene_name)}' >> synonymous_variants_cds_list.gff3
+  ((COUNTER++))
+  if [ $(( $COUNTER % 10 )) == 0 ]
+    then
+    echo "processed $COUNTER genes out of $(echo "$GENES" | wc -l)"
+  fi
+  done
+
+#Retrieve reference sequences for all CDS (from the rufus reference fasta to account for polarisation).
+bedtools getfasta -fi /GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa -bed synonymous_variants_cds_list.gff3 -fo synonymous_variants_cds_sequence.fa
+
+#Paste each CDS' sequence with the rest of the information in the gff.
+paste synonymous_variants_cds_list.gff3 <(grep -v '>' synonymous_variants_cds_sequence.fa) > synonymous_variants_cds_list_and_sequence.gff3
+
+#For partial genes, remove the non-coding SNPs at the flanks (to account for the reading frame). Complete genes will always start with reading frame = 0 so those are already correct, but many partial genes have different reading frames.
+awk '/partial_gene/ {printf ("%s\t%s\n", $0,NR)}' synonymous_variants_cds_list_and_sequence.gff3 > synonymous_variants_cds_list_and_sequence_partialgenes.gff3
+while read -r row; do
+  CUT_N=$(echo "$row" | cut -f 8)
+  CUT_N=$((CUT_N+1))
+  STRAND=$(echo "$row" | cut -f 7)
+  OLD_SEQUENCE=$(echo "$row" | cut -f 11)
+  ROW_N=$(echo "$row" | cut -f 12)
+  if [ $STRAND == "+" ]
+    then
+    CODING_SEQUENCE=$(echo $OLD_SEQUENCE | cut -c $CUT_N-)
+  elif [ $STRAND == "-" ]
+    then
+    CODING_SEQUENCE=$(echo $OLD_SEQUENCE | rev | cut -c $CUT_N- | rev)
+  fi
+  sed -i "${ROW_N}s/$OLD_SEQUENCE/$CODING_SEQUENCE/" synonymous_variants_cds_list_and_sequence.gff3
+done < synonymous_variants_cds_list_and_sequence_partialgenes.gff3  
+
+#Fuse all exons from each gene and store them in a file together with the gene name and the strand information.
+GENES=$(cat synonymous_variants_cds_list_and_sequence.gff3 | cut -f 10 | uniq)
+COUNTER=0
+rm synonymous_variants_cds_list_and_sequence_combined.txt
+for gen in ${GENES[@]}
+  do
+  #echo "${gen}"
+  STRAND=$(awk -F"\t" -v gen=$gen '$10 == gen' synonymous_variants_cds_list_and_sequence.gff3 | shuf -n1 | cut -f 7)
+  CODING_SEQUENCE=$(awk -F"\t" -v gen=$gen '$10 == gen {print $11}' synonymous_variants_cds_list_and_sequence.gff3 | tr -d '\n')
+  echo -e "$gen\t$STRAND\t$CODING_SEQUENCE" >> synonymous_variants_cds_list_and_sequence_combined.txt
+  ((COUNTER++))
+  if [ $(( $COUNTER % 10 )) == 0 ]
+    then
+    echo "processed $COUNTER genes out of $(echo "$GENES" | wc -l)"
+  fi
+  done
+sort synonymous_variants_cds_list_and_sequence_combined.txt -k1,1 | uniq > synonymous_variants_cds_list_and_sequence_combined_sorted.txt
+mv synonymous_variants_cds_list_and_sequence_combined_sorted.txt synonymous_variants_cds_list_and_sequence_combined.txt
+
+```
+
+##Combine all gene sequences in a file and calculate codon usage:
+```{bash}
+
+#Merge in a single file all gene sequences:
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/syn_pref
+cat synonymous_variants_cds_list_and_sequence_combined.txt > all_genes_sequence_combined.txt
+cat ./../provean/missense_variants_cds_list_and_sequence_combined.txt >> all_genes_sequence_combined.txt
+sort all_genes_sequence_combined.txt | uniq > all_genes_sequence_combined_bis.txt
+mv all_genes_sequence_combined_bis.txt all_genes_sequence_combined.txt
+
+#Retrieve all codons from each gene:
+rm all_genes_sequence_combined_codons.txt
+TOTAL=$(cat all_genes_sequence_combined.txt | wc -l)
+COUNTER=0
+while read -r entry; do
+  GENE=$(echo "$entry" | cut -f 1)
+  #echo $GENE
+  STRAND=$(echo "$entry" | cut -f 2)
+  #echo $STRAND
+  CODING_SEQUENCE=$(echo "$entry" | cut -f 3)
+  #echo $CODING_SEQUENCE
+  if [ $STRAND == "+" ]
+    then
+    echo $CODING_SEQUENCE | sed 's/.../&\n/g' >> all_genes_sequence_combined_codons.txt
+  elif [ $STRAND == "-" ]
+    then
+    REVERSE_SEQUENCE=$(echo $CODING_SEQUENCE | tr ACGT TGCA | rev) #this code obtains the reverse complementary sequence
+    echo $REVERSE_SEQUENCE | sed 's/.../&\n/g' >> all_genes_sequence_combined_codons.txt
+  fi
+  ((COUNTER++))
+  if [ $(( $COUNTER % 100 )) == 0 ]
+    then
+    echo "processed $COUNTER genes out of $TOTAL"
+  fi
+  done < all_genes_sequence_combined.txt
+
+#Count the occurrences of each codon:
+sort all_genes_sequence_combined_codons.txt | uniq -c > all_genes_sequence_combined_codon_counts.txt
+
+#Store the genetic code in a file:
+echo -e "TTT\tF\nTTC\tF\nTTA\tL\nTTG\tL\nCTT\tL\nCTC\tL\nCTA\tL\nCTG\tL\nATT\tI\nATC\tI\nATA\tI\nATG\tM\nGTT\tV\nGTC\tV\nGTA\tV\nGTG\tV\nTCT\tS\nTCC\tS\nTCA\tS\nTCG\tS\nCCT\tP\nCCC\tP\nCCA\tP\nCCG\tP\nACT\tT\nACC\tT\nACA\tT\nACG\tT\nGCT\tA\nGCC\tA\nGCA\tA\nGCG\tA\nTAT\tY\nTAC\tY\nTAA\t-\nTAG\t-\nCAT\tH\nCAC\tH\nCAA\tQ\nCAG\tQ\nAAT\tN\nAAC\tN\nAAA\tK\nAAG\tK\nGAT\tD\nGAC\tD\nGAA\tE\nGAG\tE\nTGT\tC\nTGC\tC\nTGA\t-\nTGG\tW\nCGT\tR\nCGC\tR\nCGA\tR\nCGG\tR\nAGT\tS\nAGC\tS\nAGA\tR\nAGG\tR\nGGT\tG\nGGC\tG\nGGA\tG\nGGG\tG\t" > genetic_code.txt
+
+#Join both files to obtain the final codon usage file:
+join -1 2 -2 1 <(sort -k2 all_genes_sequence_combined_codon_counts.txt) <(sort genetic_code.txt) | sort -k3,3 -k2,2nr | awk '{printf ("%s\t%s\t%s\n", $1, $3, $2)}' > codon_usage.txt
+
+
+```
+
+##Retrieve original and substituted codons:
+```{bash}
+
+#For each synonymous mutation, retrieve the wild and mutated codons:
+rm synonymous_variants_complete_info.txt
+echo -e "scaffold\tmutated_position\tgene\tstrand\tmutated_codon_N\tmutated_nucleotide_N\twild_codon\tmutated_codon\tmutated_base\twild_sequence" > synonymous_variants_complete_info.txt
+TOTAL=$(cat synonymous_variants_gene_names.txt | wc -l)
+COUNTER=0
+while read -r entry; do
+  SCAFFOLD=$(echo "$entry" | cut -f 1)
+  SNP=$(echo "$entry" | cut -f 2)
+  GENE=$(echo "$entry" | cut -f 3)
+  #echo $GENE
+  STRAND=$(grep $GENE synonymous_variants_cds_list_and_sequence_combined.txt | cut -f 2)
+  #echo $STRAND
+  CODING_SEQUENCE=$(grep $GENE synonymous_variants_cds_list_and_sequence_combined.txt | cut -f 3)
+  #echo $CODING_SEQUENCE  
+  if [ $STRAND == "+" ]
+    then
+    FINAL_SEQUENCE=$(echo $CODING_SEQUENCE)
+  elif [ $STRAND == "-" ]
+    then
+    FINAL_SEQUENCE=$(echo $CODING_SEQUENCE | tr ACGT TGCA | rev) #this code obtains the reverse complementary sequence
+  fi
+  #echo $FINAL_SEQUENCE
+  AFFECTED_CODON=$(echo "$entry" | cut -f 4 | sed 's/[^0-9]*//g')
+  #echo $AFFECTED_CODON
+  AFFECTED_NUCLEOTIDE=$(echo "$entry" | cut -f 5 | sed 's/[^0-9]*//g')
+  #echo $AFFECTED_NUCLEOTIDE
+  MUTATED_BASE=$(echo "$entry" | cut -f 5 | tail -c 2)
+  #echo $MUTATED_BASE
+  WILD_CODON=$(echo $FINAL_SEQUENCE | sed 's/.../&\n/g' | sed "${AFFECTED_CODON}q;d")
+  #echo $WILD_CODON
+  MUTATED_SEQUENCE=$(echo $FINAL_SEQUENCE | sed "s/./$MUTATED_BASE/$AFFECTED_NUCLEOTIDE")
+  #echo $MUTATED_SEQUENCE
+  MUTATED_CODON=$(echo $MUTATED_SEQUENCE | sed 's/.../&\n/g' | sed "${AFFECTED_CODON}q;d")
+  #echo $MUTATED_CODON
+  echo -e "$SCAFFOLD\t$SNP\t$GENE\t$STRAND\t$AFFECTED_CODON\t$AFFECTED_NUCLEOTIDE\t$WILD_CODON\t$MUTATED_CODON\t$MUTATED_BASE\t$FINAL_SEQUENCE" >> synonymous_variants_complete_info.txt
+  ((COUNTER++))
+  if [ $(( $COUNTER % 100 )) == 0 ]
+    then
+    echo "processed $COUNTER variants out of $TOTAL"
+  fi
+  done < synonymous_variants_gene_names.txt
+
+```
+
