@@ -3482,10 +3482,10 @@ average_relativised_derived_allele_allele_ratio_ggplot1 <- ggplot(data=filter(av
   ylim(0.9,1.05) +
   #ggtitle(paste0("ratio of ",type," relative to synonymous and Kirov")) +
   theme_bw() +
-  theme(text=element_text(size=12,face="bold"),
+  theme(text=element_text(size=16,face="bold"),
         rect=element_rect(size=1),
         axis.line=element_line(colour="black"),
-        axis.title=element_text(size=16),
+        axis.title=element_text(size=20),
         #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
         #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
         #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
@@ -3516,10 +3516,10 @@ average_relativised_derived_allele_allele_ratio_ggplot2 <- ggplot(data=filter(av
   ylim(0.75,1.10) +
   #ggtitle(paste0("ratio of ",type," relative to synonymous and Kirov")) +
   theme_bw() +
-  theme(text=element_text(size=12,face="bold"),
+  theme(text=element_text(size=16,face="bold"),
         rect=element_rect(size=1),
         axis.line=element_line(colour="black"),
-        axis.title=element_text(size=16),
+        axis.title=element_text(size=20),
         #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
         #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
         #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
@@ -6069,7 +6069,7 @@ variants_het_tidy$feature <- gsub('coding', 'CDS', variants_het_tidy$feature)
 variants_het_tidy
 
 #Import total sites data and cross it with the heterozygous counts to estimate neutral PI:
-total_sites <- read_tsv("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/whole_genome_counts/category_sites_total_counts_percategoryfilter.lr_ann.txt") 
+total_sites <- read_tsv("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/whole_genome_counts/category_sites_total_counts_percategoryfilter_corrected.lr_ann.txt") 
 total_sites
 #For coding categories, we'll follow the proportions estimated by Yamaguchi-Kagata et al (see here: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2561068/): 28.5% SYN, 68.1% NSYN, and 3.4% NONSENSE. From my own classification of NSYN, 60.8% were NTOL and 39.2% were NDEL. So the totals would be: 28.5% SYN, 68.1% NSYN (41.4% NTOL, 26.7% NDEL), and 3.4% NONSENSE.
 coding_proportions <- data_frame("coding_category"=c("synonymous","missense","mistol","misdel","nonsense"),"proportion"=c(0.285,0.681,0.414,0.267,0.034)) #create dataframe with these numbers and loop over it to add their estimated total counts to total_sites:
@@ -6078,16 +6078,16 @@ for (row in seq(1,nrow(coding_proportions))) {
   print(coding_category)
   proportion <- unlist(coding_proportions[row,2],use.names=F)
   print(proportion)
-  total_sites <- rbind(total_sites,c(coding_category,round(proportion*unlist(total_sites[which(total_sites$category=="CDS"),2],use.names=F)),round(proportion*unlist(total_sites[which(total_sites$category=="CDS"),3],use.names=F))))
-  total_sites$total_N <- as.numeric(total_sites$total_N)
-  total_sites$total_N_postfilter <- as.numeric(total_sites$total_N_postfilter)
+  total_sites <- rbind(total_sites,c(coding_category,NA,NA,round(proportion*unlist(total_sites[which(total_sites$category=="CDS"),4],use.names=F)),NA,round(proportion*unlist(total_sites[which(total_sites$category=="CDS"),6],use.names=F))))
+  total_sites$callable_N <- as.numeric(total_sites$callable_N)
+  total_sites$callable_N_postfilter <- as.numeric(total_sites$callable_N_postfilter)
 }
 total_sites
 total_sites$category <- factor(total_sites$category,levels=c("total","intergenic","intron","CDS","synonymous","missense","mistol","misdel","nonsense","UCNE"))
 total_sites <- total_sites[order(total_sites$category),]
-write_tsv(total_sites,paste0("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/whole_genome_counts/complete_category_sites_total_counts_percategoryfilter.lr_ann.txt"))
+write_tsv(total_sites,paste0("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/whole_genome_counts/complete_category_sites_total_counts_percategoryfilter_corrected.lr_ann.txt"))
 
-variants_het_joined_all <- left_join(variants_het_tidy,total_sites,by=c("feature"="category")) %>% mutate(het_by_total=N/total_N,het_by_total_filter=N/total_N_postfilter)
+variants_het_joined_all <- left_join(variants_het_tidy,total_sites,by=c("feature"="category")) %>% mutate(het_by_total=N/callable_N,het_by_total_filter=N/callable_N_postfilter)
 variants_het_joined_all$feature = factor(variants_het_joined_all$feature,levels=c("total","intergenic","intron","CDS","synonymous","missense","mistol","misdel","nonsense","UCNE")) 
 variants_het_joined_all
 
@@ -6281,7 +6281,7 @@ variants_het_tidy$feature <- gsub('coding', 'CDS', variants_het_tidy$feature)
 variants_het_tidy
 
 #Import total sites data and cross it with the heterozygous counts to estimate neutral PI:
-total_sites <- read_tsv("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/whole_genome_counts/category_sites_total_counts_percategoryfilter.lr_ann.txt") 
+total_sites <- read_tsv("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/whole_genome_counts/category_sites_total_counts_percategoryfilter_corrected.lr_ann.txt") 
 total_sites
 #For coding categories, we'll follow the proportions estimated by Yamaguchi-Kagata et al (see here: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2561068/): 28.5% SYN, 68.1% NSYN, and 3.4% NONSENSE. From my own classification of NSYN, 60.8% were NTOL and 39.2% were NDEL. So the totals would be: 28.5% SYN, 68.1% NSYN (41.4% NTOL, 26.7% NDEL), and 3.4% NONSENSE.
 coding_proportions <- data_frame("coding_category"=c("synonymous","missense","missense_tol","missense_del","nonsense"),"proportion"=c(0.285,0.681,0.414,0.267,0.034)) #create dataframe with these numbers and loop over it to add their estimated total counts to total_sites:
@@ -6290,13 +6290,13 @@ for (row in seq(1,nrow(coding_proportions))) {
   print(coding_category)
   proportion <- unlist(coding_proportions[row,2],use.names=F)
   print(proportion)
-  total_sites <- rbind(total_sites,c(coding_category,round(proportion*unlist(total_sites[which(total_sites$category=="CDS"),2],use.names=F)),round(proportion*unlist(total_sites[which(total_sites$category=="CDS"),3],use.names=F))))
-  total_sites$total_N <- as.numeric(total_sites$total_N)
-  total_sites$total_N_postfilter <- as.numeric(total_sites$total_N_postfilter)
+  total_sites <- rbind(total_sites,c(coding_category,NA,NA,round(proportion*unlist(total_sites[which(total_sites$category=="CDS"),4],use.names=F)),NA,round(proportion*unlist(total_sites[which(total_sites$category=="CDS"),6],use.names=F))))
+  total_sites$callable_N <- as.numeric(total_sites$callable_N)
+  total_sites$callable_N_postfilter <- as.numeric(total_sites$callable_N_postfilter)
 }
 total_sites
 
-variants_het_joined_all <- left_join(variants_het_tidy,total_sites,by=c("feature"="category")) %>% mutate(rda_by_total=N/total_N,rda_by_total_filter=N/total_N_postfilter)
+variants_het_joined_all <- left_join(variants_het_tidy,total_sites,by=c("feature"="category")) %>% mutate(rda_by_total=N/callable_N,rda_by_total_filter=N/callable_N_postfilter)
 variants_het_joined_all$feature = factor(variants_het_joined_all$feature,levels=c("total","intergenic","intron","CDS","synonymous","missense","missense_tol","missense_del","nonsense","UCNE")) 
 variants_het_joined_all
 
@@ -7261,7 +7261,7 @@ GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
 BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
 
 cd $V_PATH/$CALLING/annotation
-ALL_SITES_FILE=$(echo /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/complete_category_sites_total_counts_percategoryfilter.lr_ann.txt)
+ALL_SITES_FILE=$(echo /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/complete_category_sites_total_counts_percategoryfilter_corrected.lr_ann.txt)
 rm ${CALLING}"_ann_population_summary_watterson_"${VAR}"_"${TYPE}".lr_ann.txt"
 echo -e "species\tpopulation\tdataset\tsize\tcategory\tsegregating_N\tharmonic_N\tglobal_theta\ttotal_N\tnucleotide_theta" > ${CALLING}"_ann_population_summary_watterson_"${VAR}"_"${TYPE}".lr_ann.txt"
 POPLIST=($(ls `find . -name *"_perpop_"${VAR}"_"${TYPE}".lr_ann.vcf" ! -path '*testing_variant_numbers*' -print`))
@@ -7311,7 +7311,7 @@ for p in "${POPLIST[@]}"
       #done
     echo $HARMONIC_N "harmonic number" #this is the denominator of the global theta
     GLOBAL_THETA=$(echo "scale=8; $SEGREGATING_N/$HARMONIC_N" | bc)
-    TOTAL_N=$(grep -w "${c}" "$ALL_SITES_FILE" | cut -f3)
+    TOTAL_N=$(grep -w "${c}" "$ALL_SITES_FILE" | cut -f6)
     echo $TOTAL_N "total sites" #this is the denominator of the per site theta
     NUCLEOTIDE_THETA=$(echo "scale=8; $GLOBAL_THETA/$TOTAL_N" | bc)
     echo $NUCLEOTIDE_THETA "nucleotide average Watterson's theta" #this is the nucleotide average theta
