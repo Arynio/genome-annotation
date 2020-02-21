@@ -231,8 +231,8 @@ join -1 4 -2 5 <(sort -k4 test.bed) <(sort -k5 hg19_GERP_coord_${chr}_complete.b
 
 ```
 
-#Use BLAST to get lynx-human coordinate equivalences.
-##Make local database for human GRCH37:
+#Obtain GERP scores via human-lynx BLAST alignments.
+##Make local BLAST database for human GRCH37:
 ```{bash}
 
 #I need to retrieve the coordinate equivalence between human GRCH37/hg19 (where GERP scores are defined) and lynx. I wasn't able to find the GRCH37/hg19 database in the ncbi web, but I found a link with all GRCH37/hg19 fastas and a guide on how to build my own GRCH37/hg19 database from those fastas. This is the link with the GRCH37/hg19 fastas: http://hgdownload.soe.ucsc.edu/goldenPath/hg19/bigZips/chromFa.tar.gz. This is the link with the explanation: https://www.biostars.org/p/233113/
@@ -312,10 +312,12 @@ scp /Applications/jvarkit/$CALLING/${CALLING}.UCNE.blast.gaps dkleinman@genomics
 
 ```
 
-#Generate bed with human coordinates:
+##Generate bed with human coordinates and the exact lynx equivalence:
 ```{bash}
 
 CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/ucne_database/gerp_analysis
+
 
 rm GRCH37.$CALLING.UCNE.equivalence.bed
 FILE=$(echo $CALLING.UCNE.blast.txt)
@@ -431,10 +433,436 @@ rm working.grep.borrar
 awk -F"\t|:|-" '($2 != $3) || ($5 != $6) {print $0}' GRCH37.$CALLING.UCNE.equivalence.bed | sort -k1,1 -k2,2n -k3,3n > GRCH37.$CALLING.UCNE.equivalence_sorted_uniq.bed
 mv GRCH37.$CALLING.UCNE.equivalence_sorted_uniq.bed GRCH37.$CALLING.UCNE.equivalence.bed
 
+wc -l < GRCH37.$CALLING.UCNE.equivalence.bed #5588
 
-#From outside the server:
-CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
-scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/ucne_database/gerp_analysis/GRCH37.$CALLING.UCNE.equivalence.bed /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db/
+#Sanity check: count the length of each human segment and its lynx equivalent, then for each region subtract both numbers, then count the number of regions where the subtracted number is higher than 0. If everything's ok, the following code should output 0. 
+awk -F"\t|:|-" '{printf("%f\t%f\n",$3-$2,sqrt(($6-$5)^2))}' GRCH37.$CALLING.UCNE.equivalence.bed | awk -F"\t" '{printf("%f\t%f\t%f\n",$1,$2,$2-$1)}' | awk -F"\t" '($3 > 0) {print $0}' | wc -l #0 (it seems like everything's ok)
+
+#Since the UCSC browser that we'll be using next to retrieve the GERP scores has a limit of 1000 regions per query, we need to break the GRCH37.$CALLING.UCNE.equivalence.bed file in at least 6 files.
+TOTAL_ROWS=$(wc -l < GRCH37.$CALLING.UCNE.equivalence.bed)
+UCSC_LIMIT=1000
+FILES_REQUIRED=$(echo $(((TOTAL_ROWS+UCSC_LIMIT-1)/UCSC_LIMIT))) #TOTAL_ROWS+UCSC_LIMIT-1 is a trick to round the division up to the next integer
+ROWS_PER_FILE=$(echo $(((TOTAL_ROWS+FILES_REQUIRED-1)/FILES_REQUIRED)))
+
+START=1
+#echo $START
+END=$ROWS_PER_FILE
+#echo $END
+for part in $(seq ${FILES_REQUIRED[@]})
+  do
+  #echo ${part}
+  sed -n $START','$END'p' GRCH37.$CALLING.UCNE.equivalence.bed | awk -F"\t" '{printf("%s\t%s\t%s\t%s\n",$1,$2,$3,$4)}' > GRCH37.$CALLING.UCNE.equivalence_part_${part}.bed
+  START=$((END+1))
+  #echo $START
+  END=$((START+ROWS_PER_FILE-1))
+  #echo $END
+  done
 
 ```
 
+##Retrieve GERP scores from human coordinates:
+```{bash}
+
+#From outside the server, download all bed files to the local folder:
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/ucne_database/gerp_analysis/GRCH37.$CALLING.UCNE.equivalence_part*.bed /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db/GERP_analysis
+
+#Then go to the website: https://genome.ucsc.edu/cgi-bin/hgTables, set genome as human, assembly as GRCh37/hg19 from Feb. 2009, group as comparative genomics, track as GERP, region as defined region and submit one of the equivalence_part_${part}.bed file generated in the previous section. Write down the respective name of the output in the blank box as equivalence_part_${part}.gerp, click 'output' and then in the next window click 'get custom track in file' to start the download. Repeat the process for the rest of the parts, and move all downloaded .gerp files to /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db/GERP_analysis
+
+#Then upload all bed files to the server:
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+scp /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db/GERP_analysis/GRCH37.$CALLING.UCNE.equivalence_part*.gerp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/ucne_database/gerp_analysis/ 
+
+```
+
+##Convert GERP scores back to bed format:
+```{bash}
+
+#Once all .gerp files have been uploaded, convert them to .bed format.
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/ucne_database/gerp_analysis/temporary_folder
+
+rm ./../GRCH37.$CALLING.UCNE.equivalence_part_*.gerp.bed
+GERP_FILES=$(ls ./../GRCH37.$CALLING.UCNE.equivalence_part_*.gerp | wc -l)
+for part in $(seq ${GERP_FILES[@]})
+  do
+  echo "breaking down part" $part
+  grep -vE '#|track' ./../GRCH37.$CALLING.UCNE.equivalence_part_${part}.gerp | awk -v partname=UCNE.equivalence_part_${part} '/variableStep/{filename=partname"."NR".txt"}; {print >filename}'
+  PART_FILES=$(ls UCNE.equivalence_part_${part}.*.txt)
+  echo "generating bed file of part" $part
+  for file in ${PART_FILES[@]}
+    do
+    CHR=$(head -n1 $file | awk -F" |=" '{printf("%s\n",$3)}')
+    tail -n+2 $file | awk -v chr=$CHR '{printf("%s\t%s\t%s\t%s\n",chr,$1-1,$1,$2)}' >> ./../GRCH37.$CALLING.UCNE.equivalence_part_${part}.gerp.bed
+    done
+  bedtools sort -i ./../GRCH37.$CALLING.UCNE.equivalence_part_${part}.gerp.bed > ./../GRCH37.$CALLING.UCNE.equivalence_part_${part}_sorted.gerp.bed
+  mv ./../GRCH37.$CALLING.UCNE.equivalence_part_${part}_sorted.gerp.bed ./../GRCH37.$CALLING.UCNE.equivalence.gerp.bed
+  done
+
+cat ./../GRCH37.$CALLING.UCNE.equivalence_part_*.gerp.bed > ./../GRCH37.$CALLING.UCNE.equivalence.gerp.bed
+
+#Calculate average GERP score in our dataset:
+awk '{total += $4; count++} END {print total/count}' ./../GRCH37.$CALLING.UCNE.equivalence.gerp.bed #5.11467 is a very high score, implying that our UCNE regions are indeed highly conserved, and thus well annotated.
+
+
+#Perform sanity checks:
+#1:
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/ucne_database/gerp_analysis/temporary_folder
+ls UCNE.equivalence_part_*.txt | wc -l #5587, even though it should be 5588
+
+#2:
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/ucne_database/gerp_analysis/temporary_folder
+GERP_FILES=$(ls ./../GRCH37.$CALLING.UCNE.equivalence_part_*.gerp | wc -l)
+for part in $(seq ${GERP_FILES[@]})
+  do
+  PART_FILES_N=$(ls UCNE.equivalence_part_${part}.*.txt | wc -l)
+  echo "part" $part "has" $PART_FILES_N "files"
+  done #They should all have 932, except for the last one, that should have 928. The third one has 931.
+
+#3:
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/ucne_database/gerp_analysis/
+GERP_FILES=$(ls GRCH37.$CALLING.UCNE.equivalence_part_*.gerp | wc -l)
+for part in $(seq ${GERP_FILES[@]})
+  do
+  BED_REGIONS_LENGTH=$(awk -F"\t" '{printf("%s\t%s\t%s\n",$2,$3,$3-$2)}' GRCH37.$CALLING.UCNE.equivalence_part_${part}.bed | cut -f3 | paste -sd+ | bc)
+  GERP_POSITIONS_N=$(wc -l < GRCH37.$CALLING.UCNE.equivalence_part_${part}.gerp.bed)
+  echo $BED_REGIONS_LENGTH "should be equal to" $GERP_POSITIONS_N
+  done #Again, the third part has a region whose GERP scores weren't successfully retrieved.
+
+#4:
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/ucne_database/gerp_analysis/temporary_folder
+rm ./../GRCH37.$CALLING.UCNE.equivalence_part_3.test.bed
+PART_FILES=$(ls UCNE.equivalence_part_3.*.txt)
+for file in ${PART_FILES[@]}
+  do
+  CHR=$(head -n1 $file | awk -F" |=" '{printf("%s\n",$3)}')
+  START=$(head -n2 $file | tail -n1 | cut -f1)
+  END=$(tail -n1 $file | cut -f1)
+  echo -e "$CHR\t$((START-1))\t$END" >> ./../GRCH37.$CALLING.UCNE.equivalence_part_3.test.bed
+  done
+bedtools sort -i ./../GRCH37.$CALLING.UCNE.equivalence_part_3.test.bed | cut -f1,2,3 > ./../GRCH37.$CALLING.UCNE.equivalence_part_3_sorted.test.bed
+mv ./../GRCH37.$CALLING.UCNE.equivalence_part_3_sorted.test.bed ./../GRCH37.$CALLING.UCNE.equivalence_part_3.test.bed
+cd ./../
+cut -f1,2,3 GRCH37.$CALLING.UCNE.equivalence_part_3.bed > test.bed
+diff GRCH37.c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.equivalence_part_3.test.bed test.bed #chr1_gl000191_random	47727	48104
+#So the problematic row was one region that mapped to an undefined region of GRCH37, for which GERP scores were probably not defined. It's safe to discard it.
+rm *test.bed
+
+rm -r temporary_folder
+
+```
+
+##Convert human coordinates with GERP scores to lynx coordinates:
+```{bash}
+
+#First, remove the problematic rows from the general equivalence bed:
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/ucne_database/gerp_analysis/
+grep -v 'random' GRCH37.$CALLING.UCNE.equivalence.bed | awk -F"\t|:|-" '{printf("%s\t%s\t%s\t%s\t%s\t%s\t%s:%s-%s\n",$1,$2,$3,$4,$5,$6,$7,$8,$9)}' > GRCH37.$CALLING.UCNE.equivalence.filtered.bed
+wc -l < GRCH37.$CALLING.UCNE.equivalence.filtered.bed #5587, as expected after the removal of one row
+
+#Then split both the human regions and the lynx regions to the nucleotide level:
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/ucne_database/gerp_analysis/
+screen -S "${CALLING}-UCNE-detailed"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+script "${CALLING}.UCNE.equivalence.detailed.log"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+
+FILE=GRCH37.$CALLING.UCNE.equivalence.filtered.bed
+rm ${FILE/.filtered.bed/.detailed.bed}
+touch ${FILE/.filtered.bed/.detailed.bed}
+COUNTER=0
+TOTAL=$(wc -l < $FILE)
+while read -r human_chr human_start human_end lynx_chr lynx_start lynx_end info
+  do
+  if [ $(( $COUNTER % 100 )) == 0 ]
+    then
+    echo "processed $COUNTER regions out of $TOTAL"
+  fi
+  while [ $human_start -lt $human_end ]
+    do
+    human_stop=$((human_start+1))
+    if [ $lynx_start -lt $lynx_end ]
+      then
+      lynx_frame=1
+      lynx_stop=$((lynx_start+lynx_frame))
+      echo -e "$human_chr\t$human_start\t$human_stop\t$lynx_chr\t$lynx_start\t$lynx_stop\t$info" >> ${FILE/.filtered.bed/.detailed.bed}
+    elif [ $lynx_start -gt $lynx_end ]
+      then
+      lynx_frame=-1
+      lynx_stop=$((lynx_start+lynx_frame))
+      echo -e "$human_chr\t$human_start\t$human_stop\t$lynx_chr\t$lynx_stop\t$lynx_start\t$info" >> ${FILE/.filtered.bed/.detailed.bed}
+    fi
+    ((human_start++))
+    lynx_start=$((lynx_start+lynx_frame))
+    done
+  ((COUNTER++))
+  done < $FILE
+
+#Finally, paste together the just created human-lynx equivalence bed file with regions defined base by base, and the base by base bed file with the GERP scores.
+paste GRCH37.$CALLING.UCNE.equivalence.detailed.bed GRCH37.$CALLING.UCNE.equivalence.gerp.bed > GRCH37.$CALLING.UCNE.equivalence.detailed.gerp.bed
+
+#Also get a version with just the lynx coordinates and the GERP scores:
+cut -f4-6,11 GRCH37.$CALLING.UCNE.equivalence.detailed.gerp.bed | bedtools sort > $CALLING.UCNE.gerp.bed
+
+#Sanity checks:
+#1: check whether the use of paste was safe (i.e. if human coordinates for any given row were the same in both files):
+wc -l < GRCH37.$CALLING.UCNE.equivalence.detailed.gerp.bed #1282672
+awk -F"\t" '($2 == $9) && ($3 == $10) {print $0}' GRCH37.$CALLING.UCNE.equivalence.detailed.gerp.bed | wc -l #1282672, same number, which means all rows have the correct human start and end positions, and thus the paste command was safe.
+
+#2: check whether any of the positions that we deleted from the human coordinates (because they were missing from lynx) appears in the final equivalence .bed file:
+join -1 1 -2 1 -t $'\t' <(sort c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.blast.txt) <(sort c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.blast.gaps) | awk -F"\t" '($22 == "-") {printf ("%s\t%s\t%s\n", $2, $18-1, $18)}' > GRCH37.UCNE.human_deleted_gaps.bed
+bedtools intersect -a GRCH37.UCNE.gaps.bed -b GRCH37.c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.equivalence.detailed.gerp.bed | wc -l #This should output 0 (we're intersecting the lynx deletions, i.e. the positions that we had to delete from the human genome, with the final coordinates-equivalence file, human coordinates version). It does, so it's fine!
+
+
+#3: check whether any of the positions that we deleted from the lynx coordinates (because they were missing from human) appears in the final equivalence .bed file. This involves multiple steps:
+#A: retrieve regions (whole) where we had to delete positions:
+cut -f5 GRCH37.c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.equivalence.bed | uniq -d | awk -F"\t|:|-" '{printf ("%s\t%s\t%s\n", $1, $2, $3)}' | bedtools sort > c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.scaffold_gaps_whole.bed
+
+#B: retrieve regions (deletions already excluded) where we had to delete positions:
+join -1 1 -2 5 -t $'\t' <(cut -f5 GRCH37.c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.equivalence.bed | uniq -d | sort) <(sort -k5,5 GRCH37.c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.equivalence.bed) | awk -F"\t|:|-" '{if ($9 >= $8) {printf ("%s\t%s\t%s\n", $7, $8, $9)} else {printf ("%s\t%s\t%s\n", $7, $9, $8)}}' | bedtools sort > c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.scaffold_gaps_split.bed
+
+#C: subtract the second file from the first in order to retrieve coordinates from the deleted positions:
+bedtools subtract -a c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.scaffold_gaps_whole.bed -b c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.scaffold_gaps_split.bed > c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.gaps.bed
+
+#D: intersect the previous file with the final coordinates-equivalence file (lynx coordinates version):
+bedtools intersect -a c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.gaps.bed -b c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.gerp.bed | wc -l #This outputs 0 as it should! Everything seems to be working fine!!
+
+```
+
+##Obtain version for the derived positions only (both segregating and fixed):
+```{bash}
+
+#First, subset the Iberian lynx coordinates file with GERP scores to keep only derived positions (i.e. those that appear in the VCF, whether segregating or fixed)
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+grep 'UCNE' ${CALLING}_polarized_filteredall_varssubs_SNP.lr_ann.vcf | cut -f1,2 | awk '{printf ("%s\t%s\t%s\n", $1, $2-1, $2)}' > ucne_database/gerp_analysis/$CALLING.UCNE.derived.bed
+cd ucne_database/gerp_analysis/
+bedtools intersect -a $CALLING.UCNE.gerp.bed -b $CALLING.UCNE.derived.bed > $CALLING.UCNE.derived.gerp.bed
+
+#Calculate average GERP score for derived positions:
+awk '{total += $4; count++} END {print total/count}' $CALLING.UCNE.derived.gerp.bed #3.92908, quite lower than the all-sites one.
+
+#Next, split the derived positions .bed file into several GERP categories.
+awk -F"\t|:|-" '($4 <= 2) {print $0}' $CALLING.UCNE.derived.gerp.bed > $CALLING.UCNE.derived_lt2.gerp.bed
+awk -F"\t|:|-" '($4 > 2 && $4 <= 5) {print $0}' $CALLING.UCNE.derived.gerp.bed | less -S > $CALLING.UCNE.derived_gt2lt5.gerp.bed
+awk -F"\t|:|-" '($4 > 5) {print $0}' $CALLING.UCNE.derived.gerp.bed > $CALLING.UCNE.derived_gt5.gerp.bed
+
+```
+
+##Analyse GERP score distribution.
+###For all UCNE sites.
+####Prepare GERP score distribution file.
+```{bash}
+
+#From outside the server, download the bed file to the local folder:
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/ucne_database/gerp_analysis/GRCH37.$CALLING.UCNE.equivalence.detailed.gerp.bed /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db/GERP_analysis
+
+cd /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db/GERP_analysis
+cut -f11 GRCH37.$CALLING.UCNE.equivalence.detailed.gerp.bed > GRCH37.$CALLING.UCNE.gerp_distribution.gerp
+
+```
+
+####Draw GERP score distribution.
+```{r Other stuff}
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+
+#Prepare files:
+gerp_distribution <- read_tsv("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db/GERP_analysis/GRCH37.c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.gerp_distribution.gerp",col_names=c("GERP"))
+gerp_distribution
+
+plot_data <- gerp_distribution %>% group_by(GERP) %>% tally()
+plot_data
+
+#First draw the GERP distribution:
+GERP_distr_ggplot <- ggplot(data=plot_data, aes(GERP,n)) +
+#geom_histogram(aes(NM),binwidth=1) +
+geom_col(colour="red") +
+ggtitle("UCNE GERP distribution") +
+scale_x_continuous(breaks=seq(-12,6,by=1),labels=seq(-12,6,by=1)) +
+xlab("GERP score") +
+ylab("count") +
+theme_bw() +
+theme(text=element_text(size=12,face="bold"),
+      rect=element_rect(size=1),
+      axis.line=element_line(colour="black"),
+      axis.title=element_text(size=16),
+      #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+      #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+      #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+      panel.background=element_blank(),
+      panel.border=element_rect(colour="black"),
+      #panel.grid=element_blank(),
+      #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+      plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+      #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+      legend.background=element_rect(linetype="solid", colour="black", size=.5),
+      #legend.justification=c(0,0),
+      legend.key=element_rect(colour="white"),
+      #legend.key.size=unit(1.3,"cm"),
+      legend.position=c(0.92,0.86),
+      legend.title=element_blank()
+)
+GERP_distr_ggplot
+ggsave("c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.gerp_distribution.pdf", width=15, height=10, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db/GERP_analysis/")
+
+#Draw proportion of reads at different GERP scores:
+reads_totales <- sum(plot_data$n)
+plot_bis <- mutate(plot_data,prop=as.numeric(100*n/reads_totales))
+plot_bis$cum_prop <- cumsum(plot_bis$prop)
+
+GERP_freq_ggplot <- ggplot(data=plot_bis, aes(GERP,cum_prop)) +
+#geom_histogram(aes(NM),binwidth=1) +
+geom_point() +
+ggtitle("Proportion of sites at different GERP scores") +
+scale_x_continuous(breaks=seq(-12,6,by=1),labels=seq(-12,6,by=1)) +
+xlab("GERP score") +
+ylab("percentage (cumulative)") +
+theme_bw() +
+theme(text=element_text(size=12,face="bold"),
+      rect=element_rect(size=1),
+      axis.line=element_line(colour="black"),
+      axis.title=element_text(size=16),
+      #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+      #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+      #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+      panel.background=element_blank(),
+      panel.border=element_rect(colour="black"),
+      #panel.grid=element_blank(),
+      #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+      plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+      #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+      legend.background=element_rect(linetype="solid", colour="black", size=.5),
+      #legend.justification=c(0,0),
+      legend.key=element_rect(colour="white"),
+      #legend.key.size=unit(1.3,"cm"),
+      legend.position=c(0.92,0.86),
+      legend.title=element_blank()
+)
+GERP_freq_ggplot
+ggsave("c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.gerp_cum_proportion.pdf", width=15, height=10, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db/GERP_analysis/")
+
+```
+
+####Calculate proportion of sites for each GERP category.
+```{bash}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/ucne_database/gerp_analysis/
+
+TOTAL_N=$(wc -l < $CALLING.UCNE.gerp.bed) #1282672
+LT2_N=$(awk -F"\t|:|-" '($4 <= 2) {print $0}' $CALLING.UCNE.gerp.bed | wc -l) #38061
+LT2_PROP=$(echo "scale=4; $LT2_N/$TOTAL_N" | bc) #0.030
+LT2_DER_N=$(awk -F"\t|:|-" '($4 <= 2) {print $0}' $CALLING.UCNE.derived.gerp.bed | wc -l) #132
+LT2_DER_PROP=$(echo "scale=6; $LT2_DER_N/$LT2_N" | bc) #0.00347
+GT2LT5_N=$(awk -F"\t|:|-" '($4 > 2 && $4 <= 5) {print $0}' $CALLING.UCNE.gerp.bed | wc -l) #337852
+GT2LT5_PROP=$(echo "scale=4; $GT2LT5_N/$TOTAL_N" | bc) #0.263
+GT2LT5_DER_N=$(awk -F"\t|:|-" '($4 > 2 && $4 <= 5) {print $0}' $CALLING.UCNE.derived.gerp.bed | wc -l) #341
+GT2LT5_DER_PROP=$(echo "scale=6; $GT2LT5_DER_N/$GT2LT5_N" | bc) #0.00101
+GT5_N=$(awk -F"\t|:|-" '($4 > 5) {print $0}' $CALLING.UCNE.gerp.bed | wc -l) #906759
+GT5_PROP=$(echo "scale=4; $GT5_N/$TOTAL_N" | bc) #0.707
+GT5_DER_N=$(awk -F"\t|:|-" '($4 > 5) {print $0}' $CALLING.UCNE.derived.gerp.bed | wc -l) #397
+GT5_DER_PROP=$(echo "scale=6; $GT5_DER_N/$GT5_N" | bc) #0.00044
+
+```
+
+###For derived UCNE sites.
+####Prepare GERP score distribution file.
+```{bash}
+
+#From outside the server, download the bed file to the local folder:
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/ucne_database/gerp_analysis/$CALLING.UCNE.derived.gerp.bed /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db/GERP_analysis
+
+cd /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db/GERP_analysis
+cut -f4 $CALLING.UCNE.derived.gerp.bed > $CALLING.UCNE.derived.gerp_distribution.gerp
+
+```
+
+####Draw GERP score distribution.
+```{r Other stuff}
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+
+#Prepare files:
+gerp_distribution <- read_tsv("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db/GERP_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived.gerp_distribution.gerp",col_names=c("GERP"))
+gerp_distribution
+
+plot_data <- gerp_distribution %>% group_by(GERP) %>% tally()
+plot_data
+
+#First draw the GERP distribution:
+GERP_distr_ggplot <- ggplot(data=plot_data, aes(GERP,n)) +
+#geom_histogram(aes(NM),binwidth=1) +
+geom_col(colour="red") +
+ggtitle("UCNE derived GERP distribution") +
+scale_x_continuous(breaks=seq(-12,6,by=1),labels=seq(-12,6,by=1)) +
+xlab("GERP score") +
+ylab("count") +
+theme_bw() +
+theme(text=element_text(size=12,face="bold"),
+      rect=element_rect(size=1),
+      axis.line=element_line(colour="black"),
+      axis.title=element_text(size=16),
+      #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+      #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+      #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+      panel.background=element_blank(),
+      panel.border=element_rect(colour="black"),
+      #panel.grid=element_blank(),
+      #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+      plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+      #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+      legend.background=element_rect(linetype="solid", colour="black", size=.5),
+      #legend.justification=c(0,0),
+      legend.key=element_rect(colour="white"),
+      #legend.key.size=unit(1.3,"cm"),
+      legend.position=c(0.92,0.86),
+      legend.title=element_blank()
+)
+GERP_distr_ggplot
+ggsave("c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived.gerp_distribution.pdf", width=15, height=10, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db/GERP_analysis/")
+
+#Draw proportion of reads at different GERP scores:
+reads_totales <- sum(plot_data$n)
+plot_bis <- mutate(plot_data,prop=as.numeric(100*n/reads_totales))
+plot_bis$cum_prop <- cumsum(plot_bis$prop)
+
+GERP_freq_ggplot <- ggplot(data=plot_bis, aes(GERP,cum_prop)) +
+#geom_histogram(aes(NM),binwidth=1) +
+geom_point() +
+ggtitle("Proportion of derived sites at different GERP scores") +
+scale_x_continuous(breaks=seq(-12,6,by=1),labels=seq(-12,6,by=1)) +
+xlab("GERP score") +
+ylab("percentage (cumulative)") +
+theme_bw() +
+theme(text=element_text(size=12,face="bold"),
+      rect=element_rect(size=1),
+      axis.line=element_line(colour="black"),
+      axis.title=element_text(size=16),
+      #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+      #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+      #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+      panel.background=element_blank(),
+      panel.border=element_rect(colour="black"),
+      #panel.grid=element_blank(),
+      #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+      plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+      #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+      legend.background=element_rect(linetype="solid", colour="black", size=.5),
+      #legend.justification=c(0,0),
+      legend.key=element_rect(colour="white"),
+      #legend.key.size=unit(1.3,"cm"),
+      legend.position=c(0.92,0.86),
+      legend.title=element_blank()
+)
+GERP_freq_ggplot
+ggsave("c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived.gerp_cum_proportion.pdf", width=15, height=10, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db/GERP_analysis/")
+
+```
