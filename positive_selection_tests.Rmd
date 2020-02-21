@@ -1,0 +1,266 @@
+---
+title: "positive_selection_tests"
+output: html_document
+---
+
+#Summary:
+```{bash}
+
+#Aurora's going to perform the MK test to explore differences in positive selection between the two species. For that purpose, she needs divergencies (i.e. alternatively fixed derived alleles, which I already have classified as 'substitutions') and polymorphisms (i.e. derived alleles that are segregating in one of the species, but are fixed for the ancestral allele in the other).
+
+#I already have divergencies classified as subsitutions, so I can just split the vcf at the species level and then count them. This is the file with all substitutions: c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_substitutions_SNP.lr_ann.vcf
+
+#Polymorphisms are already classified as 'segregating' for each species in files: c_ll_nm2nm3_origcov_persp_segregating_SNP.lr_ann.vcf and c_lp_nm2nm3_origcov_persp_segregating_SNP.lr_ann.vcf. However, it's important to discard those that are segregating in both at the same time. 
+
+#With this workflow I shouldn't be retrieving another set of undesired positions: those that while segregating in one species, are fixed for the derived allele in the other.
+
+```
+
+#Private fixed derived alleles:
+##Retrieve fixed derived alleles exclusive to each species:
+```{bash}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov) #write down name of the calling
+VAR=(substitutions) #substitutions
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+screen -S "${CALLING}-${VAR}-${TYPE}"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+script "persp_${VAR}_${CALLING}_${TYPE}.lr_ann.log"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome (first eight scaffolds only)
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING)
+POPS=$(echo $CALLING | fold -w8 | cut -c1-7 | head -n$N_POPS | sort | uniq)
+SPECIES=$(echo $CALLING | fold -w8 | cut -c1-4 | head -n$N_POPS | sort | uniq)
+COVERAGE=$(echo "${CALLING}" | rev | cut -d'_' -f1 | rev)
+NM_COV=$(echo "${CALLING}" | rev | cut -d'_' -f1,2 | rev)
+for s in ${SPECIES[@]}
+  do
+  bcftools query -l ${CALLING}_polarized_filteredall_${VAR}_${TYPE}.lr_ann.vcf | cut -c1-12 | sort | uniq | grep ${s} > ${s}_samples.txt
+  echo "retrieving derived substitutions for species" $s
+  java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+  -T SelectVariants \
+  -R $REF \
+  -V ${CALLING}_polarized_filteredall_${VAR}_${TYPE}.lr_ann.vcf \
+  -o ${s}_${NM_COV}_persp_${VAR}_${TYPE}.lr_ann.vcf \
+  -env \
+  --sample_file ${s}_samples.txt
+  done
+
+```
+
+##Count private fixed derived alleles.
+```{r Get annotation statistics, eval=FALSE, engine='bash'}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+VAR=(substitutions) #substitutions
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+screen -S "${CALLING}-${VAR}-${TYPE}"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+script "${CALLING}_ann_species_summary_${VAR}_${TYPE}.lr_ann.log"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAM files path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+cd $V_PATH/$CALLING/annotation
+rm ${CALLING}"_ann_species_summary_"${VAR}"_"${TYPE}".lr_ann.txt"
+echo -e "species\ttotal_V\ttotal_A\tintergenic_V\tintergenic_A\tintronic_V\tintronic_A\tcoding_V\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tmissense_tol_V\tmissense_tol_A\tmissense_del_V\tmissense_del_A\tnonsense_V\tnonsense_A\tUCNE_V\tUCNE_A\tUCNE_low_V\tUCNE_low_A\tUCNE_mid_V\tUCNE_mid_A\tUCNE_high_V\tUCNE_high_A\tmissense/synonymous_V\tmissense/synonymous_A\tsynonymous/intronic_V\tmissense/intronic_V" > ${CALLING}"_ann_species_summary_"${VAR}"_"${TYPE}".lr_ann.txt"
+SPLIST=($(ls `find . -maxdepth 1 -name "*_persp_"${VAR}"_"${TYPE}".lr_ann.vcf" -print`))
+for i in "${SPLIST[@]}"
+  do
+  echo "${i}"
+  vcf=$(echo "${i}" | rev | cut -d'/' -f1 | rev)
+  echo "${vcf}"
+  SPECIES=$(echo "${vcf}" | cut -c3-4)
+  TOTAL_V=$(grep -v '#' ${i} | wc -l)
+  TOTAL_A=$(grep -v '#' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  INTERGENIC_V=$(grep 'intergenic' ${i} | wc -l)
+  INTERGENIC_A=$(grep 'intergenic' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  INTRONIC_V=$(grep 'intron_variant' ${i} | wc -l)
+  INTRONIC_A=$(grep 'intron_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  CODING_V=$(grep 'CDS' ${i} | wc -l)
+  SYNONYMOUS_V=$(grep 'synonymous_variant' ${i} | wc -l)
+  SYNONYMOUS_A=$(grep 'synonymous_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_V=$(grep 'missense_variant' ${i} | wc -l)
+  MISSENSE_A=$(grep 'missense_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_TOL_V=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean/missense_variants_provean_scores_tolerated.txt | grep -v '#' | wc -l)
+  MISSENSE_TOL_A=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean/missense_variants_provean_scores_tolerated.txt | grep -v '#' | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_DEL_V=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean/missense_variants_provean_scores_deleterious.txt | grep -v '#' | wc -l)
+  MISSENSE_DEL_A=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean/missense_variants_provean_scores_deleterious.txt | grep -v '#' | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  NONSENSE_V=$(grep '|HIGH|' ${i} | wc -l)
+  NONSENSE_A=$(grep '|HIGH|' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  UCNE_V=$(grep 'UCNE' ${i} | wc -l)
+  UCNE_A=$(grep 'UCNE' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  UCNE_LOW_V=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_lt2.gerp.bed | grep -v '#' | wc -l)
+  UCNE_LOW_A=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_lt2.gerp.bed | grep -v '#' | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  UCNE_MID_V=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_gt2lt5.gerp.bed | grep -v '#' | wc -l)
+  UCNE_MID_A=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_gt2lt5.gerp.bed | grep -v '#' | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  UCNE_HIGH_V=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_gt5.gerp.bed | grep -v '#' | wc -l)
+  UCNE_HIGH_A=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_gt5.gerp.bed | grep -v '#' | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_SYNONYMOUS_V=$(echo "scale=4; $MISSENSE_V/$SYNONYMOUS_V" | bc)
+  MISSENSE_SYNONYMOUS_A=$(echo "scale=4; $MISSENSE_A/$SYNONYMOUS_A" | bc)
+  SYNONYMOUS_INTRONIC_V=$(echo "scale=4; $SYNONYMOUS_V/$INTRONIC_V" | bc)
+  MISSENSE_INTRONIC_V=$(echo "scale=4; $MISSENSE_V/$INTRONIC_V" | bc)
+  echo -e "$SPECIES\t$TOTAL_V\t$TOTAL_A\t$INTERGENIC_V\t$INTERGENIC_A\t$INTRONIC_V\t$INTRONIC_A\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$MISSENSE_TOL_V\t$MISSENSE_TOL_A\t$MISSENSE_DEL_V\t$MISSENSE_DEL_A\t$NONSENSE_V\t$NONSENSE_A\t$UCNE_V\t$UCNE_A\t$UCNE_LOW_V\t$UCNE_LOW_A\t$UCNE_MID_V\t$UCNE_MID_A\t$UCNE_HIGH_V\t$UCNE_HIGH_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A\t$SYNONYMOUS_INTRONIC_V\t$MISSENSE_INTRONIC_V" >> ${CALLING}"_ann_species_summary_"${VAR}"_"${TYPE}".lr_ann.txt"
+  done
+
+#From outside the server:
+export SSHPASS=$(cat /Users/dani/Documents/genomics_pass.txt)
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+VAR=(substitutions) #substitutions
+TYPE=(SNP) #write down SNP or INDEL
+sshpass -e scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/${CALLING}_ann_species_summary_${VAR}_${TYPE}.lr_ann.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/
+unset SSHPASS
+
+```
+
+#Private segregating derived alleles:
+##Retrieve segregating derived alleles exclusive to each species:
+```{bash}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov) #write down name of the calling
+VAR=(segregating) #segregating
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+screen -S "${CALLING}-${VAR}-${TYPE}"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+script "persp_private_${VAR}_${CALLING}_${TYPE}.lr_ann.log"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome (first eight scaffolds only)
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING)
+POPS=$(echo $CALLING | fold -w8 | cut -c1-7 | head -n$N_POPS | sort | uniq)
+SPECIES=$(echo $CALLING | fold -w8 | cut -c1-4 | head -n$N_POPS | sort | uniq)
+COVERAGE=$(echo "${CALLING}" | rev | cut -d'_' -f1 | rev)
+NM_COV=$(echo "${CALLING}" | rev | cut -d'_' -f1,2 | rev)
+for s in ${SPECIES[@]}
+  do
+  echo "Generating bed file for" $s $VAR
+  grep -v '#' ${s}_${NM_COV}_persp_${VAR}_${TYPE}.lr_ann.vcf | cut -f1,2 | awk '{printf ("%s\t%s\t%s\n", $1, $2-1, $2)}' > ${s}_${NM_COV}_persp_${VAR}_${TYPE}.lr_ann.bed
+  done
+for s in ${SPECIES[@]}
+  do
+  if [ $s = "c_ll" ]
+    then
+    other_s=(c_lp)
+  elif [ $s = "c_lp" ]
+    then
+    other_s=(c_ll)
+  fi
+  echo "Generating bed file for" $s "private" $VAR
+  bedtools subtract -a ${s}_${NM_COV}_persp_${VAR}_${TYPE}.lr_ann.bed -b ${other_s}_${NM_COV}_persp_${VAR}_${TYPE}.lr_ann.bed > ${s}_${NM_COV}_persp_private_${VAR}_${TYPE}.lr_ann.bed
+  echo "Generating vcf file for" $s "private" $VAR
+  bedtools intersect -a ${s}_${NM_COV}_persp_${VAR}_${TYPE}.lr_ann.vcf -b ${s}_${NM_COV}_persp_private_${VAR}_${TYPE}.lr_ann.bed -header > ${s}_${NM_COV}_persp_private_${VAR}_${TYPE}.lr_ann.vcf
+  done
+
+```
+
+##Count private segregating derived alleles.
+```{r Get annotation statistics, eval=FALSE, engine='bash'}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+VAR=(segregating) #segregating
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+screen -S "${CALLING}-${VAR}-${TYPE}"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+script "${CALLING}_ann_species_summary_private_${VAR}_${TYPE}.lr_ann.log"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAM files path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+cd $V_PATH/$CALLING/annotation
+rm ${CALLING}"_ann_species_summary_private_"${VAR}"_"${TYPE}".lr_ann.txt"
+echo -e "species\ttotal_V\ttotal_A\tintergenic_V\tintergenic_A\tintronic_V\tintronic_A\tcoding_V\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tmissense_tol_V\tmissense_tol_A\tmissense_del_V\tmissense_del_A\tnonsense_V\tnonsense_A\tUCNE_V\tUCNE_A\tUCNE_low_V\tUCNE_low_A\tUCNE_mid_V\tUCNE_mid_A\tUCNE_high_V\tUCNE_high_A\tmissense/synonymous_V\tmissense/synonymous_A\tsynonymous/intronic_V\tmissense/intronic_V" > ${CALLING}"_ann_species_summary_private_"${VAR}"_"${TYPE}".lr_ann.txt"
+SPLIST=($(ls `find . -maxdepth 1 -name "*_persp_private_"${VAR}"_"${TYPE}".lr_ann.vcf" -print`))
+for i in "${SPLIST[@]}"
+  do
+  echo "${i}"
+  vcf=$(echo "${i}" | rev | cut -d'/' -f1 | rev)
+  echo "${vcf}"
+  SPECIES=$(echo "${vcf}" | cut -c3-4)
+  TOTAL_V=$(grep -v '#' ${i} | wc -l)
+  TOTAL_A=$(grep -v '#' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  INTERGENIC_V=$(grep 'intergenic' ${i} | wc -l)
+  INTERGENIC_A=$(grep 'intergenic' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  INTRONIC_V=$(grep 'intron_variant' ${i} | wc -l)
+  INTRONIC_A=$(grep 'intron_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  CODING_V=$(grep 'CDS' ${i} | wc -l)
+  SYNONYMOUS_V=$(grep 'synonymous_variant' ${i} | wc -l)
+  SYNONYMOUS_A=$(grep 'synonymous_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_V=$(grep 'missense_variant' ${i} | wc -l)
+  MISSENSE_A=$(grep 'missense_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_TOL_V=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean/missense_variants_provean_scores_tolerated.txt | grep -v '#' | wc -l)
+  MISSENSE_TOL_A=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean/missense_variants_provean_scores_tolerated.txt | grep -v '#' | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_DEL_V=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean/missense_variants_provean_scores_deleterious.txt | grep -v '#' | wc -l)
+  MISSENSE_DEL_A=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean/missense_variants_provean_scores_deleterious.txt | grep -v '#' | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  NONSENSE_V=$(grep '|HIGH|' ${i} | wc -l)
+  NONSENSE_A=$(grep '|HIGH|' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  UCNE_V=$(grep 'UCNE' ${i} | wc -l)
+  UCNE_A=$(grep 'UCNE' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  UCNE_LOW_V=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_lt2.gerp.bed | grep -v '#' | wc -l)
+  UCNE_LOW_A=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_lt2.gerp.bed | grep -v '#' | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  UCNE_MID_V=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_gt2lt5.gerp.bed | grep -v '#' | wc -l)
+  UCNE_MID_A=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_gt2lt5.gerp.bed | grep -v '#' | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  UCNE_HIGH_V=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_gt5.gerp.bed | grep -v '#' | wc -l)
+  UCNE_HIGH_A=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_gt5.gerp.bed | grep -v '#' | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_SYNONYMOUS_V=$(echo "scale=4; $MISSENSE_V/$SYNONYMOUS_V" | bc)
+  MISSENSE_SYNONYMOUS_A=$(echo "scale=4; $MISSENSE_A/$SYNONYMOUS_A" | bc)
+  SYNONYMOUS_INTRONIC_V=$(echo "scale=4; $SYNONYMOUS_V/$INTRONIC_V" | bc)
+  MISSENSE_INTRONIC_V=$(echo "scale=4; $MISSENSE_V/$INTRONIC_V" | bc)
+  echo -e "$SPECIES\t$TOTAL_V\t$TOTAL_A\t$INTERGENIC_V\t$INTERGENIC_A\t$INTRONIC_V\t$INTRONIC_A\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$MISSENSE_TOL_V\t$MISSENSE_TOL_A\t$MISSENSE_DEL_V\t$MISSENSE_DEL_A\t$NONSENSE_V\t$NONSENSE_A\t$UCNE_V\t$UCNE_A\t$UCNE_LOW_V\t$UCNE_LOW_A\t$UCNE_MID_V\t$UCNE_MID_A\t$UCNE_HIGH_V\t$UCNE_HIGH_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A\t$SYNONYMOUS_INTRONIC_V\t$MISSENSE_INTRONIC_V" >> ${CALLING}"_ann_species_summary_private_"${VAR}"_"${TYPE}".lr_ann.txt"
+  done
+
+#From outside the server:
+export SSHPASS=$(cat /Users/dani/Documents/genomics_pass.txt)
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+VAR=(segregating) #segregating
+TYPE=(SNP) #write down SNP or INDEL
+sshpass -e scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/${CALLING}_ann_species_summary_private_${VAR}_${TYPE}.lr_ann.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/
+unset SSHPASS
+
+```
