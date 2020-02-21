@@ -2807,7 +2807,7 @@ ggsave("NSYN_SYN_ratio.pdf", width=15, height=10, units="cm", device="pdf", path
 ```{r Get annotation statistics, eval=FALSE, engine='bash'}
 
 CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
-VAR=(substitutions) #varssubs #variants #substitutions
+VAR=(fixed) #varssubs #variants #substitutions #segregating #fixed
 TYPE=(SNP) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
 screen -S "${CALLING}-${VAR}-${TYPE}"
@@ -2832,8 +2832,8 @@ BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
 
 cd $V_PATH/$CALLING/annotation
 rm ${CALLING}"_ann_individual_summary_"${VAR}"_"${TYPE}".lr_ann.txt"
-echo -e "species\tpopulation\tdataset\tsample\ttotal_V\ttotal_A\tintergenic_V\tintergenic_A\tintronic_V\tintronic_A\tcoding_V\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tmissense_tol_V\tmissense_tol_A\tmissense_del_V\tmissense_del_A\tnonsense_V\tnonsense_A\tUCNE_V\tUCNE_A\tmissense/synonymous_V\tmissense/synonymous_A\tsynonymous/intronic_V\tmissense/intronic_V" > ${CALLING}"_ann_individual_summary_"${VAR}"_"${TYPE}".lr_ann.txt"
-INDLIST=($(ls `find . -name *"_individual_"${VAR}"_"${TYPE}".lr_ann.vcf" ! -path '*testing_variant_numbers*' -print`))
+echo -e "species\tpopulation\tdataset\tsample\ttotal_V\ttotal_A\tintergenic_V\tintergenic_A\tintronic_V\tintronic_A\tcoding_V\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tmissense_tol_V\tmissense_tol_A\tmissense_del_V\tmissense_del_A\tnonsense_V\tnonsense_A\tUCNE_V\tUCNE_A\tUCNE_low_V\tUCNE_low_A\tUCNE_mid_V\tUCNE_mid_A\tUCNE_high_V\tUCNE_high_A\tmissense/synonymous_V\tmissense/synonymous_A\tsynonymous/intronic_V\tmissense/intronic_V" > ${CALLING}"_ann_individual_summary_"${VAR}"_"${TYPE}".lr_ann.txt"
+INDLIST=($(ls `find . -name *"_individual_"${VAR}"_"${TYPE}".lr_ann.vcf" -print`))
 for i in "${INDLIST[@]}"
   do
   echo "${i}"
@@ -2862,17 +2862,23 @@ for i in "${INDLIST[@]}"
   NONSENSE_A=$(grep '|HIGH|' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
   UCNE_V=$(grep 'UCNE' ${i} | wc -l)
   UCNE_A=$(grep 'UCNE' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  UCNE_LOW_V=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_lt2.gerp.bed | grep -v '#' | wc -l)
+  UCNE_LOW_A=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_lt2.gerp.bed | grep -v '#' | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  UCNE_MID_V=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_gt2lt5.gerp.bed | grep -v '#' | wc -l)
+  UCNE_MID_A=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_gt2lt5.gerp.bed | grep -v '#' | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  UCNE_HIGH_V=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_gt5.gerp.bed | grep -v '#' | wc -l)
+  UCNE_HIGH_A=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_gt5.gerp.bed | grep -v '#' | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
   MISSENSE_SYNONYMOUS_V=$(echo "scale=4; $MISSENSE_V/$SYNONYMOUS_V" | bc)
   MISSENSE_SYNONYMOUS_A=$(echo "scale=4; $MISSENSE_A/$SYNONYMOUS_A" | bc)
   SYNONYMOUS_INTRONIC_V=$(echo "scale=4; $SYNONYMOUS_V/$INTRONIC_V" | bc)
   MISSENSE_INTRONIC_V=$(echo "scale=4; $MISSENSE_V/$INTRONIC_V" | bc)
-  echo -e "$SPECIES\t$POPULATION\t$DATASET\t$SAMPLE\t$TOTAL_V\t$TOTAL_A\t$INTERGENIC_V\t$INTERGENIC_A\t$INTRONIC_V\t$INTRONIC_A\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$MISSENSE_TOL_V\t$MISSENSE_TOL_A\t$MISSENSE_DEL_V\t$MISSENSE_DEL_A\t$NONSENSE_V\t$NONSENSE_A\t$UCNE_V\t$UCNE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A\t$SYNONYMOUS_INTRONIC_V\t$MISSENSE_INTRONIC_V" >> ${CALLING}"_ann_individual_summary_"${VAR}"_"${TYPE}".lr_ann.txt"
+  echo -e "$SPECIES\t$POPULATION\t$DATASET\t$SAMPLE\t$TOTAL_V\t$TOTAL_A\t$INTERGENIC_V\t$INTERGENIC_A\t$INTRONIC_V\t$INTRONIC_A\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$MISSENSE_TOL_V\t$MISSENSE_TOL_A\t$MISSENSE_DEL_V\t$MISSENSE_DEL_A\t$NONSENSE_V\t$NONSENSE_A\t$UCNE_V\t$UCNE_A\t$UCNE_LOW_V\t$UCNE_LOW_A\t$UCNE_MID_V\t$UCNE_MID_A\t$UCNE_HIGH_V\t$UCNE_HIGH_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A\t$SYNONYMOUS_INTRONIC_V\t$MISSENSE_INTRONIC_V" >> ${CALLING}"_ann_individual_summary_"${VAR}"_"${TYPE}".lr_ann.txt"
   done
 
 #From outside the server:
 export SSHPASS=$(cat /Users/dani/Documents/genomics_pass.txt)
 CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
-VAR=(substitutions) #varssubs #variants #substitutions
+VAR=(fixed) #varssubs #variants #substitutions #segregating #fixed
 TYPE=(SNP) #write down SNP or INDEL
 sshpass -e scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/${CALLING}_ann_individual_summary_${VAR}_${TYPE}.lr_ann.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/
 unset SSHPASS
@@ -2899,7 +2905,7 @@ variants_and_subst_wg$dataset = factor(variants_and_subst_wg$dataset,levels=c("R
 variants_and_subst_wg$population = factor(variants_and_subst_wg$population,levels=c("ki","no","po","sm","do"))
 print.data.frame(variants_and_subst_wg)
 
-variants_and_subst_wg_varN <- variants_and_subst_wg %>% select(c(1:5,9,12,14,16,18,20,22)) %>% gather(feature,N,-species,-population,-dataset,-sample,factor_key=T)
+variants_and_subst_wg_varN <- variants_and_subst_wg %>% select(c(1:5,7,9,12,14,16,18,20,22,24,26,28)) %>% gather(feature,N,-species,-population,-dataset,-sample,factor_key=T)
 levels(variants_and_subst_wg_varN$feature) <- gsub('.{2}$', '', levels(variants_and_subst_wg_varN$feature))
 variants_and_subst_wg_varN
 
@@ -2931,10 +2937,9 @@ derived_allele_variant_counts_ggplot <- ggplot(data=variants_and_subst_wg_varN, 
         legend.title=element_blank()
   )
   derived_allele_variant_counts_ggplot
-ggsave(paste0(type,"_derived_allele_variant_counts.pdf"), width=15, height=20, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
+ggsave(paste0(type,"_derived_allele_variant_counts.pdf"), width=15, height=30, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
 
-
-variants_and_subst_wg_alleleN <- variants_and_subst_wg %>% select(c(1:4,6,10,13,15,17,19,21,23)) %>% gather(feature,N,-species,-population,-dataset,-sample,factor_key=T)
+variants_and_subst_wg_alleleN <- variants_and_subst_wg %>% select(c(1:4,6,8,10,13,15,17,19,21,23,25,27,29)) %>% gather(feature,N,-species,-population,-dataset,-sample,factor_key=T)
 levels(variants_and_subst_wg_alleleN$feature) <- gsub('.{2}$', '', levels(variants_and_subst_wg_alleleN$feature))
 variants_and_subst_wg_alleleN
 
@@ -2967,7 +2972,7 @@ derived_allele_allele_counts_ggplot <- ggplot(data=variants_and_subst_wg_alleleN
         legend.title=element_blank()
   )
   derived_allele_allele_counts_ggplot
-ggsave(paste0(type,"_derived_allele_allele_counts.pdf"), width=15, height=20, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
+ggsave(paste0(type,"_derived_allele_allele_counts.pdf"), width=15, height=30, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
 
 derived_allele_allele_counts_sep_ggplot <- ggplot(data=variants_and_subst_wg_alleleN, aes(population,N,colour=population)) +
   facet_wrap(feature ~ species,nrow=length(levels(variants_and_subst_wg_alleleN$feature)),ncol=2,scales="free") +
@@ -2999,13 +3004,9 @@ derived_allele_allele_counts_sep_ggplot <- ggplot(data=variants_and_subst_wg_all
         legend.title=element_blank()
   )
   derived_allele_allele_counts_sep_ggplot
-ggsave(paste0(type,"_derived_allele_allele_counts_sep.pdf"), width=15, height=20, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
+ggsave(paste0(type,"_derived_allele_allele_counts_sep.pdf"), width=15, height=30, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
 
-variants_and_subst_wg_alleleN <- variants_and_subst_wg %>% select(c(1:4,6,10,13,15,17,19,21,23)) %>% gather(feature,N,-species,-population,-dataset,-sample,factor_key=T)
-variants_and_subst_wg_alleleN
-
-
-variants_and_subst_wg_alleleR <- variants_and_subst_wg %>% mutate(syn_intr_R=synonymous_A/intronic_A,mis_intr_R=missense_A/intronic_A,mistol_intr_R=missense_tol_A/intronic_A,misdel_intr_R=missense_del_A/intronic_A,non_intr_R=nonsense_A/intronic_A,UCNE_intr_R=UCNE_A/intronic_A) %>% select(c(1:4,28:32)) %>% gather(ratio,value,-species,-population,-dataset,-sample,factor_key=T)
+variants_and_subst_wg_alleleR <- variants_and_subst_wg %>% mutate(syn_intr_R=synonymous_A/intronic_A,mis_intr_R=missense_A/intronic_A,mistol_intr_R=missense_tol_A/intronic_A,misdel_intr_R=missense_del_A/intronic_A,non_intr_R=nonsense_A/intronic_A,UCNE_intr_R=UCNE_A/intronic_A,UCNElow_intr_R=UCNE_low_A/intronic_A,UCNEmid_intr_R=UCNE_mid_A/intronic_A,UCNEhigh_intr_R=UCNE_high_A/intronic_A) %>% select(c(1:4,34:42)) %>% gather(ratio,value,-species,-population,-dataset,-sample,factor_key=T)
 variants_and_subst_wg_alleleR
 
 derived_allele_allele_ratio_ggplot <- ggplot(data=variants_and_subst_wg_alleleR, aes(population,value,colour=population)) +
@@ -3037,7 +3038,7 @@ derived_allele_allele_ratio_ggplot <- ggplot(data=variants_and_subst_wg_alleleR,
         legend.title=element_blank()
   )
   derived_allele_allele_ratio_ggplot
-ggsave(paste0(type,"_derived_allele_allele_ratio.pdf"), width=15, height=15, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
+ggsave(paste0(type,"_derived_allele_allele_ratio.pdf"), width=15, height=20, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
 
 ```
 
@@ -3249,7 +3250,7 @@ library(ggplot2)
 library(tidyr)
 library(gridExtra)
 
-type="varssubs" #varssubs #variants #substitutions
+type="segregating" #varssubs #variants #substitutions #segregating #fixed
 
 wd_path <- ("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
 variants_and_subst_wg <- read_tsv(paste0(wd_path,"c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_ann_individual_summary_",type,"_SNP.lr_ann.txt"))
@@ -3259,7 +3260,7 @@ variants_and_subst_wg$dataset = factor(variants_and_subst_wg$dataset,levels=c("R
 variants_and_subst_wg$population = factor(variants_and_subst_wg$population,levels=c("ki","no","po","sm","do"))
 print.data.frame(variants_and_subst_wg)
 
-variants_and_subst_wg_alleleR <- variants_and_subst_wg %>% mutate(synonymous=synonymous_A/synonymous_A,missense=missense_A/synonymous_A,mistol=missense_tol_A/synonymous_A,misdel=missense_del_A/synonymous_A,nonsense=nonsense_A/synonymous_A,UCNE=UCNE_A/synonymous_A) %>% select(c(1:4,28:33)) %>% gather(ratio,value,-species,-population,-dataset,-sample,factor_key=T)
+variants_and_subst_wg_alleleR <- variants_and_subst_wg %>% mutate(synonymous=synonymous_A/synonymous_A,missense=missense_A/synonymous_A,mistol=missense_tol_A/synonymous_A,misdel=missense_del_A/synonymous_A,nonsense=nonsense_A/synonymous_A,UCNE=UCNE_A/synonymous_A,UCNElow=UCNE_low_A/synonymous_A,UCNEmid=UCNE_mid_A/synonymous_A,UCNEhigh=UCNE_high_A/synonymous_A) %>% select(c(1:4,34:42)) %>% gather(ratio,value,-species,-population,-dataset,-sample,factor_key=T)
 variants_and_subst_wg_alleleR
 
 r_average_vector <- c()
@@ -3278,8 +3279,8 @@ relativised_derived_allele_allele_ratio_ggplot <- ggplot(data=filter(relativised
   geom_boxplot(width=0.5) +
   #ggtitle("Proportion of reads at different NM") +
   ylab("ratio") +
-  scale_y_continuous(breaks = seq(0.7, 1.2, by = 0.2)) +
-  ylim(0.7,1.2) +
+  scale_y_continuous(breaks = seq(0.5, 1.5, by = 0.2)) +
+  ylim(0.5,1.5) +
   ggtitle(paste0("ratio of ",type," relative to synonymous and Kirov")) +
   theme_bw() +
   theme(text=element_text(size=12,face="bold"),
@@ -3303,17 +3304,17 @@ relativised_derived_allele_allele_ratio_ggplot <- ggplot(data=filter(relativised
         legend.title=element_blank()
   )
   relativised_derived_allele_allele_ratio_ggplot
-ggsave(paste0(type,"_derived_allele_allele_ratio_relative2synonymous_short.pdf"), width=15, height=15, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
+ggsave(paste0(type,"_derived_allele_allele_ratio_relative2synonymous_short.pdf"), width=15, height=20, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
 
 
-relativised_derived_allele_allele_ratio_ggplot1 <- ggplot(data=filter(relativised_variants_and_subst_wg_alleleR,ratio == "mistol" | ratio == "misdel"), aes(population,ki_relative_value,colour=population)) +
+relativised_derived_allele_allele_ratio_ggplot1 <- ggplot(data=filter(relativised_variants_and_subst_wg_alleleR,ratio == "missense" | ratio == "mistol" | ratio == "misdel"), aes(population,ki_relative_value,colour=population)) +
   #facet_wrap(feature ~ species,nrow=6,ncol=2,scales="free") +
   facet_grid(. ~ ratio) +
   geom_boxplot(width=0.5) +
   #ggtitle("Proportion of reads at different NM") +
   ylab("ratio") +
-  scale_y_continuous(breaks = seq(0.9, 1.05, by = 0.05)) +
-  ylim(0.9,1.05) +
+  scale_y_continuous(breaks = seq(0.9, 1.2, by = 0.05)) +
+  ylim(0.9,1.2) +
   ggtitle(paste0("ratio of ",type," relative to synonymous and Kirov")) +
   theme_bw() +
   theme(text=element_text(size=12,face="bold"),
@@ -3336,16 +3337,16 @@ relativised_derived_allele_allele_ratio_ggplot1 <- ggplot(data=filter(relativise
         #legend.position=c(0.07,0.84),
         legend.title=element_blank()
   )
-  relativised_derived_allele_allele_ratio_ggplot1
+relativised_derived_allele_allele_ratio_ggplot1
 
-relativised_derived_allele_allele_ratio_ggplot2 <- ggplot(data=filter(relativised_variants_and_subst_wg_alleleR,ratio == "nonsense" | ratio == "UCNE"), aes(population,ki_relative_value,colour=population)) +
+relativised_derived_allele_allele_ratio_ggplot2 <- ggplot(data=filter(relativised_variants_and_subst_wg_alleleR,ratio == "nonsense" | ratio == "UCNE" | ratio == "UCNElow" | ratio == "UCNEmid" | ratio == "UCNEhigh"), aes(population,ki_relative_value,colour=population)) +
   #facet_wrap(feature ~ species,nrow=6,ncol=2,scales="free") +
   facet_grid(. ~ ratio) +
   geom_boxplot(width=0.5) +
   #ggtitle("Proportion of reads at different NM") +
   ylab("ratio") +
-  scale_y_continuous(breaks = seq(0.7, 1.2, by = 0.2)) +
-  ylim(0.7,1.2) +
+  scale_y_continuous(breaks = seq(0.5, 1.5, by = 0.2)) +
+  ylim(0.5,1.5) +
   ggtitle(paste0("ratio of ",type," relative to synonymous and Kirov")) +
   theme_bw() +
   theme(text=element_text(size=12,face="bold"),
@@ -3368,9 +3369,9 @@ relativised_derived_allele_allele_ratio_ggplot2 <- ggplot(data=filter(relativise
         #legend.position=c(0.07,0.84),
         legend.title=element_blank()
   )
-  relativised_derived_allele_allele_ratio_ggplot2
+relativised_derived_allele_allele_ratio_ggplot2
 
-relativised_derived_allele_allele_ratio_ggplotcombined <- grid.arrange(relativised_derived_allele_allele_ratio_ggplot1, relativised_derived_allele_allele_ratio_ggplot2, nrow = 1)
+relativised_derived_allele_allele_ratio_ggplotcombined <- grid.arrange(relativised_derived_allele_allele_ratio_ggplot1, relativised_derived_allele_allele_ratio_ggplot2, ncol = 2, nrow = 1, widths = c(3.5,5))
 ggsave(paste0(type,"_derived_allele_allele_ratio_relative2synonymous_separate.pdf"), width=30, height=15, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/", relativised_derived_allele_allele_ratio_ggplotcombined)
 
 ```
@@ -3383,7 +3384,7 @@ library(dplyr)
 library(ggplot2)
 library(tidyr)
 
-type="varssubs" #varssubs #variants #substitutions
+type="segregating" #varssubs #variants #substitutions #segregating #fixed
 
 wd_path <- ("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
 variants_and_subst_wg <- read_tsv(paste0(wd_path,"c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_ann_individual_summary_",type,"_SNP.lr_ann.txt"))
@@ -3393,7 +3394,7 @@ variants_and_subst_wg$dataset = factor(variants_and_subst_wg$dataset,levels=c("R
 variants_and_subst_wg$population = factor(variants_and_subst_wg$population,levels=c("ki","no","po","sm","do"))
 print.data.frame(variants_and_subst_wg)
 
-variants_and_subst_wg_alleleR <- variants_and_subst_wg %>% mutate(synonymous=synonymous_A/synonymous_A,missense=missense_A/synonymous_A,mistol=missense_tol_A/synonymous_A,misdel=missense_del_A/synonymous_A,nonsense=nonsense_A/synonymous_A,UCNE=UCNE_A/synonymous_A) %>% select(c(1:4,28:33)) %>% gather(ratio,value,-species,-population,-dataset,-sample,factor_key=T)
+variants_and_subst_wg_alleleR <- variants_and_subst_wg %>% mutate(synonymous=synonymous_A/synonymous_A,missense=missense_A/synonymous_A,mistol=missense_tol_A/synonymous_A,misdel=missense_del_A/synonymous_A,nonsense=nonsense_A/synonymous_A,UCNE=UCNE_A/synonymous_A,UCNElow=UCNE_low_A/synonymous_A,UCNEmid=UCNE_mid_A/synonymous_A,UCNEhigh=UCNE_high_A/synonymous_A) %>% select(c(1:4,34:42)) %>% gather(ratio,value,-species,-population,-dataset,-sample,factor_key=T)
 variants_and_subst_wg_alleleR
 
 r_average_vector <- c()
@@ -3427,7 +3428,7 @@ for (pop in unique(relativised_variants_and_subst_wg_alleleR$population)) { #the
 }
 average_relativised_variants_and_subst_wg_alleleR$population = factor(average_relativised_variants_and_subst_wg_alleleR$population,levels=c("ki","no","po","sm","do"))
 levels(average_relativised_variants_and_subst_wg_alleleR$population)[levels(average_relativised_variants_and_subst_wg_alleleR$population)=="sm"] <- "an"
-average_relativised_variants_and_subst_wg_alleleR$ratio = factor(average_relativised_variants_and_subst_wg_alleleR$ratio,levels=c("synonymous","missense","mistol","misdel","nonsense","UCNE"))
+average_relativised_variants_and_subst_wg_alleleR$ratio = factor(average_relativised_variants_and_subst_wg_alleleR$ratio,levels=c("synonymous","missense","mistol","misdel","nonsense","UCNE","UCNElow","UCNEmid","UCNEhigh"))
 levels(average_relativised_variants_and_subst_wg_alleleR$ratio)[levels(average_relativised_variants_and_subst_wg_alleleR$ratio)=="mistol"] <- "missense_tolerated"
 levels(average_relativised_variants_and_subst_wg_alleleR$ratio)[levels(average_relativised_variants_and_subst_wg_alleleR$ratio)=="misdel"] <- "missense_deleterious"
 average_relativised_variants_and_subst_wg_alleleR$avg_ki_relative_value <- as.numeric(average_relativised_variants_and_subst_wg_alleleR$avg_ki_relative_value)
@@ -3443,8 +3444,8 @@ average_relativised_derived_allele_allele_ratio_ggplot <- ggplot(data=filter(ave
   geom_errorbar(aes(ymin=avg_ki_relative_value-se_ki_relative_value, ymax=avg_ki_relative_value+se_ki_relative_value), position=position_dodge(), width=0.5) +
   #ggtitle("Proportion of reads at different NM") +
   ylab("population mean ratio") +
-  scale_y_continuous(breaks = seq(0.7, 1.2, by = 0.2)) +
-  ylim(0.7,1.2) +
+  scale_y_continuous(breaks = seq(0.6, 1.4, by = 0.2)) +
+  ylim(0.6,1.4) +
   ggtitle(paste0("ratio of ",type," relative to synonymous and Kirov")) +
   theme_bw() +
   theme(text=element_text(size=12,face="bold"),
@@ -3468,7 +3469,7 @@ average_relativised_derived_allele_allele_ratio_ggplot <- ggplot(data=filter(ave
         legend.title=element_blank()
   )
   average_relativised_derived_allele_allele_ratio_ggplot
-ggsave(paste0(type,"_derived_allele_allele_ratio_relative2synonymous_short_mean.pdf"), width=15, height=15, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
+ggsave(paste0(type,"_derived_allele_allele_ratio_relative2synonymous_short_mean.pdf"), width=15, height=20, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
 
 #Separate plots:
 average_relativised_derived_allele_allele_ratio_ggplot1 <- ggplot(data=filter(average_relativised_variants_and_subst_wg_alleleR,ratio == "missense" | ratio == "missense_tolerated" | ratio == "missense_deleterious"), aes(population,avg_ki_relative_value,colour=population)) +
@@ -3505,15 +3506,15 @@ average_relativised_derived_allele_allele_ratio_ggplot1 <- ggplot(data=filter(av
 average_relativised_derived_allele_allele_ratio_ggplot1
 ggsave(paste0(type,"_derived_allele_allele_ratio_relative2synonymous_part1_mean.pdf"), width=20, height=15, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
 
-average_relativised_derived_allele_allele_ratio_ggplot2 <- ggplot(data=filter(average_relativised_variants_and_subst_wg_alleleR,ratio == "nonsense" | ratio == "UCNE"), aes(population,avg_ki_relative_value,colour=population)) +
+average_relativised_derived_allele_allele_ratio_ggplot2 <- ggplot(data=filter(average_relativised_variants_and_subst_wg_alleleR,ratio == "nonsense" | ratio == "UCNE" | ratio == "UCNElow" | ratio == "UCNEmid" | ratio == "UCNEhigh"), aes(population,avg_ki_relative_value,colour=population)) +
   #facet_wrap(feature ~ species,nrow=6,ncol=2,scales="free") +
   facet_grid(. ~ ratio) +
   geom_point() +
   geom_errorbar(aes(ymin=avg_ki_relative_value-se_ki_relative_value, ymax=avg_ki_relative_value+se_ki_relative_value), position=position_dodge(), width=0.5) +
   #ggtitle("Proportion of reads at different NM") +
   ylab("population mean ratio") +
-  scale_y_continuous(breaks = seq(0.75, 1.10, by = 0.2)) +
-  ylim(0.75,1.10) +
+  scale_y_continuous(breaks = seq(0.6, 1.4, by = 0.2)) +
+  ylim(0.6,1.4) +
   #ggtitle(paste0("ratio of ",type," relative to synonymous and Kirov")) +
   theme_bw() +
   theme(text=element_text(size=16,face="bold"),
@@ -3537,8 +3538,7 @@ average_relativised_derived_allele_allele_ratio_ggplot2 <- ggplot(data=filter(av
         legend.title=element_blank()
   )
 average_relativised_derived_allele_allele_ratio_ggplot2
-ggsave(paste0(type,"_derived_allele_allele_ratio_relative2synonymous_part2_mean.pdf"), width=14.6, height=15, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
-
+ggsave(paste0(type,"_derived_allele_allele_ratio_relative2synonymous_part2_mean.pdf"), width=30, height=15, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
 
 
 average_relativised_derived_allele_allele_ratio_ggplotcombined <- grid.arrange(average_relativised_derived_allele_allele_ratio_ggplot1, average_relativised_derived_allele_allele_ratio_ggplot2, nrow = 1)
@@ -5159,7 +5159,91 @@ scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dan
 
 ```
 
-##At the population level. Subsampled populations (N=8) will be used.
+##At the population level.
+###Whole-genome (joint calling).
+####Get counts.
+```{r Get annotation statistics, eval=FALSE, engine='bash'}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+VAR=(fixed) #varssubs #variants #substitutions #segregating #fixed
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+screen -S "${CALLING}-${VAR}-${TYPE}"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+script "${CALLING}_ann_population_summary_${VAR}_${TYPE}.lr_ann.log"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAM files path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+cd $V_PATH/$CALLING/annotation
+rm ${CALLING}"_ann_population_summary_"${VAR}"_"${TYPE}".lr_ann.txt"
+echo -e "species\tpopulation\tdataset\tsample\ttotal_V\ttotal_A\tintergenic_V\tintergenic_A\tintronic_V\tintronic_A\tcoding_V\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tmissense_tol_V\tmissense_tol_A\tmissense_del_V\tmissense_del_A\tnonsense_V\tnonsense_A\tUCNE_V\tUCNE_A\tUCNE_low_V\tUCNE_low_A\tUCNE_mid_V\tUCNE_mid_A\tUCNE_high_V\tUCNE_high_A\tmissense/synonymous_V\tmissense/synonymous_A\tsynonymous/intronic_V\tmissense/intronic_V" > ${CALLING}"_ann_population_summary_"${VAR}"_"${TYPE}".lr_ann.txt"
+POPLIST=($(ls `find . -name *"_perpop_"${VAR}"_"${TYPE}".lr_ann.vcf" -print`))
+for i in "${POPLIST[@]}"
+  do
+  echo "${i}"
+  vcf=$(echo "${i}" | rev | cut -d'/' -f1 | rev)
+  echo "${vcf}"
+  SPECIES=$(echo "${vcf}" | cut -c3-4)
+  POPULATION=$(echo "${vcf}" | cut -c14-15)
+  DATASET=$(echo "${vcf}" | cut -c6-7)
+  TOTAL_V=$(grep -v '#' ${i} | wc -l)
+  TOTAL_A=$(grep -v '#' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  INTERGENIC_V=$(grep 'intergenic' ${i} | wc -l)
+  INTERGENIC_A=$(grep 'intergenic' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  INTRONIC_V=$(grep 'intron_variant' ${i} | wc -l)
+  INTRONIC_A=$(grep 'intron_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  CODING_V=$(grep 'CDS' ${i} | wc -l)
+  SYNONYMOUS_V=$(grep 'synonymous_variant' ${i} | wc -l)
+  SYNONYMOUS_A=$(grep 'synonymous_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_V=$(grep 'missense_variant' ${i} | wc -l)
+  MISSENSE_A=$(grep 'missense_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_TOL_V=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean/missense_variants_provean_scores_tolerated.txt | grep -v '#' | wc -l)
+  MISSENSE_TOL_A=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean/missense_variants_provean_scores_tolerated.txt | grep -v '#' | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_DEL_V=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean/missense_variants_provean_scores_deleterious.txt | grep -v '#' | wc -l)
+  MISSENSE_DEL_A=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean/missense_variants_provean_scores_deleterious.txt | grep -v '#' | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  NONSENSE_V=$(grep '|HIGH|' ${i} | wc -l)
+  NONSENSE_A=$(grep '|HIGH|' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  UCNE_V=$(grep 'UCNE' ${i} | wc -l)
+  UCNE_A=$(grep 'UCNE' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  UCNE_LOW_V=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_lt2.gerp.bed | grep -v '#' | wc -l)
+  UCNE_LOW_A=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_lt2.gerp.bed | grep -v '#' | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  UCNE_MID_V=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_gt2lt5.gerp.bed | grep -v '#' | wc -l)
+  UCNE_MID_A=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_gt2lt5.gerp.bed | grep -v '#' | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  UCNE_HIGH_V=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_gt5.gerp.bed | grep -v '#' | wc -l)
+  UCNE_HIGH_A=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_gt5.gerp.bed | grep -v '#' | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_SYNONYMOUS_V=$(echo "scale=4; $MISSENSE_V/$SYNONYMOUS_V" | bc)
+  MISSENSE_SYNONYMOUS_A=$(echo "scale=4; $MISSENSE_A/$SYNONYMOUS_A" | bc)
+  SYNONYMOUS_INTRONIC_V=$(echo "scale=4; $SYNONYMOUS_V/$INTRONIC_V" | bc)
+  MISSENSE_INTRONIC_V=$(echo "scale=4; $MISSENSE_V/$INTRONIC_V" | bc)
+  echo -e "$SPECIES\t$POPULATION\t$DATASET\t$TOTAL_V\t$TOTAL_A\t$INTERGENIC_V\t$INTERGENIC_A\t$INTRONIC_V\t$INTRONIC_A\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$MISSENSE_TOL_V\t$MISSENSE_TOL_A\t$MISSENSE_DEL_V\t$MISSENSE_DEL_A\t$NONSENSE_V\t$NONSENSE_A\t$UCNE_V\t$UCNE_A\t$UCNE_LOW_V\t$UCNE_LOW_A\t$UCNE_MID_V\t$UCNE_MID_A\t$UCNE_HIGH_V\t$UCNE_HIGH_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A\t$SYNONYMOUS_INTRONIC_V\t$MISSENSE_INTRONIC_V" >> ${CALLING}"_ann_population_summary_"${VAR}"_"${TYPE}".lr_ann.txt"
+  done
+
+#From outside the server:
+export SSHPASS=$(cat /Users/dani/Documents/genomics_pass.txt)
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+VAR=(fixed) #varssubs #variants #substitutions #segregating #fixed
+TYPE=(SNP) #write down SNP or INDEL
+sshpass -e scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/${CALLING}_ann_population_summary_${VAR}_${TYPE}.lr_ann.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/
+unset SSHPASS
+
+```
+
+##At the subsampled population level. N=8 populations will be used.
 ###Whole-genome.
 ####Get counts.
 ```{r Get annotation statistics, eval=FALSE, engine='bash'}
@@ -5927,7 +6011,7 @@ ggsave("population_homozygous_derived_proportion.pdf", width=15, height=15, unit
 ```{r Get heterozygous counts, eval=FALSE, engine='bash'}
 
 CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
-VAR=(substitutions) #varssubs #variants #substitutions
+VAR=(segregating) #varssubs #variants #substitutions #segregating #fixed
 TYPE=(SNP) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
 screen -S "${CALLING}-${VAR}-${TYPE}"
@@ -5952,8 +6036,8 @@ BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
 
 cd $V_PATH/$CALLING/annotation
 rm ${CALLING}"_ann_individual_summary_heterozygous_"${VAR}"_"${TYPE}".lr_ann.txt"
-echo -e "species\tpopulation\tdataset\tsample\ttotal_H\tintergenic_H\tintronic_H\tcoding_H\tsynonymous_H\tmissense_H\tmistol_H\tmisdel_H\tnonsense_H\tUCNE_H" > ${CALLING}"_ann_individual_summary_heterozygous_"${VAR}"_"${TYPE}".lr_ann.txt"
-INDLIST=($(ls `find . -name *"_individual_"${VAR}"_"${TYPE}".lr_ann.vcf" ! -path '*testing_variant_numbers*' -print`))
+echo -e "species\tpopulation\tdataset\tsample\ttotal_H\tintergenic_H\tintronic_H\tcoding_H\tsynonymous_H\tmissense_H\tmistol_H\tmisdel_H\tnonsense_H\tUCNE_H\tUCNE_low_H\tUCNE_mid_H\tUCNE_high_H" > ${CALLING}"_ann_individual_summary_heterozygous_"${VAR}"_"${TYPE}".lr_ann.txt"
+INDLIST=($(ls `find . -name *"_individual_"${VAR}"_"${TYPE}".lr_ann.vcf" -print`))
 for i in "${INDLIST[@]}"
   do
   echo "${i}"
@@ -5973,12 +6057,19 @@ for i in "${INDLIST[@]}"
   MISDEL_H=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean/missense_variants_provean_scores_deleterious.txt | grep ';AF=0.500;' | wc -l)
   NONSENSE_H=$(grep '|HIGH|' ${i} | grep ';AF=0.500;' | wc -l)
   UCNE_H=$(grep 'UCNE' ${i} | grep ';AF=0.500;' | wc -l)
-  echo -e "$SPECIES\t$POPULATION\t$DATASET\t$SAMPLE\t$TOTAL_H\t$INTERGENIC_H\t$INTRONIC_H\t$CODING_H\t$SYNONYMOUS_H\t$MISSENSE_H\t$MISTOL_H\t$MISDEL_H\t$NONSENSE_H\t$UCNE_H" >> ${CALLING}"_ann_individual_summary_heterozygous_"${VAR}"_"${TYPE}".lr_ann.txt"
+  UCNE_LOW_H=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_lt2.gerp.bed | grep ';AF=0.500;' | wc -l)
+  UCNE_MID_H=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_gt2lt5.gerp.bed | grep ';AF=0.500;' | wc -l)
+  UCNE_HIGH_H=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_gt5.gerp.bed | grep ';AF=0.500;' | wc -l)
+  echo -e "$SPECIES\t$POPULATION\t$DATASET\t$SAMPLE\t$TOTAL_H\t$INTERGENIC_H\t$INTRONIC_H\t$CODING_H\t$SYNONYMOUS_H\t$MISSENSE_H\t$MISTOL_H\t$MISDEL_H\t$NONSENSE_H\t$UCNE_H\t$UCNE_LOW_H\t$UCNE_MID_H\t$UCNE_HIGH_H" >> ${CALLING}"_ann_individual_summary_heterozygous_"${VAR}"_"${TYPE}".lr_ann.txt"
   done
 
 #From outside the server:
-CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov) #c_lp_sm_c_lp_do_nm2_origcov #c_ll_ki_c_ll_no_c_ll_po_nm3_origcov #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov
-scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/*_ann_individual_summary_heterozygous_*_SNP.lr_ann.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/
+export SSHPASS=$(cat /Users/dani/Documents/genomics_pass.txt)
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+VAR=(varssubs) #varssubs #variants #substitutions #segregating #fixed
+TYPE=(SNP) #write down SNP or INDEL
+sshpass -e scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/${CALLING}_ann_individual_summary_heterozygous_${VAR}_${TYPE}.lr_ann.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/
+unset SSHPASS
 
 ```
 
@@ -6004,7 +6095,7 @@ variants_het$dataset = factor(variants_het$dataset,levels=c("REF","GP","5x","MG"
 variants_het$population = factor(variants_het$population,levels=c("ki","no","po","sm","do"))
 print.data.frame(variants_het)
 
-variants_het_tidy <- variants_het %>% select(-c(6,8)) %>% gather(feature,N,-species,-population,-dataset,-sample,factor_key=T)
+variants_het_tidy <- variants_het %>% gather(feature,N,-species,-population,-dataset,-sample,factor_key=T)
 levels(variants_het_tidy$feature) <- gsub('.{2}$', '', levels(variants_het_tidy$feature))
 variants_het_tidy
 
@@ -6012,7 +6103,7 @@ derived_allele_hetero_counts_ggplot <- ggplot(data=variants_het_tidy, aes(popula
   facet_grid(feature ~ .,scales="free") +
   geom_boxplot(width=0.5) +
   #ggtitle("Proportion of reads at different NM") +
-  ylab("N variants") +
+  ylab("N heterozygous variants") +
   theme_bw() +
   theme(strip.text=element_text(face="bold",size=9),
         text=element_text(size=12,face="bold"),
@@ -6036,7 +6127,7 @@ derived_allele_hetero_counts_ggplot <- ggplot(data=variants_het_tidy, aes(popula
         legend.title=element_blank()
   )
   derived_allele_hetero_counts_ggplot
-ggsave(paste0(type,"_derived_allele_heterozygous_counts.pdf"), width=15, height=20, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
+ggsave(paste0(type,"_derived_allele_heterozygous_counts.pdf"), width=15, height=30, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
 
 ```
 
@@ -6071,6 +6162,7 @@ variants_het_tidy
 #Import total sites data and cross it with the heterozygous counts to estimate neutral PI:
 total_sites <- read_tsv("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/whole_genome_counts/category_sites_total_counts_percategoryfilter_corrected.lr_ann.txt") 
 total_sites
+
 #For coding categories, we'll follow the proportions estimated by Yamaguchi-Kagata et al (see here: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2561068/): 28.5% SYN, 68.1% NSYN, and 3.4% NONSENSE. From my own classification of NSYN, 60.8% were NTOL and 39.2% were NDEL. So the totals would be: 28.5% SYN, 68.1% NSYN (41.4% NTOL, 26.7% NDEL), and 3.4% NONSENSE.
 coding_proportions <- data_frame("coding_category"=c("synonymous","missense","mistol","misdel","nonsense"),"proportion"=c(0.285,0.681,0.414,0.267,0.034)) #create dataframe with these numbers and loop over it to add their estimated total counts to total_sites:
 for (row in seq(1,nrow(coding_proportions))) {
@@ -6083,18 +6175,32 @@ for (row in seq(1,nrow(coding_proportions))) {
   total_sites$callable_N_postfilter <- as.numeric(total_sites$callable_N_postfilter)
 }
 total_sites
-total_sites$category <- factor(total_sites$category,levels=c("total","intergenic","intron","CDS","synonymous","missense","mistol","misdel","nonsense","UCNE"))
+
+#For UCNE categories, I calculated the proportion of total sites under each GERP category in the ucne_database script (section named: "Calculate proportion of sites for each GERP category"). These are: 3.0% UCNE_low, 26.3% UCNE_mid, 70.7% UCNE_high.
+ucne_proportions <- data_frame("ucne_category"=c("UCNE_low","UCNE_mid","UCNE_high"),"proportion"=c(0.030,0.263,0.707)) #create dataframe with these numbers and loop over it to add their estimated total counts to total_sites:
+for (row in seq(1,nrow(ucne_proportions))) {
+  ucne_category <- unlist(ucne_proportions[row,1],use.names=F)
+  print(ucne_category)
+  proportion <- unlist(ucne_proportions[row,2],use.names=F)
+  print(proportion)
+  total_sites <- rbind(total_sites,c(ucne_category,NA,NA,round(proportion*unlist(total_sites[which(total_sites$category=="UCNE"),4],use.names=F)),NA,round(proportion*unlist(total_sites[which(total_sites$category=="UCNE"),6],use.names=F))))
+  total_sites$callable_N <- as.numeric(total_sites$callable_N)
+  total_sites$callable_N_postfilter <- as.numeric(total_sites$callable_N_postfilter)
+}
+total_sites
+
+total_sites$category <- factor(total_sites$category,levels=c("total","intergenic","intron","CDS","synonymous","missense","mistol","misdel","nonsense","UCNE","UCNE_low","UCNE_mid","UCNE_high"))
 total_sites <- total_sites[order(total_sites$category),]
 write_tsv(total_sites,paste0("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/whole_genome_counts/complete_category_sites_total_counts_percategoryfilter_corrected.lr_ann.txt"))
 
 variants_het_joined_all <- left_join(variants_het_tidy,total_sites,by=c("feature"="category")) %>% mutate(het_by_total=N/callable_N,het_by_total_filter=N/callable_N_postfilter)
-variants_het_joined_all$feature = factor(variants_het_joined_all$feature,levels=c("total","intergenic","intron","CDS","synonymous","missense","mistol","misdel","nonsense","UCNE")) 
+variants_het_joined_all$feature = factor(variants_het_joined_all$feature,levels=c("total","intergenic","intron","CDS","synonymous","missense","mistol","misdel","nonsense","UCNE","UCNE_low","UCNE_mid","UCNE_high")) 
 variants_het_joined_all
 
 #Plot:
-ggplot_all_pi <- ggplot(data=as.data.frame(variants_het_joined_all),aes(x=population,y=plot_variable,colour=population)) +
+ggplot_all_pi <- ggplot(data=variants_het_joined_all,aes(x=population,y=colnames(variants_het_joined_all)[which(colnames(variants_het_joined_all) == plot_variable)],colour=population)) +
   geom_point() +
-  facet_grid(feature ~ .,scales="free_y") +
+  facet_grid(feature ~ .) +
   xlab("Population") +
   ylab(paste(type," individual ",plot_variable)) +
   theme_bw() +
@@ -6119,7 +6225,7 @@ ggplot_all_pi <- ggplot(data=as.data.frame(variants_het_joined_all),aes(x=popula
       legend.title=element_blank()
   )
 ggplot_all_pi
-ggsave(paste0(type,"_all_",plot_variable,"_joint_calling_joint_estimate.pdf"), width=10, height=25, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/genetic_load_vs_diversity")
+ggsave(paste0(type,"_all_",plot_variable,"_joint_calling_joint_estimate.pdf"), width=10, height=30, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/genetic_load_vs_diversity")
 
 
 #Obtain per population averages and standard errors:
@@ -6143,14 +6249,14 @@ for (pop in unique(variants_het_joined_all$population)) { #then loop over each p
 }
 average_variants_het_joined_all
 average_variants_het_joined_all$population = factor(average_variants_het_joined_all$population,levels=c("ki","no","po","sm","do"))
-average_variants_het_joined_all$feature = factor(average_variants_het_joined_all$feature,levels=c("total","intergenic","intron","CDS","synonymous","missense","mistol","misdel","nonsense","UCNE"))
+average_variants_het_joined_all$feature = factor(average_variants_het_joined_all$feature,levels=c("total","intergenic","intron","CDS","synonymous","missense","mistol","misdel","nonsense","UCNE","UCNE_low","UCNE_mid","UCNE_high"))
 average_variants_het_joined_all$avg_het_by_total <- as.numeric(average_variants_het_joined_all$avg_het_by_total)
 average_variants_het_joined_all$se_het_by_total <- as.numeric(average_variants_het_joined_all$se_het_by_total)
 average_variants_het_joined_all
 write_csv(average_variants_het_joined_all,paste0("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/genetic_load_vs_diversity/",type,"_all_",plot_variable,"_joint_calling_joint_estimate_mean.csv"))
   
-#Plot these means and standard errors (except for nonsense and UCNE, that need a different scale):
-average_ggplot_all_pi_part1 <- ggplot(data=filter(average_variants_het_joined_all,feature != "nonsense" & feature != "UCNE"), aes(population,avg_het_by_total,colour=population)) +
+#Plot these means and standard errors (categories with higher values):
+average_ggplot_all_pi_part1 <- ggplot(data=filter(average_variants_het_joined_all,grepl('total|intergenic|intron|CDS|synonymous|UCNE_low',feature)), aes(population,avg_het_by_total,colour=population)) +
   #facet_wrap(feature ~ species,nrow=6,ncol=2,scales="free") +
   facet_grid(feature ~ .) +
   geom_point() +
@@ -6180,10 +6286,10 @@ average_ggplot_all_pi_part1 <- ggplot(data=filter(average_variants_het_joined_al
       legend.title=element_blank()
   )
 average_ggplot_all_pi_part1
-ggsave(paste0(type,"_all_",plot_variable,"_joint_calling_joint_estimate_mean_part1.pdf"), width=10, height=25, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/genetic_load_vs_diversity")
+ggsave(paste0(type,"_all_",plot_variable,"_joint_calling_joint_estimate_mean_part1.pdf"), width=10, height=21, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/genetic_load_vs_diversity")
 
-#Plot these means and standard errors (for nonsense and UCNE, that need a different scale):
-average_ggplot_all_pi_part2 <- ggplot(data=filter(average_variants_het_joined_all,feature == "nonsense" | feature == "UCNE"), aes(population,avg_het_by_total,colour=population)) +
+#Plot these means and standard errors (categories with intermediate values):
+average_ggplot_all_pi_part2 <- ggplot(data=filter(average_variants_het_joined_all,grepl('missense|mistol|misdel|UCNE_mid',feature)), aes(population,avg_het_by_total,colour=population)) +
   #facet_wrap(feature ~ species,nrow=6,ncol=2,scales="free") +
   facet_grid(feature ~ .) +
   geom_point() +
@@ -6213,20 +6319,17 @@ average_ggplot_all_pi_part2 <- ggplot(data=filter(average_variants_het_joined_al
       legend.title=element_blank()
   )
 average_ggplot_all_pi_part2
-ggsave(paste0(type,"_all_",plot_variable,"_joint_calling_joint_estimate_mean_part2.pdf"), width=10, height=10, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/genetic_load_vs_diversity")
+ggsave(paste0(type,"_all_",plot_variable,"_joint_calling_joint_estimate_mean_part2.pdf"), width=10, height=15, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/genetic_load_vs_diversity")
 
-
-#Old: calculate PI per site for coding categories using the whole CDS category as denominator:
-variants_het_joined_coding <- left_join(variants_het_joined_all %>% filter(feature=="CDS" | feature=="synonymous" | feature=="missense" | feature=="mistol" | feature=="misdel" | feature=="nonsense") %>% select(-7),variants_het_joined_all %>% filter(feature=="CDS") %>% select(-c(5:6,8)),by=c("species","population","dataset","sample")) %>% mutate(PI=N/total_N_postfilter)
-variants_het_joined_coding$feature = factor(variants_het_joined_coding$feature,levels=c("CDS","synonymous","missense","mistol","misdel","nonsense"))
-variants_het_joined_coding
-
-#Plot:
-ggplot_coding_pi <- ggplot(data=as.data.frame(variants_het_joined_coding),aes(x=population,y=PI,colour=population)) +
+#Plot these means and standard errors (categories with low values):
+average_ggplot_all_pi_part3 <- ggplot(data=filter(average_variants_het_joined_all,grepl('nonsense|\\<UCNE\\>|UCNE_high',feature)), aes(population,avg_het_by_total,colour=population)) +
+  #facet_wrap(feature ~ species,nrow=6,ncol=2,scales="free") +
+  facet_grid(feature ~ .) +
   geom_point() +
-  facet_grid(feature ~ .,scales="free_y") +
-  xlab("Feature") +
-  ylab(paste0(type," PI")) +
+  geom_errorbar(aes(ymin=avg_het_by_total-se_het_by_total, ymax=avg_het_by_total+se_het_by_total), position=position_dodge(), width=0.5) +
+  #ggtitle("Proportion of reads at different NM") +
+  xlab("Population") +
+  ylab(paste0(type," population average ",plot_variable)) +
   theme_bw() +
   theme(text=element_text(size=12,face="bold"),
       rect=element_rect(size=1),
@@ -6248,8 +6351,11 @@ ggplot_coding_pi <- ggplot(data=as.data.frame(variants_het_joined_coding),aes(x=
       legend.position="none",
       legend.title=element_blank()
   )
-ggplot_coding_pi
-ggsave(paste0(type,"_coding_PI_joint_calling_joint_estimate.pdf"), width=10, height=20, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/genetic_load_vs_diversity")
+average_ggplot_all_pi_part3
+ggsave(paste0(type,"_all_",plot_variable,"_joint_calling_joint_estimate_mean_part3.pdf"), width=10, height=12, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/genetic_load_vs_diversity")
+
+average_ggplot_all_pi_combined <- grid.arrange(average_ggplot_all_pi_part1,average_ggplot_all_pi_part2,average_ggplot_all_pi_part3, ncol = 3, layout_matrix = cbind(c(rep(1,20)), c(rep(2,17),rep(NA,3)), c(rep(3,13),rep(NA,7))))
+ggsave(paste0(type,"_all_",plot_variable,"_joint_calling_joint_estimate_mean_all.pdf"), width=35, height=20, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/genetic_load_vs_diversity",average_ggplot_all_pi_combined)
 
 ```
 
@@ -6267,7 +6373,7 @@ plot_variable <- "rda_by_total_filter" #rda_by_total_filter #rda_by_total (for a
 #Import heterozygous counts and change to tidy format:
 wd_path <- ("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
 variant_files <- grep(list.files("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/", pattern=paste0("*origcov_ann_individual_summary_",type,"_SNP.lr_ann.txt")),pattern='wrong',inv=T,value=T)
-variants_het <- read_tsv(paste0(wd_path,variant_files)) %>% select(-c(24:27))
+variants_het <- read_tsv(paste0(wd_path,variant_files)) %>% select(-c(30:33))
 
 variants_het$dataset <- as.factor(variants_het$dataset)
 variants_het$dataset = factor(variants_het$dataset,levels=c("REF","GP","5x","MG")) #Reorder factor levels to: REF, GP, 5x, MG
@@ -6296,8 +6402,21 @@ for (row in seq(1,nrow(coding_proportions))) {
 }
 total_sites
 
+#For UCNE categories, I calculated the proportion of total sites under each GERP category in the ucne_database script (section named: "Calculate proportion of sites for each GERP category"). These are: 3.0% UCNE_low, 26.3% UCNE_mid, 70.7% UCNE_high.
+ucne_proportions <- data_frame("ucne_category"=c("UCNE_low","UCNE_mid","UCNE_high"),"proportion"=c(0.030,0.263,0.707)) #create dataframe with these numbers and loop over it to add their estimated total counts to total_sites:
+for (row in seq(1,nrow(ucne_proportions))) {
+  ucne_category <- unlist(ucne_proportions[row,1],use.names=F)
+  print(ucne_category)
+  proportion <- unlist(ucne_proportions[row,2],use.names=F)
+  print(proportion)
+  total_sites <- rbind(total_sites,c(ucne_category,NA,NA,round(proportion*unlist(total_sites[which(total_sites$category=="UCNE"),4],use.names=F)),NA,round(proportion*unlist(total_sites[which(total_sites$category=="UCNE"),6],use.names=F))))
+  total_sites$callable_N <- as.numeric(total_sites$callable_N)
+  total_sites$callable_N_postfilter <- as.numeric(total_sites$callable_N_postfilter)
+}
+total_sites
+
 variants_het_joined_all <- left_join(variants_het_tidy,total_sites,by=c("feature"="category")) %>% mutate(rda_by_total=N/callable_N,rda_by_total_filter=N/callable_N_postfilter)
-variants_het_joined_all$feature = factor(variants_het_joined_all$feature,levels=c("total","intergenic","intron","CDS","synonymous","missense","missense_tol","missense_del","nonsense","UCNE")) 
+variants_het_joined_all$feature = factor(variants_het_joined_all$feature,levels=c("total","intergenic","intron","CDS","synonymous","missense","missense_tol","missense_del","nonsense","UCNE","UCNE_low","UCNE_mid","UCNE_high")) 
 variants_het_joined_all
 
 #Plot:
@@ -6350,14 +6469,14 @@ for (pop in unique(variants_het_joined_all$population)) { #then loop over each p
 }
 average_variants_het_joined_all
 average_variants_het_joined_all$population = factor(average_variants_het_joined_all$population,levels=c("ki","no","po","sm","do"))
-average_variants_het_joined_all$feature = factor(average_variants_het_joined_all$feature,levels=c("total","intergenic","intron","CDS","synonymous","missense","missense_tol","missense_del","nonsense","UCNE"))
+average_variants_het_joined_all$feature = factor(average_variants_het_joined_all$feature,levels=c("total","intergenic","intron","CDS","synonymous","missense","missense_tol","missense_del","nonsense","UCNE","UCNE_low","UCNE_mid","UCNE_high"))
 average_variants_het_joined_all$avg_rda <- as.numeric(average_variants_het_joined_all$avg_rda)
 average_variants_het_joined_all$se_rda <- as.numeric(average_variants_het_joined_all$se_rda)
 average_variants_het_joined_all
 write_csv(average_variants_het_joined_all,paste0("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/genetic_load_vs_diversity/",type,"_all_",plot_variable,"_joint_calling_joint_estimate_mean.csv"))
-  
-#Plot these means and standard errors (except for nonsense and UCNE, that need a different scale):
-average_ggplot_all_pi_part1 <- ggplot(data=filter(average_variants_het_joined_all,feature != "nonsense" & feature != "UCNE"), aes(population,avg_rda,colour=population)) +
+
+#Plot these means and standard errors (categories with higher values):
+average_ggplot_all_pi_part1 <- ggplot(data=filter(average_variants_het_joined_all,grepl('total|intergenic|intron|CDS|synonymous|UCNE_low',feature)), aes(population,avg_rda,colour=population)) +
   #facet_wrap(feature ~ species,nrow=6,ncol=2,scales="free") +
   facet_grid(feature ~ .) +
   geom_point() +
@@ -6387,10 +6506,10 @@ average_ggplot_all_pi_part1 <- ggplot(data=filter(average_variants_het_joined_al
       legend.title=element_blank()
   )
 average_ggplot_all_pi_part1
-ggsave(paste0(type,"_all_",plot_variable,"_joint_calling_joint_estimate_mean_part1.pdf"), width=10, height=25, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/genetic_load_vs_diversity")
+ggsave(paste0(type,"_all_",plot_variable,"_joint_calling_joint_estimate_mean_part1.pdf"), width=10, height=21, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/genetic_load_vs_diversity")
 
-#Plot these means and standard errors (for nonsense and UCNE, that need a different scale):
-average_ggplot_all_pi_part2 <- ggplot(data=filter(average_variants_het_joined_all,feature == "nonsense" | feature == "UCNE"), aes(population,avg_rda,colour=population)) +
+#Plot these means and standard errors (categories with intermediate values):
+average_ggplot_all_pi_part2 <- ggplot(data=filter(average_variants_het_joined_all,grepl('missense|missense_tol|missense_del|UCNE_mid',feature)), aes(population,avg_rda,colour=population)) +
   #facet_wrap(feature ~ species,nrow=6,ncol=2,scales="free") +
   facet_grid(feature ~ .) +
   geom_point() +
@@ -6420,7 +6539,43 @@ average_ggplot_all_pi_part2 <- ggplot(data=filter(average_variants_het_joined_al
       legend.title=element_blank()
   )
 average_ggplot_all_pi_part2
-ggsave(paste0(type,"_all_",plot_variable,"_joint_calling_joint_estimate_mean_part2.pdf"), width=10, height=10, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/genetic_load_vs_diversity")
+ggsave(paste0(type,"_all_",plot_variable,"_joint_calling_joint_estimate_mean_part2.pdf"), width=10, height=15, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/genetic_load_vs_diversity")
+
+#Plot these means and standard errors (categories with low values):
+average_ggplot_all_pi_part3 <- ggplot(data=filter(average_variants_het_joined_all,grepl('nonsense|\\<UCNE\\>|UCNE_high',feature)), aes(population,avg_rda,colour=population)) +
+  #facet_wrap(feature ~ species,nrow=6,ncol=2,scales="free") +
+  facet_grid(feature ~ .) +
+  geom_point() +
+  geom_errorbar(aes(ymin=avg_rda-se_rda, ymax=avg_rda+se_rda), position=position_dodge(), width=0.5) +
+  #ggtitle("Proportion of reads at different NM") +
+  xlab("Population") +
+  ylab(paste0(type," population average ",plot_variable)) +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+      rect=element_rect(size=1),
+      axis.line=element_line(colour="black"),
+      axis.title=element_text(size=16),
+      axis.text.x=element_text(angle=30,hjust=1,size=12,colour="black"),
+      axis.text.y=element_text(size=12,colour="black"),
+      #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+      panel.background=element_blank(),
+      panel.border=element_rect(colour="black"),
+      #panel.grid=element_blank(),
+      #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+      plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+      #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+      legend.background=element_rect(linetype="solid", colour="black", size=.5),
+      #legend.justification=c(0,0),
+      legend.key=element_rect(colour="white"),
+      legend.key.size=unit(0.5,"cm"),
+      legend.position="none",
+      legend.title=element_blank()
+  )
+average_ggplot_all_pi_part3
+ggsave(paste0(type,"_all_",plot_variable,"_joint_calling_joint_estimate_mean_part3.pdf"), width=10, height=12, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/genetic_load_vs_diversity")
+
+average_ggplot_all_pi_combined <- grid.arrange(average_ggplot_all_pi_part1,average_ggplot_all_pi_part2,average_ggplot_all_pi_part3, ncol = 3, layout_matrix = cbind(c(rep(1,20)), c(rep(2,17),rep(NA,3)), c(rep(3,13),rep(NA,7))))
+ggsave(paste0(type,"_all_",plot_variable,"_joint_calling_joint_estimate_mean_all.pdf"), width=35, height=20, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/genetic_load_vs_diversity",average_ggplot_all_pi_combined)
 
 ```
 
