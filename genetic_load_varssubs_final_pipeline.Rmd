@@ -1103,7 +1103,64 @@ fi
 
 ```
 
-##Separate variants and substitutions.
+##Separate true variants and true substitutions. These are defined at the species level.
+```{r Filter the annotated VCF, eval=FALSE, engine='bash'}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov) #write down name of the calling
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+screen -S "${CALLING}-${TYPE}"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+script "${CALLING}_polarized_separate_segregating_fixed_${TYPE}.lr_ann.log"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome (first eight scaffolds only)
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING)
+POPS=$(echo $CALLING | fold -w8 | cut -c1-7 | head -n$N_POPS | sort | uniq)
+SPECIES=$(echo $CALLING | fold -w8 | cut -c1-4 | head -n$N_POPS | sort | uniq)
+COVERAGE=$(echo "${CALLING}" | rev | cut -d'_' -f1 | rev)
+NM_COV=$(echo "${CALLING}" | rev | cut -d'_' -f1,2 | rev)
+FILE=$(echo ${CALLING}_polarized_filteredall_varssubs_${TYPE}.lr_ann.vcf) #This file was generated in section 11 after applying the per dataset depth filtering to the varssubs file.
+echo "input file is" $FILE
+
+if [[ $CALLING == "c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3"* ]] #the double brackets turns the test into a regex
+  then
+  for s in ${SPECIES[@]}
+    do
+    bcftools query -l $FILE | cut -c1-12 | sort | uniq | grep ${s} > ${s}_samples.txt
+    echo "retrieving derived varssubs positions for species" $s
+    java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+    -T SelectVariants \
+    -R $REF \
+    -V $FILE \
+    -o ${s}_${NM_COV}_persp_varssubs_${TYPE}.lr_ann.vcf \
+    -env \
+    --sample_file ${s}_samples.txt
+    VARSSUBS_N=$(grep -v '#' ${s}_${NM_COV}_persp_varssubs_${TYPE}.lr_ann.vcf | wc -l) #
+    echo "varssubs total is" $VARSSUBS_N
+    echo "retrieving derived segregating positions for species" $s
+    bcftools view -i "AC/AN > 0 & AC/AN < 1" ${s}_${NM_COV}_persp_varssubs_${TYPE}.lr_ann.vcf -Ov -o ${s}_${NM_COV}_persp_segregating_${TYPE}.lr_ann.vcf
+    SEGR_N=$(grep -v '#' ${s}_${NM_COV}_persp_segregating_${TYPE}.lr_ann.vcf | wc -l) #
+    echo "segregating total is" $SEGR_N
+    echo "retrieving derived fixed positions for species" $s
+    bcftools view -i "AC/AN = 1" ${s}_${NM_COV}_persp_varssubs_${TYPE}.lr_ann.vcf -Ov -o ${s}_${NM_COV}_persp_fixed_${TYPE}.lr_ann.vcf
+    FIXED_N=$(grep -v '#' ${s}_${NM_COV}_persp_fixed_${TYPE}.lr_ann.vcf | wc -l) #
+    echo "fixed total is" $FIXED_N
+    done
+  else
+  echo "the code for this calling hasn't been written yet"
+fi
+
+```
+
+##Separate variants and substitutions. These are badly defined.
 ```{r Filter the annotated VCF, eval=FALSE, engine='bash'}
 
 CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov) #write down name of the calling
@@ -1157,6 +1214,7 @@ if [[ $CALLING == "c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3"* ]] #the doub
 ```
 
 #9: Obtain per dataset VCFs.
+##For true varssubs, false variants and false substitutions. All of these should be filtered next (steps 10 and 11).
 ```{r Obtain per dataset VCFs, eval=FALSE, engine='bash'}
 
 CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
@@ -1217,6 +1275,60 @@ for j in ${DATASETS[@]}
   -env \
   --sample_file /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered/${j}_samples
   grep -v '#' ${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_perdataset_"${VAR}"_"${TYPE}".lr_ann.vcf" | wc -l #
+  done
+
+```
+
+##For true variants and substitutions. These come from the already filtered varssubs, so steps 10 and 11 should be skipped. Go straight to step 12 after this.
+```{r Obtain per dataset VCFs, eval=FALSE, engine='bash'}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+VAR=(segregating) #segregating #fixed
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+screen -S "${CALLING}-${VAR}-${TYPE}"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+script "perdataset_${VAR}_${CALLING}_${TYPE}.lr_ann.log"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAM files path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING)
+SPECIES=$(echo $CALLING | fold -w8 | cut -c1-4 | head -n$N_POPS | sort | uniq)
+DATASETS=$(for i in ${SPECIES[@]}; do ls ${i}*_samples | cut -d'_' -f1,2,3; done)
+NM_COV=$(echo "${CALLING}" | rev | cut -d'_' -f1,2 | rev)
+cd $V_PATH/$CALLING/annotation
+
+for j in ${DATASETS[@]}
+  do
+  echo ${j}
+  SPECIES=$(echo ${j} | cut -c1-4)
+  INPUT_FILE=$(echo ${SPECIES}_${NM_COV}_persp_${VAR}_${TYPE}.lr_ann.vcf)
+  echo $INPUT_FILE
+  cat /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered/${j}_samples
+  mkdir -p ${j}_${NM_COV}_perdataset
+  java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+  -T SelectVariants \
+  -R $REF \
+  -V $INPUT_FILE \
+  -o ${j}_${NM_COV}_perdataset/${j}_${NM_COV}_perdataset_filtered_${VAR}_${TYPE}.lr_ann.vcf \
+  -env \
+  --sample_file /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered/${j}_samples
+  grep -v '#' ${j}_${NM_COV}_perdataset/${j}_${NM_COV}_perdataset_filtered_${VAR}_${TYPE}.lr_ann.vcf | wc -l #
   done
 
 ```
@@ -1487,7 +1599,7 @@ fi
 ```{r Obtain per population VCFs, eval=FALSE, engine='bash'}
 
 CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
-VAR=(substitutions) #varssubs #variants #substitutions
+VAR=(segregating) #varssubs #variants #substitutions #segregating #fixed
 TYPE=(SNP) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
 screen -S "${CALLING}-${VAR}-${TYPE}"
@@ -1769,7 +1881,7 @@ for pop in ${POPS[@]}
 ```{r Split the population VCFs into per individual VCFs, eval=FALSE, engine='bash'}
 
 CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
-VAR=(substitutions) #varssubs #variants #substitutions
+VAR=(fixed) #varssubs #variants #substitutions #segregating #fixed
 TYPE=(SNP) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
 screen -S "${CALLING}-${VAR}-${TYPE}"
