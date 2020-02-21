@@ -5,7 +5,7 @@ date: "8 de julio de 2019"
 output: html_document
 ---
 
-#Obtain UCNE variants for every individual:
+#1. Obtain UCNE variants for every individual:
 ```{bash}
 
 mkdir -p /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database
@@ -54,7 +54,7 @@ for i in "${INDLIST[@]}"
 
 ```
 
-#Analyse density and distribution of variants:
+#2. Analyse density and distribution of variants:
 ##Obtain density and distribution of variants
 ```{bash}
 
@@ -152,86 +152,7 @@ for (s in unique(ucne_variants_distribution$sample)) {
 
 ```
 
-#Analyse conservation status (GERP).
-```{bash}
-
-cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/test
-#Split the UCNE coordinates across chromosomes, and then retrieve the GERP scores for each chromosome (otherwise there's a limit to the number of regions allowed) from here: https://genome.ucsc.edu/cgi-bin/hgTables. Don't forget to manually change the name of each output file.
-#Detailed explanation: http://mendel.stanford.edu/SidowLab/downloads/gerp/Readme.txt.
-CHR=$(cut -f1 /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db/UCNE_beds/hg19_UCNE_coord.bed | uniq)
-for chr in ${CHR[@]}
-  do
-  echo ${chr}
-  awk -v chr=$chr '{if ($1 == chr) printf ("%s\t%s\t%s\t%s_%s\n", $1, $2-1, $3, $4, $5)}' /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db/UCNE_beds/hg19_UCNE_coord.bed > /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db/UCNE_beds/hg19_UCNE_coord_${chr}.bed
-  done
-
-#Once all .gerp files have been downloaded and placed in the proper folder, convert them to .bed format.
-CHR=$(cut -f1 /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db/UCNE_beds/hg19_UCNE_coord.bed | uniq)
-for chr in ${CHR[@]}
-  do
-  echo ${chr}
-  grep -vE '#|variableStep|track' /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db/UCNE_beds/hg19_GERP_coord_${chr}.gerp | awk -v chr=$chr '{printf ("%s\t%s\t%s\t%s\n", chr, $1-1, $1, $2)}' > /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db/UCNE_beds/hg19_GERP_coord_${chr}.bed
-  done
-
-
-#In the server (to use bedtools):
-cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/test
-
-#Intersect human UCNE and GERP information:
-bedtools intersect -wa -wb -a hg19_GERP_coord_${chr}.bed -b hg19_UCNE_coord_${chr}.bed | awk '{printf ("%s\t%s\t%s\t%s\t%s\n", $1, $2, $3, $4, $8)}' > hg19_GERP_coord_${chr}_complete.bed
-
-
-
-Run LiftOver:
-/Applications/LiftOver/liftOver -minMatch=0.1 /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db/UCNE_beds/hg19_GERP_coord_chr1_complete.bed /Applications/LiftOver/hg19ToFelCat5.over.chain.gz /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db/UCNE_beds/cat_GERP_coord_chr1_complete.bed /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db/UCNE_beds/cat_GERP_coord_chr1_unlifted.bed
-
-
-
-Run LiftOver:
-head -n 100 /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db/UCNE_beds/hg19_GERP_coord_chr1.bed > /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db/UCNE_beds/kaka.bed
-
-/Applications/LiftOver/liftOver -minMatch=0.1 /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db/UCNE_beds/kaka.bed /Applications/LiftOver/hg19ToFelCat5.over.chain.gz /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db/UCNE_beds/kaka_out.bed /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/ucne_db/UCNE_beds/kaka_unlifted.bed
-
-
-
-```
-
-#Obsolete (I thought I could join cat and human coordinates based on the UCNE name, but I don't know the nucleotide correspondence so GERP values won't make sense).
-```{bash}
-
-#Get file with cat coordinates, and then split the regions to the nucleotide level:
-awk '{printf ("%s\t%s\t%s\t%s_%s\n", $1, $2, $3, $4, $5)}' /home/GRUPOS/grupolince/ultra_conserved_regions/cat_conversion_UCNE_coord_from_hg19_sorted.bed > cat_conversion_UCNE_coord_from_hg19_sorted.bed
-
-screen -S cat_conversion_UCNE_coord_from_hg19_sorted_detailed.log
-
-rm cat_conversion_UCNE_coord_from_hg19_sorted_detailed.bed
-touch cat_conversion_UCNE_coord_from_hg19_sorted_detailed.bed
-FILE=cat_conversion_UCNE_coord_from_hg19_sorted.bed
-COUNTER=0
-TOTAL=$(wc -l < $FILE)
-while read -r chr start end info
-  do
-  if [ $(( $COUNTER % 10 )) == 0 ]
-    then
-    echo "processed $COUNTER regions out of $TOTAL"
-  fi
-  while [ $start -lt $end ]
-    do
-    stop=$((start+1))
-    echo -e "$chr\t$start\t$stop\t$info" >> ${FILE/.bed/_detailed.bed}
-    ((start++))
-    done
-  ((COUNTER++))
-  done < $FILE
-
-
-
-#Join cat coordinates with human UCNE and GERP information:
-join -1 4 -2 5 <(sort -k4 test.bed) <(sort -k5 hg19_GERP_coord_${chr}_complete.bed) | awk '{printf ("%s\t%s\t%s\t%s\t%s\n", $2, $3, $4, $1, $8)}' | bedtools sort > cat_GERP_coord_${chr}_complete.bed
-
-```
-
-#Obtain GERP scores via human-lynx BLAST alignments.
+#3. Obtain GERP scores via human-lynx BLAST alignments.
 ##Make local BLAST database for human GRCH37:
 ```{bash}
 
