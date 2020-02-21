@@ -1274,7 +1274,7 @@ for category in ${CATEGORIES[@]}
   GENOME_REP_T=$(bedtools intersect -a /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/repeats_and_lowcomp_no_redundant_mappability.k75_lessthan90.bed -b $category | awk '{printf ("%s\t%s\t%s\t%s\n", $1, $2, $3, $3-$2+1)}' | cut -f4 | paste -sd+ | bc)
   GENOME_REP_PROP=$(echo "scale=6; $GENOME_REP_T/$GENOME_T" | bc)  
   PRE_FILTER_T=$((GENOME_T-GENOME_REP_T))
- 
+
   FILTER_T=$(echo "scale=6; $FILTER_V_PROP*$PRE_FILTER_T" | bc | awk '{printf "%d", $0}')
   POST_FILTER_T=$((PRE_FILTER_T-FILTER_T))
   echo -e "$CATEGORY_NAME\t$GENOME_T\t$GENOME_REP_PROP\t$PRE_FILTER_T\t$FILTER_V_PROP\t$POST_FILTER_T" >> "category_sites_total_counts_percategoryfilter_corrected.lr_ann.txt"
