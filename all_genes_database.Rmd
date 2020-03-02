@@ -1,0 +1,985 @@
+---
+title: "all_genes_database"
+author: "Dani"
+output: html_document
+---
+
+#1. Build genes databases.
+##All genes database:
+###Build the genetic code file.
+```{bash}
+
+#Store the genetic code in a file:
+echo -e "TTT\tF\nTTC\tF\nTTA\tL\nTTG\tL\nCTT\tL\nCTC\tL\nCTA\tL\nCTG\tL\nATT\tI\nATC\tI\nATA\tI\nATG\tM\nGTT\tV\nGTC\tV\nGTA\tV\nGTG\tV\nTCT\tS\nTCC\tS\nTCA\tS\nTCG\tS\nCCT\tP\nCCC\tP\nCCA\tP\nCCG\tP\nACT\tT\nACC\tT\nACA\tT\nACG\tT\nGCT\tA\nGCC\tA\nGCA\tA\nGCG\tA\nTAT\tY\nTAC\tY\nTAA\t-\nTAG\t-\nCAT\tH\nCAC\tH\nCAA\tQ\nCAG\tQ\nAAT\tN\nAAC\tN\nAAA\tK\nAAG\tK\nGAT\tD\nGAC\tD\nGAA\tE\nGAG\tE\nTGT\tC\nTGC\tC\nTGA\t-\nTGG\tW\nCGT\tR\nCGC\tR\nCGA\tR\nCGG\tR\nAGT\tS\nAGC\tS\nAGA\tR\nAGG\tR\nGGT\tG\nGGC\tG\nGGA\tG\nGGG\tG\t" > genetic_code.txt
+
+```
+
+###Obtain coordinates for all CDS from all genes in the list.
+```{bash}
+
+cd /GRUPOS/grupolince/Lyp_annotation_Apr14_final/codon_usage
+
+#Obtain coordinates for all CDS from all annotated genes.
+GENES=$(grep 'CDS' LYPA23C.all.fix.nr.gff3 | cut -f9 | cut -d'=' -f2 | cut -d'T' -f1 | sort | uniq)
+COUNTER=0
+rm all_genes_cds_list.gff3
+for gen in ${GENES[@]}
+  do
+  #echo "${gen}"
+  grep "$gen" LYPA23C.all.fix.nr.gff3 | awk -v gene_name=$gen '$3 == "CDS" {printf ("%s\t%s\n", $0,gene_name)}' >> all_genes_cds_list.gff3
+  ((COUNTER++))
+  if [ $(( $COUNTER % 100 )) == 0 ]
+    then
+    echo "processed $COUNTER genes out of $(echo "$GENES" | wc -l)"
+  fi
+  done
+
+```
+
+###Build codon usage for each species of interest:
+####Generate for each gene a fasta file with its protein sequence.
+```{bash}
+
+#Define reference individual:
+REF_SP="ll" #lr #lp #ll
+cd /GRUPOS/grupolince/Lyp_annotation_Apr14_final/codon_usage
+
+screen -S "${REF_SP}-all_genes_codon_usage"
+REF_SP=$(echo ${STY#*.} | cut -d'-' -f1)
+script "${REF_SP}-all_genes_codon_usage.log"
+REF_SP=$(echo ${STY#*.} | cut -d'-' -f1)
+
+if [ $REF_SP == "lr" ]
+  then
+  REF_FA=/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa
+elif [ $REF_SP == "lp" ]
+  then
+  REF_FA=/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa
+elif [ $REF_SP == "ll" ]
+  then
+  REF_FA=/GRUPOS/grupolince/reference_genomes/lynx_lynx_genome/LynxLynx_SNVsOnly.fa
+fi
+echo "working fasta path is" $REF_FA
+
+#Retrieve reference sequences for all CDS (from the desired species' fasta).
+echo "retrieving reference sequences for all" $REF_SP "CDS"
+bedtools getfasta -fi $REF_FA -bed all_genes_cds_list.gff3 -fo all_genes_cds_sequence_${REF_SP}.fa
+
+#Paste each CDS' sequence with the rest of the information in the gff.
+paste all_genes_cds_list.gff3 <(grep -v '>' all_genes_cds_sequence_${REF_SP}.fa) > all_genes_cds_list_and_sequence_${REF_SP}.gff3
+
+#For partial genes, remove the non-coding SNPs at the flanks (to account for the reading frame). Complete genes will always start with reading frame = 0 so those are already correct, but many partial genes have different reading frames.
+echo "fixing partial genes sequences for all" $REF_SP "CDS"
+awk '/partial_gene/ {printf ("%s\t%s\n", $0,NR)}' all_genes_cds_list_and_sequence_${REF_SP}.gff3 > all_genes_cds_list_and_sequence_partialgenes_${REF_SP}.gff3
+
+COUNTER=0
+while read -r row; do
+  CUT_N=$(echo "$row" | cut -f 8)
+  CUT_N=$((CUT_N+1))
+  STRAND=$(echo "$row" | cut -f 7)
+  OLD_SEQUENCE=$(echo "$row" | cut -f 11)
+  ROW_N=$(echo "$row" | cut -f 12)
+  if [ $STRAND == "+" ]
+    then
+    CODING_SEQUENCE=$(echo $OLD_SEQUENCE | cut -c $CUT_N-)
+  elif [ $STRAND == "-" ]
+    then
+    CODING_SEQUENCE=$(echo $OLD_SEQUENCE | rev | cut -c $CUT_N- | rev)
+  fi
+  sed -i "${ROW_N}s/$OLD_SEQUENCE/$CODING_SEQUENCE/" all_genes_cds_list_and_sequence_${REF_SP}.gff3
+  if [ $(( $COUNTER % 100 )) == 0 ]
+    then
+    echo "processed" $COUNTER "partial genes out of $(wc -l < all_genes_cds_list_and_sequence_partialgenes_${REF_SP}.gff3)"
+  fi
+done < all_genes_cds_list_and_sequence_partialgenes_${REF_SP}.gff3  
+
+#Fuse all exons from each gene and store them in a file together with the gene name and the strand information.
+echo "fusing exons for all" $REF_SP "CDS"
+GENES=$(cat all_genes_cds_list_and_sequence_${REF_SP}.gff3 | cut -f 10 | uniq)
+COUNTER=0
+rm all_genes_cds_list_and_sequence_combined_${REF_SP}.txt
+for gen in ${GENES[@]}
+  do
+  #echo "${gen}"
+  STRAND=$(awk -F"\t" -v gen=$gen '$10 == gen' all_genes_cds_list_and_sequence_${REF_SP}.gff3 | shuf -n1 | cut -f 7)
+  CODING_SEQUENCE=$(awk -F"\t" -v gen=$gen '$10 == gen {print $11}' all_genes_cds_list_and_sequence_${REF_SP}.gff3 | tr -d '\n')
+  echo -e "$gen\t$STRAND\t$CODING_SEQUENCE" >> all_genes_cds_list_and_sequence_combined_${REF_SP}.txt
+  ((COUNTER++))
+  if [ $(( $COUNTER % 100 )) == 0 ]
+    then
+    echo "processed $COUNTER genes out of $(echo "$GENES" | wc -l)"
+  fi
+  done
+sort all_genes_cds_list_and_sequence_combined_${REF_SP}.txt -k1,1 | uniq > all_genes_sequence_combined_${REF_SP}.txt
+
+```
+
+####Combine all gene sequences in a file and calculate codon usage:
+```{bash}
+
+#Define reference individual:
+REF_SP="lr" #lr #lp #ll
+if [ $REF_SP == "lr" ]
+  then
+  REF_FA=/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa
+elif [ $REF_SP == "lp" ]
+  then
+  REF_FA=/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa
+elif [ $REF_SP == "ll" ]
+  then
+  REF_FA=/GRUPOS/grupolince/reference_genomes/lynx_lynx_genome/LynxLynx_SNVsOnly.fa
+fi
+
+cd /GRUPOS/grupolince/Lyp_annotation_Apr14_final/codon_usage
+
+#Obtain version that accounts for the strand:
+rm all_genes_sequence_combined_stranded_${REF_SP}.txt
+TOTAL=$(cat all_genes_sequence_combined_${REF_SP}.txt | wc -l)
+COUNTER=0
+while read -r entry; do
+  GENE=$(echo "$entry" | cut -f 1)
+  #echo $GENE
+  STRAND=$(echo "$entry" | cut -f 2)
+  #echo $STRAND
+  CODING_SEQUENCE=$(echo "$entry" | cut -f 3)
+  #echo $CODING_SEQUENCE
+  if [ $STRAND == "+" ]
+    then
+    echo -e "$GENE\t$STRAND\t$CODING_SEQUENCE" >> all_genes_sequence_combined_stranded_${REF_SP}.txt
+  elif [ $STRAND == "-" ]
+    then
+    REVERSE_SEQUENCE=$(echo $CODING_SEQUENCE | tr ACGT TGCA | rev) #this code obtains the reverse complementary sequence
+    echo -e "$GENE\t$STRAND\t$REVERSE_SEQUENCE" >> all_genes_sequence_combined_stranded_${REF_SP}.txt
+  fi
+  ((COUNTER++))
+  if [ $(( $COUNTER % 100 )) == 0 ]
+    then
+    echo "processed $COUNTER genes out of $TOTAL"
+  fi
+  done < all_genes_sequence_combined_${REF_SP}.txt
+
+#Retrieve all codons from each gene:
+rm all_genes_sequence_combined_codons_${REF_SP}.txt
+TOTAL=$(cat all_genes_sequence_combined_stranded_${REF_SP}.txt | wc -l)
+COUNTER=0
+while read -r GENE STRAND CODING_SEQUENCE; do
+  echo $CODING_SEQUENCE | fold -w 3 >> all_genes_sequence_combined_codons_${REF_SP}.txt
+  ((COUNTER++))
+  if [ $(( $COUNTER % 1000 )) == 0 ]
+    then
+    echo "processed $COUNTER genes out of $TOTAL"
+  fi
+  done < all_genes_sequence_combined_stranded_${REF_SP}.txt
+
+#Count the occurrences of each codon:
+sort all_genes_sequence_combined_codons_${REF_SP}.txt | uniq -c > all_genes_sequence_combined_codon_counts_${REF_SP}.txt
+
+#Sanity check: count if the number of final codons (empty, 1-letter or 2-letter codons) matches the number of genes.
+wc -l < all_genes_sequence_combined_stranded_${REF_SP}.txt #15201 is the number of genes in my dataset.
+awk 'length($2)<3 {printf ("%s\n", $1)}' all_genes_sequence_combined_codon_counts_${REF_SP}.txt | paste -sd+ | bc #15201 is the number of final codons (14916 are empty, but some end with a single base or two bases).
+
+#Join both files to obtain the final codon usage file:
+join -1 2 -2 1 <(sort -k2 all_genes_sequence_combined_codon_counts_${REF_SP}.txt) <(sort genetic_code.txt) | sort -k3,3 -k2,2nr | awk '{printf ("%s\t%s\t%s\n", $1, $3, $2)}' > codon_usage_all_genes_${REF_SP}.txt
+
+#Obtain version with per aminoacid proportions and Chi^2 test:
+rm codon_usage_prop_all_genes_${REF_SP}.txt
+rm codon_usage_chi2_all_genes_${REF_SP}.txt
+while read -r CODON AA N; do
+  TOTAL_N=$(grep -w $AA codon_usage_all_genes_${REF_SP}.txt | cut -f3 | paste -sd+ | bc) #total number of codons that code for the same aminoacid
+  PROP=$(awk -v N=$N -v TOTAL_N=$TOTAL_N 'BEGIN {printf "%.3f\n", N/TOTAL_N}') #proportion (rounded) of occurrences of the aminoacid encoded by the codon
+  echo -e "$CODON\t$AA\t$N\t$PROP" >> codon_usage_prop_all_genes_${REF_SP}.txt
+  LENGTH=$(grep -w $AA codon_usage_all_genes_${REF_SP}.txt | wc -l) #number of possible codons that code for the same aminoacid
+  EXPECTED=$(awk -v LENGTH=$LENGTH -v TOTAL_N=$TOTAL_N 'BEGIN {printf "%.3f\n", TOTAL_N/LENGTH}') #expected number of occurrences of the aminoacid that would be encoded by the codon under equal proportions
+  CHI_SQUARE=$(awk -v OBS=$N -v EXP=$EXPECTED 'BEGIN {printf "%.5f\n", ((OBS-EXP)*(OBS-EXP))/EXP}')
+  echo -e "$CODON\t$AA\t$N\t$EXPECTED\t$CHI_SQUARE" >> codon_usage_chi2_all_genes_${REF_SP}.txt
+  done < codon_usage_all_genes_${REF_SP}.txt
+
+```
+
+##Ribosomal (highly expressed) genes database:
+###A: Retrieve human ribosomal DNA:
+```{bash}
+
+#The idea is to get the list of ribosomal sequences in human and translate the IDs in order to obtain the equivalent from lynx.
+
+#First I followed instructions from this link (https://groups.google.com/a/soe.ucsc.edu/forum/#!topic/genome/oqG00_-ufho) to download a .bed file with coordinates and Ensembl identifiers for rDNA genes.
+
+#The downloaded file is the following: /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/all_genes_db/GRCH38.rDNA.bed
+cd /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/all_genes_db/
+cut -f4 GRCH38.rDNA.bed | tail -n+2 | sort | uniq > GRCH38.rDNA_ensembl_names.txt
+
+#Since these sequences are registered with their ENSEMBL transcript codes, but our own Lynx pardinus database uses the UniProt ID codes, we need to convert them first. The UniProt website has a tool for this. However, when uploading GRCH38.rDNA_ensembl_names.txt to https://www.uniprot.org/uploadlists/, no matter which conversion I select, I get no matches. Maybe because the human sequences are ncRNA?
+
+```
+
+###B: Retrieve lynx ribosomal DNA:
+####Obtain coordinates for all CDS from all genes in the list.
+```{bash}
+
+#Another possible approach is to directly search for ribosomal-related sequences within the lynx annotation files.
+
+grep 'ribosomal rna' LYPA23C.GENE.mRNA.CDS.GENE_promoters.GENE_introns.UTRs.ncRNA.lncRNA.lncRNA_introns.lncRNA_promoters.UCNE.intergenic.nr.gff3 > rDNA_genes_list.gff3
+
+#But I don't have the reading frame for these sequences and thus I can't get the codon usage!
+
+```
+
+##Other datasets:
+###Obtain UniProt codes for human-lynx orthologous genes database:
+####Separate types of orthologs:
+#####1to1 orthologs:
+```{bash}
+
+#First we need to update the already available human-lynx orthologous database to include UniProt codes.
+
+cd /GRUPOS/grupolince/ortologous
+rm /GRUPOS/grupolince/ortologous/HUMAN.1to1_orthologs.clean.txt
+while IFS=$'\t' read -r COMPARISON LYNX_1 CONSTANT LYNX_2 HUMAN; do
+  if [ $COMPARISON == "one-to-one" ]
+    then
+    echo $COMPARISON
+    echo $LYNX_1
+    LYNX=$(echo $LYNX_1 | cut -d';' -f1)
+    echo -e "$LYNX\t$HUMAN" >> /GRUPOS/grupolince/ortologous/HUMAN.1to1_orthologs.clean.txt
+  fi
+  done < /GRUPOS/grupolince/ortologous/HUMAN.orthologs.txt
+
+cut -f2 /GRUPOS/grupolince/ortologous/HUMAN.1to1_orthologs.clean.txt > /GRUPOS/grupolince/ortologous/HUMAN.1to1_orthologs.clean_ensembl_codes.txt
+
+#From outside the server:
+export SSHPASS=$(cat /Users/dani/Documents/genomics_pass.txt)
+sshpass -e scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/ortologous/HUMAN.1to1_orthologs.clean_ensembl_codes.txt /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/all_genes_db
+unset SSHPASS
+
+#UniProt website (https://www.uniprot.org/uploadlists/), was used to convert gene IDs. I selected "from Ensembl Proteins to UniProtKB", inserted Homo sapiens as the species, and submitted the search. Once it finished, I filtered in only the reviewed results, and selected the desired columns (in my case I included my input list as the 7th column).
+
+#From outside the server:
+export SSHPASS=$(cat /Users/dani/Documents/genomics_pass.txt)
+sshpass -e scp /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/all_genes_db/HUMAN.1to1_orthologs.clean_uniprot_codes.txt dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/ortologous/
+unset SSHPASS
+
+cd /GRUPOS/grupolince/ortologous
+join -t$'\t' -1 2 -2 7 <(sort -t$'\t' -k2,2 HUMAN.1to1_orthologs.clean.txt) <(sort -t$'\t' -k7,7 HUMAN.1to1_orthologs.clean_uniprot_codes.txt) | sort | uniq > HUMAN.1to1_orthologs.joined_codes.txt
+
+```
+
+#####Multi-orthologs:
+```{bash}
+
+cd /GRUPOS/grupolince/ortologous
+rm /GRUPOS/grupolince/ortologous/HUMAN.multi_orthologs.clean.txt
+while IFS=$'\t' read -r COMPARISON LYNX_1 CONSTANT LYNX_2 HUMAN; do
+  if [ $COMPARISON == "one-to-many" ] || [ $COMPARISON == "many-to-one" ]
+    then
+    echo $COMPARISON
+    echo $LYNX_2
+    LYNX_CODES=$(echo $LYNX_2 | tr -d '[:space:]' | tr ";," "\n" | uniq)
+    for lynx_code in ${LYNX_CODES[@]}
+      do
+      HUMAN_CODES=$(echo $HUMAN | tr -d '[:space:]' | tr ";," "\n" | uniq)
+      for human_code in ${HUMAN_CODES[@]}
+        do
+        echo -e "$lynx_code\t$human_code" >> /GRUPOS/grupolince/ortologous/HUMAN.multi_orthologs.clean.txt
+        done
+      done
+  fi
+  done < /GRUPOS/grupolince/ortologous/HUMAN.orthologs.txt
+
+cut -f2 /GRUPOS/grupolince/ortologous/HUMAN.multi_orthologs.clean.txt > /GRUPOS/grupolince/ortologous/HUMAN.multi_orthologs.clean_ensembl_codes.txt
+
+#From outside the server:
+export SSHPASS=$(cat /Users/dani/Documents/genomics_pass.txt)
+sshpass -e scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/ortologous/HUMAN.multi_orthologs.clean_ensembl_codes.txt /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/all_genes_db
+unset SSHPASS
+
+#UniProt website (https://www.uniprot.org/uploadlists/), was used to convert gene IDs. I selected "from Ensembl Proteins to UniProtKB", inserted Homo sapiens as the species, and submitted the search. Once it finished, I filtered in only the reviewed results, and selected the desired columns (in my case I included my input list as the 7th column).
+
+#From outside the server:
+export SSHPASS=$(cat /Users/dani/Documents/genomics_pass.txt)
+sshpass -e scp /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/all_genes_db/HUMAN.multi_orthologs.clean_uniprot_codes.txt dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/ortologous/
+unset SSHPASS
+
+#Unfold duplicate Ensembl entries:
+cd /GRUPOS/grupolince/ortologous
+rm /GRUPOS/grupolince/ortologous/HUMAN.multi_orthologs.clean_uniprot_codes_extended.txt
+while IFS=$'\t' read -r UNIPROT UNIPROT_2 PROT_NAME GENE_NAME ORGANISM LENGTH ENSEMBL; do
+  ENS_CODES=$(echo $ENSEMBL | tr "," "\n" | uniq)
+  for code in ${ENS_CODES[@]}
+    do
+    echo -e "$UNIPROT\t$UNIPROT_2\t$PROT_NAME\t$GENE_NAME\t$ORGANISM\t$LENGTH\t$code" >> /GRUPOS/grupolince/ortologous/HUMAN.multi_orthologs.clean_uniprot_codes_extended.txt
+    done
+  done < /GRUPOS/grupolince/ortologous/HUMAN.multi_orthologs.clean_uniprot_codes.txt
+
+cd /GRUPOS/grupolince/ortologous
+join -t$'\t' -1 2 -2 7 <(sort -t$'\t' -k2,2 HUMAN.multi_orthologs.clean.txt) <(sort -t$'\t' -k7,7 HUMAN.multi_orthologs.clean_uniprot_codes_extended.txt) | sort | uniq > HUMAN.multi_orthologs.joined_codes.txt
+
+```
+
+####Combine both files:
+```{bash}
+
+cd /GRUPOS/grupolince/ortologous
+cat HUMAN.1to1_orthologs.joined_codes.txt HUMAN.multi_orthologs.joined_codes.txt | sort | uniq > HUMAN.1to1_and_multi_orthologs.joined_codes.txt
+
+```
+
+###Housekeeping confidence set:
+####Retrieve human highly expressed DNA:
+```{bash}
+
+#The idea is to get a list of highly expressed ubiquitous genes in human and translate the IDs in order to obtain the equivalent from lynx.
+
+#I found this paper: https://www.cell.com/trends/genetics/fulltext/S0168-9525(13)00089-9#tbl0005 which lists 11 genes that could serve as control for expression research, given that they are uniform and strongly expressed across different tissues. I copied the RefSeq IDs: CA043_HUMA, CHM2A_HUMAN, EMC7_HUMAN, G6PI_HUMAN, PSB2_HUMAN, PSB4_HUMAN, RAB7A_HUMAN, REEP5_HUMAN, SMD3_HUMAN, TERA_HUMAN, VPS29_HUMAN.
+
+#Since our own Lynx pardinus database uses the UniProt ID codes, we need to convert these RefSeq IDs first. The UniProt website has a tool for this. I upload the IDs to https://www.uniprot.org/uploadlists/, selected "from RefSeq Nucleotides to UniProtKB", inserted Homo sapiens as the species, and submitted the search. Once it finished, I filtered in only the reviewed results, and selected the desired columns (in mycase I included my input list as the 7th column).
+
+#From outside the server:
+export SSHPASS=$(cat /Users/dani/Documents/genomics_pass.txt)
+sshpass -e scp /Users/dani/Downloads/human_housekeeping_confidence_UniProt.txt dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/Lyp_annotation_Apr14_final/codon_usage
+unset SSHPASS
+
+```
+
+####Retrieve the lynx-equivalent highly expressed genes:
+```{bash}
+
+cd /GRUPOS/grupolince/ortologous
+grep -f /GRUPOS/grupolince/Lyp_annotation_Apr14_final/codon_usage/housekeeping_confidence_UniProt.txt HUMAN.1to1_orthologs.joined_codes.txt #7 matches
+
+grep -f /GRUPOS/grupolince/Lyp_annotation_Apr14_final/codon_usage/housekeeping_confidence_UniProt.txt HUMAN.multi_orthologs.joined_codes.txt #No matches
+
+grep -f /GRUPOS/grupolince/Lyp_annotation_Apr14_final/codon_usage/housekeeping_confidence_UniProt.txt HUMAN.1to1_and_multi_orthologs.joined_codes.txt | cut -f2 | awk 'BEGIN{FS=OFS="\t"} {gsub("LYPA23A", "LYPA23C", $1)} 1' > /GRUPOS/grupolince/Lyp_annotation_Apr14_final/codon_usage/housekeeping_confidence_lynx_genes.txt
+
+cd /GRUPOS/grupolince/Lyp_annotation_Apr14_final/codon_usage/
+rm housekeeping_confidence_cds_list.gff3
+while read -r gen; do
+  #echo "${gen}"
+  grep "$gen" ./../LYPA23C.all.fix.nr.gff3 | awk -v gene_name=$gen '$3 == "CDS" {printf ("%s\t%s\n", $0,gene_name)}' >> housekeeping_confidence_cds_list.gff3
+  done < housekeeping_confidence_lynx_genes.txt
+sort housekeeping_confidence_cds_list.gff3 > housekeeping_confidence_cds_list_sorted.gff3
+mv housekeeping_confidence_cds_list_sorted.gff3 housekeeping_confidence_cds_list.gff3
+
+```
+
+####Build codon usage for each species of interest:
+#####Generate for each gene a fasta file with its protein sequence.
+```{bash}
+
+#Define reference individual:
+REF_SP="lr" #lr #lp #ll
+cd /GRUPOS/grupolince/Lyp_annotation_Apr14_final/codon_usage
+
+screen -S "${REF_SP}-housekeeping_confidence_codon_usage"
+REF_SP=$(echo ${STY#*.} | cut -d'-' -f1)
+script "${REF_SP}-housekeeping_confidence_codon_usage.log"
+REF_SP=$(echo ${STY#*.} | cut -d'-' -f1)
+
+if [ $REF_SP == "lr" ]
+  then
+  REF_FA=/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa
+elif [ $REF_SP == "lp" ]
+  then
+  REF_FA=/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa
+elif [ $REF_SP == "ll" ]
+  then
+  REF_FA=/GRUPOS/grupolince/reference_genomes/lynx_lynx_genome/LynxLynx_SNVsOnly.fa
+fi
+echo "working fasta path is" $REF_FA
+
+#Retrieve reference sequences for all retrieved high expression CDS (from the desired species' fasta).
+echo "retrieving reference sequences for all" $REF_SP "highly expressed CDS"
+bedtools getfasta -fi $REF_FA -bed housekeeping_confidence_cds_list.gff3 -fo housekeeping_confidence_cds_sequence_${REF_SP}.fa
+
+#Paste each CDS' sequence with the rest of the information in the gff.
+paste housekeeping_confidence_cds_list.gff3 <(grep -v '>' housekeeping_confidence_cds_sequence_${REF_SP}.fa) > housekeeping_confidence_cds_list_and_sequence_${REF_SP}.gff3
+
+#For partial genes, remove the non-coding SNPs at the flanks (to account for the reading frame). Complete genes will always start with reading frame = 0 so those are already correct, but many partial genes have different reading frames.
+echo "fixing partial genes sequences for high expression" $REF_SP "CDS"
+awk '/partial_gene/ {printf ("%s\t%s\n", $0,NR)}' housekeeping_confidence_cds_list_and_sequence_${REF_SP}.gff3 > housekeeping_confidence_cds_list_and_sequence_partialgenes_${REF_SP}.gff3
+
+COUNTER=0
+while read -r row; do
+  CUT_N=$(echo "$row" | cut -f 8)
+  CUT_N=$((CUT_N+1))
+  STRAND=$(echo "$row" | cut -f 7)
+  OLD_SEQUENCE=$(echo "$row" | cut -f 11)
+  ROW_N=$(echo "$row" | cut -f 12)
+  if [ $STRAND == "+" ]
+    then
+    CODING_SEQUENCE=$(echo $OLD_SEQUENCE | cut -c $CUT_N-)
+  elif [ $STRAND == "-" ]
+    then
+    CODING_SEQUENCE=$(echo $OLD_SEQUENCE | rev | cut -c $CUT_N- | rev)
+  fi
+  sed -i "${ROW_N}s/$OLD_SEQUENCE/$CODING_SEQUENCE/" housekeeping_confidence_cds_list_and_sequence_${REF_SP}.gff3
+done < housekeeping_confidence_cds_list_and_sequence_partialgenes_${REF_SP}.gff3  
+
+#Fuse all exons from each gene and store them in a file together with the gene name and the strand information.
+echo "fusing exons for high expression" $REF_SP "CDS"
+GENES=$(cat housekeeping_confidence_cds_list_and_sequence_${REF_SP}.gff3 | cut -f 10 | uniq)
+COUNTER=0
+rm housekeeping_confidence_cds_list_and_sequence_combined_${REF_SP}.txt
+for gen in ${GENES[@]}
+  do
+  #echo "${gen}"
+  STRAND=$(awk -F"\t" -v gen=$gen '$10 == gen' housekeeping_confidence_cds_list_and_sequence_${REF_SP}.gff3 | shuf -n1 | cut -f 7)
+  CODING_SEQUENCE=$(awk -F"\t" -v gen=$gen '$10 == gen {print $11}' housekeeping_confidence_cds_list_and_sequence_${REF_SP}.gff3 | tr -d '\n')
+  echo -e "$gen\t$STRAND\t$CODING_SEQUENCE" >> housekeeping_confidence_cds_list_and_sequence_combined_${REF_SP}.txt
+  ((COUNTER++))
+  done
+sort housekeeping_confidence_cds_list_and_sequence_combined_${REF_SP}.txt -k1,1 | uniq > housekeeping_confidence_sequence_combined_${REF_SP}.txt
+
+```
+
+#####Combine all gene sequences in a file and calculate codon usage:
+```{bash}
+
+#Define reference individual:
+REF_SP="lr" #lr #lp #ll
+if [ $REF_SP == "lr" ]
+  then
+  REF_FA=/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa
+elif [ $REF_SP == "lp" ]
+  then
+  REF_FA=/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa
+elif [ $REF_SP == "ll" ]
+  then
+  REF_FA=/GRUPOS/grupolince/reference_genomes/lynx_lynx_genome/LynxLynx_SNVsOnly.fa
+fi
+
+cd /GRUPOS/grupolince/Lyp_annotation_Apr14_final/codon_usage
+
+#Obtain version that accounts for the strand:
+rm housekeeping_confidence_sequence_combined_stranded_${REF_SP}.txt
+TOTAL=$(cat housekeeping_confidence_sequence_combined_${REF_SP}.txt | wc -l)
+COUNTER=0
+while read -r entry; do
+  GENE=$(echo "$entry" | cut -f 1)
+  #echo $GENE
+  STRAND=$(echo "$entry" | cut -f 2)
+  #echo $STRAND
+  CODING_SEQUENCE=$(echo "$entry" | cut -f 3)
+  #echo $CODING_SEQUENCE
+  if [ $STRAND == "+" ]
+    then
+    echo -e "$GENE\t$STRAND\t$CODING_SEQUENCE" >> housekeeping_confidence_sequence_combined_stranded_${REF_SP}.txt
+  elif [ $STRAND == "-" ]
+    then
+    REVERSE_SEQUENCE=$(echo $CODING_SEQUENCE | tr ACGT TGCA | rev) #this code obtains the reverse complementary sequence
+    echo -e "$GENE\t$STRAND\t$REVERSE_SEQUENCE" >> housekeeping_confidence_sequence_combined_stranded_${REF_SP}.txt
+  fi
+  ((COUNTER++))
+  done < housekeeping_confidence_sequence_combined_${REF_SP}.txt
+
+#Retrieve all codons from each gene:
+rm housekeeping_confidence_sequence_combined_codons_${REF_SP}.txt
+TOTAL=$(cat housekeeping_confidence_sequence_combined_stranded_${REF_SP}.txt | wc -l)
+COUNTER=0
+while read -r GENE STRAND CODING_SEQUENCE; do
+  echo $CODING_SEQUENCE | fold -w 3 >> housekeeping_confidence_sequence_combined_codons_${REF_SP}.txt
+  ((COUNTER++))
+  done < housekeeping_confidence_sequence_combined_stranded_${REF_SP}.txt
+
+#Count the occurrences of each codon:
+sort housekeeping_confidence_sequence_combined_codons_${REF_SP}.txt | uniq -c > housekeeping_confidence_sequence_combined_codon_counts_${REF_SP}.txt
+
+#Sanity check: count if the number of final codons (empty, 1-letter or 2-letter codons) matches the number of genes.
+wc -l < housekeeping_confidence_sequence_combined_stranded_${REF_SP}.txt #7 is the number of genes in my dataset.
+awk 'length($2)<3 {printf ("%s\n", $1)}' housekeeping_confidence_sequence_combined_codon_counts_${REF_SP}.txt | paste -sd+ | bc #This doesn't work any longer (since I replaced sed ... with fold -w 3)
+
+#Join both files to obtain the final codon usage file:
+join -1 2 -2 1 <(sort -k2 housekeeping_confidence_sequence_combined_codon_counts_${REF_SP}.txt) <(sort genetic_code.txt) | sort -k3,3 -k2,2nr | awk '{printf ("%s\t%s\t%s\n", $1, $3, $2)}' > codon_usage_housekeeping_confidence_${REF_SP}.txt
+
+#Obtain version with per aminoacid proportions and Chi^2 test:
+rm codon_usage_prop_housekeeping_confidence_${REF_SP}.txt
+rm codon_usage_chi2_housekeeping_confidence_${REF_SP}.txt
+while read -r CODON AA N; do
+  TOTAL_N=$(grep -w $AA codon_usage_housekeeping_confidence_${REF_SP}.txt | cut -f3 | paste -sd+ | bc) #total number of codons that code for the same aminoacid
+  PROP=$(awk -v N=$N -v TOTAL_N=$TOTAL_N 'BEGIN {printf "%.3f\n", N/TOTAL_N}') #proportion (rounded) of occurrences of the aminoacid encoded by the codon
+  echo -e "$CODON\t$AA\t$N\t$PROP" >> codon_usage_prop_housekeeping_confidence_${REF_SP}.txt
+  LENGTH=$(grep -w $AA codon_usage_housekeeping_confidence_${REF_SP}.txt | wc -l) #number of possible codons that code for the same aminoacid
+  EXPECTED=$(awk -v LENGTH=$LENGTH -v TOTAL_N=$TOTAL_N 'BEGIN {printf "%.3f\n", TOTAL_N/LENGTH}') #expected number of occurrences of the aminoacid that would be encoded by the codon under equal proportions
+  CHI_SQUARE=$(awk -v OBS=$N -v EXP=$EXPECTED 'BEGIN {printf "%.5f\n", ((OBS-EXP)*(OBS-EXP))/EXP}')
+  echo -e "$CODON\t$AA\t$N\t$EXPECTED\t$CHI_SQUARE" >> codon_usage_chi2_housekeeping_confidence_${REF_SP}.txt
+  done < codon_usage_housekeeping_confidence_${REF_SP}.txt
+
+```
+
+###GETX high expression genes:
+####Retrieve top 100 expressed genes from multiple tissues and their UniProt codes:
+```{bash}
+
+#First I manually downloaded from the GTEx portal the top 100 expressed genes in several human tissues (link for the stomach is https://gtexportal.org/home/eqtls/tissue?tissueName=Stomach). I downloaded data from the following tissues: blood, brain (cortex), heart (ventricle), liver, lung, muscle, pancreas, stomach, and testis. I stored them in the local folder: /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/all_genes_db/GTEx_high_expression_genes/
+
+cd /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/all_genes_db/GTEx_high_expression_genes/
+rm GTEx_top100_alltissues.txt
+FILES=$(ls GTEx*.csv)
+for file in ${FILES[@]}
+  do
+  echo $file
+  tail -n+2 $file | tr -d '"' | awk -F "," '{printf "%s\t%s\t%s\n", $1,$2,$3+0}' | awk -F "\t" '($3 >= 1000) {printf "%s\t%s\n", $1,$2}' >> GTEx_high_alltissues_duplicates.txt #the first awk converts strings to numbers, and the second one does the filtering
+  done
+sort -k1,1 GTEx_high_alltissues_duplicates.txt | uniq | cut -d'.' -f1 > GTEx_high_alltissues_ensembl.txt
+
+#Since these sequences are registered with their ENSEMBL, but our own Lynx pardinus database uses the UniProt ID codes, we need to convert them first. The UniProt website has a tool for this. I uploaded GTEx_high_alltissues_ensembl.txt to https://www.uniprot.org/uploadlists/, transformed from Ensembl to Uniprot KB, then selected human and reviewed entries on the left panel, selected my input list (ensembl codes) as the 7th column, and downloaded the list as /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/all_genes_db/GTEx_high_expression_genes/GTEx_high_alltissues_uniprot.txt 
+
+#From outside the server:
+export SSHPASS=$(cat /Users/dani/Documents/genomics_pass.txt)
+sshpass -e scp /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/all_genes_db/GTEx_high_expression_genes/GTEx_high_alltissues_UniProt.txt dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/Lyp_annotation_Apr14_final/codon_usage/
+unset SSHPASS
+
+```
+
+####Retrieve the lynx-equivalent highly expressed genes:
+```{bash}
+
+cd /GRUPOS/grupolince/Lyp_annotation_Apr14_final/codon_usage/
+
+join -t $'\t' -1 1 -2 3 <(sort -k1,1 GTEx_high_alltissues_UniProt.txt) <(sort -k3,3 /GRUPOS/grupolince/ortologous/HUMAN.1to1_and_multi_orthologs.joined_codes.txt) | cut -f9 | sort | uniq | awk 'BEGIN{FS=OFS="\t"} {gsub("LYPA23A", "LYPA23C", $1)} 1' > GTEx_high_lynx_genes.txt
+
+#grep -F -f GTEx_high_lynx_genes.txt ./../LYPA23C.all.fix.nr.gff3 | grep 'CDS' > GTEx_high_cds_list.gff3
+
+cd /GRUPOS/grupolince/Lyp_annotation_Apr14_final/codon_usage/
+rm GTEx_high_cds_list.gff3
+while read -r gen; do
+  #echo "${gen}"
+  grep "$gen" ./../LYPA23C.all.fix.nr.gff3 | awk -v gene_name=$gen '$3 == "CDS" {printf ("%s\t%s\n", $0,gene_name)}' >> GTEx_high_cds_list.gff3
+  done < GTEx_high_lynx_genes.txt
+sort GTEx_high_cds_list.gff3 > GTEx_high_cds_list_sorted.gff3
+mv GTEx_high_cds_list_sorted.gff3 GTEx_high_cds_list.gff3
+
+```
+
+####Build codon usage for each species of interest:
+#####Generate for each gene a fasta file with its protein sequence.
+```{bash}
+
+#Define reference individual:
+REF_SP="lr" #lr #lp #ll
+cd /GRUPOS/grupolince/Lyp_annotation_Apr14_final/codon_usage
+
+screen -S "${REF_SP}-GTEx_high_codon_usage"
+REF_SP=$(echo ${STY#*.} | cut -d'-' -f1)
+script "${REF_SP}-GTEx_high_codon_usage.log"
+REF_SP=$(echo ${STY#*.} | cut -d'-' -f1)
+
+if [ $REF_SP == "lr" ]
+  then
+  REF_FA=/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa
+elif [ $REF_SP == "lp" ]
+  then
+  REF_FA=/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa
+elif [ $REF_SP == "ll" ]
+  then
+  REF_FA=/GRUPOS/grupolince/reference_genomes/lynx_lynx_genome/LynxLynx_SNVsOnly.fa
+fi
+echo "working fasta path is" $REF_FA
+
+#Retrieve reference sequences for all retrieved high expression CDS (from the desired species' fasta).
+echo "retrieving reference sequences for all" $REF_SP "highly expressed CDS"
+bedtools getfasta -fi $REF_FA -bed GTEx_high_cds_list.gff3 -fo GTEx_high_cds_sequence_${REF_SP}.fa
+
+#Paste each CDS' sequence with the rest of the information in the gff.
+paste GTEx_high_cds_list.gff3 <(grep -v '>' GTEx_high_cds_sequence_${REF_SP}.fa) > GTEx_high_cds_list_and_sequence_${REF_SP}.gff3
+
+#For partial genes, remove the non-coding SNPs at the flanks (to account for the reading frame). Complete genes will always start with reading frame = 0 so those are already correct, but many partial genes have different reading frames.
+echo "fixing partial genes sequences for high expression" $REF_SP "CDS"
+awk '/partial_gene/ {printf ("%s\t%s\n", $0,NR)}' GTEx_high_cds_list_and_sequence_${REF_SP}.gff3 > GTEx_high_cds_list_and_sequence_partialgenes_${REF_SP}.gff3
+
+COUNTER=0
+while read -r row; do
+  CUT_N=$(echo "$row" | cut -f 8)
+  CUT_N=$((CUT_N+1))
+  STRAND=$(echo "$row" | cut -f 7)
+  OLD_SEQUENCE=$(echo "$row" | cut -f 11)
+  ROW_N=$(echo "$row" | cut -f 12)
+  if [ $STRAND == "+" ]
+    then
+    CODING_SEQUENCE=$(echo $OLD_SEQUENCE | cut -c $CUT_N-)
+  elif [ $STRAND == "-" ]
+    then
+    CODING_SEQUENCE=$(echo $OLD_SEQUENCE | rev | cut -c $CUT_N- | rev)
+  fi
+  if [ $(( $COUNTER % 10 )) == 0 ]
+    then
+    echo "processed" $COUNTER "partial genes out of $(wc -l < GTEx_high_cds_list_and_sequence_partialgenes_${REF_SP}.gff3)"
+  fi
+  ((COUNTER++))
+  sed -i "${ROW_N}s/$OLD_SEQUENCE/$CODING_SEQUENCE/" GTEx_high_cds_list_and_sequence_${REF_SP}.gff3
+done < GTEx_high_cds_list_and_sequence_partialgenes_${REF_SP}.gff3  
+
+#Fuse all exons from each gene and store them in a file together with the gene name and the strand information.
+echo "fusing exons for high expression" $REF_SP "CDS"
+GENES=$(cat GTEx_high_cds_list_and_sequence_${REF_SP}.gff3 | cut -f 10 | uniq)
+COUNTER=0
+rm GTEx_high_cds_list_and_sequence_combined_${REF_SP}.txt
+for gen in ${GENES[@]}
+  do
+  #echo "${gen}"
+  STRAND=$(awk -F"\t" -v gen=$gen '$10 == gen' GTEx_high_cds_list_and_sequence_${REF_SP}.gff3 | shuf -n1 | cut -f 7)
+  CODING_SEQUENCE=$(awk -F"\t" -v gen=$gen '$10 == gen {print $11}' GTEx_high_cds_list_and_sequence_${REF_SP}.gff3 | tr -d '\n')
+  echo -e "$gen\t$STRAND\t$CODING_SEQUENCE" >> GTEx_high_cds_list_and_sequence_combined_${REF_SP}.txt
+  ((COUNTER++))
+  if [ $(( $COUNTER % 10 )) == 0 ]
+    then
+    echo "processed $COUNTER genes out of $(echo "$GENES" | wc -l)"
+  fi
+  done
+sort GTEx_high_cds_list_and_sequence_combined_${REF_SP}.txt -k1,1 | uniq > GTEx_high_sequence_combined_${REF_SP}.txt
+
+```
+
+#####Combine all gene sequences in a file and calculate codon usage:
+```{bash}
+
+#Define reference individual:
+REF_SP="lr" #lr #lp #ll
+if [ $REF_SP == "lr" ]
+  then
+  REF_FA=/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa
+elif [ $REF_SP == "lp" ]
+  then
+  REF_FA=/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa
+elif [ $REF_SP == "ll" ]
+  then
+  REF_FA=/GRUPOS/grupolince/reference_genomes/lynx_lynx_genome/LynxLynx_SNVsOnly.fa
+fi
+
+cd /GRUPOS/grupolince/Lyp_annotation_Apr14_final/codon_usage
+
+#Obtain version that accounts for the strand:
+rm GTEx_high_sequence_combined_stranded_${REF_SP}.txt
+TOTAL=$(cat GTEx_high_sequence_combined_${REF_SP}.txt | wc -l)
+COUNTER=0
+while read -r entry; do
+  GENE=$(echo "$entry" | cut -f 1)
+  #echo $GENE
+  STRAND=$(echo "$entry" | cut -f 2)
+  #echo $STRAND
+  CODING_SEQUENCE=$(echo "$entry" | cut -f 3)
+  #echo $CODING_SEQUENCE
+  if [ $STRAND == "+" ]
+    then
+    echo -e "$GENE\t$STRAND\t$CODING_SEQUENCE" >> GTEx_high_sequence_combined_stranded_${REF_SP}.txt
+  elif [ $STRAND == "-" ]
+    then
+    REVERSE_SEQUENCE=$(echo $CODING_SEQUENCE | tr ACGT TGCA | rev) #this code obtains the reverse complementary sequence
+    echo -e "$GENE\t$STRAND\t$REVERSE_SEQUENCE" >> GTEx_high_sequence_combined_stranded_${REF_SP}.txt
+  fi
+  ((COUNTER++))
+  done < GTEx_high_sequence_combined_${REF_SP}.txt
+
+#Retrieve all codons from each gene:
+rm GTEx_high_sequence_combined_codons_${REF_SP}.txt
+TOTAL=$(cat GTEx_high_sequence_combined_stranded_${REF_SP}.txt | wc -l)
+COUNTER=0
+while read -r GENE STRAND CODING_SEQUENCE; do
+  echo $CODING_SEQUENCE | fold -w 3 >> GTEx_high_sequence_combined_codons_${REF_SP}.txt
+  ((COUNTER++))
+  done < GTEx_high_sequence_combined_stranded_${REF_SP}.txt
+
+#Count the occurrences of each codon:
+sort GTEx_high_sequence_combined_codons_${REF_SP}.txt | uniq -c > GTEx_high_sequence_combined_codon_counts_${REF_SP}.txt
+
+#Sanity check: count if the number of final codons (empty, 1-letter or 2-letter codons) matches the number of genes.
+wc -l < GTEx_high_sequence_combined_stranded_${REF_SP}.txt #7 is the number of genes in my dataset.
+awk 'length($2)<3 {printf ("%s\n", $1)}' GTEx_high_sequence_combined_codon_counts_${REF_SP}.txt | paste -sd+ | bc #This doesn't work any longer (since I replaced sed ... with fold -w 3)
+
+#Join both files to obtain the final codon usage file:
+join -1 2 -2 1 <(sort -k2 GTEx_high_sequence_combined_codon_counts_${REF_SP}.txt) <(sort genetic_code.txt) | sort -k3,3 -k2,2nr | awk '{printf ("%s\t%s\t%s\n", $1, $3, $2)}' > codon_usage_GTEx_high_${REF_SP}.txt
+
+#Obtain version with per aminoacid proportions and Chi^2 test:
+rm codon_usage_prop_GTEx_high_${REF_SP}.txt
+rm codon_usage_chi2_GTEx_high_${REF_SP}.txt
+while read -r CODON AA N; do
+  TOTAL_N=$(grep -w $AA codon_usage_GTEx_high_${REF_SP}.txt | cut -f3 | paste -sd+ | bc) #total number of codons that code for the same aminoacid
+  PROP=$(awk -v N=$N -v TOTAL_N=$TOTAL_N 'BEGIN {printf "%.3f\n", N/TOTAL_N}') #proportion (rounded) of occurrences of the aminoacid encoded by the codon
+  echo -e "$CODON\t$AA\t$N\t$PROP" >> codon_usage_prop_GTEx_high_${REF_SP}.txt
+  LENGTH=$(grep -w $AA codon_usage_GTEx_high_${REF_SP}.txt | wc -l) #number of possible codons that code for the same aminoacid
+  EXPECTED=$(awk -v LENGTH=$LENGTH -v TOTAL_N=$TOTAL_N 'BEGIN {printf "%.3f\n", TOTAL_N/LENGTH}') #expected number of occurrences of the aminoacid that would be encoded by the codon under equal proportions
+  CHI_SQUARE=$(awk -v OBS=$N -v EXP=$EXPECTED 'BEGIN {printf "%.5f\n", ((OBS-EXP)*(OBS-EXP))/EXP}')
+  echo -e "$CODON\t$AA\t$N\t$EXPECTED\t$CHI_SQUARE" >> codon_usage_chi2_GTEx_high_${REF_SP}.txt
+  done < codon_usage_GTEx_high_${REF_SP}.txt
+
+```
+
+###All high expression genes combined:
+####Combine datasets:
+```{bash}
+
+#Define reference individual:
+REF_SP="lr" #lr #lp #ll
+cat housekeeping_confidence_sequence_combined_stranded_${REF_SP}.txt GTEx_high_sequence_combined_stranded_${REF_SP}.txt | sort | uniq > high_expression_sequence_combined_stranded_${REF_SP}.txt
+
+```
+
+####Retrieve all codons from each gene:
+```{bash}
+
+REF_SP="lr" #lr #lp #ll
+rm high_expression_sequence_combined_codons_${REF_SP}.txt
+TOTAL=$(cat high_expression_sequence_combined_stranded_${REF_SP}.txt | wc -l)
+COUNTER=0
+while read -r GENE STRAND CODING_SEQUENCE; do
+  echo $CODING_SEQUENCE | fold -w 3 >> high_expression_sequence_combined_codons_${REF_SP}.txt
+  ((COUNTER++))
+  done < high_expression_sequence_combined_stranded_${REF_SP}.txt
+
+#Count the occurrences of each codon:
+sort high_expression_sequence_combined_codons_${REF_SP}.txt | uniq -c > high_expression_sequence_combined_codon_counts_${REF_SP}.txt
+
+#Join both files to obtain the final codon usage file:
+join -1 2 -2 1 <(sort -k2 high_expression_sequence_combined_codon_counts_${REF_SP}.txt) <(sort genetic_code.txt) | sort -k3,3 -k2,2nr | awk '{printf ("%s\t%s\t%s\n", $1, $3, $2)}' > codon_usage_high_expression_${REF_SP}.txt
+
+#Obtain version with per aminoacid proportions and Chi^2 test:
+rm codon_usage_prop_high_expression_${REF_SP}.txt
+rm codon_usage_chi2_high_expression_${REF_SP}.txt
+while read -r CODON AA N; do
+  TOTAL_N=$(grep -w $AA codon_usage_high_expression_${REF_SP}.txt | cut -f3 | paste -sd+ | bc) #total number of codons that code for the same aminoacid
+  PROP=$(awk -v N=$N -v TOTAL_N=$TOTAL_N 'BEGIN {printf "%.3f\n", N/TOTAL_N}') #proportion (rounded) of occurrences of the aminoacid encoded by the codon
+  echo -e "$CODON\t$AA\t$N\t$PROP" >> codon_usage_prop_high_expression_${REF_SP}.txt
+  LENGTH=$(grep -w $AA codon_usage_high_expression_${REF_SP}.txt | wc -l) #number of possible codons that code for the same aminoacid
+  EXPECTED=$(awk -v LENGTH=$LENGTH -v TOTAL_N=$TOTAL_N 'BEGIN {printf "%.3f\n", TOTAL_N/LENGTH}') #expected number of occurrences of the aminoacid that would be encoded by the codon under equal proportions
+  CHI_SQUARE=$(awk -v OBS=$N -v EXP=$EXPECTED 'BEGIN {printf "%.5f\n", ((OBS-EXP)*(OBS-EXP))/EXP}')
+  echo -e "$CODON\t$AA\t$N\t$EXPECTED\t$CHI_SQUARE" >> codon_usage_chi2_high_expression_${REF_SP}.txt
+  done < codon_usage_high_expression_${REF_SP}.txt
+
+```
+
+###Low expression dataset:
+```{bash}
+curl ftp://ftp.ebi.ac.uk/pub/databases/microarray/data/atlas/experiments/atlas-latest-data.tar.gz --output atlas-latest-data.tar.gz
+```
+
+###Low ENC genes database:
+####Obtain low ECN fraction of genes:
+```{bash}
+
+#From my own server:
+REF_SP="lp" #lr #lp #ll
+DATASET="all_genes" #all_genes
+INPUT=(${DATASET}_sequence_combined_stranded_${REF_SP})
+cd /home/dkleinman/codonw/$INPUT
+
+tail -n+2 ${INPUT}.out | cut -f1,9 | sort -k2,2n | grep -v '*' > ${INPUT}.enc
+TOTAL=$(wc -l < ${INPUT}.enc)
+LOWEST_5PERC=$(echo "scale=0; $TOTAL/20" | bc)
+head -n$LOWEST_5PERC ${INPUT}.enc | cut -f1 | tr -d "[:blank:]" > ${INPUT}.low_enc.txt
+mkdir /home/dkleinman/codonw/low_enc_sequence_combined_stranded_${REF_SP}
+grep -F -f ${INPUT}.low_enc.txt /GRUPOS/grupolince/Lyp_annotation_Apr14_final/codon_usage/${INPUT}.txt > /home/dkleinman/codonw/low_enc_sequence_combined_stranded_${REF_SP}/low_enc_sequence_combined_stranded_${REF_SP}.txt
+#/GRUPOS/grupolince/Lyp_annotation_Apr14_final/codon_usage/low_enc_sequence_combined_stranded_${REF_SP}.txt should be the proper path!!
+
+```
+
+####Build codon usage for each species of interest:
+```{bash}
+
+#Define reference individual:
+REF_SP="lr" #lr #lp #ll
+if [ $REF_SP == "lr" ]
+  then
+  REF_FA=/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa
+elif [ $REF_SP == "lp" ]
+  then
+  REF_FA=/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa
+elif [ $REF_SP == "ll" ]
+  then
+  REF_FA=/GRUPOS/grupolince/reference_genomes/lynx_lynx_genome/LynxLynx_SNVsOnly.fa
+fi
+
+cd /home/dkleinman/codonw/low_enc_sequence_combined_stranded_${REF_SP}
+
+#Retrieve all codons from each gene:
+rm low_enc_sequence_combined_codons_${REF_SP}.txt
+TOTAL=$(cat low_enc_sequence_combined_stranded_${REF_SP}.txt | wc -l)
+COUNTER=0
+while read -r GENE STRAND CODING_SEQUENCE; do
+  echo $CODING_SEQUENCE | fold -w 3 >> low_enc_sequence_combined_codons_${REF_SP}.txt
+  ((COUNTER++))
+  if [ $(( $COUNTER % 1000 )) == 0 ]
+    then
+    echo "processed $COUNTER genes out of $TOTAL"
+  fi
+  done < low_enc_sequence_combined_stranded_${REF_SP}.txt
+
+#Count the occurrences of each codon:
+sort low_enc_sequence_combined_codons_${REF_SP}.txt | uniq -c > low_enc_sequence_combined_codon_counts_${REF_SP}.txt
+
+#Sanity check (obsolete): count if the number of final codons (empty, 1-letter or 2-letter codons) matches the number of genes.
+wc -l < low_enc_sequence_combined_stranded_${REF_SP}.txt #15201 is the number of genes in my dataset.
+awk 'length($2)<3 {printf ("%s\n", $1)}' low_enc_sequence_combined_codon_counts_${REF_SP}.txt | paste -sd+ | bc #15201 is the number of final codons (14916 are empty, but some end with a single base or two bases).
+
+#Join both files to obtain the final codon usage file:
+join -1 2 -2 1 <(sort -k2 low_enc_sequence_combined_codon_counts_${REF_SP}.txt) <(sort genetic_code.txt) | sort -k3,3 -k2,2nr | awk '{printf ("%s\t%s\t%s\n", $1, $3, $2)}' > codon_usage_low_enc_${REF_SP}.txt
+
+#It has the same CG bias as the 5% extreme dataset chosen by codonW
+
+```
+
+#2. Analyse codon usage.
+##Manual comparison of codon usage between datasets.
+###Obtain percentage variation of codon use between all genes and high expression subset.
+```{bash}
+
+REF_SP="lr" #lr #lp #ll
+DATASET1="all_genes" #all_genes
+DATASET2="high_expression" #high_expression
+
+cd /GRUPOS/grupolince/Lyp_annotation_Apr14_final/codon_usage
+rm codon_usage_diff_${DATASET2}_${REF_SP}.txt
+while read -r CODON AA N PROP; do
+  echo $CODON
+  AVG_PROP=$(grep $CODON codon_usage_prop_${DATASET1}_${REF_SP}.txt | cut -f4)
+  PROP_CHANGE=$(awk -v PROP=$PROP -v AVG_PROP=$AVG_PROP 'BEGIN {printf "%.3f\n", PROP*100/AVG_PROP-100}')
+  echo -e "$CODON\t$AA\t$N\t$PROP\t$PROP_CHANGE" >> codon_usage_diff_${DATASET2}_${REF_SP}.txt
+  done < codon_usage_prop_${DATASET2}_${REF_SP}.txt
+
+```
+
+###Determine optimal codons.
+```{bash}
+
+REF_SP="lr" #lr #lp #ll
+DATASET1="all_genes" #all_genes
+DATASET2="high_expression" #high_expression
+
+cd /GRUPOS/grupolince/Lyp_annotation_Apr14_final/codon_usage
+rm optimal_codons_${DATASET2}_${REF_SP}.txt
+while read -r CODON AA N PROP PROP_CHANGE; do
+  echo $CODON
+  CODONS_IN_AA=$(grep -w $AA codon_usage_diff_${DATASET2}_${REF_SP}.txt | wc -l)
+  RANK=$(grep -w $AA codon_usage_diff_${DATASET2}_${REF_SP}.txt | grep -n $CODON | cut -d':' -f1)
+  REL_RANK=$(awk -v RANK=$RANK -v CODONS_IN_AA=$CODONS_IN_AA 'BEGIN {printf "%.3f\n", RANK/CODONS_IN_AA}')
+  if ((($(echo "$RANK == 1" | bc -l) && $(echo "$PROP_CHANGE > 0" | bc -l)) || ($(echo "$PROP_CHANGE >= 10.0" | bc -l) && $(echo "$REL_RANK <= 0.5" | bc -l)))) #if the codon is the most used for the aminoacid and the proportional change in the highly expressed subset is positive, or if the codon is in the upper half of the ranking and its proportional change is higher than 10%, the codon will be considered optimal
+  #if [ $PROP_CHANGE -ge 20 ] && [ $REL_RANK -le 0.5 ]
+    then
+    echo -e "$CODON\t$AA\t1" >> optimal_codons_${DATASET2}_${REF_SP}.txt
+    else
+    echo -e "$CODON\t$AA\t0" >> optimal_codons_${DATASET2}_${REF_SP}.txt
+  fi
+  done < codon_usage_diff_${DATASET2}_${REF_SP}.txt
+
+```
+
+##CodonW analysis of codon usage:
+###Summary and installation:
+```{bash}
+
+#I installed CodonW (https://www.thelinuxfaq.com/ubuntu/ubuntu-17-04-zesty-zapus/codonw) in my private server after endless unfruitful tries both in the server and in my local environment using the source website (https://sourceforge.net/projects/codonw/).
+
+```
+
+###Prepare input files:
+```{bash}
+
+REF_SP="lr" #lr #lp #ll
+DATASET="all_genes" #all_genes #high_expression
+cd /GRUPOS/grupolince/Lyp_annotation_Apr14_final/codon_usage
+
+rm ${DATASET}_sequence_combined_stranded_${REF_SP}.fa
+touch ${DATASET}_sequence_combined_stranded_${REF_SP}.fa
+while read -r gene strand sequence; do
+  echo -e ">$gene" >> ${DATASET}_sequence_combined_stranded_${REF_SP}.fa
+  echo -e "$sequence" | fold -w 60 >> ${DATASET}_sequence_combined_stranded_${REF_SP}.fa
+  done < ${DATASET}_sequence_combined_stranded_${REF_SP}.txt
+
+#From my own server:
+REF_SP="lr" #lr #lp #ll
+DATASET="all_genes" #all_genes #high_expression
+mkdir -p /home/dkleinman/codonw/${DATASET}_sequence_combined_stranded_${REF_SP}
+scp /GRUPOS/grupolince/Lyp_annotation_Apr14_final/codon_usage/${DATASET}_sequence_combined_stranded_${REF_SP}.fa /home/dkleinman/codonw/${DATASET}_sequence_combined_stranded_${REF_SP}
+
+```
+
+###Run the programme:
+```{bash}
+
+#To run codonw check: https://manpages.debian.org/unstable/codonw/codonw.1.en.html
+
+CLEAN SEQUENCES FIRST!!!
+To sort by length (prints row length too):
+cat testfile | awk '{ print length, $0 }' | sort -n -s | less -S
+Count Ns per row and remove those with a high proportion. Or better: remove those where the total number of bases (after excluding Ns) is too low.
+
+#Run codonw:
+REF_SP="lp" #lr #lp #ll
+DATASET="high_expression" #all_genes #high_expression
+INPUT=(${DATASET}_sequence_combined_stranded_${REF_SP})
+cd /home/dkleinman/codonw/$INPUT
+codonw ${INPUT}.fa ${INPUT}.out ${INPUT}.blk -nomenu -nowarn -silent -human -code 0 -coa_num 5% -all_indices -coa_cu
+
+#Clean genes.coa output for later use:
+tail -n+2 genes.coa | awk -F"\t|_| " '{printf ("%s\t%s\t%s\t%s\t%s\n", $2,$3,$4,$5,$6)}' > genes.coa.clean
+
+```
+
+###Test degree of expression:
+```{bash}
+
+#Test whether principal axis is related to codon bias (an indirect measure of expression):
+REF_SP="lp" #lr #lp #ll
+DATASET="all_genes" #all_genes #high_expression
+INPUT=(${DATASET}_sequence_combined_stranded_${REF_SP})
+cd /home/dkleinman/codonw/$INPUT
+
+#Get file with each gene's coordinate in axis#1 and its effective number of codons.
+join -1 1 -2 1 genes.coa.clean <(tail -n+2 ${INPUT}.out) | awk -F" " '{printf ("%s\t%s\t%s\n", $1,$2,$13)}' > ${INPUT}.nc_correlation.txt
+
+
+#From outside the server:
+export SSHPASS=$(cat /Users/dani/Documents/genomics_pass.txt)
+REF_SP="lp" #lr #lp #ll
+DATASET="all_genes" #all_genes #high_expression
+INPUT=(${DATASET}_sequence_combined_stranded_${REF_SP})
+sshpass -e scp dkleinman@10.50.0.65:/home/dkleinman/codonw/${INPUT}/${INPUT}.nc_correlation.txt /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/syn_db/
+unset SSHPASS
+
+```
+
+####Correlation
+```{r}
+
+library(readr)
+
+nc_file <- read_tsv("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/syn_db/all_genes_sequence_combined_stranded_lp.nc_correlation.txt",col_names=c("gene","main_axis","nc"),col_types=c("cdd"),na = c("","NA","*****"))
+nc_file
+
+cor(nc_file$main_axis,nc_file$nc,use = "complete.obs")
+
+```
+
+###Test principal trend in codon usage:
+```{bash}
+
+#Test whether principal axis is related to GC content to distinguish between mutational bias trend or selection for optimal translation. If there's a high correlation between the axis and GC, mutational bias is the main trend and the optimal codons suggested by codonw should not be accepted.
+REF_SP="lp" #lr #lp #ll
+DATASET="all_genes" #all_genes #high_expression
+INPUT=(${DATASET}_sequence_combined_stranded_${REF_SP})
+cd /home/dkleinman/codonw/$INPUT
+
+#Get file with each gene's coordinate in axis#1 and its effective number of codons.
+join -1 1 -2 1 genes.coa.clean <(tail -n+2 ${INPUT}.out) | awk -F" " '{printf ("%s\t%s\t%s\t%s\n", $1,$2,$14,$15)}'> ${INPUT}.gc_correlation.txt
+
+
+#From outside the server:
+export SSHPASS=$(cat /Users/dani/Documents/genomics_pass.txt)
+REF_SP="lp" #lr #lp #ll
+DATASET="all_genes" #all_genes #high_expression
+INPUT=(${DATASET}_sequence_combined_stranded_${REF_SP})
+sshpass -e scp dkleinman@10.50.0.65:/home/dkleinman/codonw/${INPUT}/${INPUT}.gc_correlation.txt /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/syn_db/
+unset SSHPASS
+
+```
+
+####Correlation
+```{r}
+
+library(readr)
+
+gc_file <- read_tsv("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/syn_db/all_genes_sequence_combined_stranded_lp.gc_correlation.txt",col_names=c("gene","main_axis","gc","gc3"),col_types=c("cddd"),na= c("","NA","*****"))
+gc_file
+
+cor(gc_file$main_axis,gc_file$gc,use="complete.obs")
+cor(gc_file$main_axis,gc_file$gc3,use="complete.obs")
+
+```
