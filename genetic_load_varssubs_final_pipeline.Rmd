@@ -385,6 +385,22 @@ for i in ${SAMPLES[@]}
   samtools index BAM_nm_filtered/c_lp_do_"${i}"_recal_round-1.nm2.bam
   done
 
+***
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+screen -S c_lp_do_nm3_BAMs.log
+script c_lp_do_nm3_BAMs.log
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
+declare SAMPLES=$(ls c_lp_do_*_recal_round-1.bam | cut -c9-12 | sort | uniq)
+for i in ${SAMPLES[@]}
+  do
+  echo "${i}"
+  bamtools filter -tag "NM:<=3" -in c_lp_do_"${i}"_recal_round-1.bam -out BAM_nm_filtered/c_lp_do_"${i}"_recal_round-1.nm3.bam
+  samtools index BAM_nm_filtered/c_lp_do_"${i}"_recal_round-1.nm3.bam
+  done
+
+
 ```
 
 ####DON 25x:
@@ -401,6 +417,21 @@ for i in ${SAMPLES[@]}
   echo "${i}"
   bamtools filter -tag "NM:<=2" -in c_lp_do_"${i}"_recal_round-1_25x.bam -out ./../BAM_nm_filtered/c_lp_do_"${i}"_recal_round-1_25x.nm2.bam
   samtools index ./../BAM_nm_filtered/c_lp_do_"${i}"_recal_round-1_25x.nm2.bam
+  done
+
+***
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+screen -S c_lp_do_nm3_BAMs_25x.log
+script c_lp_do_nm3_BAMs_25x.log
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/genome_project_samples_25x
+declare SAMPLES=$(ls c_lp_do_*_recal_round-1_25x.bam | cut -c9-12 | sort | uniq)
+for i in ${SAMPLES[@]}
+  do
+  echo "${i}"
+  bamtools filter -tag "NM:<=3" -in c_lp_do_"${i}"_recal_round-1_25x.bam -out ./../BAM_nm_filtered/c_lp_do_"${i}"_recal_round-1_25x.nm3.bam
+  samtools index ./../BAM_nm_filtered/c_lp_do_"${i}"_recal_round-1_25x.nm3.bam
   done
 
 ```
@@ -420,6 +451,22 @@ for i in ${SAMPLES[@]}
   bamtools filter -tag "NM:<=2" -in c_lp_sm_"${i}"_recal_round-1.bam -out BAM_nm_filtered/c_lp_sm_"${i}"_recal_round-1.nm2.bam
   samtools index BAM_nm_filtered/c_lp_sm_"${i}"_recal_round-1.nm2.bam
   done
+  
+***
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+screen -S c_lp_sm_nm3_BAMs.log
+script c_lp_sm_nm3_BAMs.log
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
+declare SAMPLES=$(ls c_lp_sm_*_recal_round-1.bam | cut -c9-12 | sort | uniq)
+for i in ${SAMPLES[@]}
+  do
+  echo "${i}"
+  bamtools filter -tag "NM:<=3" -in c_lp_sm_"${i}"_recal_round-1.bam -out BAM_nm_filtered/c_lp_sm_"${i}"_recal_round-1.nm3.bam
+  samtools index BAM_nm_filtered/c_lp_sm_"${i}"_recal_round-1.nm3.bam
+  done
+
 
 ```
 
@@ -439,6 +486,21 @@ for i in ${SAMPLES[@]}
   samtools index ./../BAM_nm_filtered/c_lp_sm_"${i}"_recal_round-1_25x.nm2.bam
   done
 
+***
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+screen -S c_lp_sm_nm3_BAMs_25x.log
+script c_lp_sm_nm3_BAMs_25x.log
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/genome_project_samples_25x
+declare SAMPLES=$(ls c_lp_sm_*_recal_round-1_25x.bam | cut -c9-12 | sort | uniq)
+for i in ${SAMPLES[@]}
+  do
+  echo "${i}"
+  bamtools filter -tag "NM:<=3" -in c_lp_sm_"${i}"_recal_round-1_25x.bam -out ./../BAM_nm_filtered/c_lp_sm_"${i}"_recal_round-1_25x.nm3.bam
+  samtools index ./../BAM_nm_filtered/c_lp_sm_"${i}"_recal_round-1_25x.nm3.bam
+  done
+
 ```
 
 ####KIR 5x:
@@ -450,7 +512,7 @@ screen -S c_ll_ki_nm3_BAMs.log
 script c_ll_ki_nm3_BAMs.log
 
 cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final
-declare SAMPLES=$(ls c_ll_ki_*_recal_round-1.bam | cut -c9-12 | sort | uniq)
+declare SAMPLES=$(ls c_ll_ki_*_recal_round-1.bam | cut -c9-12 | sort | uniq | head -n1)
 for i in ${SAMPLES[@]}
   do
   echo "${i}"
