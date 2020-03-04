@@ -6,7 +6,7 @@ output: html_document
 ---
 
 #1: Prepare RVIS database.
-
+##Prepare human RVIS database.
 ```{bash}
 
 mkdir -p /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/rvis
@@ -41,11 +41,38 @@ tail -n +2 rvis_gene_names_uniprot_codes_dirty.txt | awk -F"\t" '{printf ("%s\t%
 #Join the RVIS database and the UniProt codes file:
 join -t $'\t' <(sort -k 1b,1 rvis_gene_names_uniprot_codes_clean.txt) <(tail -n +2 rvis_database.txt | sort -k 1b,1) > rvis_database_uniprot_joined.txt
 
+```
+
+##Join it with the lynx genes.
+###Reactome pathway genes:
+```{bash}
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/rvis
 #Extract the Lynx pardinus genes (change LYPA23B for LYPA23C) and their UniProt codes from the proper file that was generated as part of the Genome Project:
-tail -n +2 /backup/grupolince/Lynx_annotation/Protein\ annotation/Funtional_annotation_140305/Reactome_pathway_annotations.txt | grep "Homo sapiens" | awk -F"\t|," '{printf ("%s\t%s\t%s\n", $1,$3,$5)}' | awk -F"\t|]" '{printf ("%s\t%s\n", $1,$3)}' | awk 'BEGIN{FS=OFS=";"} {gsub("B", "C", $1)} 1' | sort -k 2,2 | uniq > lypa_gene_names_uniprot_codes.txt
+tail -n +2 /backup/grupolince/Lynx_annotation/Protein\ annotation/Funtional_annotation_140305/Reactome_pathway_annotations.txt | grep "Homo sapiens" | awk -F"\t|," '{printf ("%s\t%s\t%s\n", $1,$3,$5)}' | awk -F"\t|]" '{printf ("%s\t%s\n", $1,$3)}' | awk 'BEGIN{FS=OFS=";"} {gsub("B", "C", $1)} 1' | sort -k 2,2 | uniq > lypa_reactome_gene_names_uniprot_codes.txt
 
 #Join the Lynx pardinus and the RVIS databases, and sort genes from most deleterious (most negative score in column 5) to least:
-join -1 2 -2 2 -t $'\t' <(sort -k 2b,2 lypa_gene_names_uniprot_codes.txt) <(tail -n +2 rvis_database_uniprot_joined.txt | sort -k 2b,2) | awk 'BEGIN{FS=OFS="\t"} {$2 = substr($2, 1, length($2)-2)}1' | sort -n -k 5,5 > lypa_rvis_database_uniprot_joined.txt
+join -1 2 -2 2 -t $'\t' <(sort -k 2b,2 lypa_reactome_gene_names_uniprot_codes.txt) <(tail -n +2 rvis_database_uniprot_joined.txt | sort -k 2b,2) | awk 'BEGIN{FS=OFS="\t"} {$2 = substr($2, 1, length($2)-2)}1' | sort -n -k 5,5 > lypa_reactome_rvis_database_uniprot_joined.txt
+
+```
+
+###Orhtologous genes:
+```{bash}
+
+#The lynx-human orthologs were already compiled before. I obtained the UniProt codes in the script "all_genes_database.Rmd", section: "Obtain UniProt codes for human-lynx orthologous genes database".
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/rvis
+
+awk -F"\t| " '{printf ("%s\t%s\n", $2,$3)}' /GRUPOS/grupolince/ortologous/HUMAN.1to1_and_multi_orthologs.joined_codes.txt | sort -k 2,2 | uniq | awk 'BEGIN{FS=OFS="\t"} {gsub("LYPA23A", "LYPA23C", $1)} 1' > lypa_orthologs_gene_names_uniprot_codes.txt
+
+#Join the Lynx pardinus and the RVIS databases, and sort genes from most deleterious (most negative score in column 5) to least:
+join -1 2 -2 2 -t $'\t' <(sort -k 2b,2 lypa_orthologs_gene_names_uniprot_codes.txt) <(tail -n +2 rvis_database_uniprot_joined.txt | sort -k 2b,2) | awk 'BEGIN{FS=OFS="\t"} {$2 = substr($2, 1, length($2)-2)}1' | sort -n -k 5,5 > lypa_orthologs_rvis_database_uniprot_joined.txt
+
+```
+
+###Combine both:
+```{bash}
+
+cat lypa_*_rvis_database_uniprot_joined.txt | sort -k2,2 | uniq > lypa_rvis_database_uniprot_joined.txt
 
 ```
 
@@ -59,7 +86,8 @@ cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c
 
 #Count number of deleterious variants within low tolerance (deleterious) or high tolerance (tolerant) genes, and calculate the average AF:
 
-DEL_GENES=$(awk '$6 < 3' lypa_rvis_database_uniprot_joined.txt | cut -f 2) #91
+screen -S del.af
+DEL_GENES=$(awk '$6 < 3' lypa_rvis_database_uniprot_joined.txt | cut -f 2) #255
 COUNTER_MIS=0
 COUNTER_LOF=0
 rm c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.lr_ann.del.af
@@ -75,16 +103,18 @@ for gen in ${DEL_GENES[@]}
   COUNTER_MIS=$((COUNTER_MIS+N_MIS))
   COUNTER_LOF=$((COUNTER_LOF+N_LOF))
   done
-echo "total of MIS is" $COUNTER_MIS #109
+echo "total of MIS is" $COUNTER_MIS #555
 SUM_AF_MIS=$(awk NF c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.lr_ann.del.af | paste -sd+ | bc)
 AVG_AF_MIS=$(echo "scale=4; $SUM_AF_MIS/$COUNTER_MIS" | bc)
-echo "average AF of MIS is" $AVG_AF_MIS #0.1348
-echo "total of LOF is" $COUNTER_LOF #5
+echo "average AF of MIS is" $AVG_AF_MIS #0.1994
+echo "total of LOF is" $COUNTER_LOF #16
 
 
-TOL_GENES=$(awk '$6 > 94' lypa_rvis_database_uniprot_joined.txt | cut -f 2) #92
+screen -S tol.af
+TOL_GENES=$(awk '$6 > 94' lypa_rvis_database_uniprot_joined.txt | cut -f 2) #429
 COUNTER_MIS=0
 COUNTER_LOF=0
+rm c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.lr_ann.tol.af
 for gen in ${TOL_GENES[@]}
   do
   echo ${gen}
@@ -105,7 +135,7 @@ echo "total of LOF is" $COUNTER_LOF #2
 
 
 
-
+#?
 DEL_GENES=$(awk '$6 < 3' lypa_rvis_database_uniprot_joined.txt | cut -f 2) #91
 for gen in ${DEL_GENES[@]}
   do
@@ -156,7 +186,7 @@ BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
 DEL_GENES_FILE=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/rvis/deleterious_genes_list.txt
 
 cd $V_PATH/$CALLING/annotation
-INDLIST=($(ls `find . -name *"_individual_"${VAR}"_"${TYPE}".lr_ann.vcf" ! -path '*testing_variant_numbers*' -print`))
+INDLIST=($(ls `find . -name *"_individual_"${VAR}"_"${TYPE}".lr_ann.vcf" -print`))
 for i in "${INDLIST[@]}"
   do
   echo "${i}"
@@ -197,8 +227,8 @@ BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
 
 cd $V_PATH/$CALLING/annotation
 rm ${CALLING}"_ann_individual_deleterious_genes_summary_"${VAR}"_"${TYPE}".lr_ann.txt"
-echo -e "species\tpopulation\tdataset\tsample\ttotal_V\ttotal_A\tintergenic_V\tintergenic_A\tintronic_V\tintronic_A\tcoding_V\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tmissense_tol_V\tmissense_tol_A\tmissense_del_V\tmissense_del_A\tnonsense_V\tnonsense_A\tUCNE_V\tUCNE_A\tmissense/synonymous_V\tmissense/synonymous_A\tsynonymous/intronic_V\tmissense/intronic_V" > ${CALLING}"_ann_individual_deleterious_genes_summary_"${VAR}"_"${TYPE}".lr_ann.txt"
-INDLIST=($(ls `find . -name *"_individual_deleterious_genes_"${VAR}"_"${TYPE}".lr_ann.vcf" ! -path '*testing_variant_numbers*' -print`))
+echo -e "species\tpopulation\tdataset\tsample\ttotal_V\ttotal_A\tintergenic_V\tintergenic_A\tintronic_V\tintronic_A\tcoding_V\tsynonymous_V\tsynonymous_A\tsyn_pref_V\tsyn_pref_A\tsyn_unpref_V\tsyn_unpref_A\tmissense_V\tmissense_A\tmissense_tol_V\tmissense_tol_A\tmissense_del_V\tmissense_del_A\tnonsense_V\tnonsense_A\tUCNE_V\tUCNE_A\tUCNE_low_V\tUCNE_low_A\tUCNE_mid_V\tUCNE_mid_A\tUCNE_high_V\tUCNE_high_A\tmissense/synonymous_V\tmissense/synonymous_A\tsynonymous/intronic_V\tmissense/intronic_V" > ${CALLING}"_ann_individual_deleterious_genes_summary_"${VAR}"_"${TYPE}".lr_ann.txt"
+INDLIST=($(ls `find . -name *"_individual_deleterious_genes_"${VAR}"_"${TYPE}".lr_ann.vcf" -print`))
 for i in "${INDLIST[@]}"
   do
   echo "${i}"
@@ -217,31 +247,38 @@ for i in "${INDLIST[@]}"
   CODING_V=$(grep 'CDS' ${i} | wc -l)
   SYNONYMOUS_V=$(grep 'synonymous_variant' ${i} | wc -l)
   SYNONYMOUS_A=$(grep 'synonymous_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/syn_pref/synonymous_variants_complete_info_0to1_lr.bed > ${VAR}_delgenes_syn_pref.temp.borrar
+  SYN_PREF_V=$(wc -l < ${VAR}_delgenes_syn_pref.temp.borrar)
+  SYN_PREF_A=$(cut -f8 ${VAR}_delgenes_syn_pref.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/syn_pref/synonymous_variants_complete_info_1to0_lr.bed > ${VAR}_delgenes_syn_unpref.temp.borrar
+  SYN_UNPREF_V=$(wc -l < ${VAR}_delgenes_syn_unpref.temp.borrar)
+  SYN_UNPREF_A=$(cut -f8 ${VAR}_delgenes_syn_unpref.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
   MISSENSE_V=$(grep 'missense_variant' ${i} | wc -l)
   MISSENSE_A=$(grep 'missense_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
-  MISSENSE_TOL_V=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean/missense_variants_provean_scores_tolerated.txt | grep -v '#' | wc -l)
-  MISSENSE_TOL_A=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean/missense_variants_provean_scores_tolerated.txt | grep -v '#' | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
-  MISSENSE_DEL_V=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean/missense_variants_provean_scores_deleterious.txt | grep -v '#' | wc -l)
-  MISSENSE_DEL_A=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean/missense_variants_provean_scores_deleterious.txt | grep -v '#' | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean/missense_variants_provean_scores_tolerated.txt > ${VAR}_delgenes_mis_tol.temp.borrar
+  MISSENSE_TOL_V=$(wc -l < ${VAR}_delgenes_mis_tol.temp.borrar)
+  MISSENSE_TOL_A=$(cut -f8 ${VAR}_delgenes_mis_tol.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean/missense_variants_provean_scores_deleterious.txt > ${VAR}_delgenes_mis_del.temp.borrar
+  MISSENSE_DEL_V=$(wc -l < ${VAR}_delgenes_mis_del.temp.borrar)
+  MISSENSE_DEL_A=$(cut -f8 ${VAR}_delgenes_mis_del.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
   NONSENSE_V=$(grep '|HIGH|' ${i} | wc -l)
-  if [ $NONSENSE_V == 0 ]
-    then
-    NONSENSE_A=0
-    else
-    NONSENSE_A=$(grep '|HIGH|' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
-  fi
+  if [ $NONSENSE_V == 0 ]; then NONSENSE_A=0; else NONSENSE_A=$(grep '|HIGH|' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc); fi
   UCNE_V=$(grep 'UCNE' ${i} | wc -l)
-  if [ $UCNE_V == 0 ]
-    then
-    UCNE_A=0
-    else
-    UCNE_A=$(grep 'UCNE' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
-    fi
+  if [ $UCNE_V == 0 ]; then UCNE_A=0; else UCNE_A=$(grep 'UCNE' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc); fi
+  bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_lt2.gerp.bed > ${VAR}_delgenes_ucne_low.temp.borrar
+  UCNE_LOW_V=$(wc -l < ${VAR}_delgenes_ucne_low.temp.borrar)
+  if [ $UCNE_LOW_V == 0 ]; then UCNE_LOW_A=0; else UCNE_LOW_A=$(cut -f8 ${VAR}_delgenes_ucne_low.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc); fi
+  bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_gt2lt5.gerp.bed > ${VAR}_delgenes_ucne_mid.temp.borrar
+  UCNE_MID_V=$(wc -l < ${VAR}_delgenes_ucne_mid.temp.borrar)
+  if [ $UCNE_MID_V == 0 ]; then UCNE_MID_A=0; else UCNE_MID_A=$(cut -f8 ${VAR}_delgenes_ucne_mid.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc); fi
+  bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_gt5.gerp.bed > ${VAR}_delgenes_ucne_high.temp.borrar
+  UCNE_HIGH_V=$(wc -l < ${VAR}_delgenes_ucne_high.temp.borrar)
+  if [ $UCNE_HIGH_V == 0 ]; then UCNE_HIGH_A=0; else UCNE_HIGH_A=$(cut -f8 ${VAR}_delgenes_ucne_high.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc); fi
   MISSENSE_SYNONYMOUS_V=$(echo "scale=4; $MISSENSE_V/$SYNONYMOUS_V" | bc)
   MISSENSE_SYNONYMOUS_A=$(echo "scale=4; $MISSENSE_A/$SYNONYMOUS_A" | bc)
   SYNONYMOUS_INTRONIC_V=$(echo "scale=4; $SYNONYMOUS_V/$INTRONIC_V" | bc)
   MISSENSE_INTRONIC_V=$(echo "scale=4; $MISSENSE_V/$INTRONIC_V" | bc)
-  echo -e "$SPECIES\t$POPULATION\t$DATASET\t$SAMPLE\t$TOTAL_V\t$TOTAL_A\t$INTERGENIC_V\t$INTERGENIC_A\t$INTRONIC_V\t$INTRONIC_A\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$MISSENSE_TOL_V\t$MISSENSE_TOL_A\t$MISSENSE_DEL_V\t$MISSENSE_DEL_A\t$NONSENSE_V\t$NONSENSE_A\t$UCNE_V\t$UCNE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A\t$SYNONYMOUS_INTRONIC_V\t$MISSENSE_INTRONIC_V" >> ${CALLING}"_ann_individual_deleterious_genes_summary_"${VAR}"_"${TYPE}".lr_ann.txt"
+  echo -e "$SPECIES\t$POPULATION\t$DATASET\t$SAMPLE\t$TOTAL_V\t$TOTAL_A\t$INTERGENIC_V\t$INTERGENIC_A\t$INTRONIC_V\t$INTRONIC_A\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$SYN_PREF_V\t$SYN_PREF_A\t$SYN_UNPREF_V\t$SYN_UNPREF_A\t$MISSENSE_V\t$MISSENSE_A\t$MISSENSE_TOL_V\t$MISSENSE_TOL_A\t$MISSENSE_DEL_V\t$MISSENSE_DEL_A\t$NONSENSE_V\t$NONSENSE_A\t$UCNE_V\t$UCNE_A\t$UCNE_LOW_V\t$UCNE_LOW_A\t$UCNE_MID_V\t$UCNE_MID_A\t$UCNE_HIGH_V\t$UCNE_HIGH_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A\t$SYNONYMOUS_INTRONIC_V\t$MISSENSE_INTRONIC_V" >> ${CALLING}"_ann_individual_deleterious_genes_summary_"${VAR}"_"${TYPE}".lr_ann.txt"
   done
 
 #From outside the server:
