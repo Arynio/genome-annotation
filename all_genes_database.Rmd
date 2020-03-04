@@ -196,6 +196,53 @@ while read -r CODON AA N; do
 
 ```
 
+###All genes except for the high expression ones:
+```{bash}
+
+REF_SP="lr" #lr #lp #ll
+cd /GRUPOS/grupolince/Lyp_annotation_Apr14_final/codon_usage
+cut -f1 high_expression_sequence_combined_stranded_${REF_SP}.txt | sed 's/..$//' > high_expression_genes.borrar
+grep -v -F -f high_expression_genes.borrar all_genes_sequence_combined_stranded_${REF_SP}.txt > except_highexpr_sequence_combined_stranded_${REF_SP}.txt
+rm high_expression_genes.borrar
+
+#Retrieve all codons from each gene:
+rm except_highexpr_sequence_combined_codons_${REF_SP}.txt
+TOTAL=$(cat except_highexpr_sequence_combined_stranded_${REF_SP}.txt | wc -l)
+COUNTER=0
+while read -r GENE STRAND CODING_SEQUENCE; do
+  echo $CODING_SEQUENCE | fold -w 3 >> except_highexpr_sequence_combined_codons_${REF_SP}.txt
+  ((COUNTER++))
+  if [ $(( $COUNTER % 1000 )) == 0 ]
+    then
+    echo "processed $COUNTER genes out of $TOTAL"
+  fi
+  done < except_highexpr_sequence_combined_stranded_${REF_SP}.txt
+
+#Count the occurrences of each codon:
+sort except_highexpr_sequence_combined_codons_${REF_SP}.txt | uniq -c > except_highexpr_sequence_combined_codon_counts_${REF_SP}.txt
+
+#Sanity check: count if the number of final codons (empty, 1-letter or 2-letter codons) matches the number of genes.
+wc -l < except_highexpr_sequence_combined_stranded_${REF_SP}.txt #15201 is the number of genes in my dataset.
+awk 'length($2)<3 {printf ("%s\n", $1)}' except_highexpr_sequence_combined_codon_counts_${REF_SP}.txt | paste -sd+ | bc #15201 is the number of final codons (14916 are empty, but some end with a single base or two bases).
+
+#Join both files to obtain the final codon usage file:
+join -1 2 -2 1 <(sort -k2 except_highexpr_sequence_combined_codon_counts_${REF_SP}.txt) <(sort genetic_code.txt) | sort -k3,3 -k2,2nr | awk '{printf ("%s\t%s\t%s\n", $1, $3, $2)}' > codon_usage_except_highexpr_${REF_SP}.txt
+
+#Obtain version with per aminoacid proportions and Chi^2 test:
+rm codon_usage_prop_except_highexpr_${REF_SP}.txt
+rm codon_usage_chi2_except_highexpr_${REF_SP}.txt
+while read -r CODON AA N; do
+  TOTAL_N=$(grep -w $AA codon_usage_except_highexpr_${REF_SP}.txt | cut -f3 | paste -sd+ | bc) #total number of codons that code for the same aminoacid
+  PROP=$(awk -v N=$N -v TOTAL_N=$TOTAL_N 'BEGIN {printf "%.3f\n", N/TOTAL_N}') #proportion (rounded) of occurrences of the aminoacid encoded by the codon
+  echo -e "$CODON\t$AA\t$N\t$PROP" >> codon_usage_prop_except_highexpr_${REF_SP}.txt
+  LENGTH=$(grep -w $AA codon_usage_except_highexpr_${REF_SP}.txt | wc -l) #number of possible codons that code for the same aminoacid
+  EXPECTED=$(awk -v LENGTH=$LENGTH -v TOTAL_N=$TOTAL_N 'BEGIN {printf "%.3f\n", TOTAL_N/LENGTH}') #expected number of occurrences of the aminoacid that would be encoded by the codon under equal proportions
+  CHI_SQUARE=$(awk -v OBS=$N -v EXP=$EXPECTED 'BEGIN {printf "%.5f\n", ((OBS-EXP)*(OBS-EXP))/EXP}')
+  echo -e "$CODON\t$AA\t$N\t$EXPECTED\t$CHI_SQUARE" >> codon_usage_chi2_except_highexpr_${REF_SP}.txt
+  done < codon_usage_except_highexpr_${REF_SP}.txt
+
+```
+
 ##Ribosomal (highly expressed) genes database:
 ###A: Retrieve human ribosomal DNA:
 ```{bash}
@@ -822,16 +869,16 @@ join -1 2 -2 1 <(sort -k2 low_enc_sequence_combined_codon_counts_${REF_SP}.txt) 
 ```{bash}
 
 REF_SP="lr" #lr #lp #ll
-DATASET1="all_genes" #all_genes
+DATASET1="except_highexpr" #all_genes #except_highexpr
 DATASET2="high_expression" #high_expression
 
 cd /GRUPOS/grupolince/Lyp_annotation_Apr14_final/codon_usage
-rm codon_usage_diff_${DATASET2}_${REF_SP}.txt
+rm codon_usage_diff_${DATASET2}_relative2_${DATASET1}_${REF_SP}.txt
 while read -r CODON AA N PROP; do
   echo $CODON
   AVG_PROP=$(grep $CODON codon_usage_prop_${DATASET1}_${REF_SP}.txt | cut -f4)
   PROP_CHANGE=$(awk -v PROP=$PROP -v AVG_PROP=$AVG_PROP 'BEGIN {printf "%.3f\n", PROP*100/AVG_PROP-100}')
-  echo -e "$CODON\t$AA\t$N\t$PROP\t$PROP_CHANGE" >> codon_usage_diff_${DATASET2}_${REF_SP}.txt
+  echo -e "$CODON\t$AA\t$N\t$PROP\t$PROP_CHANGE" >> codon_usage_diff_${DATASET2}_relative2_${DATASET1}_${REF_SP}.txt
   done < codon_usage_prop_${DATASET2}_${REF_SP}.txt
 
 ```
@@ -840,24 +887,24 @@ while read -r CODON AA N PROP; do
 ```{bash}
 
 REF_SP="lr" #lr #lp #ll
-DATASET1="all_genes" #all_genes
+DATASET1="except_highexpr" #all_genes #except_highexpr
 DATASET2="high_expression" #high_expression
 
 cd /GRUPOS/grupolince/Lyp_annotation_Apr14_final/codon_usage
-rm optimal_codons_${DATASET2}_${REF_SP}.txt
+rm optimal_codons_${DATASET2}_relative2_${DATASET1}_${REF_SP}.txt
 while read -r CODON AA N PROP PROP_CHANGE; do
   echo $CODON
-  CODONS_IN_AA=$(grep -w $AA codon_usage_diff_${DATASET2}_${REF_SP}.txt | wc -l)
-  RANK=$(grep -w $AA codon_usage_diff_${DATASET2}_${REF_SP}.txt | grep -n $CODON | cut -d':' -f1)
+  CODONS_IN_AA=$(grep -w $AA codon_usage_diff_${DATASET2}_relative2_${DATASET1}_${REF_SP}.txt | wc -l)
+  RANK=$(grep -w $AA codon_usage_diff_${DATASET2}_relative2_${DATASET1}_${REF_SP}.txt | grep -n $CODON | cut -d':' -f1)
   REL_RANK=$(awk -v RANK=$RANK -v CODONS_IN_AA=$CODONS_IN_AA 'BEGIN {printf "%.3f\n", RANK/CODONS_IN_AA}')
   if ((($(echo "$RANK == 1" | bc -l) && $(echo "$PROP_CHANGE > 0" | bc -l)) || ($(echo "$PROP_CHANGE >= 10.0" | bc -l) && $(echo "$REL_RANK <= 0.5" | bc -l)))) #if the codon is the most used for the aminoacid and the proportional change in the highly expressed subset is positive, or if the codon is in the upper half of the ranking and its proportional change is higher than 10%, the codon will be considered optimal
   #if [ $PROP_CHANGE -ge 20 ] && [ $REL_RANK -le 0.5 ]
     then
-    echo -e "$CODON\t$AA\t1" >> optimal_codons_${DATASET2}_${REF_SP}.txt
+    echo -e "$CODON\t$AA\t1" >> optimal_codons_${DATASET2}_relative2_${DATASET1}_${REF_SP}.txt
     else
-    echo -e "$CODON\t$AA\t0" >> optimal_codons_${DATASET2}_${REF_SP}.txt
+    echo -e "$CODON\t$AA\t0" >> optimal_codons_${DATASET2}_relative2_${DATASET1}_${REF_SP}.txt
   fi
-  done < codon_usage_diff_${DATASET2}_${REF_SP}.txt
+  done < codon_usage_diff_${DATASET2}_relative2_${DATASET1}_${REF_SP}.txt
 
 ```
 
