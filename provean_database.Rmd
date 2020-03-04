@@ -132,6 +132,99 @@ scp -r /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/provean_db/genes_fa
 
 ```
 
+##Generate for each gene a fasta file with its protein sequence (per-species version).
+```{bash}
+
+mkdir -p /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean
+
+#Obtain coordinates for all CDS from all genes in the list.
+GENES=$(cat missense_variants_gene_names.txt | cut -f 3 | uniq)
+COUNTER=0
+rm missense_variants_cds_list.gff3
+for gen in ${GENES[@]}
+  do
+  #echo "${gen}"
+  grep "$gen" /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.all.fix.nr.gff3 | awk -v gene_name=$gen '$3 == "CDS" {printf ("%s\t%s\n", $0,gene_name)}' >> missense_variants_cds_list.gff3
+  ((COUNTER++))
+  if [ $(( $COUNTER % 10 )) == 0 ]
+    then
+    echo "processed $COUNTER genes out of $(echo "$GENES" | wc -l)"
+  fi
+  done
+
+#Retrieve reference sequences for all CDS (from the rufus reference fasta to account for polarisation).
+bedtools getfasta -fi /GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa -bed missense_variants_cds_list.gff3 -fo missense_variants_cds_sequence.fa
+
+#Paste each CDS' sequence with the rest of the information in the gff.
+paste missense_variants_cds_list.gff3 <(grep -v '>' missense_variants_cds_sequence.fa) > missense_variants_cds_list_and_sequence.gff3
+
+#For partial genes, remove the non-coding SNPs at the flanks (to account for the reading frame). Complete genes will always start with reading frame = 0 so those are already correct, but many partial genes have different reading frames.
+awk '/partial_gene/ {printf ("%s\t%s\n", $0,NR)}' missense_variants_cds_list_and_sequence.gff3 > missense_variants_cds_list_and_sequence_partialgenes.gff3
+while read -r row; do
+  CUT_N=$(echo "$row" | cut -f 8)
+  CUT_N=$((CUT_N+1))
+  STRAND=$(echo "$row" | cut -f 7)
+  OLD_SEQUENCE=$(echo "$row" | cut -f 11)
+  ROW_N=$(echo "$row" | cut -f 12)
+  if [ $STRAND == "+" ]
+    then
+    CODING_SEQUENCE=$(echo $OLD_SEQUENCE | cut -c $CUT_N-)
+  elif [ $STRAND == "-" ]
+    then
+    CODING_SEQUENCE=$(echo $OLD_SEQUENCE | rev | cut -c $CUT_N- | rev)
+  fi
+  sed -i "${ROW_N}s/$OLD_SEQUENCE/$CODING_SEQUENCE/" missense_variants_cds_list_and_sequence.gff3
+done < missense_variants_cds_list_and_sequence_partialgenes.gff3  
+
+#Fuse all exons from each gene and store them in a file together with the gene name and the strand information.
+GENES=$(cat missense_variants_cds_list_and_sequence.gff3 | cut -f 10 | uniq)
+COUNTER=0
+rm missense_variants_cds_list_and_sequence_combined.txt
+for gen in ${GENES[@]}
+  do
+  #echo "${gen}"
+  STRAND=$(awk -F"\t" -v gen=$gen '$10 == gen' missense_variants_cds_list_and_sequence.gff3 | shuf -n1 | cut -f 7)
+  CODING_SEQUENCE=$(awk -F"\t" -v gen=$gen '$10 == gen {print $11}' missense_variants_cds_list_and_sequence.gff3 | tr -d '\n')
+  echo -e "$gen\t$STRAND\t$CODING_SEQUENCE" >> missense_variants_cds_list_and_sequence_combined.txt
+  ((COUNTER++))
+  if [ $(( $COUNTER % 10 )) == 0 ]
+    then
+    echo "processed $COUNTER genes out of $(echo "$GENES" | wc -l)"
+  fi
+  done
+
+#Translate the exons to proteins using an external website and store each protein in a fasta file (if this is run from my local mac environment at home -to prevent that expasy blocks the EBD IP-, use the version of this script that is stored as: /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/provean_db/translate_to_proteins.sh, where the head and sed commands have been replaced with ghead and gsed, respectively, so that mac uses the gnu versions. To this end, first download the input file with the following command: scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean/missense_variants_cds_list_and_sequence_combined.txt /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/provean_db).
+TOTAL=$(cat missense_variants_cds_list_and_sequence_combined.txt | wc -l)
+COUNTER=0
+while read -r entry; do
+  GENE=$(echo "$entry" | cut -f 1)
+  echo $GENE
+  STRAND=$(echo "$entry" | cut -f 2)
+  #echo $STRAND
+  CODING_SEQUENCE=$(echo "$entry" | cut -f 3)
+  #echo $CODING_SEQUENCE
+  if [ $STRAND == "+" ]
+    then
+    curl -s -d "dna_sequence=$CODING_SEQUENCE&output_format=fasta" -A "${GENE:7}" https://web.expasy.org/cgi-bin/translate/dna2aa.cgi | awk '/:5'\''3'\'' Frame 1$/,/:5'\''3'\'' Frame 2$/' | head -n-1 | sed -r '/^\s*$/d' | sed '$ s/.$//' | sed 's/-/X/g' > genes_fasta/"$GENE".fa #sends the DNA sequence to the expasy website, then selects the lines for the proper strand (here: +) between the header for Frame 1 and the header for Frame 2, then removes the header for Frame 2, then removes any empty line that may exist, then removes the last character (the hyphen that marks the end of the protein), then replaces any other existing hyphen by an X (unknown aminoacid) so that Provean doesn't crash
+  elif [ $STRAND == "-" ]
+    then
+    curl -s -d "dna_sequence=$CODING_SEQUENCE&output_format=fasta" -A "${GENE:7}" https://web.expasy.org/cgi-bin/translate/dna2aa.cgi | awk '/:3'\''5'\'' Frame 1$/,/:3'\''5'\'' Frame 2$/' | head -n-1 | sed -r '/^\s*$/d' | sed '$ s/.$//' | sed 's/-/X/g' > genes_fasta/"$GENE".fa #sends the DNA sequence to the expasy website, then selects the lines for the proper strand (here: -) between the header for Frame 1 and the header for Frame 2, then removes the header for Frame 2, then removes any empty line that may exist, then removes the last character (the hyphen that marks the end of the protein), then replaces any other existing hyphen by an X (unknown aminoacid) so that Provean doesn't crash
+  fi
+  ((COUNTER++))
+  if [ $(( $COUNTER % 100 )) == 0 ]
+    then
+    echo "processed $COUNTER genes out of $TOTAL"
+  fi
+  sleep 3
+  done < missense_variants_cds_list_and_sequence_combined.txt
+
+#From the local mac enviornment:
+cd /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/provean_db/genes_fasta
+scp -r /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/provean_db/genes_fasta/ dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean/
+
+```
+
 
 #2: Run Provean.
 ```{bash}
@@ -216,8 +309,8 @@ cat missense_variants_provean_scores_run*.txt | sort -k 3,3 > missense_variants_
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean
 
 THRESHOLD=-2.5
-awk -F"\t" -v thres=$THRESHOLD '$5 <= thres {printf ("%s\t%s\t%s\t%s\t%s\t%s\n", $1,$2-1,$2,$3,$4,$5)}' missense_variants_provean_scores.txt | bedtools sort > missense_variants_provean_scores_deleterious.txt
-awk -F"\t" -v thres=$THRESHOLD '$5 > thres {printf ("%s\t%s\t%s\t%s\t%s\t%s\n", $1,$2-1,$2,$3,$4,$5)}' missense_variants_provean_scores.txt | bedtools sort > missense_variants_provean_scores_tolerated.txt
+awk -F"\t" -v thres=$THRESHOLD '$5 <= thres {printf ("%s\t%s\t%s\t%s\t%s\t%s\n", $1,$2-1,$2,$3,$4,$5)}' missense_variants_provean_scores.txt | bedtools sort > missense_variants_provean_scores_deleterious.txt #9264 (39.2% of the total)
+awk -F"\t" -v thres=$THRESHOLD '$5 > thres {printf ("%s\t%s\t%s\t%s\t%s\t%s\n", $1,$2-1,$2,$3,$4,$5)}' missense_variants_provean_scores.txt | bedtools sort > missense_variants_provean_scores_tolerated.txt #14378 (60.8% of the total)
 
 #bedtools intersect -a .vcf -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean/missense_variants_provean_scores.txt
 
