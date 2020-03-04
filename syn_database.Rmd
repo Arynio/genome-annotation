@@ -282,68 +282,8 @@ join -t $'\t' -1 1 -2 9 <(sort -k1,1 /GRUPOS/grupolince/Lyp_annotation_Apr14_fin
 
 sort -k1,1 -k2,2n synonymous_variants_complete_info_pref_unpref_step2_${REF_SP}.txt | awk '{printf ("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", $1, $2-1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)}' > synonymous_variants_complete_info_pref_unpref_${REF_SP}.bed #31241
 
-awk '($9 == 0) && ($11 == 1) {print $0}' synonymous_variants_complete_info_pref_unpref_${REF_SP}.bed > synonymous_variants_complete_info_0to1_${REF_SP}.bed #5291
+awk '($9 == 0) && ($11 == 1) {print $0}' synonymous_variants_complete_info_pref_unpref_${REF_SP}.bed > synonymous_variants_complete_info_0to1_${REF_SP}.bed #5291 (16.9% of the total)
 
-awk '($9 == 1) && ($11 == 0) {print $0}' synonymous_variants_complete_info_pref_unpref_${REF_SP}.bed > synonymous_variants_complete_info_1to0_${REF_SP}.bed #15856
-
-```
-
-##Get counts (of variants, substitutions or vars+subs).
-```{r Get annotation statistics, eval=FALSE, engine='bash'}
-
-CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
-VAR=(varssubs) #varssubs #variants #substitutions #segregating #fixed #private
-TYPE=(SNP) #write down SNP or INDEL
-cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
-screen -S "${CALLING}-${VAR}-${TYPE}"
-CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
-VAR=$(echo ${STY#*.} | cut -d'-' -f2)
-if [ $VAR == "private" ]
-  then
-  VAR="private_segregating"
-fi
-TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
-
-
-S_PATH=/opt/snpEff #software path
-C_PATH=/home/dkleinman/datos/snpEff #config file path
-O_PATH=/home/dkleinman/datos/snpEff #output path
-I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
-V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
-G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
-B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAM files path
-REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
-GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
-BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
-
-cd $V_PATH/$CALLING/annotation
-rm ${CALLING}"_ann_individual_SYN_"${VAR}"_"${TYPE}".lr_ann.txt"
-echo -e "species\tpopulation\tdataset\tsample\tsynonymous_V\tsynonymous_A\tsyn_pref_V\tsyn_pref_A\tsyn_unpref_V\tsyn_unpref_A" > ${CALLING}"_ann_individual_SYN_"${VAR}"_"${TYPE}".lr_ann.txt"
-INDLIST=($(ls `find . -name *"_individual_"${VAR}"_"${TYPE}".lr_ann.vcf" -print`))
-for i in "${INDLIST[@]}"
-  do
-  echo "${i}"
-  ind=$(echo "${i}" | awk -F'[/]' '{print $3}' | cut -c1-12)
-  echo "${ind}"
-  SPECIES=$(echo "${ind}" | cut -c3-4)
-  POPULATION=$(echo "${ind}" | cut -c6-7)
-  DATASET=$(if [ $ind = "c_lp_sm_0221" ]; then echo "REF"; elif [ $ind = "c_ll_ki_0090" ]; then echo "MG"; elif [ $ind = "h_ll_pv_0223" ]; then echo "LD"; elif grep -Fxq $ind /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/c_lp_5x_samples || [ $SPECIES = "ll" ]; then echo "5x"; else echo "GP"; fi)
-  SAMPLE=$(echo "${ind}" | cut -c9-12)
-  SYNONYMOUS_V=$(grep 'synonymous_variant' ${i} | wc -l)
-  SYNONYMOUS_A=$(grep 'synonymous_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
-  SYN_PREF_V=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/syn_pref/synonymous_variants_complete_info_0to1_lr.bed | grep -v '#' | wc -l)
-  SYN_PREF_A=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/syn_pref/synonymous_variants_complete_info_0to1_lr.bed | grep -v '#' | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
-  SYN_UNPREF_V=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/syn_pref/synonymous_variants_complete_info_1to0_lr.bed | grep -v '#' | wc -l)
-  SYN_UNPREF_A=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/syn_pref/synonymous_variants_complete_info_1to0_lr.bed | grep -v '#' | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
-  echo -e "$SPECIES\t$POPULATION\t$DATASET\t$SAMPLE\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$SYN_PREF_V\t$SYN_PREF_A\t$SYN_UNPREF_V\t$SYN_UNPREF_A" >> ${CALLING}"_ann_individual_SYN_"${VAR}"_"${TYPE}".lr_ann.txt"
-  done
-
-#From outside the server:
-export SSHPASS=$(cat /Users/dani/Documents/genomics_pass.txt)
-CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
-VAR=(varssubs) #varssubs #variants #substitutions #segregating #fixed #private_segregating
-TYPE=(SNP) #write down SNP or INDEL
-sshpass -e scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/${CALLING}_ann_individual_SYN_${VAR}_${TYPE}.lr_ann.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/
-unset SSHPASS
+awk '($9 == 1) && ($11 == 0) {print $0}' synonymous_variants_complete_info_pref_unpref_${REF_SP}.bed > synonymous_variants_complete_info_1to0_${REF_SP}.bed #15856 (50.8% of the total)
 
 ```
