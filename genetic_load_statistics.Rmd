@@ -3138,7 +3138,7 @@ library(dplyr)
 library(ggplot2)
 library(tidyr)
 
-type="substitutions" #varssubs #variants #substitutions #segregating #fixed #private_segregating
+type="varssubs" #varssubs #variants #substitutions #segregating #fixed #private_segregating
 
 wd_path <- ("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
 variants_and_subst_wg <- read_tsv(paste0(wd_path,"c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_ann_individual_summary_",type,"_SNP.lr_ann.txt"))
@@ -7072,7 +7072,7 @@ library(ggplot2)
 library(tidyr)
 
 #Define the following variables:
-type="private_segregating" #varssubs #variants #segregating #private_segregating
+type="substitutions" #varssubs #variants #substitutions #segregating #private_segregating
 plot_variable <- "het_by_total_filter" #het_by_total_filter #het_by_total (for a filtered or unfiltered denominator)
 
 #Import heterozygous counts and change to tidy format:
@@ -7228,7 +7228,7 @@ average_ggplot_all_pi_part2 <- ggplot(data=filter(average_variants_het_joined_al
   geom_errorbar(aes(ymin=avg_het_by_total-se_het_by_total, ymax=avg_het_by_total+se_het_by_total), position=position_dodge(), width=0.5) +
   #ggtitle("Proportion of reads at different NM") +
   xlab("Population") +
-  ylab(paste0(type," population average ",plot_variable)) +
+  #ylab(paste0(type," population average ",plot_variable)) +
   theme_bw() +
   theme(text=element_text(size=12,face="bold"),
       rect=element_rect(size=1),
@@ -7261,7 +7261,7 @@ average_ggplot_all_pi_part3 <- ggplot(data=filter(average_variants_het_joined_al
   geom_errorbar(aes(ymin=avg_het_by_total-se_het_by_total, ymax=avg_het_by_total+se_het_by_total), position=position_dodge(), width=0.5) +
   #ggtitle("Proportion of reads at different NM") +
   xlab("Population") +
-  ylab(paste0(type," population average ",plot_variable)) +
+  #ylab(paste0(type," population average ",plot_variable)) +
   theme_bw() +
   theme(text=element_text(size=12,face="bold"),
       rect=element_rect(size=1),
@@ -7456,7 +7456,7 @@ average_ggplot_all_pi_part2 <- ggplot(data=filter(average_variants_het_joined_al
   geom_errorbar(aes(ymin=avg_het_by_total-se_het_by_total, ymax=avg_het_by_total+se_het_by_total), position=position_dodge(), width=0.5) +
   #ggtitle("Proportion of reads at different NM") +
   xlab("Population") +
-  ylab(paste0(type," population average ",plot_variable)) +
+  #ylab(paste0(type," population average ",plot_variable)) +
   theme_bw() +
   theme(text=element_text(size=12,face="bold"),
       rect=element_rect(size=1),
@@ -7489,7 +7489,7 @@ average_ggplot_all_pi_part3 <- ggplot(data=filter(average_variants_het_joined_al
   geom_errorbar(aes(ymin=avg_het_by_total-se_het_by_total, ymax=avg_het_by_total+se_het_by_total), position=position_dodge(), width=0.5) +
   #ggtitle("Proportion of reads at different NM") +
   xlab("Population") +
-  ylab(paste0(type," population average ",plot_variable)) +
+  #ylab(paste0(type," population average ",plot_variable)) +
   theme_bw() +
   theme(text=element_text(size=12,face="bold"),
       rect=element_rect(size=1),
@@ -7528,7 +7528,7 @@ library(ggplot2)
 library(tidyr)
 library(gridExtra)
 
-type="varssubs" #varssubs #variants #substitutions #private_segregating #fixed
+type="fixed" #varssubs #variants #substitutions #private_segregating #fixed
 plot_variable <- "rda_by_total_filter" #rda_by_total_filter #rda_by_total (for a filtered or unfiltered denominator)
 
 #Import derived counts and change to tidy format:
@@ -7682,7 +7682,7 @@ average_ggplot_all_pi_part2 <- ggplot(data=filter(average_variants_rda_joined_al
   geom_errorbar(aes(ymin=avg_rda-se_rda, ymax=avg_rda+se_rda), position=position_dodge(), width=0.5) +
   #ggtitle("Proportion of reads at different NM") +
   xlab("Population") +
-  ylab(paste0(type," population average ",plot_variable)) +
+  #ylab(paste0(type," population average ",plot_variable)) +
   theme_bw() +
   theme(text=element_text(size=12,face="bold"),
       rect=element_rect(size=1),
@@ -7715,7 +7715,7 @@ average_ggplot_all_pi_part3 <- ggplot(data=filter(average_variants_rda_joined_al
   geom_errorbar(aes(ymin=avg_rda-se_rda, ymax=avg_rda+se_rda), position=position_dodge(), width=0.5) +
   #ggtitle("Proportion of reads at different NM") +
   xlab("Population") +
-  ylab(paste0(type," population average ",plot_variable)) +
+  #ylab(paste0(type," population average ",plot_variable)) +
   theme_bw() +
   theme(text=element_text(size=12,face="bold"),
       rect=element_rect(size=1),
