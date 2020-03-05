@@ -1,0 +1,109 @@
+---
+title: "genetic_load_nm3_parallel_calling"
+output: html_document
+---
+
+#1. Write GATK calling script.
+```{r, eval=FALSE, engine='bash'}
+
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1) #name of the calling
+SCAFFOLDS=$(echo ${STY#*.} | rev | cut -d'-' -f1 | rev) #scaffolds to work with
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING #working path
+N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING)
+#echo $N_POPS
+POPS=$(echo $CALLING | fold -w8 | cut -c1-7 | head -n$N_POPS | sort | uniq)
+#echo $POPS
+REF=/GRUPOS/grupolince/GATK_tests/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+SAMPLES=$(for p in ${POPS[@]}; do ls /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered/${p}*recal_round-1*nm3.bam | rev | cut -d'/' -f1 | rev | cut -c1-12 | sort | uniq; done)
+
+echo "calling:" $CALLING "will be performed for scaffold(s):" $SCAFFOLDS "and for sample(s):"
+echo "${SAMPLES}"
+
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -jar $GATK \
+-T HaplotypeCaller \
+-R $REF \
+$(for var in $SAMPLES; do if [ -e /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered/${var}_recal_round-1_25x.nm3.bam ]; then echo -I /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered/${var}_recal_round-1_25x.nm3.bam" "; else echo -I /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered/${var}_recal_round-1.nm3.bam" "; fi; done) \
+-L bed_file_lp23.${SCAFFOLDS}.bed \
+-XL /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/repeats_and_lowcomp_no_redundant_mappability.k75_lessthan90.bed \
+-o ${CALLING}-${SCAFFOLDS}.vcf
+
+```
+
+#2. Upload GATK calling script to the server.
+```{r, eval=FALSE, engine='bash'}
+
+#Save it in a text editor as /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/GATK_calling.nm3.sh and upload it to the server:
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm3nm3_origcov)
+scp /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/GATK_calling.nm3.sh dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/
+
+#Then inside the server change permissions to run it:
+cd GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/
+chmod +x GATK_calling.nm3.sh
+
+```
+
+#3. Divide the genome in chunks.
+```{r, eval=FALSE, engine='bash'}
+
+mkdir -p /GRUPOS/grupolince/GATK_tests
+cd /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/
+FILE=bed_file_all_the_genome.bed
+
+COUNTER=0
+START_ROW=1
+START_SCAFFOLD=$(sed "${START_ROW}q;d" $FILE | cut -f1)
+PREVIOUS_END=$(sed "${START_ROW}q;d" $FILE | cut -f3)
+N_ROWS=$(wc -l < $FILE)
+echo $START_SCAFFOLD "starts new chunk"
+while read -r SCAFFOLD START END; do
+#echo $SCAFFOLD
+  if [ $((END-PREVIOUS_END)) -gt 100000 ]
+    then
+    echo $PREVIOUS_SCAFFOLD "ends the chunk"
+    echo $SCAFFOLD "starts new chunk"
+    END_SCAFFOLD=$(echo $PREVIOUS_SCAFFOLD | cut -d'.' -f2)
+    sed -n $START_ROW','$COUNTER'p' $FILE > bed_file_all_the_genome_chunks/bed_file_${START_SCAFFOLD}_to_${END_SCAFFOLD}.bed
+    START_ROW=$((COUNTER+1))
+    START_SCAFFOLD=$(sed "${START_ROW}q;d" $FILE | cut -f1)
+  fi
+  ((COUNTER++))
+  PREVIOUS_SCAFFOLD=$SCAFFOLD
+  PREVIOUS_END=$END
+  if [ $COUNTER -eq $N_ROWS ]
+    then
+    echo $PREVIOUS_SCAFFOLD "ends the chunk"
+    END_SCAFFOLD=$(echo $PREVIOUS_SCAFFOLD | cut -d'.' -f2)
+    sed -n $START_ROW','$COUNTER'p' $FILE > bed_file_all_the_genome_chunks/bed_file_${START_SCAFFOLD}_to_${END_SCAFFOLD}.bed
+  fi
+  done < $FILE
+
+#8 chunks were produced with this method.
+
+```
+
+#4. Run GATK for the desired chunks.
+```{r, eval=FALSE, engine='bash'}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm3nm3_origcov)
+mkdir -p /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING
+
+REGIONS=$(realpath /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/bed_file_all_the_genome_chunks/bed_file_lp23.*_to_*.bed)
+NL=$'\n'
+
+echo "The following region file(s) will be used:"
+echo "${REGIONS}"
+for r in ${REGIONS[@]}
+  do
+  #echo ${r}
+  SCAFFOLDS=$(echo ${r} | cut -d'.' -f2)
+  echo $SCAFFOLDS
+  screen -dmS "${CALLING}-${SCAFFOLDS}"
+  screen -S "${CALLING}-${SCAFFOLDS}" -p 0 -X stuff "script ${CALLING}-${SCAFFOLDS}.log$NL"
+  screen -S "${CALLING}-${SCAFFOLDS}" -p 0 -X stuff "time ./GATK_calling.nm3.sh; exec bash$NL"
+  screen -S "${CALLING}-${SCAFFOLDS}" -p 0 -X stuff "exit$NL"
+  screen -S "${CALLING}-${SCAFFOLDS}" -p 0 -X stuff "exit$NL"
+  done
+
+```
