@@ -22,8 +22,9 @@ BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
 
 ```
 
-#1: Obtain gene list of interest.
-##Example
+#1: TopGO approach (obsolete).
+##Obtain gene list of interest.
+###Example
 
 ```{r Obtain gene list of interest, eval=FALSE, engine='bash'}
 
@@ -41,8 +42,8 @@ scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dan
 
 ```
 
-#2: Perform GO terms enrichment.
-##Retrieve GO terms annotation from the Iberian lynx project.
+##Perform GO terms enrichment.
+###Retrieve GO terms annotation from the Iberian lynx project.
 
 ```{r Perform GO terms enrichment}
 
@@ -78,7 +79,7 @@ library(tidyr)
 # Los que comienzan por lp23 son antiguos sin la isoforma principal.
 
 wd <- "/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/GO_analysis/Lypa23c_GO_terms_annotation/"
-tabla_all_genes_GO_term_complete_info <- read.table (paste0(wd, "GO2LYPA.LYPA23C.APPRIS.fatigo.genes.txt"), sep="\t", header = T) %>% select (., GENE_NAME, GO_ACC) %>% mutate (GO_ACC=as.character(GO_ACC))
+tabla_all_genes_GO_term_complete_info <- read_tsv(paste0(wd, "GO2LYPA.LYPA23C.APPRIS.fatigo.genes.txt"),col_names=T) %>% dplyr::select(GENE_NAME, GO_ACC) %>% mutate(GO_ACC=as.character(GO_ACC))
 #Convert  data frame in a list of list based on a Key value
 #geneID2GO <- readMappings(file = system.file("examples/geneid2go.map", package = "topGO"))
 list_of_list_all_genes_GO_term <- dlply(tabla_all_genes_GO_term_complete_info, .(GENE_NAME), function(x)x$GO_ACC)
@@ -87,9 +88,15 @@ str(head(list_of_list_all_genes_GO_term_chr))
 #Guardo los nombres de los genes en cuestión. 
 geneNames <- names(list_of_list_all_genes_GO_term_chr)
 
+
+#Obtain list of GO terms and the genes associated to each of them:
+tabla_all_genes_GO_term_complete_info_modif <- read_tsv(paste0(wd, "GO2LYPA.LYPA23C.APPRIS.fatigo.genes.txt"),col_names=T) %>% dplyr::select (-"GO_TYPE") %>% dplyr::group_by(GO_ACC,GO_NAME) %>% dplyr::summarise(Genes=paste(GENE_NAME, collapse=' ')) %>% as.data.frame()
+
+write.table(tabla_all_genes_GO_term_complete_info_modif, paste0(wd, "GO2LYPA.LYPA23C.APPRIS.fatigo.genes_modif.NAMES.gmt"), quote = F, row.names = F, col.names = F, sep = "\t" )
+
 ```
 
-##Perform GO terms enrichment analysis for each population and feature of interest.
+###Perform GO terms enrichment analysis for each population and feature of interest.
 
 ```{r Perform GO terms enrichment}
 
@@ -133,8 +140,8 @@ for (genlist in pop_genlists) {
 
 ```
 
-#3: Perform pathway (KO terms) enrichment analysis for each population and feature of interest.
-##Retrieve KO terms annotation from the Iberian lynx project.
+##Perform pathway (KO terms) enrichment analysis for each population and feature of interest.
+###Retrieve KO terms annotation from the Iberian lynx project.
 
 ```{r Perform pathway (KO terms) enrichment analysis for each population and feature of interest, eval=FALSE, engine='bash'}
 
@@ -156,7 +163,7 @@ scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/Lyp_annotation_Apr14_fin
 
 ```
 
-##Perform GO terms enrichment analysis for each population and feature of interest.
+###Perform GO terms enrichment analysis for each population and feature of interest.
 
 ```{r Perform pathway (KO terms) enrichment analysis for each population and feature of interest}
 
@@ -188,3 +195,140 @@ for (genlist in pop_genlists) {
 #Take the output file to https://reactome.org/PathwayBrowser/#TOOL=AT and perform the analysis checking both boxes (project to human, include interactome). Then download and rename the pdf with the report.
 
 ```
+
+#2: Gowinda approach.
+##Getting started.
+```{bash}
+
+#Gowinda programme is installed in genomics_a: /opt/Gowinda/Gowinda-1.12.jar
+
+#Make a working directory.
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+mkdir -p /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/goterms
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/goterms
+
+#I'll be following María's script: "4.Enrichment_analysis.Rmd" (in the historical_ancient_diversity repository) which in turn is based on the following wiki: 
+https://sourceforge.net/p/gowinda/wiki/Main/
+
+#To run Gowinda we need the following:
+#1) a file containing the annotation of the genome in .gtf
+#2) a gene set file, containing for every gene set (e.g.: GO category) a list of the associated gene IDs
+#3) a file containing the total set of SNPs
+#4) a file containing the candidate SNPs
+
+```
+
+##Prepare input files:
+###1: Genome annotation file.
+```{bash}
+
+#The gtf already exists:
+/GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.all.fix.nr.gtf
+
+#María created it using a python script gff2gtf.py that transformed the .gff3 to .gtf. The python code can be found in her enrichment analysis script (referenced above).
+
+#To obtain the list of gene names from here:
+cut -f9 /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.all.fix.nr.gtf | cut -d'"' -f2 | sort | uniq #21243 genes
+
+```
+
+###2: Gene sets and gene IDs file.
+```{bash}
+
+#The file with GO terms and their respective genes was created in the topGO section. It's the following file:
+/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/GO_analysis/Lypa23c_GO_terms_annotation/GO2LYPA.LYPA23C.APPRIS.fatigo.genes_modif.NAMES.gmt
+ 
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+scp /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/GO_analysis/Lypa23c_GO_terms_annotation/GO2LYPA.LYPA23C.APPRIS.fatigo.genes_modif.NAMES.gmt dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/goterms/
+
+#To obtain the list of gene names from here:
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/goterms
+cut -f3 GO2LYPA.LYPA23C.APPRIS.fatigo.genes_modif.NAMES.gmt | tr ' ' '\n' | sort | uniq | wc -l #18513 genes
+
+```
+
+###3: Total SNP file.
+```{bash}
+
+#This file must contain all the SNPs used for the GWAS, in a simple tab-delimited file format. Gowinda also ignores entries starting with a '#' thus a '.vcf' file may also be provided.
+/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/${CALLING}_polarized_filteredall_varssubs_SNP.lr_ann.vcf
+
+```
+
+###4: Candidate SNP file.
+```{bash}
+
+#The same applies as for the total SNP file, except that the candidate SNPs must be a subset of the total SNPs. The candidate file will be the vcf for each population and/or category.
+
+```
+
+##Run the programme:
+###Output format explanation:
+```{bash}
+
+#Results file:
+#column 1: the GO term
+#column 2: on the average this number of genes are found per simulation for the given GO category. In --mode gene every gene is only counted once whereas in --mode snp a single gene may be counted several times dependent on the SNP
+#column 3: using the candidate SNPs this number of genes was found for the given GO category. In --mode gene every gene is only counted once whereas in --mode snp a single gene may be counted several times dependent on the SNP
+#column 4: p-value (uncorrected for multiple testing)
+#column 5: FDR (p-value after adjustment for multiple testing)
+#column 6: the number of genes (uniq) found for the given GO category
+#column 7: the number of genes that could at most be found for the given GO category, i.e.: genes of the given GO category that have an corresponding entry in the annotation file and contain at least one SNP
+#column 8: total number of genes for the given GO category in the GO association file
+#column 9: description of the given GO term
+#column 10: comma separated list of the gene_ids found for the given GO category
+
+```
+
+###Per population GO enrichment analysis:
+```{bash}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+VAR=(varssubs) #varssubs
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/goterms/
+screen -S "${CALLING}-${VAR}-${TYPE}"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+script "${CALLING}_polarized_perpop_cds_GO_enrichment_${VAR}_${TYPE}.lr_ann.log"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+
+N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING)
+POPS=$(echo $CALLING | fold -w8 | cut -c1-7 | head -n$N_POPS | sort | uniq)
+NM_COV=$(echo ${CALLING} | rev | cut -d'_' -f1,2 | rev)
+
+#Define universal variables:
+ANNOTATION_FILE=/GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.all.fix.nr.gtf
+GENE_SET_FILE=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/goterms/GO2LYPA.LYPA23C.APPRIS.fatigo.genes_modif.NAMES.gmt
+SNP_TOTAL_FILE=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/${CALLING}_polarized_filteredall_${VAR}_${TYPE}.lr_ann.vcf
+
+for POP in ${POPS[@]}
+  do
+  echo "preparing input file for population" $POP
+  #Define population-dependant variables:
+  SPECIES=$(echo $POP | cut -c1-4)
+  cat ./../${POP}_${NM_COV}_perpop/${SPECIES}_*_${POP}_${NM_COV}_perpop_${VAR}_${TYPE}.lr_ann.vcf | grep -v '#' | cut -f1,2 | sort -k1,1 -k2,2n | uniq > ${SPECIES}_${POP}_${NM_COV}_perpop_${VAR}_${TYPE}.lr_ann.txt
+  SNP_CANDIDATE_FILE=${SPECIES}_${POP}_${NM_COV}_perpop_${VAR}_${TYPE}.lr_ann.txt
+  OUTPUT_FILE=$(echo ${SNP_CANDIDATE_FILE/.txt/.gowinda})
+  #Launch the programme:
+  echo "starting GO enrichment analysis for population" $POP
+  java -Xmx4g -jar /opt/Gowinda/Gowinda-1.12.jar \
+  --annotation-file $ANNOTATION_FILE \
+  --gene-set-file $GENE_SET_FILE \
+  --snp-file $SNP_TOTAL_FILE \
+  --candidate-snp-file $SNP_CANDIDATE_FILE \
+  --output-file $OUTPUT_FILE \
+  --mode gene \
+  --gene-definition cds \
+  --simulations 100000 \
+  --min-genes 1 \
+  --min-significance 1 \
+  --detailed-log \
+  --threads 10
+  done
+
+```
+
