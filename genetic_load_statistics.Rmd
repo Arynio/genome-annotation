@@ -2806,8 +2806,8 @@ ggsave("NSYN_SYN_ratio.pdf", width=15, height=10, units="cm", device="pdf", path
 ####Get counts (of variants, substitutions or vars+subs).
 ```{r Get annotation statistics, eval=FALSE, engine='bash'}
 
-CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
-VAR=(private) #varssubs #variants #substitutions #segregating #fixed #private
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm3nm3_origcov)
+VAR=(varssubs) #varssubs #variants #substitutions #segregating #fixed #private
 TYPE=(SNP) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
 screen -S "${CALLING}-${VAR}-${TYPE}"
@@ -2898,8 +2898,8 @@ rm ${VAR}_*.temp.borrar
 
 #From outside the server:
 export SSHPASS=$(cat /Users/dani/Documents/genomics_pass.txt)
-CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
-VAR=(private_segregating) #varssubs #variants #substitutions #segregating #fixed #private_segregating
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm3nm3_origcov)
+VAR=(varssubs) #varssubs #variants #substitutions #segregating #fixed #private_segregating
 TYPE=(SNP) #write down SNP or INDEL
 sshpass -e scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/${CALLING}_ann_individual_summary_${VAR}_${TYPE}.lr_ann.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/
 unset SSHPASS
@@ -3063,25 +3063,28 @@ ggsave(paste0(type,"_derived_allele_allele_ratio.pdf"), width=15, height=20, uni
 
 ```
 
-#####Obsolete: relative to introns.
+#####Relative to Kirov, definitive version.
 ```{r Plot variant count results}
 
 library(readr)
 library(dplyr)
 library(ggplot2)
 library(tidyr)
+library(grid)
+library(gridExtra)
+library(egg)
 
-type="substitutions" #varssubs #variants #substitutions
+type="fixed" #varssubs #variants #substitutions #segregating #fixed #private_segregating
 
 wd_path <- ("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
-variants_and_subst_wg <- read_tsv(paste0(wd_path,"c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_ann_individual_summary_",type,"_SNP.lr_ann.txt"))
+variants_and_subst_wg <- read_tsv(paste0(wd_path,"c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_ann_individual_summary_",type,"_SNP.lr_ann.txt")) %>% select(.,species,population,dataset,sample,contains("_A"),-contains("/")) %>% rename_at(vars(ends_with("_A")),funs(gsub("_A","",.))) 
 
 variants_and_subst_wg$dataset <- as.factor(variants_and_subst_wg$dataset)
 variants_and_subst_wg$dataset = factor(variants_and_subst_wg$dataset,levels=c("REF","GP","5x","MG")) #Reorder factor levels to: REF, GP, 5x, MG
 variants_and_subst_wg$population = factor(variants_and_subst_wg$population,levels=c("ki","no","po","sm","do"))
 print.data.frame(variants_and_subst_wg)
 
-variants_and_subst_wg_alleleR <- variants_and_subst_wg %>% mutate(synonymous=synonymous_A/intronic_A,missense=missense_A/intronic_A,mistol=missense_tol_A/intronic_A,misdel=missense_del_A/intronic_A,nonsense=nonsense_A/intronic_A,UCNE=UCNE_A/intronic_A) %>% select(c(1:4,28:33)) %>% gather(ratio,value,-species,-population,-dataset,-sample,factor_key=T)
+variants_and_subst_wg_alleleR <- variants_and_subst_wg %>% gather(ratio,value,-species,-population,-dataset,-sample,factor_key=T)
 variants_and_subst_wg_alleleR
 
 r_average_vector <- c()
@@ -3094,38 +3097,150 @@ print(r_average_vector)
 
 relativised_variants_and_subst_wg_alleleR <- mutate(variants_and_subst_wg_alleleR, ki_relative_value=value/r_average_vector)
 
-relativised_derived_allele_allele_ratio_ggplot <- ggplot(data=relativised_variants_and_subst_wg_alleleR, aes(population,ki_relative_value,colour=population)) +
+#Obtain per population averages and standard errors:
+se <- function(x) sqrt(var(x)/length(x)) #first define the standard error function
+
+average_relativised_variants_and_subst_wg_alleleR <- data_frame("species"=character(0),"population"=character(0),"ratio"=character(0),"avg_ki_relative_value"=character(0),"se_ki_relative_value"=character(0)) #next, create the empty dataframe
+
+for (pop in unique(relativised_variants_and_subst_wg_alleleR$population)) { #then loop over each population and feature to get the (relativised) mean and standard error, and feed the dataframe
+  print(pop)
+  species <- filter(relativised_variants_and_subst_wg_alleleR,ratio==r & population==pop) %>% select(species) %>% unlist(.,use.names=F) %>% unique()
+  for (r in unique(relativised_variants_and_subst_wg_alleleR$ratio)) {
+    print(r)
+    pop_mean <- filter(relativised_variants_and_subst_wg_alleleR,ratio==r & population==pop) %>% select(ki_relative_value) %>% unlist(.,use.names=F) %>% mean()
+    #print(paste0(pop," feature ",r," average is ",pop_mean))
+    pop_se <- filter(relativised_variants_and_subst_wg_alleleR,ratio==r & population==pop) %>% select(ki_relative_value) %>% unlist(.,use.names=F) %>% se()
+    #print(paste0(pop," feature ",r," std error is ",pop_se))
+    row_data <- cbind(species,pop,r,pop_mean,pop_se)
+    colnames(row_data) <- c("species","population","ratio","avg_ki_relative_value","se_ki_relative_value")
+    average_relativised_variants_and_subst_wg_alleleR <- rbind(average_relativised_variants_and_subst_wg_alleleR,row_data,stringsAsFactors=F)
+  }
+}
+average_relativised_variants_and_subst_wg_alleleR$population = factor(average_relativised_variants_and_subst_wg_alleleR$population,levels=c("ki","no","po","sm","do"))
+levels(average_relativised_variants_and_subst_wg_alleleR$population)[levels(average_relativised_variants_and_subst_wg_alleleR$population)=="sm"] <- "an"
+average_relativised_variants_and_subst_wg_alleleR$ratio = factor(average_relativised_variants_and_subst_wg_alleleR$ratio,levels=c("total","intergenic","intronic","synonymous","syn_pref","syn_unpref","missense","missense_tol","missense_del","nonsense","UCNE","UCNE_low","UCNE_mid","UCNE_high"))
+levels(average_relativised_variants_and_subst_wg_alleleR$ratio) <- c("total","intergenic","introns","synonymous","synonymous_pref","synonymous_unpref","missense","missense_tolerated","missense_deleterious","nonsense","UCNE","UCNE_low","UCNE_mid","UCNE_high")
+average_relativised_variants_and_subst_wg_alleleR$avg_ki_relative_value <- as.numeric(average_relativised_variants_and_subst_wg_alleleR$avg_ki_relative_value)
+average_relativised_variants_and_subst_wg_alleleR$se_ki_relative_value <- as.numeric(average_relativised_variants_and_subst_wg_alleleR$se_ki_relative_value)
+average_relativised_variants_and_subst_wg_alleleR
+#(average_relativised_variants_and_subst_wg_alleleR,paste0("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/",type,"_derived_allele_allele_ratio_relative2introns_mean.csv"))
+
+#Separate plots:
+twodecimalsFUN <- function(x) sprintf("%.2f", x)
+type_range <- data.frame("var_type"=c("varssubs","varssubs","fixed","fixed"),"plot"=c("up","down","up","down"),"min"=c(0.9,0.7,0.9,0.5),"max"=c(1.05,1.2,1.4,3.5),"breaks"=c(0.05,0.1,0.2,0.5))
+
+average_relativised_derived_allele_allele_ratio_up <- ggplot(data=filter(average_relativised_variants_and_subst_wg_alleleR,grepl('total|intergenic|introns|synonymous|synonymous_pref|synonymous_unpref',ratio)), aes(population,avg_ki_relative_value,colour=population)) +
   #facet_wrap(feature ~ species,nrow=6,ncol=2,scales="free") +
-  facet_grid(ratio ~ .,scales="fixed") +
-  geom_boxplot(width=0.5) +
+  facet_grid(. ~ ratio) +
+  geom_point() +
+  geom_errorbar(aes(ymin=avg_ki_relative_value-se_ki_relative_value, ymax=avg_ki_relative_value+se_ki_relative_value), position=position_dodge(), width=0.5) +
   #ggtitle("Proportion of reads at different NM") +
-  ylab("ratio") +
-  scale_y_continuous(breaks = seq(0.5, 1.2, by = 0.2)) +
-  ylim(0.5,1.2) +
-  ggtitle(paste0("ratio of ",type," relative to intronic and Kirov")) +
+  xlab("Population") +
+  ylab("Average genetic load relative to ki") +
+  scale_y_continuous(labels=twodecimalsFUN, breaks=seq(filter(type_range,var_type==type & plot=="up") %>% select(min) %>% unlist(.,use.names=F), filter(type_range,var_type==type & plot=="up") %>% select(max) %>% unlist(.,use.names=F), by = filter(type_range,var_type==type & plot=="up") %>% select(breaks) %>% unlist(.,use.names=F)), limits=c(filter(type_range,var_type==type & plot=="up") %>% select(min) %>% unlist(.,use.names=F),filter(type_range,var_type==type & plot=="up") %>% select(max) %>% unlist(.,use.names=F))) +
+  #ggtitle(paste0("ratio of ",type," relative to synonymous and Kirov")) +
   theme_bw() +
   theme(text=element_text(size=12,face="bold"),
-        rect=element_rect(size=1),
-        axis.line=element_line(colour="black"),
-        axis.title=element_text(size=16),
-        #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
-        #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
-        #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
-        panel.background=element_blank(),
-        panel.border=element_rect(colour="black"),
-        #panel.grid=element_blank(),
-        #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
-        plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
-        #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
-        legend.background=element_rect(linetype="solid", colour="black", size=.5),
-        #legend.justification=c(0,0),
-        legend.key=element_rect(colour="white"),
-        #legend.key.size=unit(1.3,"cm"),
-        #legend.position=c(0.07,0.84),
-        legend.title=element_blank()
+      rect=element_rect(size=1),
+      axis.line=element_blank(),
+      axis.title=element_text(size=16),
+      axis.text.x=element_text(angle=30,hjust=1,size=12,colour="black"),
+      axis.title.x=element_blank(),
+      axis.text.y=element_text(size=12,colour="black"),
+      axis.title.y=element_text(margin=unit(c(0,0.5,0,0),"cm")),
+      panel.background=element_blank(),
+      panel.border=element_rect(colour="black",fill=NA,size=1.5),
+      strip.background=element_rect(colour="black",size=1.5),
+      #panel.grid=element_blank(),
+      #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+      plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+      #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+      legend.background=element_rect(linetype="solid", colour="black", size=.5),
+      #legend.justification=c(0,0),
+      legend.key=element_rect(colour="white"),
+      legend.key.size=unit(0.5,"cm"),
+      legend.position="none",
+      legend.title=element_blank()
   )
-  relativised_derived_allele_allele_ratio_ggplot
-ggsave(paste0(type,"_derived_allele_allele_ratio_relative2introns.pdf"), width=15, height=15, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
+average_relativised_derived_allele_allele_ratio_up
+
+average_relativised_derived_allele_allele_ratio_down <- ggplot(data=filter(average_relativised_variants_and_subst_wg_alleleR,grepl('missense|missense_tol|missense_del|nonsense|UCNE|UCNElow|UCNEmid|UCNEhigh',ratio)), aes(population,avg_ki_relative_value,colour=population)) +
+  #facet_wrap(feature ~ species,nrow=6,ncol=2,scales="free") +
+  facet_grid(. ~ ratio) +
+  geom_point() +
+  geom_errorbar(aes(ymin=avg_ki_relative_value-se_ki_relative_value, ymax=avg_ki_relative_value+se_ki_relative_value), position=position_dodge(), width=0.5) +
+  #ggtitle("Proportion of reads at different NM") +
+  xlab("Population") +
+  ylab("Average genetic load relative to ki") +
+  scale_y_continuous(labels=twodecimalsFUN, breaks=seq(filter(type_range,var_type==type & plot=="down") %>% select(min) %>% unlist(.,use.names=F), filter(type_range,var_type==type & plot=="down") %>% select(max) %>% unlist(.,use.names=F), by = filter(type_range,var_type==type & plot=="down") %>% select(breaks) %>% unlist(.,use.names=F)), limits=c(filter(type_range,var_type==type & plot=="down") %>% select(min) %>% unlist(.,use.names=F),filter(type_range,var_type==type & plot=="down") %>% select(max) %>% unlist(.,use.names=F))) +
+  #ggtitle(paste0("ratio of ",type," relative to synonymous and Kirov")) +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+      rect=element_rect(size=1),
+      axis.line=element_blank(),
+      axis.title=element_text(size=16),
+      axis.text.x=element_text(angle=30,hjust=1,size=12,colour="black"),
+      axis.text.y=element_text(size=12,colour="black"),
+      #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+      axis.title.y=element_text(margin=unit(c(0,0.5,0,0),"cm")),
+      panel.background=element_blank(),
+      panel.border=element_rect(colour="black",fill=NA,size=1.5),
+      strip.background=element_rect(colour="black",size=1.5),
+      #panel.grid=element_blank(),
+      #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+      plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+      #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+      legend.background=element_rect(linetype="solid", colour="black", size=.5),
+      #legend.justification=c(0,0),
+      legend.key=element_rect(colour="white"),
+      legend.key.size=unit(0.5,"cm"),
+      legend.position="none",
+      legend.title=element_blank()
+  )
+average_relativised_derived_allele_allele_ratio_down
+
+average_relativised_derived_allele_allele_ratio_combined <- grid.arrange(set_panel_size(average_relativised_derived_allele_allele_ratio_up,width=unit(4.5,"cm"),height=unit(10,"cm")), set_panel_size(average_relativised_derived_allele_allele_ratio_down,width=unit(4.5,"cm"),height=unit(10,"cm")),nrow=2)
+
+ggsave(paste0(type,"_genetic_load_relative2Kirov_definitive.pdf"), width=41, height=25, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios",average_relativised_derived_allele_allele_ratio_combined)
+
+
+
+average_relativised_derived_allele_allele_ratio_galtier <- ggplot(data=filter(average_relativised_variants_and_subst_wg_alleleR,grepl('introns|synonymous|synonymous_pref|synonymous_unpref|missense|missense_tol|missense_del|nonsense',ratio)), aes(population,avg_ki_relative_value,colour=population)) +
+  #facet_wrap(feature ~ species,nrow=6,ncol=2,scales="free") +
+  facet_grid(. ~ ratio) +
+  geom_point() +
+  geom_errorbar(aes(ymin=avg_ki_relative_value-se_ki_relative_value, ymax=avg_ki_relative_value+se_ki_relative_value), position=position_dodge(), width=0.5) +
+  #ggtitle("Proportion of reads at different NM") +
+  xlab("Population") +
+  ylab("Average genetic load relative to ki") +
+  scale_y_continuous(labels=twodecimalsFUN, breaks=seq(0.75,1.05,by=c(0.1)), limits=c(0.75,1.05)) +
+  #ggtitle(paste0("ratio of ",type," relative to synonymous and Kirov")) +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+      rect=element_rect(size=1),
+      axis.line=element_blank(),
+      axis.title=element_text(size=16),
+      axis.text.x=element_text(angle=30,hjust=1,size=12,colour="black"),
+      axis.title.x=element_blank(),
+      axis.text.y=element_text(size=12,colour="black"),
+      axis.title.y=element_text(margin=unit(c(0,0.5,0,0),"cm")),
+      panel.background=element_blank(),
+      panel.border=element_rect(colour="black",fill=NA,size=1.5),
+      strip.background=element_rect(colour="black",size=1.5),
+      #panel.grid=element_blank(),
+      #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+      plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+      #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+      legend.background=element_rect(linetype="solid", colour="black", size=.5),
+      #legend.justification=c(0,0),
+      legend.key=element_rect(colour="white"),
+      legend.key.size=unit(0.5,"cm"),
+      legend.position="none",
+      legend.title=element_blank()
+  )
+average_relativised_derived_allele_allele_ratio_galtier
+
+ggsave(paste0(type,"_genetic_load_relative2Kirov_coding.pdf"), width=40, height=10, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios",average_relativised_derived_allele_allele_ratio_galtier)
 
 ```
 
@@ -3471,6 +3586,72 @@ ggsave(paste0(type,"_derived_allele_allele_ratio_5xonly_relative2introns_part2_m
 
 average_relativised_derived_allele_allele_ratio_ggplotcombined <- grid.arrange(average_relativised_derived_allele_allele_ratio_ggplot1, average_relativised_derived_allele_allele_ratio_ggplot2, nrow = 2, layout_matrix = rbind(c(rep(1,20)), c(rep(2,18),rep(NA,3))))
 ggsave(paste0(type,"_derived_allele_allele_ratio_5xonly_relative2introns_all.pdf"), width=40, height=20, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/", average_relativised_derived_allele_allele_ratio_ggplotcombined)
+
+```
+
+#####Obsolete: relative to introns.
+```{r Plot variant count results}
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+
+type="substitutions" #varssubs #variants #substitutions
+
+wd_path <- ("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
+variants_and_subst_wg <- read_tsv(paste0(wd_path,"c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_ann_individual_summary_",type,"_SNP.lr_ann.txt"))
+
+variants_and_subst_wg$dataset <- as.factor(variants_and_subst_wg$dataset)
+variants_and_subst_wg$dataset = factor(variants_and_subst_wg$dataset,levels=c("REF","GP","5x","MG")) #Reorder factor levels to: REF, GP, 5x, MG
+variants_and_subst_wg$population = factor(variants_and_subst_wg$population,levels=c("ki","no","po","sm","do"))
+print.data.frame(variants_and_subst_wg)
+
+variants_and_subst_wg_alleleR <- variants_and_subst_wg %>% mutate(synonymous=synonymous_A/intronic_A,missense=missense_A/intronic_A,mistol=missense_tol_A/intronic_A,misdel=missense_del_A/intronic_A,nonsense=nonsense_A/intronic_A,UCNE=UCNE_A/intronic_A) %>% select(c(1:4,28:33)) %>% gather(ratio,value,-species,-population,-dataset,-sample,factor_key=T)
+variants_and_subst_wg_alleleR
+
+r_average_vector <- c()
+for (r in unique(variants_and_subst_wg_alleleR$ratio)) {
+  print(r)
+  r_average <- filter(variants_and_subst_wg_alleleR,r==ratio & population=="ki") %>% select(value) %>% unlist(.,use.names=F) %>% mean()
+  r_average_vector <- c(r_average_vector,rep(r_average,nrow(filter(variants_and_subst_wg_alleleR,r==ratio))))
+}
+print(r_average_vector)
+
+relativised_variants_and_subst_wg_alleleR <- mutate(variants_and_subst_wg_alleleR, ki_relative_value=value/r_average_vector)
+
+relativised_derived_allele_allele_ratio_ggplot <- ggplot(data=relativised_variants_and_subst_wg_alleleR, aes(population,ki_relative_value,colour=population)) +
+  #facet_wrap(feature ~ species,nrow=6,ncol=2,scales="free") +
+  facet_grid(ratio ~ .,scales="fixed") +
+  geom_boxplot(width=0.5) +
+  #ggtitle("Proportion of reads at different NM") +
+  ylab("ratio") +
+  scale_y_continuous(breaks = seq(0.5, 1.2, by = 0.2)) +
+  ylim(0.5,1.2) +
+  ggtitle(paste0("ratio of ",type," relative to intronic and Kirov")) +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+        rect=element_rect(size=1),
+        axis.line=element_line(colour="black"),
+        axis.title=element_text(size=16),
+        #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
+        #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+        #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+        panel.background=element_blank(),
+        panel.border=element_rect(colour="black"),
+        #panel.grid=element_blank(),
+        #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+        plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+        #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+        legend.background=element_rect(linetype="solid", colour="black", size=.5),
+        #legend.justification=c(0,0),
+        legend.key=element_rect(colour="white"),
+        #legend.key.size=unit(1.3,"cm"),
+        #legend.position=c(0.07,0.84),
+        legend.title=element_blank()
+  )
+  relativised_derived_allele_allele_ratio_ggplot
+ggsave(paste0(type,"_derived_allele_allele_ratio_relative2introns.pdf"), width=15, height=15, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
 
 ```
 
@@ -7291,6 +7472,170 @@ ggsave(paste0(type,"_all_",plot_variable,"_joint_calling_joint_estimate_mean_all
 
 ```
 
+####All individuals: SYN and NSYN breakdowns relative to totals.
+```{r Calculate PI per category}
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+
+#Define the following variables:
+type="varssubs" #varssubs #variants #substitutions #segregating #private_segregating
+plot_variable <- "het_by_total_filter" #het_by_total_filter #het_by_total (for a filtered or unfiltered denominator)
+
+#Import heterozygous counts and change to tidy format:
+wd_path <- ("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
+variant_files <- grep(list.files("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/", pattern=paste0("*origcov_ann_individual_summary_heterozygous_",type,"_SNP.lr_ann.txt")),pattern='wrong',inv=T,value=T)
+variants_het <- read_tsv(paste0(wd_path,variant_files))
+
+variants_het$dataset <- as.factor(variants_het$dataset)
+variants_het$dataset = factor(variants_het$dataset,levels=c("REF","GP","5x","MG")) #Reorder factor levels to: REF, GP, 5x, MG
+variants_het$population = factor(variants_het$population,levels=c("ki","no","po","sm","do"))
+print.data.frame(variants_het)
+
+variants_het_tidy <- variants_het %>% gather(feature,N,-species,-population,-dataset,-sample,factor_key=T)
+variants_het_tidy$feature <- gsub('_H', '', variants_het_tidy$feature)
+variants_het_tidy$feature <- gsub('intronic', 'intron', variants_het_tidy$feature)
+variants_het_tidy$feature <- gsub('coding', 'CDS', variants_het_tidy$feature)
+variants_het_tidy
+
+#Import total sites data and cross it with the heterozygous counts to estimate neutral PI:
+total_sites <- read_tsv("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/whole_genome_counts/category_sites_total_counts_percategoryfilter_corrected.lr_ann.txt") 
+total_sites
+
+#For coding categories, we'll follow the proportions estimated by Yamaguchi-Kagata et al (see here: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2561068/): 28.5% SYN, 68.1% NSYN, and 3.4% NONSENSE. From my own classification of SYN, 16.9% were PREF and 50.8% were UNPREF. From my own classification of NSYN, 60.8% were NTOL and 39.2% were NDEL. So the totals would be: 28.5% SYN (4.8% PREF, 14.5% UNPREF), 68.1% NSYN (41.4% NTOL, 26.7% NDEL), and 3.4% NONSENSE.
+coding_proportions <- data_frame("coding_category"=c("synonymous","syn_pref","syn_unpref","missense","mistol","misdel","nonsense"),"proportion"=c(0.285,0.285,0.285,0.681,0.681,0.681,0.034)) #create dataframe with these numbers and loop over it to add their estimated total counts to total_sites:
+for (row in seq(1,nrow(coding_proportions))) {
+  coding_category <- unlist(coding_proportions[row,1],use.names=F)
+  print(coding_category)
+  proportion <- unlist(coding_proportions[row,2],use.names=F)
+  print(proportion)
+  total_sites <- rbind(total_sites,c(coding_category,NA,NA,round(proportion*unlist(total_sites[which(total_sites$category=="CDS"),4],use.names=F)),NA,round(proportion*unlist(total_sites[which(total_sites$category=="CDS"),6],use.names=F))))
+  total_sites$callable_N <- as.numeric(total_sites$callable_N)
+  total_sites$callable_N_postfilter <- as.numeric(total_sites$callable_N_postfilter)
+}
+total_sites
+
+#For UCNE categories, I calculated the proportion of total sites under each GERP category in the ucne_database script (section named: "Calculate proportion of sites for each GERP category"). These are: 3.0% UCNE_low, 26.3% UCNE_mid, 70.7% UCNE_high.
+ucne_proportions <- data_frame("ucne_category"=c("UCNE_low","UCNE_mid","UCNE_high"),"proportion"=c(0.030,0.263,0.707)) #create dataframe with these numbers and loop over it to add their estimated total counts to total_sites:
+for (row in seq(1,nrow(ucne_proportions))) {
+  ucne_category <- unlist(ucne_proportions[row,1],use.names=F)
+  print(ucne_category)
+  proportion <- unlist(ucne_proportions[row,2],use.names=F)
+  print(proportion)
+  total_sites <- rbind(total_sites,c(ucne_category,NA,NA,round(proportion*unlist(total_sites[which(total_sites$category=="UCNE"),4],use.names=F)),NA,round(proportion*unlist(total_sites[which(total_sites$category=="UCNE"),6],use.names=F))))
+  total_sites$callable_N <- as.numeric(total_sites$callable_N)
+  total_sites$callable_N_postfilter <- as.numeric(total_sites$callable_N_postfilter)
+}
+total_sites
+
+total_sites$category <- factor(total_sites$category,levels=c("total","intergenic","intron","CDS","synonymous","syn_pref","syn_unpref","missense","mistol","misdel","nonsense","UCNE","UCNE_low","UCNE_mid","UCNE_high"))
+total_sites <- total_sites[order(total_sites$category),]
+#write_tsv(total_sites,paste0("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/whole_genome_counts/complete_category_sites_total_counts_percategoryfilter_corrected.lr_ann.txt"))
+
+variants_het_joined_all <- left_join(variants_het_tidy,total_sites,by=c("feature"="category")) %>% mutate(het_by_total=N/callable_N,het_by_total_filter=N/callable_N_postfilter)
+variants_het_joined_all$feature = factor(variants_het_joined_all$feature,levels=c("total","intergenic","intron","CDS","synonymous","syn_pref","syn_unpref","missense","mistol","misdel","nonsense","UCNE","UCNE_low","UCNE_mid","UCNE_high")) 
+variants_het_joined_all
+
+
+#Obtain per population averages and standard errors:
+se <- function(x) sqrt(var(x)/length(x)) #first define the standard error function
+
+average_variants_het_joined_all <- data_frame("species"=character(0),"population"=character(0),"feature"=character(0),"avg_het_by_total"=character(0),"se_het_by_total"=character(0)) #next, create the empty dataframe
+
+for (pop in unique(variants_het_joined_all$population)) { #then loop over each population and feature to get the (relativised) mean and standard error, and feed the dataframe
+  print(pop)
+  species <- filter(variants_het_joined_all,feature=="total" & population==pop) %>% select(species) %>% unlist(.,use.names=F) %>% unique()
+  for (r in unique(variants_het_joined_all$feature)) {
+    print(r)
+    pop_mean <- filter(variants_het_joined_all,feature==r & population==pop) %>% select(plot_variable) %>% unlist(.,use.names=F) %>% mean()
+    #print(paste0(pop," feature ",r," average is ",pop_mean))
+    pop_se <- filter(variants_het_joined_all,feature==r & population==pop) %>% select(plot_variable) %>% unlist(.,use.names=F) %>% se()
+    #print(paste0(pop," feature ",r," std error is ",pop_se))
+    row_data <- cbind(species,pop,r,pop_mean,pop_se)
+    colnames(row_data) <- c("species","population","feature","avg_het_by_total","se_het_by_total")
+    average_variants_het_joined_all <- rbind(average_variants_het_joined_all,row_data,stringsAsFactors=F)
+  }
+}
+average_variants_het_joined_all
+average_variants_het_joined_all$population = factor(average_variants_het_joined_all$population,levels=c("ki","no","po","sm","do"))
+average_variants_het_joined_all$feature = factor(average_variants_het_joined_all$feature,levels=c("total","intergenic","intron","CDS","synonymous","syn_pref","syn_unpref","missense","mistol","misdel","nonsense","UCNE","UCNE_low","UCNE_mid","UCNE_high"))
+average_variants_het_joined_all$avg_het_by_total <- as.numeric(average_variants_het_joined_all$avg_het_by_total)
+average_variants_het_joined_all$se_het_by_total <- as.numeric(average_variants_het_joined_all$se_het_by_total)
+average_variants_het_joined_all
+#write_csv(average_variants_het_joined_all,paste0("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/genetic_load_vs_diversity/",type,"_all_",plot_variable,"_joint_calling_joint_estimate_mean.csv"))
+  
+#Plot these means and standard errors (categories with higher values):
+average_ggplot_SYN <- ggplot(data=filter(average_variants_het_joined_all,grepl('synonymous|syn_pref|syn_unpref',feature)), aes(population,avg_het_by_total,colour=population)) +
+  #facet_wrap(feature ~ species,nrow=6,ncol=2,scales="free") +
+  facet_grid(feature ~ .) +
+  geom_point() +
+  geom_errorbar(aes(ymin=avg_het_by_total-se_het_by_total, ymax=avg_het_by_total+se_het_by_total), position=position_dodge(), width=0.5) +
+  #ggtitle("Proportion of reads at different NM") +
+  xlab("Population") +
+  ylab(paste0(type," population average ",plot_variable)) +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+      rect=element_rect(size=1),
+      axis.line=element_line(colour="black"),
+      axis.title=element_text(size=16),
+      axis.text.x=element_text(angle=30,hjust=1,size=12,colour="black"),
+      axis.text.y=element_text(size=12,colour="black"),
+      #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+      panel.background=element_blank(),
+      panel.border=element_rect(colour="black"),
+      #panel.grid=element_blank(),
+      #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+      plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+      #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+      legend.background=element_rect(linetype="solid", colour="black", size=.5),
+      #legend.justification=c(0,0),
+      legend.key=element_rect(colour="white"),
+      legend.key.size=unit(0.5,"cm"),
+      legend.position="none",
+      legend.title=element_blank()
+  )
+average_ggplot_SYN
+ggsave(paste0(type,"_all_",plot_variable,"_joint_calling_joint_estimate_mean_SYN.pdf"), width=10, height=15, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/genetic_load_vs_diversity")
+
+average_ggplot_MIS <- ggplot(data=filter(average_variants_het_joined_all,grepl('missense|mistol|misdel',feature)), aes(population,avg_het_by_total,colour=population)) +
+  #facet_wrap(feature ~ species,nrow=6,ncol=2,scales="free") +
+  facet_grid(feature ~ .) +
+  geom_point() +
+  geom_errorbar(aes(ymin=avg_het_by_total-se_het_by_total, ymax=avg_het_by_total+se_het_by_total), position=position_dodge(), width=0.5) +
+  #ggtitle("Proportion of reads at different NM") +
+  xlab("Population") +
+  ylab(paste0(type," population average ",plot_variable)) +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+      rect=element_rect(size=1),
+      axis.line=element_line(colour="black"),
+      axis.title=element_text(size=16),
+      axis.text.x=element_text(angle=30,hjust=1,size=12,colour="black"),
+      axis.text.y=element_text(size=12,colour="black"),
+      #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+      panel.background=element_blank(),
+      panel.border=element_rect(colour="black"),
+      #panel.grid=element_blank(),
+      #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+      plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+      #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+      legend.background=element_rect(linetype="solid", colour="black", size=.5),
+      #legend.justification=c(0,0),
+      legend.key=element_rect(colour="white"),
+      legend.key.size=unit(0.5,"cm"),
+      legend.position="none",
+      legend.title=element_blank()
+  )
+average_ggplot_MIS
+ggsave(paste0(type,"_all_",plot_variable,"_joint_calling_joint_estimate_mean_MIS.pdf"), width=10, height=15, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/genetic_load_vs_diversity")
+
+average_ggplot_SYN_MIS_combined <- grid.arrange(average_ggplot_SYN,average_ggplot_MIS, ncol = 2)
+ggsave(paste0(type,"_all_",plot_variable,"_joint_calling_joint_estimate_mean_SYN&MIS.pdf"), width=20, height=15, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/genetic_load_vs_diversity",average_ggplot_SYN_MIS_combined)
+
+```
+
 ####5x only.
 ```{r Calculate PI per category}
 
@@ -7519,7 +7864,251 @@ ggsave(paste0(type,"_all_",plot_variable,"_joint_calling_joint_estimate_5xonly_m
 
 ```
 
+####5x only, definitive version.
+```{r Calculate PI per category}
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(egg)
+
+#Define the following variables:
+type="varssubs" #varssubs #variants #segregating #private_segregating
+plot_variable <- "het_by_total_filter" #het_by_total_filter #het_by_total (for a filtered or unfiltered denominator)
+
+#Import heterozygous counts and change to tidy format:
+wd_path <- ("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
+variant_files <- grep(list.files("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/", pattern=paste0("*origcov_ann_individual_summary_heterozygous_",type,"_SNP.lr_ann.txt")),pattern='wrong',inv=T,value=T)
+variants_het <- read_tsv(paste0(wd_path,variant_files)) %>% filter(dataset=="5x")
+
+variants_het$dataset <- as.factor(variants_het$dataset)
+variants_het$dataset = factor(variants_het$dataset,levels=c("REF","GP","5x","MG")) #Reorder factor levels to: REF, GP, 5x, MG
+variants_het$population = factor(variants_het$population,levels=c("ki","no","po","sm","do"))
+print.data.frame(variants_het)
+
+variants_het_tidy <- variants_het %>% gather(feature,N,-species,-population,-dataset,-sample,factor_key=T)
+variants_het_tidy$feature <- gsub('_H', '', variants_het_tidy$feature)
+variants_het_tidy$feature <- gsub('intronic', 'intron', variants_het_tidy$feature)
+variants_het_tidy$feature <- gsub('coding', 'CDS', variants_het_tidy$feature)
+variants_het_tidy
+
+#Import total sites data and cross it with the heterozygous counts to estimate neutral PI:
+total_sites <- read_tsv("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/whole_genome_counts/category_sites_total_counts_percategoryfilter_corrected.lr_ann.txt") 
+total_sites
+
+#For coding categories, we'll follow the proportions estimated by Yamaguchi-Kagata et al (see here: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2561068/): 28.5% SYN, 68.1% NSYN, and 3.4% NONSENSE. From my own classification of SYN, 16.9% were PREF and 50.8% were UNPREF. From my own classification of NSYN, 60.8% were NTOL and 39.2% were NDEL. So the totals would be: 28.5% SYN (4.8% PREF, 14.5% UNPREF), 68.1% NSYN (41.4% NTOL, 26.7% NDEL), and 3.4% NONSENSE.
+coding_proportions <- data_frame("coding_category"=c("synonymous","syn_pref","syn_unpref","missense","mistol","misdel","nonsense"),"proportion"=c(0.285,0.048,0.145,0.681,0.414,0.267,0.034)) #create dataframe with these numbers and loop over it to add their estimated total counts to total_sites:
+for (row in seq(1,nrow(coding_proportions))) {
+  coding_category <- unlist(coding_proportions[row,1],use.names=F)
+  print(coding_category)
+  proportion <- unlist(coding_proportions[row,2],use.names=F)
+  print(proportion)
+  total_sites <- rbind(total_sites,c(coding_category,NA,NA,round(proportion*unlist(total_sites[which(total_sites$category=="CDS"),4],use.names=F)),NA,round(proportion*unlist(total_sites[which(total_sites$category=="CDS"),6],use.names=F))))
+  total_sites$callable_N <- as.numeric(total_sites$callable_N)
+  total_sites$callable_N_postfilter <- as.numeric(total_sites$callable_N_postfilter)
+}
+total_sites
+
+#For UCNE categories, I calculated the proportion of total sites under each GERP category in the ucne_database script (section named: "Calculate proportion of sites for each GERP category"). These are: 3.0% UCNE_low, 26.3% UCNE_mid, 70.7% UCNE_high.
+ucne_proportions <- data_frame("ucne_category"=c("UCNE_low","UCNE_mid","UCNE_high"),"proportion"=c(0.030,0.263,0.707)) #create dataframe with these numbers and loop over it to add their estimated total counts to total_sites:
+for (row in seq(1,nrow(ucne_proportions))) {
+  ucne_category <- unlist(ucne_proportions[row,1],use.names=F)
+  print(ucne_category)
+  proportion <- unlist(ucne_proportions[row,2],use.names=F)
+  print(proportion)
+  total_sites <- rbind(total_sites,c(ucne_category,NA,NA,round(proportion*unlist(total_sites[which(total_sites$category=="UCNE"),4],use.names=F)),NA,round(proportion*unlist(total_sites[which(total_sites$category=="UCNE"),6],use.names=F))))
+  total_sites$callable_N <- as.numeric(total_sites$callable_N)
+  total_sites$callable_N_postfilter <- as.numeric(total_sites$callable_N_postfilter)
+}
+total_sites
+
+total_sites$category <- factor(total_sites$category,levels=c("total","intergenic","intron","CDS","synonymous","syn_pref","syn_unpref","missense","mistol","misdel","nonsense","UCNE","UCNE_low","UCNE_mid","UCNE_high"))
+total_sites <- total_sites[order(total_sites$category),]
+#write_tsv(total_sites,paste0("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/whole_genome_counts/complete_category_sites_total_counts_percategoryfilter_corrected.lr_ann.txt"))
+
+variants_het_joined_all <- left_join(variants_het_tidy,total_sites,by=c("feature"="category")) %>% mutate(het_by_total=N/callable_N,het_by_total_filter=N/callable_N_postfilter)
+variants_het_joined_all$feature = factor(variants_het_joined_all$feature,levels=c("total","intergenic","intron","CDS","synonymous","syn_pref","syn_unpref","missense","mistol","misdel","nonsense","UCNE","UCNE_low","UCNE_mid","UCNE_high")) 
+variants_het_joined_all
+
+#Obtain per population averages and standard errors:
+se <- function(x) sqrt(var(x)/length(x)) #first define the standard error function
+
+average_variants_het_joined_all <- data_frame("species"=character(0),"population"=character(0),"feature"=character(0),"avg_het_by_total"=character(0),"se_het_by_total"=character(0)) #next, create the empty dataframe
+
+for (pop in unique(variants_het_joined_all$population)) { #then loop over each population and feature to get the (relativised) mean and standard error, and feed the dataframe
+  print(pop)
+  species <- filter(variants_het_joined_all,feature=="total" & population==pop) %>% select(species) %>% unlist(.,use.names=F) %>% unique()
+  for (r in unique(variants_het_joined_all$feature)) {
+    print(r)
+    pop_mean <- filter(variants_het_joined_all,feature==r & population==pop) %>% select(plot_variable) %>% unlist(.,use.names=F) %>% mean()
+    #print(paste0(pop," feature ",r," average is ",pop_mean))
+    pop_se <- filter(variants_het_joined_all,feature==r & population==pop) %>% select(plot_variable) %>% unlist(.,use.names=F) %>% se()
+    #print(paste0(pop," feature ",r," std error is ",pop_se))
+    row_data <- cbind(species,pop,r,pop_mean,pop_se)
+    colnames(row_data) <- c("species","population","feature","avg_het_by_total","se_het_by_total")
+    average_variants_het_joined_all <- rbind(average_variants_het_joined_all,row_data,stringsAsFactors=F)
+  }
+}
+average_variants_het_joined_all
+average_variants_het_joined_all$population = factor(average_variants_het_joined_all$population,levels=c("ki","no","po","sm","do"))
+average_variants_het_joined_all$feature = factor(average_variants_het_joined_all$feature,levels=c("total","intergenic","intron","CDS","synonymous","syn_pref","syn_unpref","missense","mistol","misdel","nonsense","UCNE","UCNE_low","UCNE_mid","UCNE_high"))
+average_variants_het_joined_all$avg_het_by_total <- as.numeric(average_variants_het_joined_all$avg_het_by_total)
+average_variants_het_joined_all$se_het_by_total <- as.numeric(average_variants_het_joined_all$se_het_by_total)
+average_variants_het_joined_all
+#write_csv(average_variants_het_joined_all,paste0("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/genetic_load_vs_diversity/",type,"_all_",plot_variable,"_joint_calling_joint_estimate_mean.csv"))
+
+#Plot these means and standard errors (categories with higher values):
+scaleFUN <- function(x) sprintf("%7.1e", x)
+
+average_ggplot_all_pi_upright <- ggplot(data=filter(average_variants_het_joined_all,grepl('intron|synonymous|UCNE_low',feature)), aes(population,avg_het_by_total,colour=population)) +
+  #facet_wrap(feature ~ species,nrow=6,ncol=2,scales="free") +
+  facet_grid(. ~ feature) +
+  geom_point() +
+  geom_errorbar(aes(ymin=avg_het_by_total-se_het_by_total, ymax=avg_het_by_total+se_het_by_total), position=position_dodge(), width=0.5) +
+  #ggtitle("Proportion of reads at different NM") +
+  #xlab("Population") +
+  #ylab(paste0(type," population average ",plot_variable)) +
+  scale_y_continuous(labels=scaleFUN) +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+      rect=element_rect(size=1),
+      axis.line=element_blank(),
+      axis.title=element_text(size=16),
+      axis.text.x=element_text(angle=30,hjust=1,size=12,colour="black"),
+      axis.title.x=element_blank(),
+      axis.text.y=element_text(size=12,colour="black"),
+      axis.title.y=element_blank(),
+      panel.background=element_blank(),
+      panel.border=element_rect(colour="black",fill=NA,size=1.5),
+      strip.background=element_rect(colour="black",size=1.5),
+      #panel.grid=element_blank(),
+      #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+      plot.margin=unit(c(0.5,2,0.5,0),"cm"),
+      #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+      legend.background=element_rect(linetype="solid", colour="black", size=.5),
+      #legend.justification=c(0,0),
+      legend.key=element_rect(colour="white"),
+      legend.key.size=unit(0.5,"cm"),
+      legend.position="none",
+      legend.title=element_blank()
+  )
+average_ggplot_all_pi_upright
+
+upright_lims <- layer_scales(average_ggplot_all_pi_upright)$y$range$range
+
+average_ggplot_all_pi_upleft <- ggplot(data=filter(average_variants_het_joined_all,grepl('total|intergenic',feature)), aes(population,avg_het_by_total,colour=population)) +
+  #facet_wrap(feature ~ species,nrow=6,ncol=2,scales="free") +
+  facet_grid(. ~ feature) +
+  geom_point() +
+  geom_errorbar(aes(ymin=avg_het_by_total-se_het_by_total, ymax=avg_het_by_total+se_het_by_total), position=position_dodge(), width=0.5) +
+  #ggtitle("Proportion of reads at different NM") +
+  xlab("Population") +
+  ylab("Average nucleotide heterozygosity") +
+  scale_y_continuous(labels=scaleFUN,limits=c(upright_lims[1],upright_lims[2])) +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+      rect=element_rect(size=1),
+      axis.line=element_blank(),
+      axis.title=element_text(size=16),
+      axis.text.x=element_text(angle=30,hjust=1,size=12,colour="black"),
+      axis.title.x=element_blank(),
+      axis.text.y=element_text(size=12,colour="black"),
+      axis.title.y=element_text(margin=unit(c(0,0.5,0,0),"cm")),
+      panel.background=element_blank(),
+      panel.border=element_rect(colour="black",fill=NA,size=1.5),
+      strip.background=element_rect(colour="black",size=1.5),
+      #panel.grid=element_blank(),
+      #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+      plot.margin=unit(c(0.5,0,0.5,-2),"cm"),
+      #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+      legend.background=element_rect(linetype="solid", colour="black", size=.5),
+      #legend.justification=c(0,0),
+      legend.key=element_rect(colour="white"),
+      legend.key.size=unit(0.5,"cm"),
+      legend.position="none",
+      legend.title=element_blank()
+  )
+average_ggplot_all_pi_upleft
+
+average_ggplot_all_pi_downleft <- ggplot(data=filter(average_variants_het_joined_all,grepl('missense|UCNE_mid',feature)), aes(population,avg_het_by_total,colour=population)) +
+  #facet_wrap(feature ~ species,nrow=6,ncol=2,scales="free") +
+  facet_grid(. ~ feature) +
+  geom_point() +
+  geom_errorbar(aes(ymin=avg_het_by_total-se_het_by_total, ymax=avg_het_by_total+se_het_by_total), position=position_dodge(), width=0.5) +
+  #ggtitle("Proportion of reads at different NM") +
+  xlab("Population") +
+  ylab("Average nucleotide heterozygosity") +
+  scale_y_continuous(labels=scaleFUN) +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+      rect=element_rect(size=1),
+      axis.line=element_blank(),
+      axis.title=element_text(size=16),
+      axis.text.x=element_text(angle=30,hjust=1,size=12,colour="black"),
+      axis.text.y=element_text(size=12,colour="black"),
+      #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+      axis.title.y=element_text(margin=unit(c(0,0.5,0,0),"cm")),
+      panel.background=element_blank(),
+      panel.border=element_rect(colour="black",fill=NA,size=1.5),
+      strip.background=element_rect(colour="black",size=1.5),
+      #panel.grid=element_blank(),
+      #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+      plot.margin=unit(c(0.5,0,0.5,-2),"cm"),
+      #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+      legend.background=element_rect(linetype="solid", colour="black", size=.5),
+      #legend.justification=c(0,0),
+      legend.key=element_rect(colour="white"),
+      legend.key.size=unit(0.5,"cm"),
+      legend.position="none",
+      legend.title=element_blank()
+  )
+average_ggplot_all_pi_downleft
+
+average_ggplot_all_pi_downright <- ggplot(data=filter(average_variants_het_joined_all,grepl('nonsense|\\<UCNE\\>|UCNE_high',feature)), aes(population,avg_het_by_total,colour=population)) +
+  #facet_wrap(feature ~ species,nrow=6,ncol=2,scales="free") +
+  facet_grid(. ~ feature) +
+  geom_point() +
+  geom_errorbar(aes(ymin=avg_het_by_total-se_het_by_total, ymax=avg_het_by_total+se_het_by_total), position=position_dodge(), width=0.5) +
+  #ggtitle("Proportion of reads at different NM") +
+  xlab("Population") +
+  #ylab(paste0(type," population average ",plot_variable)) +
+  scale_y_continuous(labels=scaleFUN) +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+      rect=element_rect(size=1),
+      axis.line=element_blank(),
+      #axis.line=element_line(colour="black",size=1.5),
+      axis.title=element_text(size=16),
+      axis.text.x=element_text(angle=30,hjust=1,size=12,colour="black"),
+      axis.text.y=element_text(size=12,colour="black"),
+      axis.title.y=element_blank(),
+      panel.background=element_blank(),
+      panel.border=element_rect(colour="black",fill=NA,size=1.5),
+      strip.background=element_rect(colour="black",size=1.5),
+      #panel.grid=element_blank(),
+      #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+      plot.margin=unit(c(0.5,2,0.5,0),"cm"),
+      #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+      legend.background=element_rect(linetype="solid", colour="black", size=.5),
+      #legend.justification=c(0,0),
+      legend.key=element_rect(colour="white"),
+      legend.key.size=unit(0.5,"cm"),
+      legend.position="none",
+      legend.title=element_blank()
+  )
+average_ggplot_all_pi_downright
+
+#average_ggplot_all_pi_combined <- ggarrange(average_ggplot_all_pi_upleft,average_ggplot_all_pi_upright,average_ggplot_all_pi_downleft,average_ggplot_all_pi_downright,widths=c(1.35,2),nrow=2,ncol=2)
+
+average_ggplot_all_pi_combined <- grid.arrange(grobs=lapply(list(average_ggplot_all_pi_upleft,average_ggplot_all_pi_upright,average_ggplot_all_pi_downleft,average_ggplot_all_pi_downright), set_panel_size,width=unit(4.5,"cm"),height=unit(10,"cm")),nrow=2)
+
+ggsave(paste0(type,"_",plot_variable,"_5xonly_mean_definitive.pdf"), width=29, height=26, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/genetic_load_vs_diversity",average_ggplot_all_pi_combined)
+
+```
+
 ###Calculate relative amount of derived alleles per category (joint calling; estimated joint totals from the variants only filters and from published proportions for CDS).
+####All individuals.
 ```{r Calculate PI per category}
 
 library(readr)
@@ -7745,7 +8334,171 @@ ggsave(paste0(type,"_all_",plot_variable,"_joint_calling_joint_estimate_mean_all
 
 ```
 
-###Calculate individual heterozygosity per category (joint calling; split totals).
+####All individuals: SYN and NSYN breakdowns relative to totals.
+```{r Calculate PI per category}
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(gridExtra)
+
+type="varssubs" #varssubs #variants #substitutions #private_segregating #fixed
+plot_variable <- "rda_by_total_filter" #rda_by_total_filter #rda_by_total (for a filtered or unfiltered denominator)
+
+#Import derived counts and change to tidy format:
+wd_path <- ("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
+variant_files <- grep(list.files("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/", pattern=paste0("*origcov_ann_individual_summary_",type,"_SNP.lr_ann.txt")),pattern='wrong',inv=T,value=T)
+variants_rda <- read_tsv(paste0(wd_path,variant_files)) %>% select(-c(34:37))
+
+variants_rda$dataset <- as.factor(variants_rda$dataset)
+variants_rda$dataset = factor(variants_rda$dataset,levels=c("REF","GP","5x","MG")) #Reorder factor levels to: REF, GP, 5x, MG
+variants_rda$population = factor(variants_rda$population,levels=c("ki","no","po","sm","do"))
+print.data.frame(variants_rda)
+
+variants_rda_tidy <- variants_rda %>% gather(feature,N,-species,-population,-dataset,-sample,factor_key=T) %>% filter(!grepl("_V",feature))
+variants_rda_tidy$feature <- gsub('_A', '', variants_rda_tidy$feature)
+variants_rda_tidy$feature <- gsub('intronic', 'intron', variants_rda_tidy$feature)
+variants_rda_tidy$feature <- gsub('coding', 'CDS', variants_rda_tidy$feature)
+variants_rda_tidy
+
+#Import total sites data and cross it with the derived counts to estimate RDA:
+total_sites <- read_tsv("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/whole_genome_counts/category_sites_total_counts_percategoryfilter_corrected.lr_ann.txt") 
+total_sites
+
+#For coding categories, we'll follow the proportions estimated by Yamaguchi-Kagata et al (see here: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2561068/): 28.5% SYN, 68.1% NSYN, and 3.4% NONSENSE. From my own classification of SYN, 16.9% were PREF and 50.8% were UNPREF. From my own classification of NSYN, 60.8% were NTOL and 39.2% were NDEL. So the totals would be: 28.5% SYN (4.8% PREF, 14.5% UNPREF), 68.1% NSYN (41.4% NTOL, 26.7% NDEL), and 3.4% NONSENSE.
+coding_proportions <- data_frame("coding_category"=c("synonymous","syn_pref","syn_unpref","missense","missense_tol","missense_del","nonsense"),"proportion"=c(0.285,0.285,0.285,0.681,0.681,0.681,0.034)) #create dataframe with these numbers and loop over it to add their estimated total counts to total_sites:
+for (row in seq(1,nrow(coding_proportions))) {
+  coding_category <- unlist(coding_proportions[row,1],use.names=F)
+  print(coding_category)
+  proportion <- unlist(coding_proportions[row,2],use.names=F)
+  print(proportion)
+  total_sites <- rbind(total_sites,c(coding_category,NA,NA,round(proportion*unlist(total_sites[which(total_sites$category=="CDS"),4],use.names=F)),NA,round(proportion*unlist(total_sites[which(total_sites$category=="CDS"),6],use.names=F))))
+  total_sites$callable_N <- as.numeric(total_sites$callable_N)
+  total_sites$callable_N_postfilter <- as.numeric(total_sites$callable_N_postfilter)
+}
+total_sites
+
+#For UCNE categories, I calculated the proportion of total sites under each GERP category in the ucne_database script (section named: "Calculate proportion of sites for each GERP category"). These are: 3.0% UCNE_low, 26.3% UCNE_mid, 70.7% UCNE_high.
+ucne_proportions <- data_frame("ucne_category"=c("UCNE_low","UCNE_mid","UCNE_high"),"proportion"=c(0.030,0.263,0.707)) #create dataframe with these numbers and loop over it to add their estimated total counts to total_sites:
+for (row in seq(1,nrow(ucne_proportions))) {
+  ucne_category <- unlist(ucne_proportions[row,1],use.names=F)
+  print(ucne_category)
+  proportion <- unlist(ucne_proportions[row,2],use.names=F)
+  print(proportion)
+  total_sites <- rbind(total_sites,c(ucne_category,NA,NA,round(proportion*unlist(total_sites[which(total_sites$category=="UCNE"),4],use.names=F)),NA,round(proportion*unlist(total_sites[which(total_sites$category=="UCNE"),6],use.names=F))))
+  total_sites$callable_N <- as.numeric(total_sites$callable_N)
+  total_sites$callable_N_postfilter <- as.numeric(total_sites$callable_N_postfilter)
+}
+total_sites
+
+total_sites$category <- factor(total_sites$category,levels=c("total","intergenic","intron","CDS","synonymous","syn_pref","syn_unpref","missense","missense_tol","missense_del","nonsense","UCNE","UCNE_low","UCNE_mid","UCNE_high"))
+total_sites <- total_sites[order(total_sites$category),]
+#write_tsv(total_sites,paste0("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/whole_genome_counts/complete_category_sites_total_counts_percategoryfilter_corrected.lr_ann.txt"))
+
+variants_rda_joined_all <- left_join(variants_rda_tidy,total_sites,by=c("feature"="category")) %>% mutate(rda_by_total=N/callable_N,rda_by_total_filter=N/callable_N_postfilter)
+variants_rda_joined_all$feature = factor(variants_rda_joined_all$feature,levels=c("total","intergenic","intron","CDS","synonymous","syn_pref","syn_unpref","missense","missense_tol","missense_del","nonsense","UCNE","UCNE_low","UCNE_mid","UCNE_high")) 
+variants_rda_joined_all
+
+#Obtain per population averages and standard errors:
+se <- function(x) sqrt(var(x)/length(x)) #first define the standard error function
+
+average_variants_rda_joined_all <- data_frame("species"=character(0),"population"=character(0),"feature"=character(0),"avg_rda"=character(0),"se_rda"=character(0)) #next, create the empty dataframe
+for (pop in unique(variants_rda_joined_all$population)) { #then loop over each population and feature to get the (relativised) mean and standard error, and feed the dataframe
+  print(pop)
+  species <- filter(variants_rda_joined_all,feature=="total" & population==pop) %>% select(species) %>% unlist(.,use.names=F) %>% unique()
+  for (r in unique(variants_rda_joined_all$feature)) {
+    print(r)
+    pop_mean <- filter(variants_rda_joined_all,feature==r & population==pop) %>% select(plot_variable) %>% unlist(.,use.names=F) %>% mean()
+    #print(paste0(pop," feature ",r," average is ",pop_mean))
+    pop_se <- filter(variants_rda_joined_all,feature==r & population==pop) %>% select(plot_variable) %>% unlist(.,use.names=F) %>% se()
+    #print(paste0(pop," feature ",r," std error is ",pop_se))
+    row_data <- cbind(species,pop,r,pop_mean,pop_se)
+    colnames(row_data) <- c("species","population","feature","avg_rda","se_rda")
+    average_variants_rda_joined_all <- rbind(average_variants_rda_joined_all,row_data,stringsAsFactors=F)
+  }
+}
+average_variants_rda_joined_all
+average_variants_rda_joined_all$population = factor(average_variants_rda_joined_all$population,levels=c("ki","no","po","sm","do"))
+average_variants_rda_joined_all$feature = factor(average_variants_rda_joined_all$feature,levels=c("total","intergenic","intron","CDS","synonymous","syn_pref","syn_unpref","missense","missense_tol","missense_del","nonsense","UCNE","UCNE_low","UCNE_mid","UCNE_high"))
+average_variants_rda_joined_all$avg_rda <- as.numeric(average_variants_rda_joined_all$avg_rda)
+average_variants_rda_joined_all$se_rda <- as.numeric(average_variants_rda_joined_all$se_rda)
+average_variants_rda_joined_all
+#write_csv(average_variants_rda_joined_all,paste0("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/genetic_load_vs_diversity/",type,"_all_",plot_variable,"_joint_calling_joint_estimate_mean.csv"))
+
+#Plot these means and standard errors (categories with higher values):
+average_ggplot_SYN <- ggplot(data=filter(average_variants_rda_joined_all,grepl('synonymous|syn_pref|syn_unpref',feature)), aes(population,avg_rda,colour=population)) +
+  #facet_wrap(feature ~ species,nrow=6,ncol=2,scales="free") +
+  facet_grid(feature ~ .) +
+  geom_point() +
+  geom_errorbar(aes(ymin=avg_rda-se_rda, ymax=avg_rda+se_rda), position=position_dodge(), width=0.5) +
+  #ggtitle("Proportion of reads at different NM") +
+  xlab("Population") +
+  ylab(paste0(type," population average ",plot_variable)) +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+      rect=element_rect(size=1),
+      axis.line=element_line(colour="black"),
+      axis.title=element_text(size=16),
+      axis.text.x=element_text(angle=30,hjust=1,size=12,colour="black"),
+      axis.text.y=element_text(size=12,colour="black"),
+      #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+      panel.background=element_blank(),
+      panel.border=element_rect(colour="black"),
+      #panel.grid=element_blank(),
+      #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+      plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+      #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+      legend.background=element_rect(linetype="solid", colour="black", size=.5),
+      #legend.justification=c(0,0),
+      legend.key=element_rect(colour="white"),
+      legend.key.size=unit(0.5,"cm"),
+      legend.position="none",
+      legend.title=element_blank()
+  )
+average_ggplot_SYN
+ggsave(paste0(type,"_all_",plot_variable,"_joint_calling_joint_estimate_mean_SYN.pdf"), width=10, height=15, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/genetic_load_vs_diversity")
+
+#Plot these means and standard errors (categories with intermediate values):
+average_ggplot_MIS <- ggplot(data=filter(average_variants_rda_joined_all,grepl('missense|missense_tol|missense_del',feature)), aes(population,avg_rda,colour=population)) +
+  #facet_wrap(feature ~ species,nrow=6,ncol=2,scales="free") +
+  facet_grid(feature ~ .) +
+  geom_point() +
+  geom_errorbar(aes(ymin=avg_rda-se_rda, ymax=avg_rda+se_rda), position=position_dodge(), width=0.5) +
+  #ggtitle("Proportion of reads at different NM") +
+  xlab("Population") +
+  ylab(paste0(type," population average ",plot_variable)) +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+      rect=element_rect(size=1),
+      axis.line=element_line(colour="black"),
+      axis.title=element_text(size=16),
+      axis.text.x=element_text(angle=30,hjust=1,size=12,colour="black"),
+      axis.text.y=element_text(size=12,colour="black"),
+      #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+      panel.background=element_blank(),
+      panel.border=element_rect(colour="black"),
+      #panel.grid=element_blank(),
+      #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+      plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+      #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+      legend.background=element_rect(linetype="solid", colour="black", size=.5),
+      #legend.justification=c(0,0),
+      legend.key=element_rect(colour="white"),
+      legend.key.size=unit(0.5,"cm"),
+      legend.position="none",
+      legend.title=element_blank()
+  )
+average_ggplot_MIS
+ggsave(paste0(type,"_all_",plot_variable,"_joint_calling_joint_estimate_mean_MIS.pdf"), width=10, height=15, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/genetic_load_vs_diversity")
+
+average_ggplot_SYN_MIS_combined <- grid.arrange(average_ggplot_SYN,average_ggplot_MIS, ncol = 2)
+ggsave(paste0(type,"_all_",plot_variable,"_joint_calling_joint_estimate_mean_SYN&MIS.pdf"), width=20, height=15, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/genetic_load_vs_diversity",average_ggplot_SYN_MIS_combined)
+
+```
+
+###Obsolete:
+####Calculate individual heterozygosity per category (joint calling; split totals).
 ```{r Calculate PI per category}
 
 library(readr)
@@ -7813,7 +8566,7 @@ ggsave(paste0(type,"_coding_PI_joint_calling.pdf"), width=10, height=20, units="
 
 ```
 
-###Calculate individual heterozygosity per category (separate calling).
+####Calculate individual heterozygosity per category (separate calling).
 ```{r Calculate PI per category}
 
 library(readr)
@@ -7879,7 +8632,7 @@ ggsave("coding_PI.pdf", width=10, height=20, units="cm", device="pdf", path="/Us
 
 ```
 
-###Plot genetic load vs. diversity graphs (joint callings).
+####Plot genetic load vs. diversity graphs (joint callings).
 ```{r Plot genetic load vs. diversity graphs}
 
 library(readr)
@@ -8029,7 +8782,7 @@ ggsave(paste0(type,"_LOF_S_ratio_vs_diversity_joint_calling.pdf"), width=15, hei
 
 ```
 
-###Plot genetic load vs. diversity graphs (separate callings).
+####Plot genetic load vs. diversity graphs (separate callings).
 ```{r Plot genetic load vs. diversity graphs}
 
 library(readr)
@@ -8138,7 +8891,7 @@ ggsave("LOF_S_ratio_vs_diversity.pdf", width=15, height=10, units="cm", device="
 
 ```
 
-###Obtain heterozygosity reduction (HR).
+####Obtain heterozygosity reduction (HR).
 ```{r Obtain heterozygosity reduction (HR)}
 
 HR_table <- left_join(variants_het_joined_coding,variants_het_joined_all %>% filter(feature=="intron") %>% mutate(PI=N/total_N_depth_correction) %>% select(-c(5:8)),by=c("species","population","dataset","sample"),suffix=c("_coding", "_intron")) %>% mutate(HR=(PI_intron-PI_coding)/PI_intron)
