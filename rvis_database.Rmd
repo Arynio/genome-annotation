@@ -72,6 +72,7 @@ join -1 2 -2 2 -t $'\t' <(sort -k 2b,2 lypa_orthologs_gene_names_uniprot_codes.t
 ###Combine both:
 ```{bash}
 
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/rvis
 cat lypa_*_rvis_database_uniprot_joined.txt | sort -k2,2 | uniq > lypa_rvis_database_uniprot_joined.txt
 
 ```
