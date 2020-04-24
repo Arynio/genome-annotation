@@ -901,3 +901,53 @@ ggsave(paste0(type,"_derived_allele_allele_ratio_relative2synonymous_methodB.pdf
 
 ```
 
+
+```{bash}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov) #write down name of the calling
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome (first eight scaffolds only)
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING)
+POPS=$(echo $CALLING | fold -w8 | cut -c1-7 | head -n$N_POPS | sort | uniq)
+SPECIES=$(echo $CALLING | fold -w8 | cut -c1-4 | head -n$N_POPS | sort | uniq)
+COVERAGE=$(echo "${CALLING}" | rev | cut -d'_' -f1 | rev)
+NM_COV=$(echo "${CALLING}" | rev | cut -d'_' -f1,2 | rev)
+FILE=$(echo ${CALLING}_polarized_filtered2_${TYPE}.lr_ann.vcf) #This file was generated in section 11 after applying the per dataset depth filtering to the varssubs file.
+echo "input file is" $FILE
+s=(c_ll)
+cat ${s}_samples.txt
+echo "retrieving derived varssubs positions for species" $s
+java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+-T SelectVariants \
+-R $REF \
+-V $FILE \
+-o ${s}_varssubs.borrar \
+-env \
+--sample_file ${s}_samples.txt
+echo "retrieving derived segregating positions for species" $s
+bcftools view -i "AC/AN > 0 & AC/AN < 1" ${s}_varssubs.borrar -Ov -o ${s}_segregating.borrar
+echo "retrieving derived fixed positions for species" $s
+bcftools view -i "AC/AN = 1" ${s}_varssubs.borrar -Ov -o ${s}_fixed.borrar
+
+INDIVIDUALS=$(bcftools query -l c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filtered2_SNP.lr_ann.vcf | grep "ki")
+for i in ${INDIVIDUALS[@]}
+  do
+  echo "${i}"
+  grep -E '#|stop_gained' c_ll_fixed.borrar | bcftools view -Ou -s "${i}" | bcftools query -f '%INFO/AC\t%INFO/AN[\t%GT]\n' | awk '$1 >= 1' | wc -l
+  done
+  
+INDIVIDUALS=$(bcftools query -l c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filtered2_SNP.lr_ann.vcf | grep "sm")
+for i in ${INDIVIDUALS[@]}
+  do
+  echo "${i}"
+  grep -E '#|stop_gained' c_lp_fixed.borrar | bcftools view -Ou -s "${i}" | bcftools query -f '%INFO/AC\t%INFO/AN[\t%GT]\n' | awk '$1 >= 1' | wc -l
+  done
+
+
+
+```
