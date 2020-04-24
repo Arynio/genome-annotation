@@ -38,7 +38,6 @@ for chr in ${CHROMOSOMES[@]}
 
 ```
 
-
 #2: Perform variant calling. Both Lynx pardinus and Lynx lynx together, all samples at their original cov (~6-25x). A joint calling allows the tracking of substitutions, as monomorphic positions (incl. substitutions) are NOT included/polarized in the separate callings.
 ##All positions:
 ```{r Perform variant calling, eval=FALSE, engine='bash'}
@@ -122,25 +121,103 @@ bcftools query -l ${CALLING}_nr.vcf #check sample names... yes, they are all cor
 ```
 
 #3: Prepare annotation file.
+##A: NCBI annotation.
 ```{bash}
 
 #The annotation file was downloaded from: "https://www.ncbi.nlm.nih.gov/genome/?term=lynx+canadensis" in GFF format and stored as /GRUPOS/grupolince/reference_genomes/lynx_canadensis/GCF_007474595.1_mLynCan4_v1.p_genomic.gff3
 
 #Since this annotation file uses RefSeq names, but the reference genome uses scaffolds, a conversion is necessary. I downloaded the assembly definition from https://www.ncbi.nlm.nih.gov/assembly/GCA_007474595.1 and saved the chromosome-refseq equivalence in /GRUPOS/grupolince/reference_genomes/lynx_canadensis/lc_ref_refseq_equivalence.txt
 
-#The following code replaces all refsew names in the annotation file with their respective scaffold names:
+#The following code replaces all refseq names in the annotation file with their respective scaffold names:
 cd /GRUPOS/grupolince/reference_genomes/lynx_canadensis/
-scp GCF_007474595.1_mLynCan4_v1.p_genomic.gff3 lc4.gff3
+scp GCF_007474595.1_mLynCan4_v1.p_genomic.gff3 lc4.NCBI.temp.gff3
 REFSEQ=$(cat lc_ref_refseq_equivalence.txt | cut -f3)
 for seq in ${REFSEQ[@]}
   do
   SCAFFOLD=$(grep "${seq}" lc_ref_refseq_equivalence.txt | cut -f1)
   echo $seq "is scaffold" $SCAFFOLD
-  sed -i "s/$seq/$SCAFFOLD/g" lc4.gff3
+  sed -i "s/$seq/$SCAFFOLD/g" lc4.NCBI.temp.gff3
   done
 
 #Then remove the annotation for unassigned chromosomes (from row 1264033 onwards):
-head lc4.gff3 -n1264032 > lc4_final.gff3
+head lc4.NCBI.temp.gff3 -n1264032 > lc4.NCBI.gff3
+
+#Finally, for each gene remove all transcripts except for the main insoform:
+screen -S lc4.NCBI.nr_main.gff3.log
+script lc4.NCBI.nr_main.gff3.log
+
+rm lc4.NCBI.nr_main.gff3
+grep -v '#' lc4.NCBI.gff3 | awk '$3=="mRNA"' > lc4.NCBI.isoforms
+GENES=$(grep -v '#' lc4.NCBI.gff3 | awk '$3=="mRNA"' | awk -F"Dbxref=GeneID:|," '{printf ("%s\n", $2)}' | sort | uniq)
+TOTAL=$(echo "$GENES" | wc -l)
+COUNTER=0
+echo "processed $COUNTER genes out of $TOTAL"
+for gen in ${GENES[@]}
+  do
+  #echo $gen
+  MAIN_RNA=$(grep -w $gen lc4.NCBI.isoforms | head -n1 | awk -F"=|;" '{printf ("%s\n", $2)}')
+  grep -v '#' lc4.NCBI.gff3 | awk '$3=="gene"' | grep "$gen" >> lc4.NCBI.nr_main.gff3 #add gene row of the main isoform to the gff3
+  grep -w $MAIN_RNA lc4.NCBI.gff3 >> lc4.NCBI.nr_main.gff3 #add mRNA, exon & CDS rows of the main isoform to the gff3
+  ((COUNTER++))
+  if [ $(( $COUNTER % 100 )) == 0 ]
+    then
+    echo "processed $COUNTER genes out of $TOTAL"
+  fi
+  done
+
+sort -k1,1 -k4,4n -k5,5n lc4.NCBI.nr_main.gff3 > lc4.NCBI.nr_main.sorted.gff3
+mv lc4.NCBI.nr_main.sorted.gff3 lc4.NCBI.nr_main.gff3
+
+```
+
+##B: UCSC annotation.
+```{bash}
+
+#Annotation alternative B: UCSC. Downloaded from https://genome-euro.ucsc.edu/cgi-bin/hgTables (group: genes; track: augustus) and uploaded to the server as: /GRUPOS/grupolince/reference_genomes/lynx_canadensis/lynx_canadensis.mLynCan4_v1.UCSC.gtf
+
+#Annotation alternative C: ftp://ftp.ensembl.org/pub/release-99/gff3/lynx_canadensis/
+
+#I downloaded the assembly structure report from https://www.ncbi.nlm.nih.gov/assembly/GCF_007474595.1/ and saved the chromosome-scaffold equivalence in /GRUPOS/grupolince/reference_genomes/lynx_canadensis/lc_ref_coordinates_equivalence.txt
+
+#The following code replaces all chromosome names in the annotation file with their respective scaffold names:
+cd /GRUPOS/grupolince/reference_genomes/lynx_canadensis/
+grep -vE 'chrM|chrUn' lynx_canadensis.mLynCan4_v1.UCSC.gtf | sort -k1,1 > lc4.UCSC.gtf
+
+CHROMOSOMES=$(cat lc_ref_coordinates_equivalence.txt | cut -f2)
+for chr in ${CHROMOSOMES[@]}
+  do
+  SCAFFOLD=$(grep "${chr}" lc_ref_coordinates_equivalence.txt | cut -f1)
+  echo $chr "is scaffold" $SCAFFOLD
+  sed -i "s/$chr/$SCAFFOLD/g" lc4.UCSC.gtf
+  done
+
+#Then for each gene remove all transcripts except for the first one (the main insoform):
+grep '.t1' lc4.UCSC.gtf | sort -k1,1 -k9,9 -k4,4n | awk -F"\t" '{printf ("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", $1, "augustus", $3, $4, $5, ".", $7, $8, $9)}' > lc4.UCSC.nr_first.gtf
+
+#Or for each gene remove all transcripts except for the longest one (the main insoform):
+#CHECK CODE FIRST
+awk -F"\t|\"" '{printf ("%s\n", $10)}' lc4.UCSC.gtf | sort | uniq > lc4.UCSC.isoforms
+GENES=$(cut -d'.' -f1 lc4.UCSC.isoforms | sort | uniq | less -S)
+for gen in ${GENES[@]}
+  do
+  echo $gen
+  RNAs=$(grep -w $gen lc4.UCSC.isoforms)
+  N_RNAs=$(echo "$RNAs" | wc -l)
+  if [ N_RNAs == 1 ]
+    then
+    echo $RNAs >> lc4.UCSC.nr_main.isoforms
+    else
+      for rna in ${RNAs[@]}
+        do
+        echo $rna
+        LENGTH_RNA=$(grep -w $rna lc4.UCSC.gtf | awk -F"\t" '$3 == "CDS" {printf ("%s\n", $5-$4)}' | paste -sd+ | bc)
+        echo -e "$rna\t$LENGTH_RNA" >> $gen.temp.borrar
+        done
+      MAIN_RNA=$(sort -k2,2n $gen.temp.borrar | head -n1)
+      echo $MAIN_RNA >> lc4.UCSC.nr_main.isoforms
+      rm $gen.temp.borrar
+  done
+  grep -F -f lc4.UCSC.nr_main.isoforms lc4.UCSC.gtf > lc4.UCSC.nr_main.gtf
 
 ```
 
@@ -306,14 +383,18 @@ LYRU.LYCA4.genome : Bobcat #from now on, LYRU.LYCA4 is the code (in snpEff) for 
 ###Create directory and move files
 ```{r Set up SnpEff, eval=FALSE, engine='bash'}
 
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+
 #First for the regular annotation:
-mkdir $C_PATH/data/LYRU.LYCA4 #create a directory inside the software's dependencies whose name matches the code
+mkdir -p $C_PATH/data/LYRU.LYCA4 #create a directory inside the software's dependencies whose name matches the code
 cd $C_PATH/data/LYRU.LYCA4
 
-scp /GRUPOS/grupolince/reference_genomes/lynx_canadensis/lc4_final.gff3 $C_PATH/data/LYRU.LYCA4/ #copy the annotation file (can be gff or gtf) to the newly created directory. This gff file includes CDS, introns, exons and genes, so it's very basic. A more complex version that Maria created which includes lncRNAs, etc., will be considered as custom annotation.
-mv lc4_final.gff3 genes.gff #rename the file as the tutorial indicates
+scp /GRUPOS/grupolince/reference_genomes/lynx_canadensis/lc4.NCBI.nr_main.gff3 $C_PATH/data/LYRU.LYCA4/ #copy the annotation file (can be gff or gtf) to the newly created directory. This gff file includes CDS, introns, exons and genes, so it's very basic. A more complex version that Maria created which includes lncRNAs, etc., will be considered as custom annotation.
+mv lc4.NCBI.nr_main.gff3 genes.gff #rename the file as the tutorial indicates. Use the .gff3 ending for gff files and .gtf22 for gtf files.
 
-mkdir $C_PATH/data/genomes #create a directory inside the software's dependencies called genomes
+mkdir -p $C_PATH/data/genomes #create a directory inside the software's dependencies called genomes
 cd $C_PATH/data/genomes
 scp /GRUPOS/grupolince/reference_genomes/lynx_canadensis/lr1_based_on_lc4.fa $C_PATH/data/genomes #copy the reference genome fasta to the new genomes directory
 mv lr1_based_on_lc4.fa LYRU.LYCA4.fa #rename the file so that it matches the code
@@ -323,6 +404,10 @@ mv lr1_based_on_lc4.fa LYRU.LYCA4.fa #rename the file so that it matches the cod
 ###Build the database
 ```{r Set up SnpEff, eval=FALSE, engine='bash'}
 
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+
 cd $C_PATH
 screen -S build_LYRU.LYCA4_snpEff_db #open a dettachable screen in case the database building takes too long
 script build_LYRU.LYCA4_snpEff_db.txt #initiate the log file
@@ -331,7 +416,8 @@ S_PATH=/opt/snpEff #redefine the variable, since we're inside a script
 C_PATH=/home/dkleinman/datos/snpEff #redefine the variable, since we're inside a script
 
 cd $S_PATH
-java -jar snpEff.jar build -gff3 -v LYRU.LYCA4 -c $C_PATH/snpEff.config -dataDir $C_PATH/data #build the database. Use the -gff3 command for gff files and -gtf22 for gtf files. Use -v for verbose (expanded information on the processes and the warnings/errors that may appear). Use -c to indicate the path to my own config file. Then use -dataDir to override the data directory from the config file (by default the software thinks that the data folder with the genome and the genes files is located where config is, so it's necessary to give it the correct path).
+java -jar snpEff.jar build -gff3 -v LYRU.LYCA4 -c $C_PATH/snpEff.config -dataDir $C_PATH/data
+#build the database. Use the -gff3 command for gff files and -gtf22 for gtf files. Use -v for verbose (expanded information on the processes and the warnings/errors that may appear). Use -c to indicate the path to my own config file. Then use -dataDir to override the data directory from the config file (by default the software thinks that the data folder with the genome and the genes files is located where config is, so it's necessary to give it the correct path).
 
 ctrl + D #terminate the script
 ctrl + D #terminate the screen
@@ -339,15 +425,7 @@ ctrl + D #terminate the screen
 ```
 
 #6: Annotate using SnpEff.
-##Create custom annotation bed file
-
-```{r Annotate using SnpEff, eval=FALSE, engine='bash'}
-
-
-```
-
-##Annotate the VCF with custom annotation
-
+##Annotate the VCF with default annotation:
 ```{r Annotate using SnpEff, eval=FALSE, engine='bash'}
 
 CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_lcnm3_origcov)
@@ -366,7 +444,953 @@ cd $O_PATH #run this code from the directory where the config is located.
 java -Xmx16g -jar $S_PATH/snpEff.jar LYRU.LYCA4 -v -s $V_PATH/$CALLING/annotation/"${CALLING}_polarized.lr_ann.html" -csvStats $V_PATH/$CALLING/annotation/"${CALLING}_polarized.lr_ann.csv" $V_PATH/$CALLING/"${CALLING}_polarized.vcf" > $V_PATH/$CALLING/annotation/"${CALLING}_polarized.lr_ann.vcf" #run this code from the directory where the config is located.
 
 cd $V_PATH/$CALLING/annotation
-grep -v '#' "${CALLING}_polarized.lr_ann.vcf" | wc -l 
+grep -v '#' "${CALLING}_polarized.lr_ann.vcf" | wc -l #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_lcnm3_origcov 9185795
+
+```
+
+#7: Filter the annotated VCF. 
+##Subset the VCF files in order to keep only good quality biallelic SNP variants.
+
+```{r Filter the annotated VCF, eval=FALSE, engine='bash'}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_lcnm3_origcov) #write down name of the calling
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/lynx_canadensis_VCFs/$CALLING/annotation
+screen -S "${CALLING}-${TYPE}"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+script "${CALLING}_polarized_filtered_${TYPE}.lr_ann.log"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+
+REF=/GRUPOS/grupolince/reference_genomes/lynx_canadensis/lc4.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+#The following short loop defines the OTHER variable as the opposite of the TYPE variable (SNP or INDEL)
+if [ $TYPE = "SNP" ]
+  then
+  OTHER=(INDEL)
+elif [ $TYPE = "INDEL" ]
+  then
+  OTHER=(SNP)
+fi
+
+if [ $TYPE != "SNP" ] && [ $TYPE != "INDEL" ] #Don't apply filters if $TYPE is invalid
+  then
+  echo "Invalid value for variable TYPE"
+  echo "Filtering aborted"
+  else #Apply filters if $TYPE is valid
+  echo "Initializing filtering for $TYPE variants"
+  #Filter 1: Remove repetitive regions and those with low mappability:
+  echo "Filtering out repetitive and low mappability regions"
+  bedtools subtract -a ${CALLING}"_polarized.lr_ann.vcf" -b /GRUPOS/grupolince/reference_genomes/lynx_canadensis/repetitive_regions/lc_rep_ALL_scaffold_coord.bed -header | uniq > ${CALLING}"_polarized_filtered1.lr_ann.vcf"
+  
+  grep -v '#' ${CALLING}"_polarized_filtered1.lr_ann.vcf" | wc -l
+  #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov (XL nr filtered) 5671908
+  #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov 5783764
+  #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm3nm3_origcov 5839239
+  #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nmNnmN_origcov 6312383
+  #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_lcnm3_origcov 9185795
+  #If the file has more than the unfiltered one it's due to some weird behaviour of bedtools subtract with some INDELs that become duplicated. These will be removed in the subsequent step.
+
+  #Filter 2: During this step, all multiallelic variants as well as all variants from the other type (SNPs/INDELs) will be dropped from the respective VCFs.
+  echo "Filtering out multiallelic variants and $OTHER variants"
+  java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+  -T SelectVariants \
+  -selectType ${TYPE} \
+  -restrictAllelesTo BIALLELIC \
+  -R $REF \
+  -V ${CALLING}"_polarized_filtered1.lr_ann.vcf" \
+  -o ${CALLING}"_polarized_filtered2_"${TYPE}".lr_ann.vcf"
+  
+  grep -v '#' ${CALLING}"_polarized_filtered2_"${TYPE}".lr_ann.vcf" | wc -l 
+  #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov 4782660
+  #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov 4865867
+  #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm3nm3_origcov 4907765
+  #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nmNnmN_origcov 5237095
+  #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_lcnm3_origcov 7308213
+  
+  #Filter 3: Remove polarized fixed variants (AF=0 or AF=1) or those that weren't polarizable (AA different from either REF or ALT):
+  echo "Filtering out non-polarizable and fixed variants"
+  $BCF view -e '(INFO/AA!=REF & INFO/AA!=ALT) | INFO/AF=0.00 | INFO/AF=1.00' ${CALLING}"_polarized_filtered2_"${TYPE}".lr_ann.vcf" > ${CALLING}"_polarized_filtered3_"${TYPE}".lr_ann.vcf"
+  
+  grep -v '#' ${CALLING}"_polarized_filtered3_"${TYPE}".lr_ann.vcf" | wc -l 
+  #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov 4676648
+  #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov 4758637
+  #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm3nm3_origcov 4798043
+  #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nmNnmN_origcov 5103863
+  #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_lcnm3_origcov 5243308
+  
+  #Filter 4: Apply GATK's recommended hard-filters, and then some.
+  echo "Filtering out low quality and unreliable variants"
+  java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+  -T SelectVariants \
+  -select "QUAL >= 30 && QD >= 2.0 && FS <= 60.0 && MQ >= 40.0 && MQRankSum >= -12.5 && ReadPosRankSum >= -8.0" \
+  -R $REF \
+  -V ${CALLING}"_polarized_filtered3_"${TYPE}".lr_ann.vcf" \
+  -o ${CALLING}"_polarized_filtered4_"${TYPE}".lr_ann.vcf"
+  
+  grep -v '#' ${CALLING}"_polarized_filtered4_"${TYPE}".lr_ann.vcf" | wc -l 
+  #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov 4548968
+  #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov 4555453
+  #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm3nm3_origcov 4565640
+  #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nmNnmN_origcov 4710686
+  #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_lcnm3_origcov 4912242
+  
+  #Filter 5: For each species exclude those positions that have more than 15% missing genotypes (i.e. that have low depth in any dataset).
+  echo "Filtering out high missingness variants"
+  $BCF filter -e "F_MISSING > 0.15" -Ov -o ${CALLING}"_polarized_filtered5_"${TYPE}".lr_ann.vcf" ${CALLING}"_polarized_filtered4_"${TYPE}".lr_ann.vcf"
+  
+  grep -v '#' ${CALLING}"_polarized_filtered5_"${TYPE}".lr_ann.vcf" | wc -l 
+  #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov 4332653
+  #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov 4420467
+  #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm3nm3_origcov 4439054
+  #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nmNnmN_origcov 4617432
+  #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_lcnm3_origcov 4678793
+  
+  #Filter 6: Finally, exclude sites that have low depth globally.
+  echo "Filtering out low depth variants"
+  $BCF filter -e "DP < 200" -Ov -o ${CALLING}"_polarized_filtered6_"${TYPE}".lr_ann.vcf" ${CALLING}"_polarized_filtered5_"${TYPE}".lr_ann.vcf"
+  
+  grep -v '#' ${CALLING}"_polarized_filtered6_"${TYPE}".lr_ann.vcf" | wc -l 
+  #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov
+  #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov 4391212
+  #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm3nm3_origcov 4412177
+  #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nmNnmN_origcov 4602025
+  #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_lcnm3_origcov 4623197
+fi
+
+```
+
+#8: Obtain per dataset VCFs.
+##For varssubs, variants and substitutions. All of these should be filtered next (steps 9 and 10).
+```{r Obtain per dataset VCFs, eval=FALSE, engine='bash'}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_lcnm3_origcov)
+VAR=(varssubs) #varssubs #variants #substitutions
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/lynx_canadensis_VCFs/$CALLING/annotation
+screen -S "${CALLING}-${VAR}-${TYPE}"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+script "perdataset_${VAR}_${CALLING}_${TYPE}.lr_ann.log"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+
+REF=/GRUPOS/grupolince/reference_genomes/lynx_canadensis/lc4.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+#Define input variant:
+if [ $VAR == "varssubs" ]
+  then
+  INPUT_FILE=$(echo ${CALLING}"_polarized_filtered6_"${TYPE}".lr_ann.vcf")
+elif [ $VAR == "variants" ]
+  then
+  INPUT_FILE=$(echo ${CALLING}"_polarized_variants_"${TYPE}".lr_ann.vcf")
+elif [ $VAR == "substitutions" ]
+  then
+  INPUT_FILE=$(echo ${CALLING}"_polarized_substitutions_"${TYPE}".lr_ann.vcf")
+else
+  INPUT_FILE=()
+fi
+echo $INPUT_FILE
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING)
+SPECIES=$(echo $CALLING | fold -w8 | cut -c1-4 | head -n$N_POPS | sort | uniq)
+DATASETS=$(for i in ${SPECIES[@]}; do ls ${i}*_samples | cut -d'_' -f1,2,3; done)
+NM_COV=$(echo "${CALLING}" | rev | cut -d'_' -f1,2 | rev)
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/lynx_canadensis_VCFs/$CALLING/annotation
+for j in ${DATASETS[@]}
+  do
+  echo "${j}"
+  cat /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered/"${j}"_samples
+  mkdir -p "${j}"_"${NM_COV}"_perdataset
+  java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+  -T SelectVariants \
+  -R $REF \
+  -V $INPUT_FILE \
+  -o ${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_perdataset_"${VAR}"_"${TYPE}".lr_ann.vcf" \
+  -env \
+  --sample_file /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered/${j}_samples
+  grep -v '#' ${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_perdataset_"${VAR}"_"${TYPE}".lr_ann.vcf" | wc -l #
+  done
+
+```
+
+#9: Depth range calculus. Obtain depth range for each species in order to filter high depth positions as part of the next section's many filterings.
+##A: retrieve depth distribution from each dataset.
+```{bash}
+
+#Change calling variable
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_lcnm3_origcov)
+VAR=(varssubs) #varssubs #variants #substitutions
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/lynx_canadensis_VCFs/$CALLING/annotation
+screen -S "${CALLING}-${VAR}-${TYPE}"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+script "${CALLING}_depth_calc_datasets_${VAR}_${TYPE}.lr_ann.log"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+
+
+mkdir -p /home/dkleinman/datos/nm_depth_calculus/$CALLING
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING)
+SPECIES=$(echo $CALLING | fold -w8 | cut -c1-4 | head -n$N_POPS | sort | uniq)
+DATASETS=$(for i in ${SPECIES[@]}; do ls ${i}*_samples | cut -d'_' -f1,2,3; done)
+COVERAGE=$(echo "${CALLING}" | rev | cut -d'_' -f1 | rev)
+NM_COV=$(echo "${CALLING}" | rev | cut -d'_' -f1,2 | rev)
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/lynx_canadensis_VCFs/$CALLING/annotation
+for i in ${DATASETS[@]}
+  do
+  echo "extracting depth from dataset" ${i}
+  #Retrieve depth data points:
+  bcftools query -f '%INFO/DP\n' ${i}_${NM_COV}_perdataset/${i}_${NM_COV}_perdataset_${VAR}_${TYPE}.lr_ann.vcf | sort -k1,1n | uniq -c | awk -F" " '{printf "%s\t%s\n", $2, $1}' > ${i}_${NM_COV}_perdataset/${i}_${NM_COV}_perdataset_${VAR}_${TYPE}.lr_ann.depth.exc
+  #Remove those over certain threshold:
+  NUMBER_IND=$(bcftools query -l ${i}_${NM_COV}_perdataset/${i}_${NM_COV}_perdataset_${VAR}_${TYPE}.lr_ann.vcf | wc -l)
+  MAXDEPTH=$(expr $NUMBER_IND \* 1000)
+  awk -v maxdepth=$MAXDEPTH '$1 <= maxdepth' ${i}_${NM_COV}_perdataset/${i}_${NM_COV}_perdataset_${VAR}_${TYPE}.lr_ann.depth.exc > ${i}_${NM_COV}_perdataset/${i}_${NM_COV}_perdataset_${VAR}_${TYPE}.lr_ann.depth.temp
+  #Retrieve missing depth data points:
+  cut -f1 ${i}_${NM_COV}_perdataset/${i}_${NM_COV}_perdataset_${VAR}_${TYPE}.lr_ann.depth.temp | awk '{while(++x<$1) printf "%s\t%s\n", x, 0}' > ${i}_${NM_COV}_perdataset/${i}_${NM_COV}_perdataset_${VAR}_${TYPE}.lr_ann.nodepth.temp
+  #Combine all data points and format them:
+  cat ${i}_${NM_COV}_perdataset/${i}_${NM_COV}_perdataset_${VAR}_${TYPE}.lr_ann.*depth.temp | sort -k1,1n | cut -f2 | tr "\n" "\t" | sed '$s/\t$/\n/' > /home/dkleinman/datos/nm_depth_calculus/$CALLING/${i}_${NM_COV}_perdataset_${VAR}_${TYPE}.lr_ann.depth
+  rm ${i}_${NM_COV}_perdataset/*depth.exc
+  rm ${i}_${NM_COV}_perdataset/*depth.temp
+  done
+
+#From outside the server:
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_lcnm3_origcov)
+mkdir -p /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/depth_calculus/$CALLING
+scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/nm_depth_calculus/$CALLING/*.depth /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/depth_calculus/$CALLING
+
+```
+
+##B: compile statistics and draw graphs.
+```{r Depth range calculus}
+
+calling <- "c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_lcnm3_origcov"
+
+#Now we use R to plot the depth distribution and to obtain a summary table:
+
+library(plyr)
+library(dplyr)
+library(ggplot2)
+library(gridExtra)
+library(knitr)
+
+##Functions:
+get_mean <- function(dat) { with(dat, sum(as.numeric(freq)*value)/sum(as.numeric(freq))) }
+get_sd <- function(dat) { mu <- get_mean (dat) 
+with (dat, sqrt(sum(as.numeric(freq)*(value-mu)^2)/(sum(as.numeric(freq))-1))) } 
+
+#*******************************************************************************************
+
+my_files_depthGlobal = list.files(path = paste0("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/depth_calculus/",calling),pattern="*.depth$") #"5x|GP|MG|LD"
+
+for (i in 1:length(my_files_depthGlobal)) {
+  assign(my_files_depthGlobal[i], (scan(paste0("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/depth_calculus/",calling,"/",my_files_depthGlobal[i],sep=""), sep = " ", dec = ".")) %>% .[!is.na(.)])
+  }
+mean_folds = 0.95
+depth_per_sample <- data.frame()
+
+#Compute globaldepth for all populations found
+#*******************************************************************************************
+
+for (i in 1:length(my_files_depthGlobal)) {
+  DF = read.table(paste0("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/depth_calculus/",calling,"/",my_files_depthGlobal[i],sep=""),head=F, stringsAsFactors=F, check.names=FALSE)
+  freq_table_DF <- data.frame (value = 1:length (DF), freq = t(DF))
+  freq_table_truncated_DF <- filter(freq_table_DF, value < (nrow(freq_table_DF)))
+  #Mean depth:
+  my_mean_DF <-  get_mean (freq_table_DF)
+  my_mean_truncated_DF <- get_mean (freq_table_truncated_DF)
+  my_sd_DF <-  get_sd (freq_table_DF)
+  my_sd_truncated_DF <- get_sd (freq_table_truncated_DF)
+  #Max and min depth:
+  maxDepth_DF = my_mean_DF + (3 * my_sd_DF)
+  minDepth_DF  = my_mean_DF - (1 * my_sd_DF)
+  #maxDepth_truncated_DF = my_mean_truncated_DF + (mean_folds * my_sd_truncated_DF)
+  maxDepth_truncated_DF = my_mean_truncated_DF + (3 * my_sd_truncated_DF)
+  #minDepth_truncated_DF  = my_mean_truncated_DF - (mean_folds * my_sd_truncated_DF)
+  minDepth_truncated_DF = my_mean_truncated_DF - (1 * my_sd_truncated_DF)
+  #Para una o más poblaciones:
+  population=unlist(strsplit(my_files_depthGlobal[i],"[.]"))[1]
+  depth_per_sample <- rbind(depth_per_sample, 
+                            data.frame(pop = population,
+                                       mean = my_mean_DF,
+                                       sd = my_sd_DF, 
+                                       mean_truncated = my_mean_truncated_DF,
+                                       sd_truncated = my_sd_truncated_DF,
+                                       maxDepth = maxDepth_DF, 
+                                       minDepth = minDepth_DF,
+                                       maxDepth_truncated = maxDepth_truncated_DF,
+                                       minDepth_truncated = minDepth_truncated_DF)) 
+  #Plotting:
+  ggplot(freq_table_truncated_DF, aes(x = value, y = freq)) + 
+    geom_bar(stat = "identity", color = "black") +
+    scale_x_continuous(breaks = 0:250*10, limits = c(0, maxDepth_truncated_DF*1.5)) +
+    scale_y_continuous(expand=c(0,0)) +
+    ggtitle (paste(my_files_depthGlobal[i],"_", mean_folds, "_",maxDepth_truncated_DF, "_",maxDepth_DF) ) +
+    geom_vline(xintercept=maxDepth_DF,linetype="dashed", size=0.5) + 
+    geom_vline(xintercept=minDepth_DF,linetype="dashed", size=0.5) + 
+    geom_vline(xintercept=maxDepth_truncated_DF, colour ="grey",linetype="dashed", size=0.5) + 
+    geom_vline(xintercept=minDepth_truncated_DF,colour ="grey",linetype="dashed", size=0.5) + 
+    theme_classic() + 
+    theme(text = element_text(size=10))
+  plot_name=paste0("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/depth_calculus/",calling,"/",my_files_depthGlobal[i],"_",mean_folds,".pdf",sep="")
+  ggsave(filename = plot_name)
+}
+
+#When finished write the table
+
+#Results for all datasets within a calling are stored in one single dataframe:
+write.table(x = depth_per_sample,file = paste("/Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/depth_calculus/",calling,"/",calling,"_mean_sd_depthGlobal_nm_per_dataset_mean_folds_",mean_folds,".csv", sep= ""),quote=FALSE, col.names = FALSE, row.names = FALSE, sep= " ")
+
+```
+
+##C: separate for each sample set
+```{r Depth range calculus, eval=FALSE, engine='bash'}
+
+#From outside the server, first upload the summary table to the server:
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_lcnm3_origcov)
+scp /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/depth_calculus/$CALLING/"$CALLING"_mean_sd_depthGlobal_nm_per_dataset_mean_folds_0.95.csv dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/nm_depth_calculus/$CALLING
+
+#In the server, separate in populations:
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_lcnm3_origcov)
+cd /home/dkleinman/datos/nm_depth_calculus/$CALLING
+POPS=$(cat /home/dkleinman/datos/nm_depth_calculus/$CALLING/"$CALLING"_mean_sd_depthGlobal_nm_per_dataset_mean_folds_0.95.csv | awk '{print $1}')
+for POP in ${POPS[@]}
+  do
+  echo $POP
+  grep "${POP}" /home/dkleinman/datos/nm_depth_calculus/$CALLING/"$CALLING"_mean_sd_depthGlobal_nm_per_dataset_mean_folds_0.95.csv > "$POP"_mean_sd_depthGlobal_nm_per_dataset_mean_folds_0.95.csv
+  done
+
+```
+
+#10: Perform high-depth filtering. Obtain list of sites with very high depth within each dataset, join them, and remove those sites.
+##At the dataset level:
+```{r Perform depth filtering, eval=FALSE, engine='bash'}
+
+#For each dataset obtain the list of positions that have lower (higher) depth than the minimum (maximum) within 0.95 of the distribution, as calculated in the previous section, and join them to later remove all of them from all datasets:
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_lcnm3_origcov)
+VAR=(varssubs) #varssubs #variants #substitutions
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/lynx_canadensis_VCFs/$CALLING/annotation
+screen -S "${CALLING}-${VAR}-${TYPE}"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+script "${CALLING}_depth_filter_datasets_${VAR}_${TYPE}.lr_ann.log"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+
+REF=/GRUPOS/grupolince/reference_genomes/lynx_canadensis/lc4.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING)
+SPECIES=$(echo $CALLING | fold -w8 | cut -c1-4 | head -n$N_POPS | sort | uniq)
+DATASETS=$(for i in ${SPECIES[@]}; do ls ${i}*_samples | cut -d'_' -f1,2,3; done)
+COVERAGE=$(echo "${CALLING}" | rev | cut -d'_' -f1 | rev)
+NM_COV=$(echo "${CALLING}" | rev | cut -d'_' -f1,2 | rev)
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/lynx_canadensis_VCFs/$CALLING/annotation
+for j in ${DATASETS[@]}
+  do
+  echo "${j}"
+  #MIN_DP=$(cat /home/dkleinman/datos/nm_depth_calculus/$CALLING/${j}_${COVERAGE}*_mean_sd_depthGlobal_nm_per_dataset_mean_folds_0.95.csv | awk '{print $9}') #Obtained in section 10
+  MAX_DP=$(cat /home/dkleinman/datos/nm_depth_calculus/$CALLING/${j}_${NM_COV}_perdataset_${VAR}_${TYPE}_mean_sd_depthGlobal_nm_per_dataset_mean_folds_0.95.csv | awk '{print $8}') #Obtained in section 10
+  #echo $MIN_DP
+  echo $MAX_DP
+  $BCF filter -i "DP > ${MAX_DP}" -Ov -o ${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_minmaxdepth_to_remove_"${VAR}"_"${TYPE}".lr_ann.vcf" ${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_perdataset_"${VAR}"_"${TYPE}".lr_ann.vcf"
+  sed -e 's/chr//' ${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_minmaxdepth_to_remove_"${VAR}"_"${TYPE}".lr_ann.vcf" | awk '{OFS="\t"; if (!/^#/){print $1,$2-1,$2}}' > ${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_minmaxdepth_to_remove_"${VAR}"_"${TYPE}".bed" #convert from VCF to BED
+  done
+cat *"_"${NM_COV}"_perdataset/"*"_"${NM_COV}"_minmaxdepth_to_remove_"${VAR}"_"${TYPE}".bed" | bedtools sort | uniq > ${CALLING}"_joined_minmaxdepth_to_remove_"${VAR}"_"${TYPE}".bed" #join all BEDs
+for j in ${DATASETS[@]}
+  do
+  echo "${j}"
+  bedtools subtract -a ${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_perdataset_"${VAR}"_"${TYPE}".lr_ann.vcf" -b ${CALLING}"_joined_minmaxdepth_to_remove_"${VAR}"_"${TYPE}".bed" -header > ${j}"_"${NM_COV}"_perdataset/"${j}"_"${NM_COV}"_perdataset_filtered_"${VAR}"_"${TYPE}".lr_ann.vcf"
+  done
+  
+```
+
+#11: Obtain per population VCFs.
+```{r Obtain per population VCFs, eval=FALSE, engine='bash'}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_lcnm3_origcov)
+VAR=(varssubs) #varssubs #variants #substitutions #segregating #fixed
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/lynx_canadensis_VCFs/$CALLING/annotation
+screen -S "${CALLING}-${VAR}-${TYPE}"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+script "perpop_${VAR}_${CALLING}_${TYPE}.lr_ann.log"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+
+REF=/GRUPOS/grupolince/reference_genomes/lynx_canadensis/lc4.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING)
+SPECIES=$(echo $CALLING | fold -w8 | cut -c1-4 | head -n$N_POPS | sort | uniq)
+DATASETS=$(for i in ${SPECIES[@]}; do ls ${i}*_samples | cut -d'_' -f1,2,3; done)
+COVERAGE=$(echo "${CALLING}" | rev | cut -d'_' -f1 | rev)
+NM_COV=$(echo "${CALLING}" | rev | cut -d'_' -f1,2 | rev)
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/lynx_canadensis_VCFs/$CALLING/annotation
+for i in ${DATASETS[@]}
+  do
+  echo "${i}"
+  declare POP=$(bcftools query -l ${i}"_"${NM_COV}"_perdataset/"${i}"_"${NM_COV}"_perdataset_filtered_"${VAR}"_"${TYPE}".lr_ann.vcf" | cut -c1-7 | sort | uniq)
+  for j in ${POP[@]}
+    do
+    echo "${j}"
+    rm ${i}"_"${NM_COV}"_perdataset/"${i}"_"${j}"_pop_list_to_remove.txt"
+    $BCF query -l ${i}"_"${NM_COV}"_perdataset/"${i}"_"${NM_COV}"_perdataset_filtered_"${VAR}"_"${TYPE}".lr_ann.vcf" | grep "${j}" > ${i}"_"${NM_COV}"_perdataset/"${i}"_"${j}"_pop_list_to_remove.txt"
+    cat ${i}"_"${NM_COV}"_perdataset/"${i}"_"${j}"_pop_list_to_remove.txt"
+    mkdir -p "${j}"_"${NM_COV}"_perpop
+    java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+    -T SelectVariants \
+    -R $REF \
+    -V ${i}"_"${NM_COV}"_perdataset/"${i}"_"${NM_COV}"_perdataset_filtered_"${VAR}"_"${TYPE}".lr_ann.vcf" \
+    -o ${j}"_"${NM_COV}"_perpop/"${i}"_"${j}"_"${NM_COV}"_perpop_"${VAR}"_"${TYPE}".lr_ann.vcf" \
+    -env \
+    --sample_file ${i}"_"${NM_COV}"_perdataset/"${i}"_"${j}"_pop_list_to_remove.txt"
+    rm ${i}"_"${NM_COV}"_perdataset/"${i}"_"${j}"_pop_list_to_remove.txt"
+    grep -v '#' ${j}"_"${NM_COV}"_perpop/"${i}"_"${j}"_"${NM_COV}"_perpop_"${VAR}"_"${TYPE}".lr_ann.vcf" | wc -l #
+    done
+  done
+
+```
+
+#12: Split the population VCFs into per individual VCFs. Generate a VCF for each individual.
+##Whole-genome.
+```{r Split the population VCFs into per individual VCFs, eval=FALSE, engine='bash'}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_lcnm3_origcov)
+VAR=(varssubs) #varssubs #variants #substitutions #segregating #fixed
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/lynx_canadensis_VCFs/$CALLING/annotation
+screen -S "${CALLING}-${VAR}-${TYPE}"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+script "individual_${VAR}_${CALLING}_${TYPE}.lr_ann.log"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+
+REF=/GRUPOS/grupolince/reference_genomes/lynx_canadensis/lc4.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING)
+SPECIES=$(echo $CALLING | fold -w8 | cut -c1-4 | head -n$N_POPS | sort | uniq)
+DATASETS=$(for i in ${SPECIES[@]}; do ls ${i}*_samples | cut -d'_' -f1,2,3; done)
+COVERAGE=$(echo "${CALLING}" | rev | cut -d'_' -f1 | rev)
+NM_COV=$(echo "${CALLING}" | rev | cut -d'_' -f1,2 | rev)
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/lynx_canadensis_VCFs/$CALLING/annotation
+declare POP=$(bcftools query -l ${CALLING}"_polarized_filtered6_"${TYPE}".lr_ann.vcf" | cut -c1-7 | sort | uniq)
+for i in ${POP[@]}
+  do
+  echo "${i}"
+  mkdir -p "${i}"_"${NM_COV}"_individuals
+  VCF_LIST=$(ls ${i}"_"${NM_COV}"_perpop/"*"_"${i}"_"${NM_COV}"_perpop_"${VAR}"_"${TYPE}".lr_ann.vcf")
+  for j in ${VCF_LIST[@]}
+    do 
+    INDIVIDUALS=$(bcftools query -l "${j}" | sort | uniq)
+    for k in ${INDIVIDUALS[@]}
+      do
+      echo "${k}"
+      ID=$(echo "${k}")
+      java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+      -T SelectVariants \
+      -R $REF \
+      -V "${j}" \
+      -o ${i}"_"${NM_COV}"_individuals/"${k}"_"${NM_COV}"_individual_"${VAR}"_"${TYPE}".lr_ann.vcf" \
+      -env \
+      -sn $ID
+      done
+    done
+  done
+
+```
+
+##gBGC.
+```{r Split the population VCFs into per individual VCFs, eval=FALSE, engine='bash'}
+
+#This code will only work if the whole-genome individual VCFs have been generated before.
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_lcnm3_origcov)
+VAR=(varssubs) #varssubs #variants #substitutions
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/lynx_canadensis_VCFs/$CALLING/annotation
+screen -S "${CALLING}-${VAR}-${TYPE}"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+script "individual_gBGC_${VAR}_${CALLING}_${TYPE}.lr_ann.log"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/lynx_canadensis_VCFs/$CALLING/annotation
+INDLIST=($(ls `find . -name *"_individual_"${VAR}"_"${TYPE}".lr_ann.vcf" -print`))
+for i in "${INDLIST[@]}"
+  do
+  echo "${i}"
+  ind=$(echo "${i}" | awk -F'[/]' '{print $3}' | cut -c1-12)
+  echo "${ind}"
+  bcftools filter -i '(REF="A" || REF="T") && (ALT="G" || ALT="C")' -Ov -o ${i/_individual_${VAR}_${TYPE}.lr_ann.vcf/_individual_WtoS_${VAR}_${TYPE}.lr_ann.vcf} ${i}
+  bcftools filter -i '(REF="G" || REF="C") && (ALT="A" || ALT="T")' -Ov -o ${i/_individual_${VAR}_${TYPE}.lr_ann.vcf/_individual_StoW_${VAR}_${TYPE}.lr_ann.vcf} ${i}
+  bcftools filter -i '(REF="A" && ALT="T") || (REF="T" && ALT="A") || (REF="G" && ALT="C") || (REF="C" && ALT="G")' -Ov -o ${i/_individual_${VAR}_${TYPE}.lr_ann.vcf/_individual_StoSandWtoW_${VAR}_${TYPE}.lr_ann.vcf} ${i}
+  done
+
+```
+
+#13: Get counts (of variants, substitutions or vars+subs).
+##Whole-genome.
+```{r Get annotation statistics, eval=FALSE, engine='bash'}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_lcnm3_origcov)
+VAR=(varssubs) #varssubs #variants #substitutions #segregating #fixed
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/lynx_canadensis_VCFs/$CALLING/annotation
+screen -S "${CALLING}-${VAR}-${TYPE}"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+if [ $VAR == "private" ]
+  then
+  VAR="private_segregating"
+fi
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+script "${CALLING}_ann_individual_summary_${VAR}_${TYPE}.lr_ann.log"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+if [ $VAR == "private" ]
+  then
+  VAR="private_segregating"
+fi
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+
+
+REF=/GRUPOS/grupolince/reference_genomes/lynx_canadensis/lc4.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/lynx_canadensis_VCFs/$CALLING/annotation
+rm ${CALLING}"_ann_individual_summary_"${VAR}"_"${TYPE}".lr_ann.txt"
+echo -e "species\tpopulation\tdataset\tsample\ttotal_V\ttotal_A\tintergenic_V\tintergenic_A\tintronic_V\tintronic_A\tcoding_V\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tstop_V\tstop_A\tmissense/synonymous_V\tmissense/synonymous_A\tsynonymous/intronic_V\tmissense/intronic_V" > ${CALLING}"_ann_individual_summary_"${VAR}"_"${TYPE}".lr_ann.txt"
+INDLIST=($(ls `find . -name *"_individual_"${VAR}"_"${TYPE}".lr_ann.vcf" -print`))
+for i in "${INDLIST[@]}"
+  do
+  echo "${i}"
+  ind=$(echo "${i}" | awk -F'[/]' '{print $3}' | cut -c1-12)
+  echo "${ind}"
+  SPECIES=$(echo "${ind}" | cut -c3-4)
+  POPULATION=$(echo "${ind}" | cut -c6-7)
+  DATASET=$(if [ $ind = "c_lp_sm_0221" ]; then echo "REF"; elif [ $ind = "c_ll_ki_0090" ]; then echo "MG"; elif [ $ind = "h_ll_pv_0223" ]; then echo "LD"; elif grep -Fxq $ind /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/c_lp_5x_samples || [ $SPECIES = "ll" ]; then echo "5x"; else echo "GP"; fi)
+  SAMPLE=$(echo "${ind}" | cut -c9-12)
+  TOTAL_V=$(grep -v '#' ${i} | wc -l)
+  TOTAL_A=$(grep -v '#' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  INTERGENIC_V=$(grep 'intergenic' ${i} | wc -l)
+  INTERGENIC_A=$(grep 'intergenic' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  INTRONIC_V=$(grep 'intron_variant' ${i} | wc -l)
+  INTRONIC_A=$(grep 'intron_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  CODING_V=$(grep 'CDS' ${i} | wc -l)
+  SYNONYMOUS_V=$(grep 'synonymous_variant' ${i} | wc -l)
+  SYNONYMOUS_A=$(grep 'synonymous_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_V=$(grep 'missense_variant' ${i} | wc -l)
+  MISSENSE_A=$(grep 'missense_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  NONSENSE_V=$(grep '|HIGH|' ${i} | wc -l)
+  NONSENSE_A=$(grep '|HIGH|' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  STOP_V=$(grep 'stop_gained' ${i} | wc -l)
+  STOP_A=$(grep 'stop_gained' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_SYNONYMOUS_V=$(echo "scale=4; $MISSENSE_V/$SYNONYMOUS_V" | bc)
+  MISSENSE_SYNONYMOUS_A=$(echo "scale=4; $MISSENSE_A/$SYNONYMOUS_A" | bc)
+  SYNONYMOUS_INTRONIC_V=$(echo "scale=4; $SYNONYMOUS_V/$INTRONIC_V" | bc)
+  MISSENSE_INTRONIC_V=$(echo "scale=4; $MISSENSE_V/$INTRONIC_V" | bc)
+  echo -e "$SPECIES\t$POPULATION\t$DATASET\t$SAMPLE\t$TOTAL_V\t$TOTAL_A\t$INTERGENIC_V\t$INTERGENIC_A\t$INTRONIC_V\t$INTRONIC_A\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$STOP_V\t$STOP_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A\t$SYNONYMOUS_INTRONIC_V\t$MISSENSE_INTRONIC_V" >> ${CALLING}"_ann_individual_summary_"${VAR}"_"${TYPE}".lr_ann.txt"
+  done
+
+#From outside the server:
+export SSHPASS=$(cat /Users/dani/Documents/genomics_pass.txt)
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_lcnm3_origcov)
+VAR=(varssubs) #varssubs #variants #substitutions #segregating #fixed #private_segregating
+TYPE=(SNP) #write down SNP or INDEL
+sshpass -e scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/lynx_canadensis_VCFs/$CALLING/annotation/${CALLING}_ann_individual_summary_${VAR}_${TYPE}.lr_ann.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/
+unset SSHPASS
+
+```
+
+##gBGC.
+```{r Get annotation statistics, eval=FALSE, engine='bash'}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_lcnm3_origcov)
+VAR=(varssubs) #varssubs #variants #substitutions #segregating #fixed
+gBGC=(same) #WtoS #StoW #same
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/lynx_canadensis_VCFs/$CALLING/annotation
+screen -S "${CALLING}-${gBGC}-${VAR}-${TYPE}"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+gBGC=$(echo ${STY#*.} | cut -d'-' -f2)
+if [ $gBGC == "same" ]; then gBGC=(StoSandWtoW); fi
+VAR=$(echo ${STY#*.} | cut -d'-' -f3)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f4)
+script "${CALLING}_ann_individual_summary_${gBGC}_${VAR}_${TYPE}.lr_ann.log"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+gBGC=$(echo ${STY#*.} | cut -d'-' -f2)
+if [ $gBGC == "same" ]; then gBGC=(StoSandWtoW); fi
+VAR=$(echo ${STY#*.} | cut -d'-' -f3)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f4)
+
+
+REF=/GRUPOS/grupolince/reference_genomes/lynx_canadensis/lc4.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/lynx_canadensis_VCFs/$CALLING/annotation
+rm -f ${CALLING}"_ann_individual_summary_"${gBGC}"_"${VAR}"_"${TYPE}".lr_ann.txt"
+echo -e "species\tpopulation\tdataset\tsample\ttotal_V\ttotal_A\tintergenic_V\tintergenic_A\tintronic_V\tintronic_A\tcoding_V\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tmissense/synonymous_V\tmissense/synonymous_A\tsynonymous/intronic_V\tmissense/intronic_V" > ${CALLING}"_ann_individual_summary_"${gBGC}"_"${VAR}"_"${TYPE}".lr_ann.txt"
+INDLIST=($(ls `find . -name *"_individual_"${gBGC}"_"${VAR}"_"${TYPE}".lr_ann.vcf" -print`))
+for i in "${INDLIST[@]}"
+  do
+  echo "${i}"
+  ind=$(echo "${i}" | awk -F'[/]' '{print $3}' | cut -c1-12)
+  echo "${ind}"
+  SPECIES=$(echo "${ind}" | cut -c3-4)
+  POPULATION=$(echo "${ind}" | cut -c6-7)
+  DATASET=$(if [ $ind = "c_lp_sm_0221" ]; then echo "REF"; elif [ $ind = "c_ll_ki_0090" ]; then echo "MG"; elif [ $ind = "h_ll_pv_0223" ]; then echo "LD"; elif grep -Fxq $ind /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/c_lp_5x_samples || [ $SPECIES = "ll" ]; then echo "5x"; else echo "GP"; fi)
+  SAMPLE=$(echo "${ind}" | cut -c9-12)
+  TOTAL_V=$(grep -v '#' ${i} | wc -l)
+  TOTAL_A=$(grep -v '#' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  INTERGENIC_V=$(grep 'intergenic' ${i} | wc -l)
+  INTERGENIC_A=$(grep 'intergenic' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  INTRONIC_V=$(grep 'intron_variant' ${i} | wc -l)
+  INTRONIC_A=$(grep 'intron_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  CODING_V=$(grep 'CDS' ${i} | wc -l)
+  SYNONYMOUS_V=$(grep 'synonymous_variant' ${i} | wc -l)
+  SYNONYMOUS_A=$(grep 'synonymous_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_V=$(grep 'missense_variant' ${i} | wc -l)
+  MISSENSE_A=$(grep 'missense_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  NONSENSE_V=$(grep '|HIGH|' ${i} | wc -l)
+  if [ -z "$NONSENSE_V" ]; then NONSENSE_V=0; fi
+  NONSENSE_A=$(grep '|HIGH|' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  if [ -z "$NONSENSE_A" ]; then NONSENSE_A=0; fi
+  MISSENSE_SYNONYMOUS_V=$(echo "scale=4; $MISSENSE_V/$SYNONYMOUS_V" | bc)
+  MISSENSE_SYNONYMOUS_A=$(echo "scale=4; $MISSENSE_A/$SYNONYMOUS_A" | bc)
+  SYNONYMOUS_INTRONIC_V=$(echo "scale=4; $SYNONYMOUS_V/$INTRONIC_V" | bc)
+  MISSENSE_INTRONIC_V=$(echo "scale=4; $MISSENSE_V/$INTRONIC_V" | bc)
+  echo -e "$SPECIES\t$POPULATION\t$DATASET\t$SAMPLE\t$TOTAL_V\t$TOTAL_A\t$INTERGENIC_V\t$INTERGENIC_A\t$INTRONIC_V\t$INTRONIC_A\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A\t$SYNONYMOUS_INTRONIC_V\t$MISSENSE_INTRONIC_V" >> ${CALLING}"_ann_individual_summary_"${gBGC}"_"${VAR}"_"${TYPE}".lr_ann.txt"
+  done
+
+#From outside the server:
+export SSHPASS=$(cat /Users/dani/Documents/genomics_pass.txt)
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_lcnm3_origcov)
+VAR=(varssubs) #varssubs #variants #substitutions #segregating #fixed #private_segregating
+gBGC=(WtoS) #WtoS #StoW #StoSandWtoW
+TYPE=(SNP) #write down SNP or INDEL
+sshpass -e scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/lynx_canadensis_VCFs/$CALLING/annotation/${CALLING}_ann_individual_summary_${gBGC}_${VAR}_${TYPE}.lr_ann.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/gBGC/
+unset SSHPASS
+
+```
+
+#14: Plot individual variant count results.
+#####W-g relative to Kirov, definitive version.
+```{r Plot variant count results}
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(grid)
+library(gridExtra)
+library(egg)
+
+type="varssubs" #varssubs #variants #substitutions #segregating #fixed #private_segregating
+
+wd_path <- ("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
+variants_and_subst_wg <- read_tsv(paste0(wd_path,"c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_lcnm3_origcov_ann_individual_summary_",type,"_SNP.lr_ann.txt")) %>% select(.,species,population,dataset,sample,contains("_A"),-contains("/")) %>% rename_at(vars(ends_with("_A")),funs(gsub("_A","",.))) 
+
+variants_and_subst_wg$dataset <- as.factor(variants_and_subst_wg$dataset)
+variants_and_subst_wg$dataset = factor(variants_and_subst_wg$dataset,levels=c("REF","GP","5x","MG")) #Reorder factor levels to: REF, GP, 5x, MG
+variants_and_subst_wg$population = factor(variants_and_subst_wg$population,levels=c("ki","no","po","sm","do"))
+print.data.frame(variants_and_subst_wg)
+
+variants_and_subst_wg_alleleR <- variants_and_subst_wg %>% gather(ratio,value,-species,-population,-dataset,-sample,factor_key=T)
+variants_and_subst_wg_alleleR
+
+r_average_vector <- c()
+for (r in unique(variants_and_subst_wg_alleleR$ratio)) {
+  print(r)
+  r_average <- filter(variants_and_subst_wg_alleleR,r==ratio & population=="ki") %>% select(value) %>% unlist(.,use.names=F) %>% mean()
+  r_average_vector <- c(r_average_vector,rep(r_average,nrow(filter(variants_and_subst_wg_alleleR,r==ratio))))
+}
+print(r_average_vector)
+
+relativised_variants_and_subst_wg_alleleR <- mutate(variants_and_subst_wg_alleleR, ki_relative_value=value/r_average_vector)
+
+#Obtain per population averages and standard errors:
+se <- function(x) sqrt(var(x)/length(x)) #first define the standard error function
+
+average_relativised_variants_and_subst_wg_alleleR <- data_frame("species"=character(0),"population"=character(0),"ratio"=character(0),"avg_ki_relative_value"=character(0),"se_ki_relative_value"=character(0)) #next, create the empty dataframe
+
+for (pop in unique(relativised_variants_and_subst_wg_alleleR$population)) { #then loop over each population and feature to get the (relativised) mean and standard error, and feed the dataframe
+  print(pop)
+  species <- filter(relativised_variants_and_subst_wg_alleleR,ratio==r & population==pop) %>% select(species) %>% unlist(.,use.names=F) %>% unique()
+  for (r in unique(relativised_variants_and_subst_wg_alleleR$ratio)) {
+    print(r)
+    pop_mean <- filter(relativised_variants_and_subst_wg_alleleR,ratio==r & population==pop) %>% select(ki_relative_value) %>% unlist(.,use.names=F) %>% mean()
+    #print(paste0(pop," feature ",r," average is ",pop_mean))
+    pop_se <- filter(relativised_variants_and_subst_wg_alleleR,ratio==r & population==pop) %>% select(ki_relative_value) %>% unlist(.,use.names=F) %>% se()
+    #print(paste0(pop," feature ",r," std error is ",pop_se))
+    row_data <- cbind(species,pop,r,pop_mean,pop_se)
+    colnames(row_data) <- c("species","population","ratio","avg_ki_relative_value","se_ki_relative_value")
+    average_relativised_variants_and_subst_wg_alleleR <- rbind(average_relativised_variants_and_subst_wg_alleleR,row_data,stringsAsFactors=F)
+  }
+}
+average_relativised_variants_and_subst_wg_alleleR$population = factor(average_relativised_variants_and_subst_wg_alleleR$population,levels=c("ki","no","po","sm","do"))
+levels(average_relativised_variants_and_subst_wg_alleleR$population)[levels(average_relativised_variants_and_subst_wg_alleleR$population)=="sm"] <- "an"
+average_relativised_variants_and_subst_wg_alleleR$ratio = factor(average_relativised_variants_and_subst_wg_alleleR$ratio,levels=c("total","intergenic","intronic","synonymous","missense","nonsense","stop"))
+levels(average_relativised_variants_and_subst_wg_alleleR$ratio) <- c("total","intergenic","intronic","synonymous","missense","nonsense","stop_gained")
+average_relativised_variants_and_subst_wg_alleleR$avg_ki_relative_value <- as.numeric(average_relativised_variants_and_subst_wg_alleleR$avg_ki_relative_value)
+average_relativised_variants_and_subst_wg_alleleR$se_ki_relative_value <- as.numeric(average_relativised_variants_and_subst_wg_alleleR$se_ki_relative_value)
+average_relativised_variants_and_subst_wg_alleleR
+#(average_relativised_variants_and_subst_wg_alleleR,paste0("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/",type,"_derived_allele_allele_ratio_relative2introns_mean.csv"))
+
+#Separate plots:
+twodecimalsFUN <- function(x) sprintf("%.2f", x)
+type_range <- data.frame("var_type"=c("varssubs","varssubs","fixed","fixed"),"plot"=c("main","other","main","other"),"min"=c(0.60,0.95,0.75,0.5),"max"=c(1.3,1.2,1.75,3.5),"breaks"=c(0.05,0.1,0.2,0.5))
+
+average_relativised_derived_allele_allele_ratio_up <- ggplot(data=average_relativised_variants_and_subst_wg_alleleR, aes(population,avg_ki_relative_value,colour=population)) +
+  #facet_wrap(feature ~ species,nrow=6,ncol=2,scales="free") +
+  facet_grid(. ~ ratio) +
+  geom_point() +
+  geom_errorbar(aes(ymin=avg_ki_relative_value-se_ki_relative_value, ymax=avg_ki_relative_value+se_ki_relative_value), position=position_dodge(), width=0.5) +
+  #ggtitle("Proportion of reads at different NM") +
+  xlab("Population") +
+  ylab(ifelse(type=="varssubs","Average genetic load relative to ki",ifelse(type=="fixed","Derived fixation rate relative to ki", "Check code"))) +
+  scale_y_continuous(labels=twodecimalsFUN, breaks=seq(filter(type_range,var_type==type & plot=="main") %>% select(min) %>% unlist(.,use.names=F), filter(type_range,var_type==type & plot=="main") %>% select(max) %>% unlist(.,use.names=F), by = filter(type_range,var_type==type & plot=="main") %>% select(breaks) %>% unlist(.,use.names=F)), limits=c(filter(type_range,var_type==type & plot=="main") %>% select(min) %>% unlist(.,use.names=F),filter(type_range,var_type==type & plot=="main") %>% select(max) %>% unlist(.,use.names=F))) +
+  #ggtitle(paste0("ratio of ",type," relative to synonymous and Kirov")) +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+      rect=element_rect(size=1),
+      axis.line=element_blank(),
+      axis.title=element_text(size=16),
+      axis.text.x=element_text(angle=30,hjust=1,size=12,colour="black"),
+      axis.title.x=element_blank(),
+      axis.title.y=element_blank(),
+      axis.text.y=element_text(size=12,colour="black"),
+      #axis.title.y=element_text(margin=unit(c(0,0.5,0,0),"cm")),
+      panel.background=element_blank(),
+      panel.border=element_rect(colour="black",fill=NA,size=1.5),
+      strip.background=element_rect(colour="black",size=1.5),
+      #panel.grid=element_blank(),
+      #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+      plot.margin=unit(c(0.5,1,0.5,0.2),"cm"),
+      #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+      legend.background=element_rect(linetype="solid", colour="black", size=.5),
+      #legend.justification=c(0,0),
+      legend.key=element_rect(colour="white"),
+      legend.key.size=unit(0.5,"cm"),
+      legend.position="none",
+      legend.title=element_blank()
+  )
+average_relativised_derived_allele_allele_ratio_up
+
+ggsave(paste0(type,"_genetic_load_relative2Kirov_lcnm3.pdf"), width=20, height=10, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios",average_relativised_derived_allele_allele_ratio_up)
+
+```
+
+#####gBGC relative to Kirov, definitive version.
+```{r Plot variant count results}
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(grid)
+library(gridExtra)
+library(egg)
+
+gBGC="StoSandWtoW" #WtoS #StoW #StoSandWtoW
+type="varssubs" #varssubs #variants #substitutions #segregating #fixed #private_segregating
+
+wd_path <- ("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/gBGC/")
+variants_and_subst_wg <- read_tsv(paste0(wd_path,"c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_lcnm3_origcov_ann_individual_summary_",gBGC,"_",type,"_SNP.lr_ann.txt")) %>% select(.,species,population,dataset,sample,contains("_A"),-contains("/")) %>% rename_at(vars(ends_with("_A")),funs(gsub("_A","",.))) 
+
+variants_and_subst_wg$dataset <- as.factor(variants_and_subst_wg$dataset)
+variants_and_subst_wg$dataset = factor(variants_and_subst_wg$dataset,levels=c("REF","GP","5x","MG")) #Reorder factor levels to: REF, GP, 5x, MG
+variants_and_subst_wg$population = factor(variants_and_subst_wg$population,levels=c("ki","no","po","sm","do"))
+print.data.frame(variants_and_subst_wg)
+
+variants_and_subst_wg_alleleR <- variants_and_subst_wg %>% gather(ratio,value,-species,-population,-dataset,-sample,factor_key=T)
+variants_and_subst_wg_alleleR
+
+r_average_vector <- c()
+for (r in unique(variants_and_subst_wg_alleleR$ratio)) {
+  print(r)
+  r_average <- filter(variants_and_subst_wg_alleleR,r==ratio & population=="ki") %>% select(value) %>% unlist(.,use.names=F) %>% mean()
+  r_average_vector <- c(r_average_vector,rep(r_average,nrow(filter(variants_and_subst_wg_alleleR,r==ratio))))
+}
+print(r_average_vector)
+
+relativised_variants_and_subst_wg_alleleR <- mutate(variants_and_subst_wg_alleleR, ki_relative_value=value/r_average_vector)
+
+#Obtain per population averages and standard errors:
+se <- function(x) sqrt(var(x)/length(x)) #first define the standard error function
+
+average_relativised_variants_and_subst_wg_alleleR <- data_frame("species"=character(0),"population"=character(0),"ratio"=character(0),"avg_ki_relative_value"=character(0),"se_ki_relative_value"=character(0)) #next, create the empty dataframe
+
+for (pop in unique(relativised_variants_and_subst_wg_alleleR$population)) { #then loop over each population and feature to get the (relativised) mean and standard error, and feed the dataframe
+  print(pop)
+  species <- filter(relativised_variants_and_subst_wg_alleleR,ratio==r & population==pop) %>% select(species) %>% unlist(.,use.names=F) %>% unique()
+  for (r in unique(relativised_variants_and_subst_wg_alleleR$ratio)) {
+    print(r)
+    pop_mean <- filter(relativised_variants_and_subst_wg_alleleR,ratio==r & population==pop) %>% select(ki_relative_value) %>% unlist(.,use.names=F) %>% mean()
+    #print(paste0(pop," feature ",r," average is ",pop_mean))
+    pop_se <- filter(relativised_variants_and_subst_wg_alleleR,ratio==r & population==pop) %>% select(ki_relative_value) %>% unlist(.,use.names=F) %>% se()
+    #print(paste0(pop," feature ",r," std error is ",pop_se))
+    row_data <- cbind(species,pop,r,pop_mean,pop_se)
+    colnames(row_data) <- c("species","population","ratio","avg_ki_relative_value","se_ki_relative_value")
+    average_relativised_variants_and_subst_wg_alleleR <- rbind(average_relativised_variants_and_subst_wg_alleleR,row_data,stringsAsFactors=F)
+  }
+}
+average_relativised_variants_and_subst_wg_alleleR$population = factor(average_relativised_variants_and_subst_wg_alleleR$population,levels=c("ki","no","po","sm","do"))
+levels(average_relativised_variants_and_subst_wg_alleleR$population)[levels(average_relativised_variants_and_subst_wg_alleleR$population)=="sm"] <- "an"
+average_relativised_variants_and_subst_wg_alleleR$ratio = factor(average_relativised_variants_and_subst_wg_alleleR$ratio,levels=c("total","intergenic","intronic","synonymous","missense","nonsense"))
+levels(average_relativised_variants_and_subst_wg_alleleR$ratio) <- c("total","intergenic","intronic","synonymous","missense","nonsense")
+average_relativised_variants_and_subst_wg_alleleR$avg_ki_relative_value <- as.numeric(average_relativised_variants_and_subst_wg_alleleR$avg_ki_relative_value)
+average_relativised_variants_and_subst_wg_alleleR$se_ki_relative_value <- as.numeric(average_relativised_variants_and_subst_wg_alleleR$se_ki_relative_value)
+average_relativised_variants_and_subst_wg_alleleR
+
+
+#Separate plots:
+twodecimalsFUN <- function(x) sprintf("%.2f", x)
+type_range <- data.frame("var_type"=c("varssubs","varssubs","fixed","fixed"),"plot"=c("main","other","main","other"),"min"=c(0.70,0.70,0.75,0.5),"max"=c(1.70,1.70,1.75,3.5),"breaks"=c(0.1,0.1,0.2,0.5))
+
+average_relativised_derived_allele_allele_ratio_up <- ggplot(data=average_relativised_variants_and_subst_wg_alleleR, aes(population,avg_ki_relative_value,colour=population)) +
+  #facet_wrap(feature ~ species,nrow=6,ncol=2,scales="free") +
+  facet_grid(. ~ ratio) +
+  geom_point() +
+  geom_errorbar(aes(ymin=avg_ki_relative_value-se_ki_relative_value, ymax=avg_ki_relative_value+se_ki_relative_value), position=position_dodge(), width=0.5) +
+  #ggtitle("Proportion of reads at different NM") +
+  xlab("Population") +
+  ylab(ifelse(gBGC=="StoSandWtoW","GC-conservative average genetic load relative to ki",paste(gBGC,"average genetic load relative to ki"))) +
+  scale_y_continuous(labels=twodecimalsFUN, breaks=seq(filter(type_range,var_type==type & plot=="main") %>% select(min) %>% unlist(.,use.names=F), filter(type_range,var_type==type & plot=="main") %>% select(max) %>% unlist(.,use.names=F), by = filter(type_range,var_type==type & plot=="main") %>% select(breaks) %>% unlist(.,use.names=F)), limits=c(filter(type_range,var_type==type & plot=="main") %>% select(min) %>% unlist(.,use.names=F),filter(type_range,var_type==type & plot=="main") %>% select(max) %>% unlist(.,use.names=F))) +
+  #ggtitle(paste0("ratio of ",type," relative to synonymous and Kirov")) +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+      rect=element_rect(size=1),
+      axis.line=element_blank(),
+      axis.title=element_text(size=16),
+      axis.text.x=element_text(angle=30,hjust=1,size=12,colour="black"),
+      axis.title.x=element_blank(),
+      #axis.title.y=element_blank(),
+      axis.text.y=element_text(size=12,colour="black"),
+      axis.title.y=element_text(margin=unit(c(0,0.5,0,0),"cm")),
+      panel.background=element_blank(),
+      panel.border=element_rect(colour="black",fill=NA,size=1.5),
+      strip.background=element_rect(colour="black",size=1.5),
+      #panel.grid=element_blank(),
+      #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+      plot.margin=unit(c(0.5,1,0.5,0.2),"cm"),
+      #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+      legend.background=element_rect(linetype="solid", colour="black", size=.5),
+      #legend.justification=c(0,0),
+      legend.key=element_rect(colour="white"),
+      legend.key.size=unit(0.5,"cm"),
+      legend.position="none",
+      legend.title=element_blank()
+  )
+average_relativised_derived_allele_allele_ratio_up
+
+ggsave(paste0(gBGC,"_",type,"_genetic_load_relative2Kirov_lcnm3.pdf"), width=30, height=15, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/gBGC",average_relativised_derived_allele_allele_ratio_up)
+
+```
+
+#Extra: testing GC content.
+```{bash}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+VAR=(varssubs) #varssubs #variants #substitutions #segregating #fixed
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+
+INDLIST=($(ls `find . -path *"_individuals/*_individual_"${VAR}"_"${TYPE}".lr_ann.vcf" -print`))
+for i in "${INDLIST[@]}"
+  do
+  ind=$(echo "${i}" | awk -F'[/]' '{print $3}' | cut -c1-12)
+  echo "individual" ${ind}
+  AT=$(grep 'synonymous_variant' $i | awk -F"\t|;|=" '{printf ("%s %s\n", $5, $11)}' | sort | uniq -c | grep -E 'A|T' | awk -F" " '{printf ("%s\n", $1* $3)}' | paste -sd+ | bc)
+  GC=$(grep 'synonymous_variant' $i | awk -F"\t|;|=" '{printf ("%s %s\n", $5, $11)}' | sort | uniq -c | grep -E 'G|C' | awk -F" " '{printf ("%s\n", $1* $3)}' | paste -sd+ | bc)
+  GC_AT=$(echo "scale=5; $GC/$AT" | bc)
+  echo "GC/AT ratio is" $GC_AT
+  done
+
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+VAR=(varssubs) #varssubs #variants #substitutions #segregating #fixed
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+
+INDLIST=($(ls `find . -path *"_individuals/*_individual_"${VAR}"_"${TYPE}".lr_ann.vcf" -print`))
+for i in "${INDLIST[@]}"
+  do
+  ind=$(echo "${i}" | awk -F'[/]' '{print $3}' | cut -c1-12)
+  echo "individual" ${ind}
+  AT=$(grep 'intron_variant' $i | awk -F"\t|;|=" '{printf ("%s %s\n", $5, $11)}' | sort | uniq -c | grep -E 'A|T' | awk -F" " '{printf ("%s\n", $1* $3)}' | paste -sd+ | bc)
+  GC=$(grep 'intron_variant' $i | awk -F"\t|;|=" '{printf ("%s %s\n", $5, $11)}' | sort | uniq -c | grep -E 'G|C' | awk -F" " '{printf ("%s\n", $1* $3)}' | paste -sd+ | bc)
+  GC_AT=$(echo "scale=5; $GC/$AT" | bc)
+  echo "GC/AT ratio is" $GC_AT
+  done
+
+
+
+******
+
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+VAR=(varssubs) #varssubs #variants #substitutions #segregating #fixed
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+
+INDLIST=($(ls `find . -path *"_individuals/*_individual_"${VAR}"_"${TYPE}".lr_ann.vcf" -print`))
+for i in "${INDLIST[@]}"
+  do
+  ind=$(echo "${i}" | awk -F'[/]' '{print $3}' | cut -c1-12)
+  echo "individual" ${ind}
+  grep 'intergenic_region' $i | awk -F"\t|;|=" '{printf ("%s %s %s\n", $4, $5, $11)}' | sort | uniq -c > ${ind}.borrar
+  
+  AT=$(awk -F" " '$3 == "A" || $3 == "T"' ${ind}.borrar | awk -F" " '{printf ("%s\n", $1* $4)}' | paste -sd+ | bc)
+  GC=$(awk -F" " '$3 == "C" || $3 == "G"' ${ind}.borrar | awk -F" " '{printf ("%s\n", $1* $4)}' | paste -sd+ | bc)
+
+  StoW=$(awk -F" " '($2 == "C" || $2 == "G") && ($3 == "A" || $3 == "T")' ${ind}.borrar | awk -F" " '{printf ("%s\n", $1 * $4)}' | paste -sd+ | bc)
+  WtoS=$(awk -F" " '($2 == "A" || $2 == "T") && ($3 == "C" || $3 == "G")' ${ind}.borrar | awk -F" " '{printf ("%s\n", $1 * $4)}' | paste -sd+ | bc)
+  GCcons=$(awk -F" " '($2 == "A" && $3 == "T") || ($2 == "T" && $3 == "A") || ($2 == "C" && $3 == "G") || ($2 == "G" && $3 == "C")' ${ind}.borrar | awk -F" " '{printf ("%s\n", $1 * $4)}' | paste -sd+ | bc)
+  TOTAL=$(awk -F" " '{printf ("%s\n", $1 * $4)}' ${ind}.borrar | paste -sd+ | bc)
+  
+  AT_rel=$(echo "scale=5; $AT/$TOTAL" | bc)
+  GC_rel=$(echo "scale=5; $GC/$TOTAL" | bc)
+  StoW_rel=$(echo "scale=5; $StoW/$TOTAL" | bc)
+  WtoS_rel=$(echo "scale=5; $WtoS/$TOTAL" | bc)
+  GCcons_rel=$(echo "scale=5; $GCcons/$TOTAL" | bc)
+
+  echo "AT ratio is" $AT_rel ";GC ratio is" $GC_rel ";StoW ratio is" $StoW_rel "; WtoS ratio is" $WtoS_rel "; GCcons ratio is" $GCcons_rel
+  done
 
 
 ```
+
