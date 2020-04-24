@@ -1,0 +1,482 @@
+---
+title: "genome_bootstrap"
+output: html_document
+---
+
+#1. Define bootstrap blocks:
+```{bash}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/bootstrap/
+
+
+#Obtain the length of the whole genome:
+cut -f2 /GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/Length_scaffolds_lp23 | paste -sd+ | bc #2413209059
+
+#Since the genome measures 2.4Gb, we'll split it into 2400 blocks of 1005504b. To this end, we'll be using only those scaffolds larger than 1005504b (after discarding the regions that were associated to chromosomes X and Y). Obtain length of the scaffolds:
+BLOCK_LENGTH=1005504
+awk -F"\t" '{printf ("%s\t%s\t%s\t%s\n", $1,$2,$3,$3-$2)}' /GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/bed_file_all_the_genome_without_Y_X_chr.bed | awk -F"\t" -v bl=$BLOCK_LENGTH '$4 >= bl {printf ("%s\t%s\t%s\t%s\n", $1,$2,$3,$4)}' > bed_file_long_scaffolds_without_Y_X_chr.bed
+
+cut -f4 bed_file_long_scaffolds_without_Y_X_chr.bed | paste -sd+ | bc #1503187977 (which constitutes 62.3% of the genome)
+
+#Obtain the number of subdivision blocks for each scaffold, as well as the starting point of the last block:
+awk -F"\t" -v bl=$BLOCK_LENGTH '{printf ("%s\t%s\t%s\t%s\t%s\t%s\n", $1,$2,$3,$4,$4-bl,int($4/bl))}' bed_file_long_scaffolds_without_Y_X_chr.bed | sort -k4,4nr > bed_file_long_scaffolds_without_Y_X_chr_modified.bed
+
+#For each scaffold, calculate $DIFF (the average distance between the starting points of different blocks i.e. the length of a block + the interblock distance, without considering the last block). Then define the starting and finishing point of each block (except for the last one) accounting for the interblock distance. Then define the last block at the very end of the scaffold. Finally, output all blocks to a new file.
+rm bed_file_bootstrap_blocks.bed
+while read -r SCAFFOLD BEGIN END LENGTH WOUT_LAST N_BLOCKS; do
+  echo $SCAFFOLD "has" $N_BLOCKS "block(s)"
+  DIFF=$(echo "scale=6; $WOUT_LAST/($N_BLOCKS-1)" | bc | awk '{printf "%s", int($0)}')
+  for ((b=1; b<N_BLOCKS; b++))
+    do
+    CURRENT_DIFF=$((DIFF*(b-1)))
+    START=$((BEGIN+1+CURRENT_DIFF))
+    STOP=$((START+BLOCK_LENGTH-1))
+    echo -e "$SCAFFOLD\t$START\t$STOP" >> bed_file_bootstrap_blocks.bed
+    done
+  echo -e "$SCAFFOLD\t$((WOUT_LAST+1))\t$LENGTH" >> bed_file_bootstrap_blocks.bed
+done < bed_file_long_scaffolds_without_Y_X_chr_modified.bed
+
+#Sanity check: test whether all blocks measure exactly 1005504b. They do!
+awk -F"\t" '{printf ("%s\t%s\t%s\t%s\n", $1,$2,$3,$3-$2+1)}' bed_file_bootstrap_blocks.bed | cut -f4 | sort | uniq
+
+#Sort the bed by scaffold and position.
+sort -k1,1 -k2,2n bed_file_bootstrap_blocks.bed | awk -F"\t" '{printf ("%s\t%s\t%s\t%s%04d_%s_%s_%s\n", $1,$2,$3,"bl",NR,$1,$2,$3)}' > bed_file_bootstrap_blocks_sorted.bed
+mv bed_file_bootstrap_blocks_sorted.bed bed_file_bootstrap_blocks.bed
+
+#Finally, generate a .bed file for each block (row).
+mkdir -p block_beds
+cd block_beds
+awk '{filename = sprintf("%s.bed", $4); print >filename; close(filename)}' ./../bed_file_bootstrap_blocks.bed
+
+```
+
+#2. Define parallelisation parameters.
+```{r, eval=FALSE, engine='bash'}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+PARTITIONS=10
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/bootstrap/
+
+BLOCK_N=$(ll -rth block_beds/bl*.bed | wc -l)
+PARTITION_N=$(echo "scale=3; $BLOCK_N/$PARTITIONS" | bc | awk '{printf "%s", int($0)}')
+for ((part=1; part < ${PARTITIONS[@]}; part++));
+  do
+  echo $part
+  PARTbis=$(printf "%02d\n" $part)
+  START=$(((part-1)*PARTITION_N+1))
+  ls block_beds/ | tail -n+$START | head -n$PARTITION_N > block_list_${PARTbis}.txt
+  done
+part=${PARTITIONS[@]}
+echo $part
+PARTbis=$(printf "%02d\n" $part)
+START=$(((part-1)*PARTITION_N+1)) 
+ls block_beds/ | tail -n+$START > block_list_${PARTbis}.txt
+
+```
+
+#3. Write scripts for each statistic.
+##Derived allele counts.
+```{r Get annotation statistics, eval=FALSE, engine='bash'}
+
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1) #name of the calling
+VAR=$(echo ${STY#*.} | cut -d'-' -f2) #behaviour of variant
+if [ $VAR == "private" ]
+  then
+  VAR="private_segregating"
+fi
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3) #type of variant
+CHUNK=$(echo ${STY#*.} | cut -d'-' -f4) #chunk of parallelisation
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+
+echo "generating parallel derived allele counts for" $VAR "and chunk" $CHUNK
+echo "retrieving blocks in chunk" $CHUNK
+BLOCKLIST=$(cut -d'.' -f1,2 bootstrap/block_list_${CHUNK}.txt)
+echo "retrieving individual VCFs"
+INDLIST=($(ls `find . -path *"_individuals/*_individual_"${VAR}"_"${TYPE}".lr_ann.vcf" -print`))
+for BLOCK in ${BLOCKLIST[@]}
+  do 
+  echo "working with block" ${BLOCK}
+  BED=$(realpath bootstrap/block_beds/${BLOCK}.bed)
+  rm bootstrap/derived_allele_counts/$VAR/${CALLING}_ann_individual_summary_${VAR}_${TYPE}.${BLOCK}.lr_ann.txt
+  echo -e "species\tpopulation\tdataset\tsample\ttotal_V\ttotal_A\tintergenic_V\tintergenic_A\tintronic_V\tintronic_A\tcoding_V\tsynonymous_V\tsynonymous_A\tsyn_pref_V\tsyn_pref_A\tsyn_unpref_V\tsyn_unpref_A\tmissense_V\tmissense_A\tmissense_tol_V\tmissense_tol_A\tmissense_del_V\tmissense_del_A\tnonsense_V\tnonsense_A\tUCNE_V\tUCNE_A\tUCNE_low_V\tUCNE_low_A\tUCNE_mid_V\tUCNE_mid_A\tUCNE_high_V\tUCNE_high_A\tmissense/synonymous_V\tmissense/synonymous_A\tsynonymous/intronic_V\tmissense/intronic_V" > bootstrap/derived_allele_counts/$VAR/${CALLING}_ann_individual_summary_${VAR}_${TYPE}.${BLOCK}.lr_ann.txt
+  for n in "${INDLIST[@]}"
+    do
+    echo ${n}
+    ind=$(echo ${n} | awk -F'[/]' '{print $3}' | cut -c1-12)
+    echo ${ind}
+    SPECIES=$(echo ${ind} | cut -c3-4)
+    POPULATION=$(echo ${ind} | cut -c6-7)
+    DATASET=$(if [ $ind = "c_lp_sm_0221" ]; then echo "REF"; elif [ $ind = "c_ll_ki_0090" ]; then echo "MG"; elif [ $ind = "h_ll_pv_0223" ]; then echo "LD"; elif grep -Fxq $ind /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/c_lp_5x_samples || [ $SPECIES = "ll" ]; then echo "5x"; else echo "GP"; fi)
+    SAMPLE=$(echo ${ind} | cut -c9-12)
+    echo "subsetting VCF for block" $BLOCK "and individual" $ind
+    bedtools intersect -a ${n} -b ${BED} -header > ${n/.vcf/.${BLOCK}.vcf}
+    i=${n/.vcf/.${BLOCK}.vcf}
+    TOTAL_V=$(grep -v '#' ${i} | wc -l)
+    if [ "$TOTAL_V" -eq 0 ]; then TOTAL_A=0; else TOTAL_A=$(grep -v '#' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc); fi
+    INTERGENIC_V=$(grep 'intergenic' ${i} | wc -l)
+    if [ "$INTERGENIC_V" -eq 0 ]; then INTERGENIC_A=0; else INTERGENIC_A=$(grep 'intergenic' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc); fi
+    INTRONIC_V=$(grep 'intron_variant' ${i} | wc -l)
+    if [ "$INTRONIC_V" -eq 0 ]; then INTRONIC_A=0; else INTRONIC_A=$(grep 'intron_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc); fi
+    CODING_V=$(grep 'CDS' ${i} | wc -l)
+    SYNONYMOUS_V=$(grep 'synonymous_variant' ${i} | wc -l)
+    if [ "$SYNONYMOUS_V" -eq 0 ]; then SYNONYMOUS_A=0; else SYNONYMOUS_A=$(grep 'synonymous_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc); fi
+    bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/syn_pref/synonymous_variants_complete_info_0to1_lr.bed > ${BLOCK}_${ind}_${VAR}_syn_pref.temp.borrar
+    SYN_PREF_V=$(wc -l < ${BLOCK}_${ind}_${VAR}_syn_pref.temp.borrar)
+    if [ "$SYN_PREF_V" -eq 0 ]; then SYN_PREF_A=0; else SYN_PREF_A=$(cut -f8 ${BLOCK}_${ind}_${VAR}_syn_pref.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc); fi
+    bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/syn_pref/synonymous_variants_complete_info_1to0_lr.bed > ${BLOCK}_${ind}_${VAR}_syn_unpref.temp.borrar
+    SYN_UNPREF_V=$(wc -l < ${BLOCK}_${ind}_${VAR}_syn_unpref.temp.borrar)
+    if [ "$SYN_UNPREF_V" -eq 0 ]; then SYN_UNPREF_A=0; else SYN_UNPREF_A=$(cut -f8 ${BLOCK}_${ind}_${VAR}_syn_unpref.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc); fi
+    MISSENSE_V=$(grep 'missense_variant' ${i} | wc -l)
+    if [ "$MISSENSE_V" -eq 0 ]; then MISSENSE_A=0; else MISSENSE_A=$(grep 'missense_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc); fi
+    bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/provean/missense_variants_provean_scores_tolerated.txt > ${BLOCK}_${ind}_${VAR}_mis_tol.temp.borrar
+    MISSENSE_TOL_V=$(wc -l < ${BLOCK}_${ind}_${VAR}_mis_tol.temp.borrar)
+    if [ "$MISSENSE_TOL_V" -eq 0 ]; then MISSENSE_TOL_A=0; else MISSENSE_TOL_A=$(cut -f8 ${BLOCK}_${ind}_${VAR}_mis_tol.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc); fi
+    bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/provean/missense_variants_provean_scores_deleterious.txt > ${BLOCK}_${ind}_${VAR}_mis_del.temp.borrar
+    MISSENSE_DEL_V=$(wc -l < ${BLOCK}_${ind}_${VAR}_mis_del.temp.borrar)
+    if [ "$MISSENSE_DEL_V" -eq 0 ]; then MISSENSE_DEL_A=0; else MISSENSE_DEL_A=$(cut -f8 ${BLOCK}_${ind}_${VAR}_mis_del.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc); fi
+    NONSENSE_V=$(grep '|HIGH|' ${i} | wc -l)
+    if [ "$NONSENSE_V" -eq 0 ]; then NONSENSE_A=0; else NONSENSE_A=$(grep '|HIGH|' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc); fi
+    UCNE_V=$(grep 'UCNE' ${i} | wc -l)
+    if [ "$UCNE_V" -eq 0 ]; then UCNE_A=0; else UCNE_A=$(grep 'UCNE' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc); fi
+    bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_lt2.gerp.bed > ${BLOCK}_${ind}_${VAR}_ucne_low.temp.borrar
+    UCNE_LOW_V=$(wc -l < ${BLOCK}_${ind}_${VAR}_ucne_low.temp.borrar)
+    if [ "$UCNE_LOW_V" -eq 0 ]; then UCNE_LOW_A=0; else UCNE_LOW_A=$(cut -f8 ${BLOCK}_${ind}_${VAR}_ucne_low.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc); fi
+    bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_gt2lt5.gerp.bed > ${BLOCK}_${ind}_${VAR}_ucne_mid.temp.borrar
+    UCNE_MID_V=$(wc -l < ${BLOCK}_${ind}_${VAR}_ucne_mid.temp.borrar)
+    if [ "$UCNE_MID_V" -eq 0 ]; then UCNE_MID_A=0; else UCNE_MID_A=$(cut -f8 ${BLOCK}_${ind}_${VAR}_ucne_mid.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc); fi
+    bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_gt5.gerp.bed > ${BLOCK}_${ind}_${VAR}_ucne_high.temp.borrar
+    UCNE_HIGH_V=$(wc -l < ${BLOCK}_${ind}_${VAR}_ucne_high.temp.borrar)
+    if [ "$UCNE_HIGH_V" -eq 0 ]; then UCNE_HIGH_A=0; else UCNE_HIGH_A=$(cut -f8 ${BLOCK}_${ind}_${VAR}_ucne_high.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc); fi
+    MISSENSE_SYNONYMOUS_V=$(echo "scale=4; $MISSENSE_V/$SYNONYMOUS_V" | bc)
+    MISSENSE_SYNONYMOUS_A=$(echo "scale=4; $MISSENSE_A/$SYNONYMOUS_A" | bc)
+    SYNONYMOUS_INTRONIC_V=$(echo "scale=4; $SYNONYMOUS_V/$INTRONIC_V" | bc)
+    MISSENSE_INTRONIC_V=$(echo "scale=4; $MISSENSE_V/$INTRONIC_V" | bc)
+    echo -e "$SPECIES\t$POPULATION\t$DATASET\t$SAMPLE\t$TOTAL_V\t$TOTAL_A\t$INTERGENIC_V\t$INTERGENIC_A\t$INTRONIC_V\t$INTRONIC_A\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$SYN_PREF_V\t$SYN_PREF_A\t$SYN_UNPREF_V\t$SYN_UNPREF_A\t$MISSENSE_V\t$MISSENSE_A\t$MISSENSE_TOL_V\t$MISSENSE_TOL_A\t$MISSENSE_DEL_V\t$MISSENSE_DEL_A\t$NONSENSE_V\t$NONSENSE_A\t$UCNE_V\t$UCNE_A\t$UCNE_LOW_V\t$UCNE_LOW_A\t$UCNE_MID_V\t$UCNE_MID_A\t$UCNE_HIGH_V\t$UCNE_HIGH_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A\t$SYNONYMOUS_INTRONIC_V\t$MISSENSE_INTRONIC_V" >> bootstrap/derived_allele_counts/$VAR/${CALLING}_ann_individual_summary_${VAR}_${TYPE}.${BLOCK}.lr_ann.txt
+    rm ${BLOCK}_${ind}_${VAR}_*.temp.borrar
+    rm ${n/.vcf/.${BLOCK}.vcf}
+    done
+done
+
+```
+
+#4. Upload scripts to the server.
+##Derived allele counts.
+```{r, eval=FALSE, engine='bash'}
+
+#Save it in a text editor as /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/bootstrap/retrieve_individual_counts.sh and upload it to the server:
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+scp /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/bootstrap/retrieve_individual_counts.sh dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/bootstrap/derived_allele_counts/
+
+#Then inside the server change permissions to run it:
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/bootstrap/derived_allele_counts/
+chmod +x retrieve_individual_counts.sh
+
+```
+
+#5. Obtain statistics for each block in parallel runs.
+```{r, eval=FALSE, engine='bash'}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+VAR=(fixed) #varssubs #variants #substitutions #segregating #fixed #private
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/bootstrap/
+PARALLEL=$(ls block_list_*.txt | cut -d'_' -f3 | cut -d'.' -f1)
+mkdir -p derived_allele_counts/$VAR
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/bootstrap/derived_allele_counts/$VAR
+NL=$'\n'
+
+for p in ${PARALLEL[@]}
+  do
+  echo ${p}
+  screen -dmS "${CALLING}-${VAR}-${TYPE}-${p}"
+  screen -S "${CALLING}-${VAR}-${TYPE}-${p}" -p 0 -X stuff "script ${CALLING}-${VAR}-${TYPE}-${p}.log$NL"
+  screen -S "${CALLING}-${VAR}-${TYPE}-${p}" -p 0 -X stuff "time ./../retrieve_individual_counts.sh; exec bash$NL"
+  screen -S "${CALLING}-${VAR}-${TYPE}-${p}" -p 0 -X stuff "exit$NL"
+  screen -S "${CALLING}-${VAR}-${TYPE}-${p}" -p 0 -X stuff "exit$NL"
+  done
+
+```
+
+#6. Perform the bootstrap, obtain the bootstrap error, and relativise it.
+```{bash}
+
+N_BOOT=100 #100 #1000
+N1_BOOT=$((N_BOOT-1))
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+VAR=(varssubs) #varssubs #variants #substitutions #segregating #fixed #private
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/bootstrap/derived_allele_counts/$VAR
+
+#First, generate the stuff common to all bootstraps:
+rm blocks_${VAR}.list
+for i in {1..50}
+  do
+  ls *bl*.lr_ann.txt >> blocks_${VAR}.list #List each block 50 times to generate the pool for the randomisation
+  done
+head -n1 $(head -n1 blocks_${VAR}.list) | cut -f-33 > ind_headers.txt #Retrieve headers for files with individuals
+cut -f2,5- ind_headers.txt > pop_headers.txt #Retrieve headers for files with populations
+tail -n+2 $(head -n1 blocks_${VAR}.list) | cut -f-4 > ids.txt #Retrieve first 4 columns with individual data
+
+#Next, generate several bootstrapped w-g counts by adding the counts of 2400 blocks pulled at random from the pool, and obtain the population averages relativised by the Kirov one:
+for boot in $(seq 1 $N_BOOT) #100 (4mins) #1000
+  do
+  #First, generate the counts for each bootstrapped genome:
+  echo "generating counts for bootstrapped genome number" $boot
+  shuf -n2400 blocks_${VAR}.list > bootstrapped_genome_${boot}.list
+  paste ids.txt <(awk '{for (i=5;i<=33;i++) total[FNR","i]+=$i;} END{for (j=1;j<=FNR;j++) {for (i=5;i<=33;i++) printf "%s\t",total[j","i]; print "";}}' $(cat bootstrapped_genome_${boot}.list) | tail -n+2) > ${CALLING}_ann_individual_summary_${VAR}_${TYPE}.boot_${boot}.lr_ann.txt
+  rm bootstrapped_genome_${boot}.list
+  #Next, obtain the population average for each bootstrap:
+  echo "calculating population averages for bootstrapped genome number" $boot
+  gawk '{N[$2]++;
+         for (i=5;i<=NF;i++)
+           {sum[$2"."i] += $i}; 
+        }
+        END {for (p in N) 
+              {printf "%s\t", p; 
+               for (i=5;i<NF;i++)
+               printf("%.3f\t",sum[p"."i]/N[p]);
+               printf("%.3f\n",sum[p"."NF]/N[p]);
+              }
+            }' ${CALLING}_ann_individual_summary_${VAR}_${TYPE}.boot_${boot}.lr_ann.txt > ${CALLING}_ann_population_average_${VAR}_${TYPE}.boot_${boot}.lr_ann.txt #(sum["ki."i]/N["ki"]) to relativise by Kirov
+  done
+
+cut -f1 c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_ann_population_average_varssubs_SNP.boot_1.lr_ann.txt > pops.txt #Retrieve column with population data
+
+#Next, obtain the population average and sampling error for the empirical data:
+##Average:
+cat pop_headers.txt <(gawk '{N[$2]++;
+                             for (i=5;i<=NF;i++)
+                               {sum[$2"."i] += $i}; 
+                            }
+                            END {for (p in N) 
+                                  {printf "%s\t", p; 
+                                   for (i=5;i<NF;i++)
+                                   printf("%.3f\t",sum[p"."i]/N[p]);
+                                   printf("%.3f\n",sum[p"."NF]/N[p]);
+                                  }
+                                }' <(tail -n+2 ../../../${CALLING}_ann_individual_summary_${VAR}_${TYPE}.lr_ann.txt | cut -f-33)) > ../../../${CALLING}_ann_population_average_${VAR}_${TYPE}.empirmean.lr_ann.txt
+
+##Error:
+cat pop_headers.txt <(gawk '{N[$2]++; for (i=5;i<=NF;i++) {sum[$2","i] += $i; sumsq[$2","i]+=$i*$i;}} END {for (p in N) {printf "%s\t", p; for (i=5;i<NF;i++) printf("%.3f\t",(((sumsq[p","i]/(N[p]-1))-(sum[p","i]/N[p])**2)/(N[p]-1))**0.5); printf("%.3f\n",(((sumsq[p","NF]/(N[p]-1))-(sum[p","NF]/N[p])**2)/(N[p]-1))**0.5); }}' <(tail -n+2 ../../../${CALLING}_ann_individual_summary_${VAR}_${TYPE}.lr_ann.txt | cut -f-33)) > ../../../${CALLING}_ann_population_average_${VAR}_${TYPE}.empirerror.lr_ann.txt
+ 
+ 
+#Next, obtain the population average of derived counts across bootstrapped genomes, but first store the correct files for the current $BOOT_N in an input list, so that only those (and not those from other bootstraps) are called:
+ls ${CALLING}_ann_population_average_${VAR}_${TYPE}.boot_*[[:digit:]]*.lr_ann.txt | awk -v nboot="$N_BOOT" -F"_|\\\\." '$24 <= nboot {print $0}' > ${CALLING}_ann_population_average_${VAR}_${TYPE}.Nboot_${N_BOOT}.list
+
+cat pop_headers.txt <(paste pops.txt <(awk -v nboot="$N_BOOT" '{for (i=2;i<=NF;i++) total[FNR","i]+=$i;} END{for (j=1;j<=FNR;j++) {for (i=2;i<=NF;i++) printf "%.1f\t ",total[j","i]/nboot; print "";}}' $(<${CALLING}_ann_population_average_${VAR}_${TYPE}.Nboot_${N_BOOT}.list))) > ${CALLING}_ann_population_average_${VAR}_${TYPE}.bootmean.lr_ann.txt
+
+#Next, obtain the bootstrap error of derived counts across bootstrapped genomes. The bootstrap error is the standard deviation of the N bootstraps, so it can be obtained as the sqrt(var(N)):
+cat pop_headers.txt <(paste pops.txt <(awk -v nboot="$N_BOOT" '{for (i=2;i<=NF;i++) {total[FNR","i]+=$i; sumsq[FNR","i]+=$i*$i; }} END{for (j=1;j<=FNR;j++) {for (i=2;i<=NF;i++) printf "%.5f\t",((sumsq[j","i]/nboot)-(total[j","i]/nboot)**2)**0.5; print "";}}' $(<${CALLING}_ann_population_average_${VAR}_${TYPE}.Nboot_${N_BOOT}.list))) > ${CALLING}_ann_population_average_${VAR}_${TYPE}.booterror.lr_ann.txt
+
+!!! CHANGE DENOMINATOR TO N-1 (nboot="$N1_BOOT") AND SOLVE THE NAN PROBLEM.
+
+#Since averages are different between the empirical data and the bootstrap, we need to correct the errors. 
+##As a first step, the empirical means should be divided by the bootstrap means to obtain the correction factor for the bootstrap errors:
+cat pop_headers.txt <(paste <(tail -n+2 ../../../${CALLING}_ann_population_average_${VAR}_${TYPE}.empirmean.lr_ann.txt) <(tail -n+2 ${CALLING}_ann_population_average_${VAR}_${TYPE}.bootmean.lr_ann.txt) | awk '{h=NF/2;for (i=2;i<=h;i++) $i=$i/$(i+h);NF=h};1' | tr " " "\t") > ${CALLING}_ann_population_average_${VAR}_${TYPE}.bootcorrectionfactor.lr_ann.txt
+##Then the errors can be multiplied by the correction factors in order to obtain the expected errors for the empirical means:
+cat pop_headers.txt <(paste <(tail -n+2 ${CALLING}_ann_population_average_${VAR}_${TYPE}.bootcorrectionfactor.lr_ann.txt) <(tail -n+2 ${CALLING}_ann_population_average_${VAR}_${TYPE}.booterror.lr_ann.txt) | awk '{h=NF/2;for (i=2;i<=h;i++) $i=$i*$(i+h);NF=h};1' | tr " " "\t") > ${CALLING}_ann_population_average_${VAR}_${TYPE}.booterrorcorrected.lr_ann.txt
+
+#In order to relativise by the Kirov population average, divide both the empirical population average and the (corrected) bootstrap errors (empirical errors in the next section) by the empirical Kirov population averages:
+##Bootstrap errors divided by the empirical Kirov population average:
+cat pop_headers.txt <(paste pops.txt <(cat <(grep 'ki' ../../../${CALLING}_ann_population_average_${VAR}_${TYPE}.empirmean.lr_ann.txt | cut -f2-) <(tail -n+2 ${CALLING}_ann_population_average_${VAR}_${TYPE}.booterror.lr_ann.txt | cut -f2-) | column -t |
+awk 'BEGIN {OFS = "\t"} NR == 1 {cols = split($0,m);next} NF == cols {for (i=1; i<=NF; i++) $i = sprintf ("%.5f", $i/m[i])}1')) > ${CALLING}_ann_population_average_${VAR}_${TYPE}.booterror_ki_rel.lr_ann.txt
+##Bootstrap corrected errors divided by the empirical Kirov population average:
+cat pop_headers.txt <(paste pops.txt <(cat <(grep 'ki' ../../../${CALLING}_ann_population_average_${VAR}_${TYPE}.empirmean.lr_ann.txt | cut -f2-) <(tail -n+2 ${CALLING}_ann_population_average_${VAR}_${TYPE}.booterrorcorrected.lr_ann.txt | cut -f2-) | column -t |
+awk 'BEGIN {OFS = "\t"} NR == 1 {cols = split($0,m);next} NF == cols {for (i=1; i<=NF; i++) $i = sprintf ("%.5f", $i/m[i])}1')) > ${CALLING}_ann_population_average_${VAR}_${TYPE}.booterrorcorrected_ki_rel.lr_ann.txt
+##Empirical population averages divided by the empirical Kirov population average:
+cat pop_headers.txt <(paste pops.txt <(cat <(grep 'ki' ../../../${CALLING}_ann_population_average_${VAR}_${TYPE}.empirmean.lr_ann.txt | cut -f2-) <(tail -n+2 ../../../${CALLING}_ann_population_average_${VAR}_${TYPE}.empirmean.lr_ann.txt | cut -f2-) | awk 'BEGIN {OFS = "\t"} NR == 1 {cols = split($0,m);next} NF == cols {for (i=1; i<=NF; i++) $i = sprintf ("%.5f", $i/m[i])}1')) > ../../../${CALLING}_ann_population_average_${VAR}_${TYPE}.empirmean_ki_rel.lr_ann.txt
+##Empirical errors divided by the empirical Kirov population average:
+cat pop_headers.txt <(paste pops.txt <(cat <(grep 'ki' ../../../${CALLING}_ann_population_average_${VAR}_${TYPE}.empirmean.lr_ann.txt | cut -f2-) <(tail -n+2 ../../../${CALLING}_ann_population_average_${VAR}_${TYPE}.empirerror.lr_ann.txt | cut -f2-) | column -t |
+awk 'BEGIN {OFS = "\t"} NR == 1 {cols = split($0,m);next} NF == cols {for (i=1; i<=NF; i++) $i = sprintf ("%.5f", $i/m[i])}1')) > ../../../${CALLING}_ann_population_average_${VAR}_${TYPE}.empirerror_ki_rel.lr_ann.txt
+
+```
+
+#7. Obtain the combined error.
+```{bash}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+VAR=(varssubs) #varssubs #variants #substitutions #segregating #fixed #private
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/bootstrap/derived_allele_counts/$VAR
+
+#Combine both the empirical and the bootstrap error (as the square root of the sum of the variances) to obtain the total error:
+cat pop_headers.txt <(paste pops.txt <(awk '{for (i=2;i<=NF;i++) {total[FNR","i]+=$i; sumsq[FNR","i]+=$i*$i; }} END{for (j=1;j<=FNR;j++) {for (i=2;i<=NF;i++) printf "%.8f\t",(sumsq[j","i])**0.5; print "";}}' <(tail -n+2 ${CALLING}_ann_population_average_${VAR}_${TYPE}.booterrorcorrected_ki_rel.lr_ann.txt) <(tail -n+2 ../../../${CALLING}_ann_population_average_${VAR}_${TYPE}.empirerror_ki_rel.lr_ann.txt))) > ${CALLING}_ann_population_average_${VAR}_${TYPE}.totalerror_ki_rel.lr_ann.txt
+                                
+```
+
+#8: Download files:
+```{bash}
+
+#From outside the server:
+export SSHPASS=$(cat /Users/dani/Documents/genomics_pass.txt)
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+VAR=(varssubs) #varssubs #variants #substitutions #segregating #fixed #private_segregating
+TYPE=(SNP) #write down SNP or INDEL
+sshpass -e scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/${CALLING}_ann_population_average_${VAR}_${TYPE}.empirmean_ki_rel.lr_ann.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/bootstrap/
+sshpass -e scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/bootstrap/derived_allele_counts/varssubs/${CALLING}_ann_population_average_${VAR}_${TYPE}.totalerror_ki_rel.lr_ann.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/bootstrap/
+unset SSHPASS
+
+```
+
+#9: Plot results.
+```{r Plot variant count results}
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(grid)
+library(gridExtra)
+library(egg)
+
+type="varssubs" #varssubs #variants #substitutions #segregating #fixed #private_segregating
+wd_path <- ("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/bootstrap/")
+averages <- read_tsv(paste0(wd_path,"c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_ann_population_average_",type,"_SNP.empirmean_ki_rel.lr_ann.txt")) %>% select(.,population,contains("_A"),-contains("/")) %>% rename_at(vars(ends_with("_A")),funs(gsub("_A","",.)))
+averages$population = factor(averages$population,levels=c("ki","no","po","sm","do"))
+print.data.frame(averages)
+
+errors <- read_tsv(paste0(wd_path,"c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_ann_population_average_",type,"_SNP.totalerror_ki_rel.lr_ann.txt")) %>% select(.,population,contains("_A"),-contains("/")) %>% rename_at(vars(ends_with("_A")),funs(gsub("_A","",.))) 
+errors$population = factor(errors$population,levels=c("ki","no","po","sm","do"))
+print.data.frame(errors)
+
+averages_tidy <- averages %>% gather(ratio,value,-population,factor_key=T)
+averages_tidy
+
+errors_tidy <- errors %>% gather(ratio,value,-population,factor_key=T)
+errors_tidy
+
+combined_tidy <- left_join(averages_tidy,errors_tidy,by=c("population","ratio"))
+colnames(combined_tidy) <- c("population","ratio","mean","error")
+
+combined_tidy$population = factor(combined_tidy$population,levels=c("ki","no","po","sm","do"))
+levels(combined_tidy$population)[levels(combined_tidy$population)=="sm"] <- "an"
+combined_tidy$ratio = factor(combined_tidy$ratio,levels=c("total","intergenic","intronic","synonymous","syn_pref","syn_unpref","missense","missense_tol","missense_del","nonsense","UCNE","UCNE_low","UCNE_mid","UCNE_high"))
+levels(combined_tidy$ratio) <- c("total","intergenic","introns","synonymous","synonymous_pref","synonymous_unpref","missense","missense_tolerated","missense_deleterious","nonsense","UCNE","UCNE_low","UCNE_mid","UCNE_high")
+
+
+#Separate plots:
+twodecimalsFUN <- function(x) sprintf("%.2f", x)
+type_range <- data.frame("var_type"=c("varssubs","varssubs","fixed","fixed"),"plot"=c("main","other","main","other"),"min"=c(0.65,0.65,0.75,0.5),"max"=c(1.25,1.5,1.75,3.5),"breaks"=c(0.05,0.1,0.2,0.5))
+
+ggplot_up <- ggplot(data=filter(combined_tidy,grepl('total|intergenic|introns|\\<synonymous\\>|\\<missense\\>|nonsense|\\<UCNE\\>',ratio)), aes(population,mean,colour=population)) +
+  #facet_wrap(feature ~ species,nrow=6,ncol=2,scales="free") +
+  facet_grid(. ~ ratio) +
+  geom_point() +
+  geom_errorbar(aes(ymin=mean-error, ymax=mean+error), position=position_dodge(), width=0.5) +
+  #ggtitle("Proportion of reads at different NM") +
+  xlab("Population") +
+  ylab(ifelse(type=="varssubs","Average genetic load relative to ki",ifelse(type=="fixed","Derived fixation rate relative to ki", "Check code"))) +
+  scale_y_continuous(labels=twodecimalsFUN, breaks=seq(filter(type_range,var_type==type & plot=="main") %>% select(min) %>% unlist(.,use.names=F), filter(type_range,var_type==type & plot=="main") %>% select(max) %>% unlist(.,use.names=F), by = filter(type_range,var_type==type & plot=="main") %>% select(breaks) %>% unlist(.,use.names=F)), limits=c(filter(type_range,var_type==type & plot=="main") %>% select(min) %>% unlist(.,use.names=F),filter(type_range,var_type==type & plot=="main") %>% select(max) %>% unlist(.,use.names=F))) +
+  #ggtitle(paste0("ratio of ",type," relative to synonymous and Kirov")) +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+      rect=element_rect(size=1),
+      axis.line=element_blank(),
+      axis.title=element_text(size=16),
+      axis.text.x=element_text(angle=30,hjust=1,size=12,colour="black"),
+      axis.title.x=element_blank(),
+      axis.title.y=element_blank(),
+      axis.text.y=element_text(size=12,colour="black"),
+      #axis.title.y=element_text(margin=unit(c(0,0.5,0,0),"cm")),
+      panel.background=element_blank(),
+      panel.border=element_rect(colour="black",fill=NA,size=1.5),
+      strip.background=element_rect(colour="black",size=1.5),
+      #panel.grid=element_blank(),
+      #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+      plot.margin=unit(c(0.5,1,0.5,0.2),"cm"),
+      #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+      legend.background=element_rect(linetype="solid", colour="black", size=.5),
+      #legend.justification=c(0,0),
+      legend.key=element_rect(colour="white"),
+      legend.key.size=unit(0.5,"cm"),
+      legend.position="none",
+      legend.title=element_blank()
+  )
+ggplot_up
+
+ggplot_down <- ggplot(data=filter(combined_tidy,grepl('synonymous_pref|synonymous_unpref|missense_tolerated|missense_deleterious|UCNE_mid|UCNE_high',ratio)), aes(population,mean,colour=population)) +
+  #facet_wrap(feature ~ species,nrow=6,ncol=2,scales="free") +
+  facet_grid(. ~ ratio) +
+  geom_point() +
+  geom_errorbar(aes(ymin=mean-error, ymax=mean+error), position=position_dodge(), width=0.5) +
+  #ggtitle("Proportion of reads at different NM") +
+  xlab("Population") +
+  ylab(ifelse(type=="varssubs","Average genetic load relative to ki",ifelse(type=="fixed","Derived fixation rate relative to ki", "Check code"))) +
+  scale_y_continuous(labels=twodecimalsFUN, breaks=seq(filter(type_range,var_type==type & plot=="main") %>% select(min) %>% unlist(.,use.names=F), filter(type_range,var_type==type & plot=="main") %>% select(max) %>% unlist(.,use.names=F), by = filter(type_range,var_type==type & plot=="main") %>% select(breaks) %>% unlist(.,use.names=F)), limits=c(filter(type_range,var_type==type & plot=="main") %>% select(min) %>% unlist(.,use.names=F),filter(type_range,var_type==type & plot=="main") %>% select(max) %>% unlist(.,use.names=F))) +
+  #ggtitle(paste0("ratio of ",type," relative to synonymous and Kirov")) +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+      rect=element_rect(size=1),
+      axis.line=element_blank(),
+      axis.title=element_text(size=16),
+      axis.title.x=element_blank(),
+      axis.title.y=element_blank(),
+      axis.text.x=element_text(angle=30,hjust=1,size=12,colour="black"),
+      axis.text.y=element_text(size=12,colour="black"),
+      #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+      #axis.title.y=element_text(margin=unit(c(0,0.5,0,0),"cm")),
+      panel.background=element_blank(),
+      panel.border=element_rect(colour="black",fill=NA,size=1.5),
+      strip.background=element_rect(colour="black",size=1.5),
+      #panel.grid=element_blank(),
+      #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+      plot.margin=unit(c(0.5,1,0.5,0.4),"cm"),
+      #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+      legend.background=element_rect(linetype="solid", colour="black", size=.5),
+      #legend.justification=c(0,0),
+      legend.key=element_rect(colour="white"),
+      legend.key.size=unit(0.5,"cm"),
+      legend.position="none",
+      legend.title=element_blank()
+  )
+ggplot_down
+
+ggplot_other <- ggplot(combined_tidy[combined_tidy$ratio=="UCNE_low",], aes(population,mean,colour=population)) +
+  #facet_wrap(feature ~ species,nrow=6,ncol=2,scales="free") +
+  facet_wrap(. ~ ratio) +
+  geom_point() +
+  geom_errorbar(aes(ymin=mean-error, ymax=mean+error), position=position_dodge(), width=0.5) +
+  #ggtitle("Proportion of reads at different NM") +
+  xlab("Population") +
+  #ylab("Average genetic load relative to ki") +
+  scale_y_continuous(position="right",labels=twodecimalsFUN, breaks=seq(filter(type_range,var_type==type & plot=="other") %>% select(min) %>% unlist(.,use.names=F), filter(type_range,var_type==type & plot=="other") %>% select(max) %>% unlist(.,use.names=F), by = filter(type_range,var_type==type & plot=="other") %>% select(breaks) %>% unlist(.,use.names=F)), limits=c(filter(type_range,var_type==type & plot=="other") %>% select(min) %>% unlist(.,use.names=F),filter(type_range,var_type==type & plot=="other") %>% select(max) %>% unlist(.,use.names=F))) +
+  #ggtitle(paste0("ratio of ",type," relative to synonymous and Kirov")) +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+      rect=element_rect(size=1),
+      axis.line=element_blank(),
+      axis.title=element_text(size=16),
+      axis.title.x=element_blank(),
+      axis.text.x=element_text(angle=30,hjust=1,size=12,colour="black"),
+      axis.text.y=element_text(size=12,colour="black"),
+      axis.title.y=element_blank(),
+      #axis.title.y=element_text(margin=unit(c(0,0.5,0,0),"cm")),
+      panel.background=element_blank(),
+      panel.border=element_rect(colour="black",fill=NA,size=1.5),
+      strip.text=element_text(colour="black",face="bold"),
+      strip.background=element_rect(colour="black",size=1.5),
+      #panel.grid=element_blank(),
+      #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+      plot.margin=unit(c(0.5,-1,0.5,-10),"cm"),
+      #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+      legend.background=element_rect(linetype="solid", colour="black", size=.5),
+      #legend.justification=c(0,0),
+      legend.key=element_rect(colour="white"),
+      legend.key.size=unit(0.5,"cm"),
+      legend.position="none",
+      legend.title=element_blank()
+  )
+ggplot_other
+
+
+if(type=="varssubs") {
+  ggplot_combined <- grid.arrange(set_panel_size(ggplot_up,width=unit(4.5,"cm"),height=unit(10,"cm")), set_panel_size(ggplot_down,width=unit(4.5,"cm"),height=unit(10,"cm")),set_panel_size(ggplot_other,width=unit(4.5,"cm"),height=unit(10,"cm")),widths=c(7,1,0.2),layout_matrix=rbind(c(1,1,NA),c(2,NA,3)),bottom=textGrob(expression(bold("Population")),gp=gpar(fontsize=16,fontface="bold")),left=textGrob(expression(bold("Average genetic load relative to ki")), rot=90,gp=gpar(fontsize=16,fontface="bold"),vjust=3))
+} else if (type=="fixed") {
+    ggplot_combined <- grid.arrange(set_panel_size(ggplot_up,width=unit(4.5,"cm"),height=unit(10,"cm")), set_panel_size(ggplot_down,width=unit(4.5,"cm"),height=unit(10,"cm")),set_panel_size(ggplot_other,width=unit(4.5,"cm"),height=unit(10,"cm")),widths=c(7,1,0.2),layout_matrix=rbind(c(1,1,NA),c(2,NA,3)),bottom=textGrob(expression(bold("Population")),gp=gpar(fontsize=16,fontface="bold")),left=textGrob(expression(bold("Derived fixation rate relative to ki")), rot=90,gp=gpar(fontsize=16,fontface="bold"),vjust=3))
+}
+
+ggsave(paste0(type,"_genetic_load_relative2Kirov_bootstrapped.pdf"), width=41, height=25, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/bootstrap",ggplot_combined)
+
+```
