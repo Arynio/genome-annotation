@@ -112,7 +112,7 @@ for r in ${REGIONS[@]}
 #5. Combine the chunk VCFs and rename wrong samples:
 ```{bash}
 
-CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm3nm3_origcov)
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nmNnmN_origcov)
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING
 
 REGIONS=$(realpath /GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/bed_file_all_the_genome_chunks/bed_file_lp23.*_to_*.bed | cut -d'.' -f2)
@@ -130,7 +130,7 @@ for r in ${REGIONS[@]}
   done
 
 #Get the number of variants:
-grep -v '#' ${CALLING}.vcf | wc -l #5839239
+grep -v '#' ${CALLING}.vcf | wc -l #6312383
 
 #Rename the samples with wrong names.
 bcftools query -l ${CALLING}.vcf #check sample names
@@ -144,7 +144,7 @@ bcftools reheader -s lp_ll_rename.txt -o ${CALLING}_renamed.vcf ${CALLING}.vcf #
 #rm lp_ll_rename.txt
 mv ${CALLING}_renamed.vcf ${CALLING}.vcf
 
-grep -v '#' ${CALLING}.vcf | wc -l #5839239
+grep -v '#' ${CALLING}.vcf | wc -l #6312383
 
 #From here on, continue with the general script (genetic_load_varssubs_final_pipeline.Rmd), section 5: polarize contemporary VCFs.
 
