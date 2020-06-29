@@ -1070,7 +1070,6 @@ grep -v '#' "${CALLING}_polarized.lr_ann.vcf" | wc -l
 
 #8: Filter the annotated VCF. 
 ##Subset the VCF files in order to keep only good quality biallelic SNP variants.
-
 ```{r Filter the annotated VCF, eval=FALSE, engine='bash'}
 
 CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nmNnmN_origcov) #write down name of the calling
@@ -1685,7 +1684,7 @@ fi
 #12: Obtain per population VCFs.
 ```{r Obtain per population VCFs, eval=FALSE, engine='bash'}
 
-CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nmNnmN_origcov)
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
 VAR=(varssubs) #varssubs #variants #substitutions #segregating #fixed
 TYPE=(SNP) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
@@ -1967,8 +1966,8 @@ for pop in ${POPS[@]}
 ##Whole-genome.
 ```{r Split the population VCFs into per individual VCFs, eval=FALSE, engine='bash'}
 
-CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nmNnmN_origcov)
-VAR=(varssubs) #varssubs #variants #substitutions #segregating #fixed
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+VAR=(fixed) #varssubs #variants #substitutions #segregating #fixed
 TYPE=(SNP) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
 screen -S "${CALLING}-${VAR}-${TYPE}"
