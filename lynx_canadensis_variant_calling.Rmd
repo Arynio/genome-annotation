@@ -823,7 +823,35 @@ for j in ${DATASETS[@]}
   
 ```
 
+##At the global level (run the dataset level code first):
+```{r Perform depth filtering, eval=FALSE, engine='bash'}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_lcnm3_origcov)
+VAR=(varssubs) #varssubs #variants #substitutions
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/lynx_canadensis_VCFs/$CALLING/annotation
+screen -S "${CALLING}-${VAR}-${TYPE}"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+script "${CALLING}_depth_filter_global_${VAR}_${TYPE}.lr_ann.log"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+
+if [ $VAR == "varssubs" ]
+  then
+  echo $VAR
+  bedtools subtract -a ${CALLING}"_polarized_filtered6_"${TYPE}".lr_ann.vcf" -b ${CALLING}"_joined_minmaxdepth_to_remove_"${VAR}"_"${TYPE}".bed" -header > ${CALLING}"_polarized_filteredall_"${VAR}"_"${TYPE}".lr_ann.vcf"
+  else
+  echo $VAR
+  bedtools subtract -a ${CALLING}"_polarized_"${VAR}"_"${TYPE}".lr_ann.vcf" -b ${CALLING}"_joined_minmaxdepth_to_remove_"${VAR}"_"${TYPE}".bed" -header > ${CALLING}"_polarized_filteredall_"${VAR}"_"${TYPE}".lr_ann.vcf"
+fi
+
+```
+
 #11: Obtain per population VCFs.
+##Population x dataset:
 ```{r Obtain per population VCFs, eval=FALSE, engine='bash'}
 
 CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_lcnm3_origcov)
@@ -872,6 +900,55 @@ for i in ${DATASETS[@]}
     grep -v '#' ${j}"_"${NM_COV}"_perpop/"${i}"_"${j}"_"${NM_COV}"_perpop_"${VAR}"_"${TYPE}".lr_ann.vcf" | wc -l #
     done
   done
+
+```
+
+##Population (combined):
+```{r Obtain per population VCFs, eval=FALSE, engine='bash'}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_lcnm3_origcov)
+VAR=(varssubs) #varssubs #variants #substitutions #segregating #fixed
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/lynx_canadensis_VCFs/$CALLING/annotation
+screen -S "${CALLING}-${VAR}-${TYPE}"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+script "perpopcombined_${VAR}_${CALLING}_${TYPE}.lr_ann.log"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+
+REF=/GRUPOS/grupolince/reference_genomes/lynx_canadensis/lc4.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING)
+SPECIES=$(echo $CALLING | fold -w8 | cut -c1-4 | head -n$N_POPS | sort | uniq)
+DATASETS=$(for i in ${SPECIES[@]}; do ls ${i}*_samples | cut -d'_' -f1,2,3; done)
+COVERAGE=$(echo "${CALLING}" | rev | cut -d'_' -f1 | rev)
+NM_COV=$(echo "${CALLING}" | rev | cut -d'_' -f1,2 | rev)
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/lynx_canadensis_VCFs/$CALLING/annotation
+
+declare POP=$(bcftools query -l ${CALLING}"_polarized_filteredall_"${VAR}"_"${TYPE}".lr_ann.vcf" | cut -c1-7 | sort | uniq)
+for j in ${POP[@]}
+  do
+  echo "${j}"
+  rm ${j}"_pop_list_to_remove.txt"
+  $BCF query -l ${CALLING}"_polarized_filteredall_"${VAR}"_"${TYPE}".lr_ann.vcf" | grep "${j}" > ${j}"_pop_list_to_remove.txt"
+  cat ${j}"_pop_list_to_remove.txt"
+  mkdir -p "${j}"_"${NM_COV}"_perpop
+  java -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:+UseStringDeduplication -Xms16g -Xmx32g -jar $GATK \
+  -T SelectVariants \
+  -R $REF \
+  -V ${CALLING}"_polarized_filteredall_"${VAR}"_"${TYPE}".lr_ann.vcf" \
+  -o ${j}"_"${NM_COV}"_perpop/combined_"${j}"_"${NM_COV}"_perpop_"${VAR}"_"${TYPE}".lr_ann.vcf" \
+  -env \
+  --sample_file ${j}"_pop_list_to_remove.txt"
+  rm ${j}"_pop_list_to_remove.txt"
+  grep -v '#' ${j}"_"${NM_COV}"_perpop/combined_"${j}"_"${NM_COV}"_perpop_"${VAR}"_"${TYPE}".lr_ann.vcf" | wc -l #
+done
 
 ```
 
