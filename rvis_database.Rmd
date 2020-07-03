@@ -317,7 +317,7 @@ variants_and_subst_wg_alleleR
 r_average_vector <- c()
 for (r in unique(variants_and_subst_wg_alleleR$ratio)) {
   print(r)
-  r_average <- filter(variants_and_subst_wg_alleleR,r==ratio & population=="ki") %>% select(value) %>% unlist(.,use.names=F) %>% mean()
+  r_average <- filter(variants_and_subst_wg_alleleR,r==ratio & dataset=="5x" & population=="ki") %>% select(value) %>% unlist(.,use.names=F) %>% mean()
   r_average_vector <- c(r_average_vector,rep(r_average,nrow(filter(variants_and_subst_wg_alleleR,r==ratio))))
 }
 print(r_average_vector)
@@ -331,12 +331,12 @@ average_relativised_variants_and_subst_wg_alleleR <- data_frame("species"=charac
 
 for (pop in unique(relativised_variants_and_subst_wg_alleleR$population)) { #then loop over each population and feature to get the (relativised) mean and standard error, and feed the dataframe
   print(pop)
-  species <- filter(relativised_variants_and_subst_wg_alleleR,ratio==r & population==pop) %>% select(species) %>% unlist(.,use.names=F) %>% unique()
+  species <- filter(relativised_variants_and_subst_wg_alleleR,ratio==r & dataset=="5x" & population==pop) %>% select(species) %>% unlist(.,use.names=F) %>% unique()
   for (r in unique(relativised_variants_and_subst_wg_alleleR$ratio)) {
     print(r)
-    pop_mean <- filter(relativised_variants_and_subst_wg_alleleR,ratio==r & population==pop) %>% select(ki_relative_value) %>% unlist(.,use.names=F) %>% mean()
+    pop_mean <- filter(relativised_variants_and_subst_wg_alleleR,ratio==r & dataset=="5x" & population==pop) %>% select(ki_relative_value) %>% unlist(.,use.names=F) %>% mean()
     #print(paste0(pop," feature ",r," average is ",pop_mean))
-    pop_se <- filter(relativised_variants_and_subst_wg_alleleR,ratio==r & population==pop) %>% select(ki_relative_value) %>% unlist(.,use.names=F) %>% se()
+    pop_se <- filter(relativised_variants_and_subst_wg_alleleR,ratio==r & dataset=="5x" & population==pop) %>% select(ki_relative_value) %>% unlist(.,use.names=F) %>% se()
     #print(paste0(pop," feature ",r," std error is ",pop_se))
     row_data <- cbind(species,pop,r,pop_mean,pop_se)
     colnames(row_data) <- c("species","population","ratio","avg_ki_relative_value","se_ki_relative_value")
@@ -364,8 +364,8 @@ average_relativised_derived_allele_allele_ratio_ggplot1 <- ggplot(data=filter(av
   geom_errorbar(aes(ymin=avg_ki_relative_value-se_ki_relative_value, ymax=avg_ki_relative_value+se_ki_relative_value), position=position_dodge(), width=0.5) +
   #ggtitle("Proportion of reads at different NM") +
   ylab("population mean ratio") +
-  scale_y_continuous(breaks = seq(0.7, 1.2, by = 0.1)) +
-  ylim(0.7,1.2) +
+  scale_y_continuous(breaks = seq(0.6, 1.2, by = 0.1)) +
+  ylim(0.6,1.2) +
   #ggtitle(paste0("ratio of ",type," relative to synonymous and Kirov")) +
   theme_bw() +
   theme(text=element_text(size=16,face="bold"),
@@ -427,7 +427,7 @@ ggsave(paste0(type,"_derived_allele_allele_ratio_relative2introns_part2_mean.pdf
 
 
 average_relativised_derived_allele_allele_ratio_ggplotcombined <- grid.arrange(average_relativised_derived_allele_allele_ratio_ggplot1, average_relativised_derived_allele_allele_ratio_ggplot2, nrow = 2, layout_matrix = rbind(c(rep(1,20)), c(rep(2,18),rep(NA,3))))
-ggsave(paste0(type,"_derived_allele_allele_ratio_relative2introns_all.pdf"), width=40, height=20, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/deleterious_genes/", average_relativised_derived_allele_allele_ratio_ggplotcombined)
+ggsave(paste0(type,"_derived_allele_allele_ratio_5xrelative2introns_all.pdf"), width=40, height=20, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/deleterious_genes/", average_relativised_derived_allele_allele_ratio_ggplotcombined)
 
 ```
 
