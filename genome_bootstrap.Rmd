@@ -237,6 +237,87 @@ for BLOCK in ${BLOCKLIST[@]}
 
 ```
 
+##Derived allele homozygous counts.
+```{r Get heterozygous counts, eval=FALSE, engine='bash'}
+
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1) #name of the calling
+VAR=$(echo ${STY#*.} | cut -d'-' -f2) #behaviour of variant
+if [ $VAR == "private" ]
+  then
+  VAR="private_segregating"
+fi
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3) #type of variant
+CHUNK=$(echo ${STY#*.} | cut -d'-' -f4) #chunk of parallelisation
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+
+echo "generating parallel derived homozygous counts for" $VAR "and chunk" $CHUNK
+echo "retrieving blocks in chunk" $CHUNK
+BLOCKLIST=$(cut -d'.' -f1,2 bootstrap/block_list_${CHUNK}.txt)
+echo "retrieving individual VCFs"
+INDLIST=($(ls `find . -path *"_individuals/*_individual_"${VAR}"_"${TYPE}".lr_ann.vcf" -print`))
+for BLOCK in ${BLOCKLIST[@]}
+  do 
+  echo "working with block" ${BLOCK}
+  BED=$(realpath bootstrap/block_beds/${BLOCK}.bed)
+  rm bootstrap/derived_homozygous_counts/$VAR/${CALLING}_ann_individual_summary_homozygous_${VAR}_${TYPE}.${BLOCK}.lr_ann.txt
+  echo -e "species\tpopulation\tdataset\tsample\ttotal_H\tintergenic_H\tintronic_H\tcoding_H\tsynonymous_H\tsyn_pref_H\tsyn_unpref_H\tmissense_H\tmistol_H\tmisdel_H\tnonsense_H\tUCNE_H\tUCNE_low_H\tUCNE_mid_H\tUCNE_high_H" > bootstrap/derived_homozygous_counts/$VAR/${CALLING}_ann_individual_summary_homozygous_${VAR}_${TYPE}.${BLOCK}.lr_ann.txt
+  for n in "${INDLIST[@]}"
+    do
+    echo ${n}
+    ind=$(echo ${n} | awk -F'[/]' '{print $3}' | cut -c1-12)
+    echo ${ind}
+    SPECIES=$(echo ${ind} | cut -c3-4)
+    POPULATION=$(echo ${ind} | cut -c6-7)
+    DATASET=$(if [ $ind = "c_lp_sm_0221" ]; then echo "REF"; elif [ $ind = "c_ll_ki_0090" ]; then echo "MG"; elif [ $ind = "h_ll_pv_0223" ]; then echo "LD"; elif grep -Fxq $ind /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/c_lp_5x_samples || [ $SPECIES = "ll" ]; then echo "5x"; else echo "GP"; fi)
+    SAMPLE=$(echo ${ind} | cut -c9-12)
+    echo "subsetting VCF for block" $BLOCK "and individual" $ind
+    bedtools intersect -a ${n} -b ${BED} -header > ${n/.vcf/.${BLOCK}.vcf}
+    i=${n/.vcf/.${BLOCK}.vcf}
+    TOTAL_H=$(grep -v '#' ${i} | grep ';AF=1.00;' | wc -l)
+    if [ -z "$TOTAL_H" ]; then TOTAL_H=0; fi
+    INTERGENIC_H=$(grep 'intergenic' ${i} | grep ';AF=1.00;' | wc -l)
+    if [ -z "$INTERGENIC_H" ]; then INTERGENIC_H=0; fi
+    INTRONIC_H=$(grep 'intron_variant' ${i} | grep ';AF=1.00;' | wc -l)
+    if [ -z "$INTRONIC_H" ]; then INTRONIC_H=0; fi
+    CODING_H=$(grep 'CDS' ${i} | grep ';AF=1.00;' | wc -l)
+    if [ -z "$CODING_H" ]; then CODING_H=0; fi
+    SYNONYMOUS_H=$(grep 'synonymous_variant' ${i} | grep ';AF=1.00;' | wc -l)
+    if [ -z "$SYNONYMOUS_H" ]; then SYNONYMOUS_H=0; fi
+    bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/syn_pref/synonymous_variants_complete_info_0to1_lr.bed > ${BLOCK}_${ind}_${VAR}_hom_syn_pref.temp.borrar
+    SYN_PREF_H=$(grep ';AF=1.00;' ${BLOCK}_${ind}_${VAR}_hom_syn_pref.temp.borrar | wc -l)
+    if [ -z "$SYN_PREF_H" ]; then SYN_PREF_H=0; fi
+    bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/syn_pref/synonymous_variants_complete_info_1to0_lr.bed > ${BLOCK}_${ind}_${VAR}_hom_syn_unpref.temp.borrar
+    SYN_UNPREF_H=$(grep ';AF=1.00;' ${BLOCK}_${ind}_${VAR}_hom_syn_unpref.temp.borrar | wc -l)
+    if [ -z "$SYN_UNPREF_H" ]; then SYN_UNPREF_H=0; fi
+    MISSENSE_H=$(grep 'missense_variant' ${i} | grep ';AF=1.00;' | wc -l)
+    if [ -z "$MISSENSE_H" ]; then MISSENSE_H=0; fi
+    bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/provean/missense_variants_provean_scores_tolerated.txt > ${BLOCK}_${ind}_${VAR}_hom_mis_tol.temp.borrar
+    MISTOL_H=$(grep ';AF=1.00;' ${BLOCK}_${ind}_${VAR}_hom_mis_tol.temp.borrar | wc -l)
+    if [ -z "$MISTOL_H" ]; then MISTOL_H=0; fi
+    bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/provean/missense_variants_provean_scores_deleterious.txt > ${BLOCK}_${ind}_${VAR}_hom_mis_del.temp.borrar
+    MISDEL_H=$(grep ';AF=1.00;' ${BLOCK}_${ind}_${VAR}_hom_mis_del.temp.borrar | wc -l)
+    if [ -z "$MISDEL_H" ]; then MISDEL_H=0; fi
+    NONSENSE_H=$(grep '|HIGH|' ${i} | grep ';AF=1.00;' | wc -l)
+    if [ -z "$NONSENSE_H" ]; then NONSENSE_H=0; fi
+    UCNE_H=$(grep 'UCNE' ${i} | grep ';AF=1.00;' | wc -l)
+    if [ -z "$UCNE_H" ]; then UCNE_H=0; fi
+    bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_lt2.gerp.bed > ${BLOCK}_${ind}_${VAR}_hom_ucne_low.temp.borrar
+    UCNE_LOW_H=$(grep ';AF=1.00;' ${BLOCK}_${ind}_${VAR}_hom_ucne_low.temp.borrar | wc -l)
+    if [ -z "$UCNE_LOW_H" ]; then UCNE_LOW_H=0; fi
+    bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_gt2lt5.gerp.bed > ${BLOCK}_${ind}_${VAR}_hom_ucne_mid.temp.borrar
+    UCNE_MID_H=$(grep ';AF=1.00;' ${BLOCK}_${ind}_${VAR}_hom_ucne_mid.temp.borrar | wc -l)
+    if [ -z "$UCNE_MID_H" ]; then UCNE_MID_H=0; fi
+    bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_gt5.gerp.bed > ${BLOCK}_${ind}_${VAR}_hom_ucne_high.temp.borrar
+    UCNE_HIGH_H=$(grep ';AF=1.00;' ${BLOCK}_${ind}_${VAR}_hom_ucne_high.temp.borrar | wc -l)
+    if [ -z "$UCNE_HIGH_H" ]; then UCNE_HIGH_H=0; fi
+    echo -e "$SPECIES\t$POPULATION\t$DATASET\t$SAMPLE\t$TOTAL_H\t$INTERGENIC_H\t$INTRONIC_H\t$CODING_H\t$SYNONYMOUS_H\t$SYN_PREF_H\t$SYN_UNPREF_H\t$MISSENSE_H\t$MISTOL_H\t$MISDEL_H\t$NONSENSE_H\t$UCNE_H\t$UCNE_LOW_H\t$UCNE_MID_H\t$UCNE_HIGH_H" >> bootstrap/derived_homozygous_counts/$VAR/${CALLING}_ann_individual_summary_homozygous_${VAR}_${TYPE}.${BLOCK}.lr_ann.txt
+    rm ${BLOCK}_${ind}_${VAR}_hom_*.temp.borrar
+    rm ${n/.vcf/.${BLOCK}.vcf}
+    done
+  done
+
+```
+
 #4. Upload scripts to the server.
 ##Derived allele counts.
 ```{r, eval=FALSE, engine='bash'}
@@ -263,6 +344,20 @@ scp /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/bootstrap/retrieve_het
 CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/bootstrap/derived_heterozygous_counts/
 chmod +x retrieve_heterozygous_counts.sh
+
+```
+
+##Derived allele homozygous counts.
+```{r, eval=FALSE, engine='bash'}
+
+#Save it in a text editor as /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/bootstrap/retrieve_homozygous_counts.sh and upload it to the server:
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+scp /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/bootstrap/retrieve_homozygous_counts.sh dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/bootstrap/derived_homozygous_counts/
+
+#Then inside the server change permissions to run it:
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/bootstrap/derived_homozygous_counts/
+chmod +x retrieve_homozygous_counts.sh
 
 ```
 
@@ -309,6 +404,30 @@ for p in ${PARALLEL[@]}
   screen -dmS "${CALLING}-${VAR}-${TYPE}-${p}"
   screen -S "${CALLING}-${VAR}-${TYPE}-${p}" -p 0 -X stuff "script ${CALLING}-${VAR}-${TYPE}-${p}.log$NL"
   screen -S "${CALLING}-${VAR}-${TYPE}-${p}" -p 0 -X stuff "time ./../retrieve_heterozygous_counts.sh; exec bash$NL"
+  screen -S "${CALLING}-${VAR}-${TYPE}-${p}" -p 0 -X stuff "exit$NL"
+  screen -S "${CALLING}-${VAR}-${TYPE}-${p}" -p 0 -X stuff "exit$NL"
+  done
+
+```
+
+##Derived allele homozygous counts.
+```{r, eval=FALSE, engine='bash'}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+VAR=(varssubs) #varssubs #variants #substitutions #segregating #fixed #private
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/bootstrap/
+PARALLEL=$(ls block_list_*.txt | cut -d'_' -f3 | cut -d'.' -f1)
+mkdir -p derived_homozygous_counts/$VAR
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/bootstrap/derived_homozygous_counts/$VAR
+NL=$'\n'
+
+for p in ${PARALLEL[@]}
+  do
+  echo ${p}
+  screen -dmS "${CALLING}-${VAR}-${TYPE}-${p}"
+  screen -S "${CALLING}-${VAR}-${TYPE}-${p}" -p 0 -X stuff "script ${CALLING}-${VAR}-${TYPE}-${p}.log$NL"
+  screen -S "${CALLING}-${VAR}-${TYPE}-${p}" -p 0 -X stuff "time ./../retrieve_homozygous_counts.sh; exec bash$NL"
   screen -S "${CALLING}-${VAR}-${TYPE}-${p}" -p 0 -X stuff "exit$NL"
   screen -S "${CALLING}-${VAR}-${TYPE}-${p}" -p 0 -X stuff "exit$NL"
   done
