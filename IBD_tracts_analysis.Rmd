@@ -729,7 +729,7 @@ write.table(x = depth_per_sample,file = paste("/Users/Dani/ownCloud/backup/g-w_a
 ```
 
 ####Run ANGSD to obtain the BEAGLE format genotype likelihood files:
-
+#####Whole-genome:
 ```{r Prepare input files for ngsF-HMM, eval=FALSE, engine='bash'}
 
 #Third, run ANGSD to obtain the genotype likelihood files.
@@ -790,8 +790,69 @@ $FILTER2 \
 
 ```
 
-###Generate genome coordinates file:
+#####Tv only:
+```{r Prepare input files for ngsF-HMM, eval=FALSE, engine='bash'}
 
+#Third, run ANGSD to obtain the genotype likelihood files.
+
+#To that end, first the previously obtained depth table must be uploaded to the server (from the local computer).
+scp /Users/Dani/ownCloud/backup/g-w_analysis/IBD_analysis/a_ll_pv_analysis/beagle_gl/mean_sd_depthGlobal_lynx_per_pop_mean_folds_0.95.csv dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/a_ll_pv_analysis/beagle_gl/
+
+#Prepare files and filters to run ANGSD:
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/a_ll_pv_analysis/beagle_gl
+POP=$(ls -rth *.bamlist | cut -d'.' -f1)
+screen -S ${POP}.tv2.genolike
+POP=$(echo ${STY#*.} | cut -d'.' -f1)
+script ${POP}.tv2.genolike.log
+POP=$(echo ${STY#*.} | cut -d'.' -f1)
+
+THREADS=10 #no. of computer cores used by bwa and samtools. 20 = OK, >20 = ask people first!
+read POP mean sd mean_truncated sd_truncated maxDepth minDepth maxDepth_truncated minDepth_truncated < /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/a_ll_pv_analysis/beagle_gl/mean_sd_depthGlobal_lynx_per_pop_mean_folds_0.95.csv
+
+ANGSD=/opt/angsd/angsd
+NGSTOOLS=/opt/angsd/angsd/misc
+REF=/GRUPOS/grupolince/reference_genomes/felis_catus_genome/Felis_catus.Felis_catus_9.0.dna_rm.toplevel.fa #path to reference genome
+FILTER1=" -uniqueOnly 1 -remove_bads 1 -only_proper_pairs 1 -baq 1 -C 50 "
+FILTER2=" -minMapQ 30 -minQ 20 -doCounts 1 "
+N_IND=$(echo ${POP: -3})
+MIN_IND=$(expr $N_IND / 2)
+SNP_PVAL="1e-6"
+
+#Sanity checks:
+echo $POP
+echo $N_IND
+echo $MIN_IND
+echo $maxDepth
+echo $minDepth
+echo $SNP_PVAL
+
+# Running GL:
+$ANGSD/angsd -nThreads $THREADS -bam /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/a_ll_pv_analysis/beagle_gl/${POP}.bamlist -ref $REF  \
+-out ${POP}.tv2.genolike \
+$FILTER1 \
+$FILTER2 \
+-GL 1 -doGlf 2 \
+-doMajorMinor 1 -doMaf 1 -SNP_pval $SNP_PVAL -skipTriallelic 1 -rmTrans 1 \
+-minInd $MIN_IND -setMaxDepth $maxDepth -setMinDepth $minDepth
+
+#And done.
+
+# Parameters chosen:
+# FILTER1=" -uniqueOnly 1 -remove_bads 1 -only_proper_pairs 1 -baq 1 -C 50 "
+# FILTER2=" -minMapQ 30 -minQ 20 -doCounts 1 "
+# GL 1 --> Use samtools
+# doGlf 2 --> beagle likelihood file
+# doMajorMinor 1 --> Infer major and minor from GL (other options would be: infer major and minor from allele counts, from a file, use reference as major, use ancestral as major)
+# doMaf 3 --> frequency (fixed major and minor/fixed major,unknownminor): Both are assumed to be known. Allele freq i obtained using based on GL.  
+# -doMajorMinor 1 -doMaf 3. Example for estimating the allele frequencies both while assuming known major and minor allele but also while taking the uncertaincy of the minor allele inference into account. The inference of the major and minor allele is done directly from the genotype likelihood
+# -SNP_pval [float]
+# The p-value used for calling snaps. see Allele_Frequency_estimation for additional options. 
+
+```
+
+###Generate genome coordinates file:
+####Whole-genome:
 ```{r Prepare input files for ngsF-HMM, eval=FALSE, engine='bash'}
 
 #If only variable positions are needed:
@@ -802,19 +863,29 @@ zcat ${POP}.genolike.beagle.gz | cut -f1 | cut -d$'_' -f1,2 --output-delimiter='
 
 ```
 
+####Tv only:
+```{r Prepare input files for ngsF-HMM, eval=FALSE, engine='bash'}
+
+#If only variable positions are needed:
+cd /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/a_ll_pv_analysis/beagle_gl/
+POP=$(ls -rth *.bamlist | cut -d'.' -f1)
+zcat ${POP}.tv2.genolike.beagle.gz | cut -f1 | cut -d$'_' -f1,2 --output-delimiter=' ' | tail -n +2 > /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/a_ll_pv_analysis/ngsF-HMM/${POP}_variable_coordinates.tv2.list
+#Remove the tail command if the genolike file doesn't have headers.
+
+```
+
 ###Generate individual ID file:
 
 ```{r Prepare input files for ngsF-HMM, eval=FALSE, engine='bash'}
 
 cd /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/a_ll_pv_analysis/beagle_gl/
 POP=$(ls -rth *.bamlist | cut -d'.' -f1)
-cd /GRUPOS/grupolince/CatRef_bams_aln
-ls -rth *_ll_*.bam | cut -d'_' -f-4 > /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/a_ll_pv_analysis/ngsF-HMM/${POP}.ind
+cat $POP*.bamlist | rev | cut -d "/"  -f1 | rev | cut -d "_" -f-4 > /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/a_ll_pv_analysis/ngsF-HMM/${POP}.ind
 
 ```
 
 ##2: Run ngsF-HMM.
-
+###Whole-genome:
 ```{r Run ngsF-HMM, eval=FALSE, engine='bash'}
 
 cd /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/a_ll_pv_analysis/beagle_gl/
@@ -832,10 +903,29 @@ N_SITES=$(cat ${POP}_variable_coordinates.list | wc -l)
 
 ```
 
+###Tv only:
+```{r Run ngsF-HMM, eval=FALSE, engine='bash'}
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/a_ll_pv_analysis/beagle_gl/
+POP=$(ls -rth *.bamlist | cut -d'.' -f1)
+cd /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/a_ll_pv_analysis/ngsF-HMM/
+screen -S ${POP}.tv2.ngsF-HMM
+POP=$(echo ${STY#*.} | cut -d'.' -f1)
+script ${POP}.tv2.ngsF-HMM.log
+POP=$(echo ${STY#*.} | cut -d'.' -f1)
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/a_ll_pv_analysis/ngsF-HMM/
+N_IND=$(wc -l < /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/a_ll_pv_analysis/beagle_gl/${POP}.bamlist)
+N_SITES=$(cat ${POP}_variable_coordinates.tv2.list | wc -l)
+/opt/ngsF-HMM/ngsF-HMM --geno /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/a_ll_pv_analysis/beagle_gl/${POP}.tv2.genolike.beagle.gz --lkl --pos ${POP}_variable_coordinates.tv2.list --n_ind $N_IND --n_sites $N_SITES --out ${POP}.tv2.ngsF-HMM
+
+```
+
 ##3: Analyse ngsF-HMM output.
 Autores: Enrico, Dani, Maria. Nosotros tenemos un archivo donde están todas las posiciones de cada scaffold, se llama genome_coordinates.list. A este archivo le vamos a pegar una modificación del archivo ibd que en vez de ser una fila por cada individuo sea una columna. Así por cada individuo vamos a pegar la columna con sus valores 0 y 1 y la columna con información de scaffold y de base. Vamos a tener tantos archivos como individuos. 
 
-###Count number of large IBD tracts.
+###Whole-genome:
+####Count number of large IBD tracts.
 
 ```{bash}
 
@@ -888,12 +978,11 @@ done < <(cat $MODIF_FILE)
 #Sanity check: hemos contado el número de cromosomas antes y despues de filtrar para un individuo y hemos visto que los filtros se aplican correctamente.
 
 #From outside the server:
-cd /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/a_ll_pv_analysis/ngsF-HMM/
 scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/a_ll_pv_analysis/ngsF-HMM/*.ibdtract.bed /Users/dani/ownCloud/backup/g-w_analysis/IBD_analysis/a_ll_pv_analysis/ngsF-HMM/
 
 ```
 
-###Plot tract length results.
+####Plot tract length results.
 
 ```{r}
 
@@ -940,7 +1029,7 @@ ggplot (ibd_tract3, aes(x=length_category, y=n, colour=pop, fill=pop)) +
 
 ```
 
-###Retrieve IBD tract coordinates for each individual. Generate BED files with coordinates for each IBD tract (in chromosomes bigger than 1.6Mb).
+####Retrieve IBD tract coordinates for each individual. Generate BED files with coordinates for each IBD tract (in chromosomes bigger than 1.6Mb).
 ```{bash}
 
 #El archivo de entrada es un .bed con las coordenadas de los IBD tracts de todos los individuos del dataset, y se genera en la sección "Count number of large IBD tracts". En esta sección partimos ese archivo por individuo.
@@ -966,7 +1055,7 @@ for i in ${INDIVIDUALS[@]}
 
 ```
 
-###Generate the distribution of IBD tracts.
+####Generate the distribution of IBD tracts.
 
 ```{bash}
 
@@ -978,8 +1067,8 @@ script ${POP}.ibd_counts.log
 POP=$(echo ${STY#*.} | cut -d'.' -f1)
 
 rm ${POP}.ibdtract_interval_counts.txt
-echo "tract_length\tn\tind" > ${POP}.ibdtract_interval_counts.txt
-INDIVIDUALS=$(ls `find . -name '*.ibdtract.bed' -path '*_ibdtracts/*' -print`)
+echo -e "tract_length\tn\tind" > ${POP}.ibdtract_interval_counts.txt
+INDIVIDUALS=$(ls `find . -name '*.ibdtract.bed' ! -name '*tv*' -path '*_ibdtracts/*' -print`)
 for i in ${INDIVIDUALS[@]}
   do
   ind=$(echo ${i} | cut -d'/' -f3 | cut -d'.' -f1)
@@ -1005,7 +1094,7 @@ scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/IBD_anal
 
 ```
 
-###Plot tract length distribution.
+####Plot tract length distribution.
 
 ```{r}
 
@@ -1071,5 +1160,296 @@ theme(text=element_text(size=12,face="bold"),
 )
 long_ROHs_n_ggplot
 ggsave(">1000000kb_ibd_tract_n.pdf", width=30, height=20, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/IBD_analysis/a_ll_pv_analysis/ngsF-HMM")
+
+```
+
+###Tv only:
+####Count number of large IBD tracts.
+
+```{bash}
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/a_ll_pv_analysis/ngsF-HMM/
+POP=$(ls -rth *.tv.ngsF-HMM.geno | cut -d'.' -f1)
+
+#El archivo con la informacion ibd de cada individuo por fila (generado en la sección 2) lo guardamos en la variable $INPUT_FILE:
+screen -S ${POP}.tv.ngsF-HMM
+POP=$(echo ${STY#*.} | cut -d'.' -f1)
+script ${POP}.tv.ngsF-HMM.ibd.log
+POP=$(echo ${STY#*.} | cut -d'.' -f1)
+
+INPUT_FILE=$(echo ${STY#*.}.ibd)
+#A este archivo le quitamos los cabeceros y las filas de likelihoods, dejando solo las filas con información IBD, y lo guardamos en la variable $MODIF_FILE:
+N_IND=$(echo $INPUT_FILE | awk  '{gsub("_","\t",$0); print;}' | grep -o '\bn0\w*' | sed 's/n//')
+tail -n+2 ${INPUT_FILE} | head -n$N_IND > ${INPUT_FILE/.ibd/-headless.ibd}
+MODIF_FILE=$(echo ${INPUT_FILE/.ibd/-headless.ibd})
+
+#Para este análisis nos vamos a quedar solo con los chromosome mayores de 1.6 MB (que es el n50), así que hacemos una lista con ellos:
+awk '$2 > 1600000 {print $1}' /GRUPOS/grupolince/reference_genomes/felis_catus_genome/Felis_catus.Felis_catus_9.0.dna_rm.toplevel.bed > chromosome_bigger_than_1.6_filtered.borrar
+
+#A continuación iteramos sobre las líneas de $MODIF_FILE:
+COUNTER=1
+rm ${INPUT_FILE/.ngsF-HMM.ibd/.ibdtract.bed}
+echo -e "chromosome\tstart_position\tend_position\tlenght\tind" > ${INPUT_FILE/.ngsF-HMM.ibd/.ibdtract.bed}
+while read IBD_TRACK
+  do
+  #Seleccionamos del archivo con los nombres de individuos el nombre del individuo actual usando el número de la iteración:
+  IND_NAME=($(sed -n "${COUNTER}p" ${INPUT_FILE/.tv.ngsF-HMM.ibd/.ind}))
+  echo $IND_NAME
+  #Guardamos la fila con información ibd del individuo actual en un archivo temporal:
+  echo $IBD_TRACK > ibd_per_ind.borrar
+  #Convertimos la fila con información ibd en una columna:
+  fold -w1 ibd_per_ind.borrar > ibd_tracks_temp.borrar
+  #Generamos un archivo en el que reportamos las regiones en las que hay identidad 1 de forma consecutiva (i.e. las regiones ibd). Estas regiones tienen una longitud igual a la separación entre dos snps con identidad 0 (la identidad 0 significa que no son ibd, todo lo demás sería 1 por defecto). 
+  #Para ello, en primer lugar unimos el archivo con la información de los sitios variables tomados en consideración (obtenido en la sección 1) y el archivo que contiene la información ibd del individuo actual en una columna, que contiene el estado ibd de los sitios (1 = IBD; 0 != IBD):
+  paste <(cat ${INPUT_FILE/.tv.ngsF-HMM.ibd/_variable_coordinates.tv.list}) <(cat ibd_tracks_temp.borrar) | \
+  #Aquí convertimos este archivo en un bed y seleccionamos solo los valores que no son IBD:
+  awk -v OFS='\t' '{print $1, $2-1, $2, $3}' | grep '0$' | \
+  #Aquí sustraemos de las coordenadas de todo el genoma aquellas posiciones que no son IBD, para quedarnos únicamente con los tramos que sí son IBD:
+  bedtools subtract -a /GRUPOS/grupolince/reference_genomes/felis_catus_genome/Felis_catus.Felis_catus_9.0.dna_rm.toplevel.all_the_genome.bed -b stdin | \
+  #Ahora calculamos la longitud de estos tracts que son 1. 
+  awk -v OFS='\t' -v ind_name="$IND_NAME" '{print $1, $2, $3, $3-$2, ind_name}' | \
+  #Nos quitamos todos los cromosomas que tengan menos de 1.6Mb (que son en realidad los scaffolds que no se han podido ensamblar, más el ADN mitocondrial).
+  #grep -f chromosome_bigger_than_1.6.borrar - | \
+  grep -f chromosome_bigger_than_1.6_filtered.borrar - >> ${INPUT_FILE/.ngsF-HMM.ibd/.ibdtract.bed}
+  COUNTER=$[$COUNTER+1]
+done < <(cat $MODIF_FILE)
+
+#Sanity check: hemos contado el número de cromosomas antes y despues de filtrar para un individuo y hemos visto que los filtros se aplican correctamente.
+
+#From outside the server:
+scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/a_ll_pv_analysis/ngsF-HMM/*tv.ibdtract.bed /Users/dani/ownCloud/backup/g-w_analysis/IBD_analysis/a_ll_pv_analysis/ngsF-HMM/
+
+```
+
+####Plot tract length results.
+
+```{r}
+
+library("readr")
+library("ggplot2")
+library("dplyr")
+library("ggrepel")
+library("RColorBrewer")
+library("viridis")
+
+ibd_tract <- read_tsv ("/Users/dani/ownCloud/backup/g-w_analysis/IBD_analysis/a_ll_pv_analysis/ngsF-HMM/a_ll_pv-c_ll_ba-c_ll_ca-c_ll_cr-c_ll_ki-c_ll_vl-c_ll_ya_n013.tv.ibdtract.bed", col_names = T) %>% 
+  mutate (length_category = ifelse (lenght>10000 & lenght<100000,"10-100kb",
+                            ifelse (lenght>100000 & lenght<1000000,"100-1000kb",
+                            ifelse (lenght>1000000, ">1000kb","<10kb")))) %>% dplyr::rename (length_ibd=lenght)
+ibd_tract$length_category <- factor(ibd_tract$length_category, levels=c("<10kb","10-100kb", "100-1000kb", ">1000kb"))
+ibd_tract2 <- ibd_tract %>% 
+  filter (ibd_tract$length_category!="<10kb") %>% 
+  mutate (pop = substring(ind,1,7)) %>% 
+  mutate (sps = substring(ind,1,4))
+ibd_tract_cumsumlength <- ibd_tract2 %>% 
+  dplyr::group_by(ind,length_category,pop,sps) %>% 
+  dplyr::summarise(sum_length = sum(length_ibd),n = n()) %>%
+  mutate (.,Populations=ifelse (pop == "a_ll_pv", "Ancient Basque Country",ifelse (pop == "c_ll_ca", "Caucasus",ifelse (pop == "c_ll_ba", "Balkans",ifelse (pop == "c_ll_po", "NE-Poland",ifelse (pop == "c_ll_ur", "Urals",ifelse (pop == "c_ll_ki", "Kirov",ifelse (pop == "c_ll_la", "Latvia",ifelse (pop == "c_ll_no", "Norway",ifelse (pop == "c_ll_cr", "Carpathians",ifelse (pop == "c_ll_to", "Mongolia",ifelse (pop == "c_ll_tu", "Tuva",ifelse (pop == "c_ll_ka", "Mongolia",ifelse (pop == "c_ll_og", "Mongolia",ifelse (pop == "c_ll_vl", "Vladivostok",ifelse (pop == "c_ll_ya", "Yakutia",ifelse (pop == "c_lp_sm", "Sierra Morena",ifelse (pop == "c_lp_do", "Doñana", NA)))))))))))))))))) %>% 
+  mutate (.,color=ifelse(Populations == "Ancient Basque Country","#000000",ifelse(Populations == "Caucasus", "#B8860b",ifelse(Populations == "Balkans", "#A035AF",ifelse(Populations == "NE-Poland", viridis_pal()(5)[3],ifelse(Populations == "Urals", "#0F4909",ifelse(Populations == "Carpathians", brewer.pal(12,"Paired")[9],ifelse(Populations == "Kirov", viridis_pal()(5)[1],ifelse(Populations == "Latvia", brewer.pal(12,"Paired")[3],ifelse(Populations == "Norway", viridis_pal()(5)[2],ifelse(Populations == "Tuva", brewer.pal(12,"Paired")[8],ifelse(Populations == "Mongolia", brewer.pal(12,"Paired")[7],ifelse(Populations == "Vladivostok", brewer.pal(12,"Paired")[5],ifelse(Populations == "Yakutia", brewer.pal(12,"Paired")[6],ifelse(Populations == "Sierra Morena", brewer.pal(8, "Greys") [5],ifelse(Populations == "Doñana", brewer.pal(8, "Greys") [8], NA))))))))))))))))
+
+cols <- c("Ancient Basque Country"="#000000",
+          "Caucasus"="#B8860b",
+          "NE-Poland"=viridis_pal()(5)[3],
+          "Urals"="#0F4909",
+          "Balkans"="#A035AF",
+          "Carpathians"=brewer.pal(12,"Paired")[9],
+          "Kirov"=viridis_pal()(5)[1],
+          "Latvia"=brewer.pal(12,"Paired")[3],
+          "Norway"=viridis_pal()(5)[2],
+          "Tuva"=brewer.pal(12,"Paired")[8],
+          "Mongolia"=brewer.pal(12,"Paired")[7],
+          "Vladivostok"=brewer.pal(12,"Paired")[5],
+          "Yakutia"=brewer.pal(12,"Paired")[6],
+          "Sierra Morena"=brewer.pal(8, "Greys") [5],
+          "Doñana"=brewer.pal(8, "Greys") [8])
+
+ggplot (ibd_tract_cumsumlength %>% filter (length_category==">1000kb"), aes(x=ind, y=sum_length, colour=Populations, fill=Populations)) +
+  geom_col() +
+  #facet_grid(~sps, scales="free_x") +
+  scale_colour_manual(values=cols) +
+  scale_fill_manual(values=cols) +
+  theme_classic() +
+  theme(axis.text.x=element_text(size=8, angle=90, vjust=0.5)) +
+  xlab("Individual") +
+  ylab("Cumulative IBD length") +
+  ggsave("/Users/dani/ownCloud/backup/g-w_analysis/IBD_analysis/a_ll_pv_analysis/ngsF-HMM/>1000kb_ibd_tract_cumsumlength.tv.pdf", width=15, height=15, units="cm", device="pdf")
+
+ggplot (ibd_tract_cumsumlength %>% filter (length_category==">1000kb"), aes(x=sum_length, y=n)) +
+  geom_point(aes(colour=Populations)) +
+  geom_text_repel(aes(label=ind, colour=Populations), size=3, show.legend = FALSE) +
+  stat_smooth(method="lm", se=FALSE) +
+  scale_colour_manual(values=cols) +
+  theme_classic() +
+  ylab("Number of IBD tracts >1000kb long") +
+  xlab("Cumulative IBD length") +
+  ggsave("/Users/dani/ownCloud/backup/g-w_analysis/IBD_analysis/a_ll_pv_analysis/ngsF-HMM/>1000kb_ibd_tract_length_n_cor.tv.pdf", width=15, height=15, units="cm", device="pdf")
+
+ibd_tract3 <- ibd_tract %>% 
+  dplyr::group_by(ind,length_category) %>%
+  dplyr::summarise(n = n())
+
+#PLOTEAR por individuo?
+ggplot (ibd_tract3, aes(x=length_category, y=n, colour=pop, fill=pop)) +
+  geom_col() +
+  facet_grid(~sps, scales="free_x") +
+  theme (axis.text.x = element_text(size=6, angle=90, vjust=0.5))
+
+```
+
+####Retrieve IBD tract coordinates for each individual. Generate BED files with coordinates for each IBD tract (in chromosomes bigger than 1.6Mb).
+```{bash}
+
+#El archivo de entrada es un .bed con las coordenadas de los IBD tracts de todos los individuos del dataset, y se genera en la sección "Count number of large IBD tracts". En esta sección partimos ese archivo por individuo.
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/a_ll_pv_analysis/ngsF-HMM/
+POP=$(ls -rth *.tv.ngsF-HMM.geno | cut -d'.' -f1)
+
+screen -S ${POP}.tv.ibdtract
+POP=$(echo ${STY#*.} | cut -d'.' -f1)
+script ${POP}.tv.per_ind.ibdtract.bed.log
+POP=$(echo ${STY#*.} | cut -d'.' -f1)
+
+INPUT_FILE=$(echo ${STY#*.}.bed)
+
+INDIVIDUALS=$(cut -f5 $INPUT_FILE | uniq | tail -n +2)
+for i in ${INDIVIDUALS[@]}
+  do
+  echo "processing individual" ${i}
+  POP=$(echo ${i} | cut -c1-7)
+  mkdir -p ./$POP"_ibdtracts"
+  grep ${i} $INPUT_FILE > $POP"_ibdtracts"/${i}".tv.ibdtract.bed"
+  done
+
+```
+
+####Generate the distribution of IBD tracts.
+
+```{bash}
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/a_ll_pv_analysis/ngsF-HMM/
+POP=$(ls -rth *.tv.ngsF-HMM.geno | cut -d'.' -f1)
+screen -S ${POP}.tv.ibd_counts
+POP=$(echo ${STY#*.} | cut -d'.' -f1)
+script ${POP}.tv.ibd_counts.log
+POP=$(echo ${STY#*.} | cut -d'.' -f1)
+
+rm ${POP}.tv.ibdtract_interval_counts.txt
+echo -e "tract_length\tn\tind" > ${POP}.tv.ibdtract_interval_counts.txt
+INDIVIDUALS=$(ls `find . -name '*.tv.ibdtract.bed' -path '*_ibdtracts/*' -print`)
+for i in ${INDIVIDUALS[@]}
+  do
+  ind=$(echo ${i} | cut -d'/' -f3 | cut -d'.' -f1)
+  echo "processing individual" ${ind}
+  cat ${i} | cut -f4 | sort -n | uniq -c > ${i/.ibdtract.bed/.ibdtract_counts.bed}
+  awk -v ind=$ind '{ 
+   if      ($2 < 1000) first+=$1
+   else if ($2 >= 1000 && $2 < 10000)
+   second+=$1
+   else if ($2 >= 10000 && $2 < 100000)      
+   third+=$1
+   else if ($2 >= 100000 && $2 < 1000000)
+   fourth+=$1
+   else if ($2 >= 1000000)
+   fifth+=$1
+   } END {
+   printf "%s\t%d\t%s\n%s\t%d\t%s\n%s\t%d\t%s\n%s\t%d\t%s\n%s\t%d\t%s\n", "<1000",first,ind,"<10000",second,ind,"<100000",third,ind,"<1000000",fourth,ind,">1000000",fifth,ind
+   }' ${i/.ibdtract.bed/.ibdtract_counts.bed} >> ${POP}.tv.ibdtract_interval_counts.txt
+   done
+
+#From outside the server:
+scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/a_ll_pv_analysis/ngsF-HMM/*.tv.ibdtract_interval_counts.txt /Users/dani/ownCloud/backup/g-w_analysis/IBD_analysis/a_ll_pv_analysis/ngsF-HMM/
+
+```
+
+####Plot tract length distribution.
+
+```{r}
+
+library("readr")
+library("ggplot2")
+library("dplyr")
+library("ggrepel")
+library("RColorBrewer")
+library("viridis")
+
+ibd_tract <- read_tsv("/Users/dani/ownCloud/backup/g-w_analysis/IBD_analysis/a_ll_pv_analysis/ngsF-HMM/a_ll_pv-c_ll_ba-c_ll_ca-c_ll_cr-c_ll_ki-c_ll_vl-c_ll_ya_n013.tv.ibdtract_interval_counts.txt", col_names = T) %>% mutate(pop=substr(ind,1,7))  %>%
+  mutate (.,Populations=ifelse (pop == "a_ll_pv", "Ancient Basque Country",ifelse (pop == "c_ll_ca", "Caucasus",ifelse (pop == "c_ll_ba", "Balkans",ifelse (pop == "c_ll_po", "NE-Poland",ifelse (pop == "c_ll_ur", "Urals",ifelse (pop == "c_ll_ki", "Kirov",ifelse (pop == "c_ll_la", "Latvia",ifelse (pop == "c_ll_no", "Norway",ifelse (pop == "c_ll_cr", "Carpathians",ifelse (pop == "c_ll_to", "Mongolia",ifelse (pop == "c_ll_tu", "Tuva",ifelse (pop == "c_ll_ka", "Mongolia",ifelse (pop == "c_ll_og", "Mongolia",ifelse (pop == "c_ll_vl", "Vladivostok",ifelse (pop == "c_ll_ya", "Yakutia",ifelse (pop == "c_lp_sm", "Sierra Morena",ifelse (pop == "c_lp_do", "Doñana", NA))))))))))))))))))
+
+cols <- c("Ancient Basque Country"="#000000",
+          "Caucasus"="#B8860b",
+          "NE-Poland"=viridis_pal()(5)[3],
+          "Urals"="#0F4909",
+          "Balkans"="#A035AF",
+          "Carpathians"=brewer.pal(12,"Paired")[9],
+          "Kirov"=viridis_pal()(5)[1],
+          "Latvia"=brewer.pal(12,"Paired")[3],
+          "Norway"=viridis_pal()(5)[2],
+          "Tuva"=brewer.pal(12,"Paired")[8],
+          "Mongolia"=brewer.pal(12,"Paired")[7],
+          "Vladivostok"=brewer.pal(12,"Paired")[5],
+          "Yakutia"=brewer.pal(12,"Paired")[6],
+          "Sierra Morena"=brewer.pal(8, "Greys") [5],
+          "Doñana"=brewer.pal(8, "Greys") [8])
+
+ROHs_distr_ggplot <- ggplot(data=ibd_tract, aes(ind,log(n), colour=Populations)) +
+geom_point(aes(shape=tract_length)) +
+scale_colour_manual(values=cols) +
+theme_classic() +
+theme(axis.text.x=element_text(size=8, angle=90)) +
+xlab("Individual") +
+ylab("Log of the number of IBD tracts") #+
+# theme(text=element_text(size=12,face="bold"),
+#       rect=element_rect(size=1),
+#       axis.line=element_line(colour="black"),
+#       axis.title=element_text(size=16),
+#       axis.text.x=element_text(angle=90, hjust=1, size=6, colour="black"),
+#       #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+#       #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+#       panel.background=element_blank(),
+#       panel.border=element_rect(colour="black"),
+#       #panel.grid=element_blank(),
+#       #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+#       plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+#       #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+#       legend.background=element_rect(linetype="solid", colour="black", size=.5),
+#       #legend.justification=c(0,0),
+#       legend.key=element_rect(colour="white"),
+#       #legend.key.size=unit(1.3,"cm"),
+#       #legend.position=c(0.92,0.86),
+#       legend.title=element_blank()
+#)
+ROHs_distr_ggplot
+ggsave("all_ibd_tract_log_n.tv.pdf", width=15, height=12, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/IBD_analysis/a_ll_pv_analysis/ngsF-HMM")
+
+
+long_ROHs_n_ggplot <- ggplot(data=filter(ibd_tract,tract_length==">1000000"), aes(ind,n, colour=Populations)) +
+geom_point() +
+scale_colour_manual(values=cols) +
+theme_classic() +
+theme(axis.text.x=element_text(size=8, angle=90)) +
+xlab("Individual") +
+ylab("Number of IBD tracts >1,000 kb long") #+
+# theme(text=element_text(size=12,face="bold"),
+#       rect=element_rect(size=1),
+#       axis.line=element_line(colour="black"),
+#       axis.title=element_text(size=16),
+#       axis.text.x=element_text(angle=90, hjust=1, size=6, colour="black"),
+#       #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+#       #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+#       panel.background=element_blank(),
+#       panel.border=element_rect(colour="black"),
+#       #panel.grid=element_blank(),
+#       #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+#       plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+#       #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+#       legend.background=element_rect(linetype="solid", colour="black", size=.5),
+#       #legend.justification=c(0,0),
+#       legend.key=element_rect(colour="white"),
+#       #legend.key.size=unit(1.3,"cm"),
+#       #legend.position=c(0.92,0.86),
+#       legend.title=element_blank()
+# )
+long_ROHs_n_ggplot
+ggsave(">1000000kb_ibd_tract_n.tv.pdf", width=15, height=12, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/IBD_analysis/a_ll_pv_analysis/ngsF-HMM")
 
 ```
