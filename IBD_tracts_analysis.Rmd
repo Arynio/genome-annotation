@@ -931,19 +931,8 @@ POP=$(echo ${STY#*.} | cut -d'.' -f1)
 cd /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/a_ll_pv_analysis/ngsF-HMM/
 N_IND=$(wc -l < /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/a_ll_pv_analysis/beagle_gl/${POP}.bamlist)
 N_SITES=$(cat ${POP}_variable_coordinates.tv.list | wc -l)
-/opt/ngsF-HMM/ngsF-HMM.sh --geno /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/a_ll_pv_analysis/beagle_gl/${POP}.tv.genolike.beagle.gz --lkl --pos ${POP}_variable_coordinates.tv.list --n_ind $N_IND --n_sites $N_SITES --out ${POP}.tv.sh.ngsF-HMM --log 1
-
-
-#freq_est runs:
-screen -S ${POP}.fe2.ngsF-HMM
-POP=$(echo ${STY#*.} | cut -d'.' -f1)
-script ${POP}.fe2.ngsF-HMM.log
-POP=$(echo ${STY#*.} | cut -d'.' -f1)
-
-cd /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/a_ll_pv_analysis/ngsF-HMM/
-N_IND=$(wc -l < /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/a_ll_pv_analysis/beagle_gl/${POP}.bamlist)
-N_SITES=$(cat ${POP}_variable_coordinates.tv.list | wc -l)
-/opt/ngsF-HMM/ngsF-HMM --geno /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/a_ll_pv_analysis/beagle_gl/${POP}.tv.genolike.beagle.gz --lkl --pos ${POP}_variable_coordinates.tv.list --freq_est 2 --n_ind $N_IND --n_sites $N_SITES --out ${POP}.tv.fe2.ngsF-HMM
+SEED=$(shuf -i 1-100000 -n 1)
+/opt/ngsF-HMM/ngsF-HMM.sh --geno /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/a_ll_pv_analysis/beagle_gl/${POP}.tv.genolike.beagle.gz --lkl --pos ${POP}_variable_coordinates.tv.list --n_ind $N_IND --n_sites $N_SITES --out ${POP}.tv.sh.ngsF-HMM --log 1 --seed $SEED
 
 ```
 
@@ -1270,8 +1259,10 @@ ibd_tract2 <- ibd_tract %>%
 ibd_tract_cumsumlength <- ibd_tract2 %>% 
   dplyr::group_by(ind,length_category,pop,sps) %>% 
   dplyr::summarise(sum_length = sum(length_ibd),n = n()) %>%
-  mutate (.,Populations=ifelse (pop == "a_ll_pv", "Ancient Basque Country",ifelse (pop == "c_ll_ca", "Caucasus",ifelse (pop == "c_ll_ba", "Balkans",ifelse (pop == "c_ll_po", "NE-Poland",ifelse (pop == "c_ll_ur", "Urals",ifelse (pop == "c_ll_ki", "Kirov",ifelse (pop == "c_ll_la", "Latvia",ifelse (pop == "c_ll_no", "Norway",ifelse (pop == "c_ll_cr", "Carpathians",ifelse (pop == "c_ll_to", "Mongolia",ifelse (pop == "c_ll_tu", "Tuva",ifelse (pop == "c_ll_ka", "Mongolia",ifelse (pop == "c_ll_og", "Mongolia",ifelse (pop == "c_ll_vl", "Vladivostok",ifelse (pop == "c_ll_ya", "Yakutia",ifelse (pop == "c_lp_sm", "Sierra Morena",ifelse (pop == "c_lp_do", "Doñana", NA)))))))))))))))))) %>% 
-  mutate (.,color=ifelse(Populations == "Ancient Basque Country","#000000",ifelse(Populations == "Caucasus", "#B8860b",ifelse(Populations == "Balkans", "#A035AF",ifelse(Populations == "NE-Poland", viridis_pal()(5)[3],ifelse(Populations == "Urals", "#0F4909",ifelse(Populations == "Carpathians", brewer.pal(12,"Paired")[9],ifelse(Populations == "Kirov", viridis_pal()(5)[1],ifelse(Populations == "Latvia", brewer.pal(12,"Paired")[3],ifelse(Populations == "Norway", viridis_pal()(5)[2],ifelse(Populations == "Tuva", brewer.pal(12,"Paired")[8],ifelse(Populations == "Mongolia", brewer.pal(12,"Paired")[7],ifelse(Populations == "Vladivostok", brewer.pal(12,"Paired")[5],ifelse(Populations == "Yakutia", brewer.pal(12,"Paired")[6],ifelse(Populations == "Sierra Morena", brewer.pal(8, "Greys") [5],ifelse(Populations == "Doñana", brewer.pal(8, "Greys") [8], NA))))))))))))))))
+  mutate(.,Populations=ifelse (pop == "a_ll_pv", "Ancient Basque Country",ifelse (pop == "c_ll_ca", "Caucasus",ifelse (pop == "c_ll_ba", "Balkans",ifelse (pop == "c_ll_po", "NE-Poland",ifelse (pop == "c_ll_ur", "Urals",ifelse (pop == "c_ll_ki", "Kirov",ifelse (pop == "c_ll_la", "Latvia",ifelse (pop == "c_ll_no", "Norway",ifelse (pop == "c_ll_cr", "Carpathians",ifelse (pop == "c_ll_to", "Mongolia",ifelse (pop == "c_ll_tu", "Tuva",ifelse (pop == "c_ll_ka", "Mongolia",ifelse (pop == "c_ll_og", "Mongolia",ifelse (pop == "c_ll_vl", "Primorsky Krai",ifelse (pop == "c_ll_ya", "Yakutia",ifelse (pop == "c_lp_sm", "Sierra Morena",ifelse (pop == "c_lp_do", "Doñana", NA))))))))))))))))))
+
+ibd_tract_cumsumlength$Populations <- factor(ibd_tract_cumsumlength$Populations, levels=c("Ancient Basque Country","Balkans","Carpathians","Caucasus","Kirov","Yakutia","Primorsky Krai"))
+ibd_tract_cumsumlength$ind <- factor(ibd_tract_cumsumlength$ind, levels=c("a_ll_pv_0223","c_ll_ba_0227","c_ll_ba_0229","c_ll_ca_0241","c_ll_ca_0242","c_ll_cr_0205","c_ll_cr_0212","c_ll_ki_0090","c_ll_ki_0091","c_ll_ya_0138","c_ll_ya_0146","c_ll_vl_0112","c_ll_vl_0113"))
 
 cols <- c("Ancient Basque Country"="#000000",
           "Caucasus"="#B8860b",
@@ -1284,30 +1275,31 @@ cols <- c("Ancient Basque Country"="#000000",
           "Norway"=viridis_pal()(5)[2],
           "Tuva"=brewer.pal(12,"Paired")[8],
           "Mongolia"=brewer.pal(12,"Paired")[7],
-          "Vladivostok"=brewer.pal(12,"Paired")[5],
+          "Primorsky Krai"=brewer.pal(12,"Paired")[5],
           "Yakutia"=brewer.pal(12,"Paired")[6],
           "Sierra Morena"=brewer.pal(8, "Greys") [5],
           "Doñana"=brewer.pal(8, "Greys") [8])
 
-ggplot (ibd_tract_cumsumlength %>% filter (length_category==">1000kb"), aes(x=ind, y=sum_length, colour=Populations, fill=Populations)) +
+ggplot(ibd_tract_cumsumlength %>% filter(length_category==">1000kb"), aes(x=ind, y=sum_length, colour=Populations, fill=Populations)) +
   geom_col() +
   #facet_grid(~sps, scales="free_x") +
   scale_colour_manual(values=cols) +
   scale_fill_manual(values=cols) +
+  scale_x_discrete(labels=substr(levels(ibd_tract_cumsumlength$ind),10,12)) +
   theme_minimal() +
   theme(axis.text.x=element_text(size=8, angle=90, vjust=0.5)) +
-  xlab("Individual") +
-  ylab("Cumulative IBD length") +
+  xlab("\nIndividual") +
+  ylab("Cumulative length of IBD tracts >1000kb long\n") +
   ggsave("/Users/dani/ownCloud/backup/g-w_analysis/IBD_analysis/a_ll_pv_analysis/ngsF-HMM/>1000kb_ibd_tract_cumsumlength.tv.sh.pdf", width=15, height=15, units="cm", device="pdf")
 
-ggplot (ibd_tract_cumsumlength %>% filter (length_category==">1000kb"), aes(x=sum_length, y=n)) +
+ggplot(ibd_tract_cumsumlength %>% filter(length_category==">1000kb"), aes(x=sum_length, y=n)) +
   geom_point(aes(colour=Populations)) +
-  geom_text_repel(aes(label=ind, colour=Populations), size=3, show.legend = FALSE) +
-  stat_smooth(method="lm", se=FALSE) +
+  stat_smooth(method="lm",se=FALSE,colour="black") +
+  geom_text_repel(aes(label=substr(levels(ibd_tract_cumsumlength$ind),10,12), colour=Populations), size=3, show.legend=FALSE) +
   scale_colour_manual(values=cols) +
   theme_minimal() +
-  ylab("Number of IBD tracts >1000kb long") +
-  xlab("Cumulative IBD length") +
+  ylab("Number of IBD tracts >1000kb long\n") +
+  xlab("\nCumulative length of IBD tracts >1000kb long") +
   ggsave("/Users/dani/ownCloud/backup/g-w_analysis/IBD_analysis/a_ll_pv_analysis/ngsF-HMM/>1000kb_ibd_tract_length_n_cor.tv.sh.pdf", width=15, height=15, units="cm", device="pdf")
 
 ```
@@ -1320,9 +1312,9 @@ ggplot (ibd_tract_cumsumlength %>% filter (length_category==">1000kb"), aes(x=su
 cd /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/a_ll_pv_analysis/ngsF-HMM/
 POP=$(ls -rth *.tv.fe1.ngsF-HMM.geno | cut -d'.' -f1)
 
-screen -S ${POP}.tv.fe1
+screen -S ${POP}.tv.sh
 POP=$(echo ${STY#*.} | cut -d'.' -f1)
-script ${POP}.tv.fe1.per_ind.ibdtract.bed.log
+script ${POP}.tv.sh.per_ind.ibdtract.bed.log
 POP=$(echo ${STY#*.} | cut -d'.' -f1)
 
 INPUT_FILE=$(echo ${STY#*.}.ibdtract.bed)
@@ -1333,7 +1325,7 @@ for i in ${INDIVIDUALS[@]}
   echo "processing individual" ${i}
   POP=$(echo ${i} | cut -c1-7)
   mkdir -p ./$POP"_ibdtracts"
-  grep ${i} $INPUT_FILE > $POP"_ibdtracts"/${i}".tv.fe1.ibdtract.bed"
+  grep ${i} $INPUT_FILE > $POP"_ibdtracts"/${i}".tv.sh.ibdtract.bed"
   done
 
 ```
@@ -1344,14 +1336,14 @@ for i in ${INDIVIDUALS[@]}
 
 cd /GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/a_ll_pv_analysis/ngsF-HMM/
 POP=$(ls -rth *.tv.ngsF-HMM.geno | cut -d'.' -f1)
-screen -S ${POP}.tv.fe1
+screen -S ${POP}.tv.sh
 POP=$(echo ${STY#*.} | cut -d'.' -f1)
-script ${POP}.tv.fe1.ibd_counts.log
+script ${POP}.tv.sh.ibd_counts.log
 POP=$(echo ${STY#*.} | cut -d'.' -f1)
 
-rm ${POP}.tv.fe1.ibdtract_interval_counts.txt
-echo -e "tract_length\tn\tind" > ${POP}.tv.fe1.ibdtract_interval_counts.txt
-INDIVIDUALS=$(ls `find . -name '*.tv.fe1.ibdtract.bed' -path '*_ibdtracts/*' -print`)
+rm ${POP}.tv.sh.ibdtract_interval_counts.txt
+echo -e "tract_length\tn\tind" > ${POP}.tv.sh.ibdtract_interval_counts.txt
+INDIVIDUALS=$(ls `find . -name '*.tv.sh.ibdtract.bed' -path '*_ibdtracts/*' -print`)
 for i in ${INDIVIDUALS[@]}
   do
   ind=$(echo ${i} | cut -d'/' -f3 | cut -d'.' -f1)
@@ -1369,11 +1361,11 @@ for i in ${INDIVIDUALS[@]}
    fifth+=$1
    } END {
    printf "%s\t%d\t%s\n%s\t%d\t%s\n%s\t%d\t%s\n%s\t%d\t%s\n%s\t%d\t%s\n", "<1000",first,ind,"<10000",second,ind,"<100000",third,ind,"<1000000",fourth,ind,">1000000",fifth,ind
-   }' ${i/.ibdtract.bed/.ibdtract_counts.bed} >> ${POP}.tv.fe1.ibdtract_interval_counts.txt
+   }' ${i/.ibdtract.bed/.ibdtract_counts.bed} >> ${POP}.tv.sh.ibdtract_interval_counts.txt
    done
 
 #From outside the server:
-scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/a_ll_pv_analysis/ngsF-HMM/*.tv.fe*.ibdtract_interval_counts.txt /Users/dani/ownCloud/backup/g-w_analysis/IBD_analysis/a_ll_pv_analysis/ngsF-HMM/
+scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/IBD_analysis/a_ll_pv_analysis/ngsF-HMM/*.tv.sh.ibdtract_interval_counts.txt /Users/dani/ownCloud/backup/g-w_analysis/IBD_analysis/a_ll_pv_analysis/ngsF-HMM/
 
 ```
 
@@ -1389,7 +1381,10 @@ library("RColorBrewer")
 library("viridis")
 
 ibd_tract <- read_tsv("/Users/dani/ownCloud/backup/g-w_analysis/IBD_analysis/a_ll_pv_analysis/ngsF-HMM/a_ll_pv-c_ll_ba-c_ll_ca-c_ll_cr-c_ll_ki-c_ll_vl-c_ll_ya_n013.tv.ibdtract_interval_counts.txt", col_names = T) %>% mutate(pop=substr(ind,1,7))  %>%
-  mutate (.,Populations=ifelse (pop == "a_ll_pv", "Ancient Basque Country",ifelse (pop == "c_ll_ca", "Caucasus",ifelse (pop == "c_ll_ba", "Balkans",ifelse (pop == "c_ll_po", "NE-Poland",ifelse (pop == "c_ll_ur", "Urals",ifelse (pop == "c_ll_ki", "Kirov",ifelse (pop == "c_ll_la", "Latvia",ifelse (pop == "c_ll_no", "Norway",ifelse (pop == "c_ll_cr", "Carpathians",ifelse (pop == "c_ll_to", "Mongolia",ifelse (pop == "c_ll_tu", "Tuva",ifelse (pop == "c_ll_ka", "Mongolia",ifelse (pop == "c_ll_og", "Mongolia",ifelse (pop == "c_ll_vl", "Vladivostok",ifelse (pop == "c_ll_ya", "Yakutia",ifelse (pop == "c_lp_sm", "Sierra Morena",ifelse (pop == "c_lp_do", "Doñana", NA))))))))))))))))))
+  mutate(.,Populations=ifelse (pop == "a_ll_pv", "Ancient Basque Country",ifelse (pop == "c_ll_ca", "Caucasus",ifelse (pop == "c_ll_ba", "Balkans",ifelse (pop == "c_ll_po", "NE-Poland",ifelse (pop == "c_ll_ur", "Urals",ifelse (pop == "c_ll_ki", "Kirov",ifelse (pop == "c_ll_la", "Latvia",ifelse (pop == "c_ll_no", "Norway",ifelse (pop == "c_ll_cr", "Carpathians",ifelse (pop == "c_ll_to", "Mongolia",ifelse (pop == "c_ll_tu", "Tuva",ifelse (pop == "c_ll_ka", "Mongolia",ifelse (pop == "c_ll_og", "Mongolia",ifelse (pop == "c_ll_vl", "Primorsky Krai",ifelse (pop == "c_ll_ya", "Yakutia",ifelse (pop == "c_lp_sm", "Sierra Morena",ifelse (pop == "c_lp_do", "Doñana", NA))))))))))))))))))
+
+ibd_tract$Populations <- factor(ibd_tract$Populations, levels=c("Ancient Basque Country","Balkans","Carpathians","Caucasus","Kirov","Yakutia","Primorsky Krai"))
+ibd_tract$ind <- factor(ibd_tract$ind, levels=c("a_ll_pv_0223","c_ll_ba_0227","c_ll_ba_0229","c_ll_ca_0241","c_ll_ca_0242","c_ll_cr_0205","c_ll_cr_0212","c_ll_ki_0090","c_ll_ki_0091","c_ll_ya_0138","c_ll_ya_0146","c_ll_vl_0112","c_ll_vl_0113"))
 
 cols <- c("Ancient Basque Country"="#000000",
           "Caucasus"="#B8860b",
@@ -1402,7 +1397,7 @@ cols <- c("Ancient Basque Country"="#000000",
           "Norway"=viridis_pal()(5)[2],
           "Tuva"=brewer.pal(12,"Paired")[8],
           "Mongolia"=brewer.pal(12,"Paired")[7],
-          "Vladivostok"=brewer.pal(12,"Paired")[5],
+          "Primorsky Krai"=brewer.pal(12,"Paired")[5],
           "Yakutia"=brewer.pal(12,"Paired")[6],
           "Sierra Morena"=brewer.pal(8, "Greys") [5],
           "Doñana"=brewer.pal(8, "Greys") [8])
@@ -1410,10 +1405,11 @@ cols <- c("Ancient Basque Country"="#000000",
 ROHs_distr_ggplot <- ggplot(data=ibd_tract, aes(ind,log(n), colour=Populations)) +
 geom_point(aes(shape=tract_length)) +
 scale_colour_manual(values=cols) +
+scale_x_discrete(labels=substr(levels(ibd_tract$ind),10,12)) +
 theme_minimal() +
 theme(axis.text.x=element_text(size=8, angle=90)) +
-xlab("Individual") +
-ylab("Log of the number of IBD tracts") +
+xlab("\nIndividual") +
+ylab("Log of the number of IBD tracts\n") +
 labs(shape="IBD tract length (bp)") #+
 # theme(text=element_text(size=12,face="bold"),
 #       rect=element_rect(size=1),
@@ -1436,17 +1432,18 @@ labs(shape="IBD tract length (bp)") #+
 #       legend.title=element_blank()
 #)
 ROHs_distr_ggplot
-ggsave("all_ibd_tract_log_n.tv.pdf", width=15, height=12, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/IBD_analysis/a_ll_pv_analysis/ngsF-HMM")
+ggsave("all_ibd_tract_log_n.tv.sh.pdf", width=15, height=12, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/IBD_analysis/a_ll_pv_analysis/ngsF-HMM")
 
 
 long_ROHs_n_ggplot <- ggplot(data=filter(ibd_tract,tract_length==">1000000"), aes(ind,n, colour=Populations,fill=Populations)) +
 geom_col() +
 scale_colour_manual(values=cols) +
 scale_fill_manual(values=cols) +
+scale_x_discrete(labels=substr(levels(ibd_tract$ind),10,12)) +
 theme_minimal() +
 theme(axis.text.x=element_text(size=8, angle=90)) +
-xlab("Individual") +
-ylab("Number of IBD tracts >1,000 kb long") #+
+xlab("\nIndividual") +
+ylab("Number of IBD tracts >1,000 kb long\n") #+
 # theme(text=element_text(size=12,face="bold"),
 #       rect=element_rect(size=1),
 #       axis.line=element_line(colour="black"),
@@ -1468,6 +1465,6 @@ ylab("Number of IBD tracts >1,000 kb long") #+
 #       legend.title=element_blank()
 # )
 long_ROHs_n_ggplot
-ggsave(">1000kb_ibd_tract_n.tv.pdf", width=15, height=12, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/IBD_analysis/a_ll_pv_analysis/ngsF-HMM")
+ggsave(">1000kb_ibd_tract_n.tv.sh.pdf", width=15, height=12, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/IBD_analysis/a_ll_pv_analysis/ngsF-HMM")
 
 ```
