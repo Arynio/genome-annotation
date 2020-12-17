@@ -13,3 +13,5 @@ bedtools intersect -a ../lynx2cat_wTiger.sorted.bed -b /GRUPOS/grupolince/lynx_g
 
 Import Lynx rufus fasta sequence into the tiger-cat-lynx synteny.
 ```
+
+ÑAÑAÑAÑA!!!
