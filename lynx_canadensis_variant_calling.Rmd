@@ -1069,7 +1069,7 @@ BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
 
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/lynx_canadensis_VCFs/$CALLING/annotation
 rm ${CALLING}"_ann_individual_summary_"${VAR}"_"${TYPE}".lr_ann.txt"
-echo -e "species\tpopulation\tdataset\tsample\ttotal_V\ttotal_A\tintergenic_V\tintergenic_A\tintronic_V\tintronic_A\tcoding_V\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tnonsense_V\tnonsense_A\tstop_V\tstop_A\tmissense/synonymous_V\tmissense/synonymous_A\tsynonymous/intronic_V\tmissense/intronic_V" > ${CALLING}"_ann_individual_summary_"${VAR}"_"${TYPE}".lr_ann.txt"
+echo -e "species\tpopulation\tdataset\tsample\ttotal_V\ttotal_A\tintergenic_V\tintergenic_A\tintronic_V\tintronic_A\tcoding_V\tsynonymous_V\tsynonymous_A\tmissense_V\tmissense_A\tmissense_tol_V\tmissense_tol_A\tmissense_del_V\tmissense_del_A\tnonsense_V\tnonsense_A\tstop_V\tstop_A\tmissense/synonymous_V\tmissense/synonymous_A\tsynonymous/intronic_V\tmissense/intronic_V" > ${CALLING}"_ann_individual_summary_"${VAR}"_"${TYPE}".lr_ann.txt"
 INDLIST=($(ls `find . -name *"_individual_"${VAR}"_"${TYPE}".lr_ann.vcf" -print`))
 for i in "${INDLIST[@]}"
   do
@@ -1091,6 +1091,12 @@ for i in "${INDLIST[@]}"
   SYNONYMOUS_A=$(grep 'synonymous_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
   MISSENSE_V=$(grep 'missense_variant' ${i} | wc -l)
   MISSENSE_A=$(grep 'missense_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/lynx_canadensis_VCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_lcnm3_origcov/annotation/provean/missense_variants_provean_scores_tolerated.txt > ${VAR}_mis_tol.temp.borrar
+  MISSENSE_TOL_V=$(wc -l < ${VAR}_mis_tol.temp.borrar)
+  MISSENSE_TOL_A=$(cut -f8 ${VAR}_mis_tol.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/lynx_canadensis_VCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_lcnm3_origcov/annotation/provean/missense_variants_provean_scores_deleterious.txt > ${VAR}_mis_del.temp.borrar
+  MISSENSE_DEL_V=$(wc -l < ${VAR}_mis_del.temp.borrar)
+  MISSENSE_DEL_A=$(cut -f8 ${VAR}_mis_del.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
   NONSENSE_V=$(grep '|HIGH|' ${i} | wc -l)
   NONSENSE_A=$(grep '|HIGH|' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
   STOP_V=$(grep 'stop_gained' ${i} | wc -l)
@@ -1099,7 +1105,7 @@ for i in "${INDLIST[@]}"
   MISSENSE_SYNONYMOUS_A=$(echo "scale=4; $MISSENSE_A/$SYNONYMOUS_A" | bc)
   SYNONYMOUS_INTRONIC_V=$(echo "scale=4; $SYNONYMOUS_V/$INTRONIC_V" | bc)
   MISSENSE_INTRONIC_V=$(echo "scale=4; $MISSENSE_V/$INTRONIC_V" | bc)
-  echo -e "$SPECIES\t$POPULATION\t$DATASET\t$SAMPLE\t$TOTAL_V\t$TOTAL_A\t$INTERGENIC_V\t$INTERGENIC_A\t$INTRONIC_V\t$INTRONIC_A\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$NONSENSE_V\t$NONSENSE_A\t$STOP_V\t$STOP_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A\t$SYNONYMOUS_INTRONIC_V\t$MISSENSE_INTRONIC_V" >> ${CALLING}"_ann_individual_summary_"${VAR}"_"${TYPE}".lr_ann.txt"
+  echo -e "$SPECIES\t$POPULATION\t$DATASET\t$SAMPLE\t$TOTAL_V\t$TOTAL_A\t$INTERGENIC_V\t$INTERGENIC_A\t$INTRONIC_V\t$INTRONIC_A\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$MISSENSE_V\t$MISSENSE_A\t$MISSENSE_TOL_V\t$MISSENSE_TOL_A\t$MISSENSE_DEL_V\t$MISSENSE_DEL_A\t$NONSENSE_V\t$NONSENSE_A\t$STOP_V\t$STOP_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A\t$SYNONYMOUS_INTRONIC_V\t$MISSENSE_INTRONIC_V" >> ${CALLING}"_ann_individual_summary_"${VAR}"_"${TYPE}".lr_ann.txt"
   done
 
 #From outside the server:
