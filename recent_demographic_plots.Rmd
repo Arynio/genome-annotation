@@ -1,0 +1,104 @@
+---
+title: "recent_demographic_plots"
+output: html_document
+---
+
+
+#Adapted from María's "recent_demographic_reconstruction" script, to plot my SNeP data.
+```{r}
+
+library (data.table)
+library(ggplot2)
+library (dplyr)
+library (magrittr)
+library(plyr)
+library (tidyr)
+library(viridis)
+library(RColorBrewer)
+
+wd <- "/Users/dani/ownCloud/publico/Eurasian\ lynx\ phylogeography/recent_demographic_reconstruction/SNeP/"
+
+sample_files = list.files(path = wd, pattern="*NeAll$")
+list_Ne<- lapply( sample_files, function (x) 
+     # Aquí leo la tabla
+  fread(paste0(wd,x)))
+#names the list using the basename from `l`
+# this also is the step to manipuly the filesnamaes to whatever you like
+names(list_Ne) <- basename( sample_files )
+#bind the rows from the list togetgher, putting the filenames into the colum "id"
+Ne_reconstruction <- rbindlist( list_Ne, idcol = "pop1" ) %>% 
+  # Corto este string para que sea igual en los dos dataset
+  mutate(pop=substr(.$pop1, 1, 7) ) %>% 
+  # Elimino el valor que no me interesa
+  select (-pop1)%>% 
+  mutate (., Populations =  ifelse (pop == "c_ll_po", "NE-Poland",
+                          ifelse (pop == "c_ll_ur", "Urals",
+                          ifelse (pop == "c_ll_ki", "Kirov",
+                          ifelse (pop == "c_ll_la", "Latvia",
+                          ifelse (pop == "c_ll_no", "Norway",
+                          ifelse (pop == "c_ll_ba" | pop == "h_ll_ba", "Balkans" ,
+                          ifelse (pop == "c_ll_cr","Carpathians",
+                          ifelse (pop == "c_ll_to", "Töv",
+                          ifelse (pop == "c_ll_tu", "Tuva",
+                          ifelse (pop == "c_ll_ka", "Khentii-Aimag",
+                          ifelse (pop == "c_ll_mo", "Mongolia",
+                          ifelse (pop == "c_ll_og", "Ömnögovi", 
+                          ifelse (pop == "c_ll_vl", "Vladivostok", 
+                          ifelse (pop == "c_ll_ya", "Yakutia",
+                          ifelse (pop == "c_lp_sm", "Sierra Morena",
+                          ifelse (pop == "c_lp_do", "Doñana", NA))))))))))))))))) %>% 
+  mutate(YBP=GenAgo*5) #%>% filter (pop!=  "c_lp_do" & pop!="c_lp_sm")
+
+
+cols <- c("NE-Poland"=viridis_pal()(5)[3], 
+          "Urals"="#0F4909", 
+          "Carpathians"=brewer.pal(12,"Paired")[9], 
+          "Kirov"=viridis_pal()(5)[1], 
+          "Latvia"=brewer.pal(12,"Paired")[3], 
+          "Norway"=viridis_pal()(5)[2], 
+          "Mongolia"=brewer.pal(12,"Paired")[12], 
+          "Tuva"=brewer.pal(12,"Paired")[8], 
+          "Vladivostok"=brewer.pal(12,"Paired")[5], 
+          "Yakutia"=brewer.pal(12,"Paired")[6],
+          "Doñana"="black",
+          "Sierra Morena"="grey")
+
+
+Ne_reconstruction_Dani <- Ne_reconstruction %>% filter(Populations == "Kirov" | Populations == "NE-Poland" | Populations == "Norway" | Populations == "Sierra Morena" | Populations == "Doñana")
+
+Ne_reconstruction_Dani$Populations <- factor(Ne_reconstruction_Dani$Populations,levels=c("Kirov","NE-Poland","Norway","Sierra Morena","Doñana"))
+levels(Ne_reconstruction_Dani$Populations) <- c("KIR","POL","NOR","AND","DON")
+
+
+ggplot(Ne_reconstruction_Dani, aes(YBP, Ne, fill=Populations, colour=Populations)) +
+  geom_point(alpha=0.1) +
+  geom_smooth(se = F) + 
+  scale_x_reverse() +
+  labs(y=expression(bold(N[e]))) +
+  theme_classic() +
+  theme(text=element_text(size=12,face="bold"),
+      rect=element_rect(size=1),
+      axis.line=element_line(colour="black",size=1),
+      axis.title=element_text(size=16),
+      axis.text.x=element_text(angle=30,hjust=1,size=14,colour="black"),
+      axis.title.x=element_text(size=18,colour="black"),
+      axis.title.y=element_text(size=18,colour="black"),
+      axis.text.y=element_text(size=14,colour="black"),
+      #axis.title.y=element_text(margin=unit(c(0,0.5,0,0),"cm")),
+      panel.background=element_blank(),
+      #panel.border=element_rect(colour="black",fill=NA,size=1.5),
+      #strip.background=element_rect(colour="black",size=1.5),
+      #panel.grid=element_blank(),
+      #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+      plot.margin=unit(c(0.5,1,0.5,0.2),"cm"),
+      #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+      legend.background=element_rect(linetype="solid", colour="black", size=.5),
+      #legend.justification=c(0,0),
+      legend.key=element_rect(colour="white"),
+      legend.key.size=unit(0.5,"cm"),
+      #legend.position="none",
+      legend.title=element_blank()
+  ) +
+  ggsave(paste(wd,"all_pop_chr_Dani.pdf", sep=""),device="pdf")
+
+```
