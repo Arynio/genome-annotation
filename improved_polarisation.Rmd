@@ -1,0 +1,15 @@
+---
+title: "improved_polarisation"
+output: html_document
+---
+
+#1. Add bobcat state to the tiger-cat-lynx synteny file:
+```{bash}
+
+cd /GRUPOS/grupolince/copia_fabascal/MAPPINGS/with_rufus_dani
+
+#First, retrieve only informative sites (i.e. variants in my VCF).
+bedtools intersect -a ../lynx2cat_wTiger.sorted.bed -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.lr_ann.vcf > lynx2cat_wTiger.sorted.dani_variants.bed
+
+Import Lynx rufus fasta sequence into the tiger-cat-lynx synteny.
+```
