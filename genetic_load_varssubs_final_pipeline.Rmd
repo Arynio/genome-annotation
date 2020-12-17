@@ -1072,7 +1072,7 @@ grep -v '#' "${CALLING}_polarized.lr_ann.vcf" | wc -l
 ##Subset the VCF files in order to keep only good quality biallelic SNP variants.
 ```{r Filter the annotated VCF, eval=FALSE, engine='bash'}
 
-CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nmNnmN_origcov) #write down name of the calling
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov) #write down name of the calling
 TYPE=(SNP) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
 screen -S "${CALLING}-${TYPE}"
@@ -1176,7 +1176,7 @@ if [ $TYPE != "SNP" ] && [ $TYPE != "INDEL" ] #Don't apply filters if $TYPE is i
   $BCF filter -e "DP < 200" -Ov -o ${CALLING}"_polarized_filtered6_"${TYPE}".lr_ann.vcf" ${CALLING}"_polarized_filtered5_"${TYPE}".lr_ann.vcf"
   
   grep -v '#' ${CALLING}"_polarized_filtered6_"${TYPE}".lr_ann.vcf" | wc -l 
-  #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov
+  #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov 4241437
   #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov 4391212
   #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm3nm3_origcov 4412177
   #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nmNnmN_origcov 4602025
@@ -1187,7 +1187,7 @@ fi
 ##Separate variants and substitutions.
 ```{r Filter the annotated VCF, eval=FALSE, engine='bash'}
 
-CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm3nm3_origcov) #write down name of the calling
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov) #write down name of the calling
 TYPE=(SNP) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
 screen -S "${CALLING}-${TYPE}"
@@ -1207,7 +1207,7 @@ N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING)
 SPECIES=$(echo $CALLING | fold -w8 | cut -c1-4 | head -n$N_POPS | sort | uniq)
 COVERAGE=$(echo "${CALLING}" | rev | cut -d'_' -f1 | rev)
 
-if [[ $CALLING == "c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm3nm3"* ]] #the double brackets turns the test into a regex
+if [[ $CALLING == "c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3"* ]] #the double brackets turns the test into a regex
   then
     for s in ${SPECIES[@]}
       do
@@ -1225,9 +1225,11 @@ if [[ $CALLING == "c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm3nm3"* ]] #the doub
     bedtools subtract -a "${CALLING}"_polarized_filtered6_"$TYPE".lr_ann.vcf -b "${CALLING}"_joined_1_and_0_positions_"$TYPE".bed -header > "${CALLING}"_polarized_variants_"$TYPE".lr_ann.vcf
     echo "variants retrieved"
     grep -v '#' "${CALLING}"_polarized_substitutions_"$TYPE".lr_ann.vcf | wc -l
+    #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov 1382501
     #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov 1421816
     #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm3nm3_origcov 1420110
     grep -v '#' "${CALLING}"_polarized_variants_"$TYPE".lr_ann.vcf | wc -l
+    #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov 2858936
     #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov 2969396
     #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm3nm3_origcov 2992067
     #bedtools subtract -a "${CALLING}"_polarized_filtered6_"$TYPE".lr_ann.vcf -b "${CALLING}"_joined_1_and_0_positions_"$TYPE".bed -header | grep -v '#' | wc -l #sanity check that counts the number of discarded variants. This number should equal the difference between _filtered6 (not anymore, now filtered6 is a different thing) and _substitutions. It is for both treatments:
@@ -1301,7 +1303,7 @@ fi
 ##For varssubs, variants and substitutions. All of these should be filtered next (steps 10 and 11).
 ```{r Obtain per dataset VCFs, eval=FALSE, engine='bash'}
 
-CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nmNnmN_origcov)
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov)
 VAR=(varssubs) #varssubs #variants #substitutions
 TYPE=(SNP) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
@@ -1452,7 +1454,7 @@ echo $OUT_NAME
 echo $NUMBER_IND
 echo $MAXDEPTH
 
-/opt/angsd/angsd/angsd \
+/angsd \
 -P $THREADS \
 -b $BAMLIST \
 -ref $REF \
@@ -1477,7 +1479,7 @@ scp /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/depth_calculus/depth_c
 ```{r Depth range calculus, eval=FALSE, engine='bash'}
 
 #Change calling variable
-CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nmNnmN_origcov)
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov)
 
 mkdir -p /home/dkleinman/datos/nm_depth_calculus/$CALLING
 cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
@@ -1498,7 +1500,7 @@ for i in ${DATASETS[@]}
     done
 
 #From outside the server:
-CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nmNnmN_origcov)
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov)
 mkdir -p /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/depth_calculus/$CALLING
 scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/nm_depth_calculus/$CALLING/*depthGlobal /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/depth_calculus/$CALLING
 
@@ -1507,7 +1509,7 @@ scp dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/nm_depth_calculus/$CA
 ##C: compile statistics and draw graphs
 ```{r Depth range calculus}
 
-calling <- "c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nmNnmN_origcov"
+calling <- "c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov"
 
 #Now we use R to plot the depth distribution and to obtain a summary table:
 
@@ -1590,11 +1592,11 @@ write.table(x = depth_per_sample,file = paste("/Users/Dani/ownCloud/backup/g-w_a
 ```{r Depth range calculus, eval=FALSE, engine='bash'}
 
 #From outside the server, first upload the summary table to the server:
-CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nmNnmN_origcov)
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov)
 scp /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/depth_calculus/$CALLING/"$CALLING"_mean_sd_depthGlobal_nm_per_dataset_mean_folds_0.95.csv dkleinman@genomics-b.ebd.csic.es:/home/dkleinman/datos/nm_depth_calculus/$CALLING
 
 #In the server, separate in populations:
-CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nmNnmN_origcov)
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov)
 cd /home/dkleinman/datos/nm_depth_calculus/$CALLING
 POPS=$(cat /home/dkleinman/datos/nm_depth_calculus/$CALLING/"$CALLING"_mean_sd_depthGlobal_nm_per_dataset_mean_folds_0.95.csv | awk '{print $1}')
 for POP in ${POPS[@]}
@@ -1610,7 +1612,7 @@ for POP in ${POPS[@]}
 ```{r Perform depth filtering, eval=FALSE, engine='bash'}
 
 #For each dataset obtain the list of positions that have lower (higher) depth than the minimum (maximum) within 0.95 of the distribution, as calculated in the previous section, and join them to later remove all of them from all datasets:
-CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nmNnmN_origcov)
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov)
 VAR=(varssubs) #varssubs #variants #substitutions
 TYPE=(SNP) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
@@ -1657,7 +1659,7 @@ for j in ${DATASETS[@]}
 ##At the global level (run the dataset level code first):
 ```{r Perform depth filtering, eval=FALSE, engine='bash'}
 
-CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nmNnmN_origcov)
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov)
 VAR=(varssubs) #varssubs #variants #substitutions
 TYPE=(SNP) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
@@ -1684,7 +1686,7 @@ fi
 #12: Obtain per population VCFs.
 ```{r Obtain per population VCFs, eval=FALSE, engine='bash'}
 
-CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov)
 VAR=(varssubs) #varssubs #variants #substitutions #segregating #fixed
 TYPE=(SNP) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
@@ -1966,8 +1968,8 @@ for pop in ${POPS[@]}
 ##Whole-genome.
 ```{r Split the population VCFs into per individual VCFs, eval=FALSE, engine='bash'}
 
-CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
-VAR=(fixed) #varssubs #variants #substitutions #segregating #fixed
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov)
+VAR=(varssubs) #varssubs #variants #substitutions #segregating #fixed
 TYPE=(SNP) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
 screen -S "${CALLING}-${VAR}-${TYPE}"
