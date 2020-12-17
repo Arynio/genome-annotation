@@ -1290,6 +1290,135 @@ unset SSHPASS
 
 ```
 
+##Telomeres, joint calling (estimate all filters proportion per category, corrected for repetitive regions and low mappability):
+```{r Filter the annotated VCF, eval=FALSE, engine='bash'}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+TYPE=(all) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+screen -S "${CALLING}-${TYPE}"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+script "${CALLING}_polarized_filtered_tally_sites_telomerefilter_corrected_${TYPE}.lr_ann.log"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+
+#Define paths:
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome (first eight scaffolds only)
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+CATEGORIES=$(realpath /home/dkleinman/datos/snpEff/data/*.bed | grep -v 'nr')
+#N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING)
+#SPECIES=$(echo $CALLING | fold -w8 | cut -c1-4 | head -n$N_POPS | sort | uniq)
+TELOMERE_FILE="/GRUPOS/grupolince/telomers_centromers_definition/tel0-10m_regions_based_on_synteny_1000bp.bed"
+    
+#Prepare output file:
+rm "category_sites_total_counts_telomerefilter_corrected.lr_ann.txt"
+echo -e "category\ttotal_N\trepetitive_prop\tcallable_N\tfiltered_prop\tcallable_N_postfilter" > "category_sites_total_counts_telomerefilter_corrected.lr_ann.txt"
+for category in ${CATEGORIES[@]}
+  do
+  CATEGORY_NAME=$(echo $category | cut -d'.' -f2)
+  echo "counting" $CATEGORY_NAME "variants"
+  if [ $CATEGORY_NAME == "all" ]
+    then
+    PRE_FILTER_V=$(bedtools intersect -a /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/${CALLING}_polarized.lr_ann.vcf -b $TELOMERE_FILE | wc -l)
+    POST_FILTER_V=$(bedtools intersect -a /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/${CALLING}_polarized_filteredall_varssubs_SNP.lr_ann.vcf -b $TELOMERE_FILE | wc -l)
+    else
+    PRE_FILTER_V=$(bedtools intersect -a /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/${CALLING}_polarized.lr_ann.vcf -b $TELOMERE_FILE | grep $CATEGORY_NAME | wc -l)
+    POST_FILTER_V=$(bedtools intersect -a /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/${CALLING}_polarized_filteredall_varssubs_SNP.lr_ann.vcf -b $TELOMERE_FILE | grep $CATEGORY_NAME | wc -l)
+  fi
+  FILTER_V=$((PRE_FILTER_V-POST_FILTER_V))
+  FILTER_V_PROP=$(echo "scale=6; $FILTER_V/$PRE_FILTER_V" | bc | awk '{printf "%3.4f", $0}')
+  echo "estimating" $CATEGORY_NAME "callable universe"
+  bedtools intersect -a $category -b $TELOMERE_FILE > telomere.bed.temp
+  GENOME_T=$( awk '{printf ("%s\t%s\t%s\t%s\t%s\n", $1, $2, $3, $4, $3-$2+1)}' telomere.bed.temp | cut -f5 | paste -sd+ | bc)
+  GENOME_REP_T=$(bedtools intersect -a /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/repeats_and_lowcomp_no_redundant_mappability.k75_lessthan90.bed -b telomere.bed.temp | awk '{printf ("%s\t%s\t%s\t%s\n", $1, $2, $3, $3-$2+1)}' | cut -f4 | paste -sd+ | bc)
+  rm telomere.bed.temp
+  GENOME_REP_PROP=$(echo "scale=6; $GENOME_REP_T/$GENOME_T" | bc)  
+  PRE_FILTER_T=$((GENOME_T-GENOME_REP_T))
+
+  FILTER_T=$(echo "scale=6; $FILTER_V_PROP*$PRE_FILTER_T" | bc | awk '{printf "%d", $0}')
+  POST_FILTER_T=$((PRE_FILTER_T-FILTER_T))
+  echo -e "$CATEGORY_NAME\t$GENOME_T\t$GENOME_REP_PROP\t$PRE_FILTER_T\t$FILTER_V_PROP\t$POST_FILTER_T" >> "category_sites_total_counts_telomerefilter_corrected.lr_ann.txt"
+  done
+sed -i.bak "s/$(printf 'all\t')/$(printf 'total\t')/" category_sites_total_counts_telomerefilter_corrected.lr_ann.txt
+rm category_sites_total_counts_telomerefilter_corrected.lr_ann.txt.bak
+
+
+#From outside the server:
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov) 
+export SSHPASS=$(cat /Users/dani/Documents/genomics_pass.txt)
+sshpass -e scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/"category_sites_total_counts_telomerefilter_corrected.lr_ann.txt" /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/whole_genome_counts/
+unset SSHPASS
+
+```
+
+##Centromeres, joint calling (estimate all filters proportion per category, corrected for repetitive regions and low mappability):
+```{r Filter the annotated VCF, eval=FALSE, engine='bash'}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+TYPE=(all) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+screen -S "${CALLING}-${TYPE}"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+script "${CALLING}_polarized_filtered_tally_sites_centromerefilter_corrected_${TYPE}.lr_ann.log"
+CALLING=${STY#*.}
+CALLING=${CALLING%-*}
+TYPE=${STY#*-}
+
+#Define paths:
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome (first eight scaffolds only)
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+CATEGORIES=$(realpath /home/dkleinman/datos/snpEff/data/*.bed | grep -v 'nr')
+#N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING)
+#SPECIES=$(echo $CALLING | fold -w8 | cut -c1-4 | head -n$N_POPS | sort | uniq)
+CENTROMERE_FILE="/GRUPOS/grupolince/telomers_centromers_definition/centr_regions_based_on_synteny_1000bp.bed"
+    
+#Prepare output file:
+rm "category_sites_total_counts_centromerefilter_corrected.lr_ann.txt"
+echo -e "category\ttotal_N\trepetitive_prop\tcallable_N\tfiltered_prop\tcallable_N_postfilter" > "category_sites_total_counts_centromerefilter_corrected.lr_ann.txt"
+for category in ${CATEGORIES[@]}
+  do
+  CATEGORY_NAME=$(echo $category | cut -d'.' -f2)
+  echo "counting" $CATEGORY_NAME "variants"
+  if [ $CATEGORY_NAME == "all" ]
+    then
+    PRE_FILTER_V=$(bedtools intersect -a /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/${CALLING}_polarized.lr_ann.vcf -b $CENTROMERE_FILE | wc -l)
+    POST_FILTER_V=$(bedtools intersect -a /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/${CALLING}_polarized_filteredall_varssubs_SNP.lr_ann.vcf -b $CENTROMERE_FILE | wc -l)
+    else
+    PRE_FILTER_V=$(bedtools intersect -a /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/${CALLING}_polarized.lr_ann.vcf -b $CENTROMERE_FILE | grep $CATEGORY_NAME | wc -l)
+    POST_FILTER_V=$(bedtools intersect -a /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/${CALLING}_polarized_filteredall_varssubs_SNP.lr_ann.vcf -b $CENTROMERE_FILE | grep $CATEGORY_NAME | wc -l)
+  fi
+  FILTER_V=$((PRE_FILTER_V-POST_FILTER_V))
+  FILTER_V_PROP=$(echo "scale=6; $FILTER_V/$PRE_FILTER_V" | bc | awk '{printf "%3.4f", $0}')
+  echo "estimating" $CATEGORY_NAME "callable universe"
+  bedtools intersect -a $category -b $CENTROMERE_FILE > centromere.bed.temp
+  GENOME_T=$( awk '{printf ("%s\t%s\t%s\t%s\t%s\n", $1, $2, $3, $4, $3-$2+1)}' centromere.bed.temp | cut -f5 | paste -sd+ | bc)
+  GENOME_REP_T=$(bedtools intersect -a /home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/repeats_and_lowcomp_no_redundant_mappability.k75_lessthan90.bed -b centromere.bed.temp | awk '{printf ("%s\t%s\t%s\t%s\n", $1, $2, $3, $3-$2+1)}' | cut -f4 | paste -sd+ | bc)
+  rm centromere.bed.temp
+  GENOME_REP_PROP=$(echo "scale=6; $GENOME_REP_T/$GENOME_T" | bc)  
+  PRE_FILTER_T=$((GENOME_T-GENOME_REP_T))
+
+  FILTER_T=$(echo "scale=6; $FILTER_V_PROP*$PRE_FILTER_T" | bc | awk '{printf "%d", $0}')
+  POST_FILTER_T=$((PRE_FILTER_T-FILTER_T))
+  echo -e "$CATEGORY_NAME\t$GENOME_T\t$GENOME_REP_PROP\t$PRE_FILTER_T\t$FILTER_V_PROP\t$POST_FILTER_T" >> "category_sites_total_counts_centromerefilter_corrected.lr_ann.txt"
+  done
+sed -i.bak "s/$(printf 'all\t')/$(printf 'total\t')/" category_sites_total_counts_centromerefilter_corrected.lr_ann.txt
+rm category_sites_total_counts_centromerefilter_corrected.lr_ann.txt.bak
+
+#From outside the server:
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov) 
+export SSHPASS=$(cat /Users/dani/Documents/genomics_pass.txt)
+sshpass -e scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/"category_sites_total_counts_centromerefilter_corrected.lr_ann.txt" /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/whole_genome_counts/
+unset SSHPASS
+
+```
+
 #Z: Finally unused:
 #Z1: Obtain per dataset VCFs. Split the VCF into per datasets VCFs. Generate a VCF for each dataset in order to apply proper depth filters.
 ##Separate callings:
