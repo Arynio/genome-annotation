@@ -1742,6 +1742,15 @@ pop_pairs <- c("c_lp_do/c_lp_sm","c_lp_sm/c_ll_ki","c_ll_po/c_ll_no","c_ll_po/c_
 tidy_derived_freq_ratios <- tidy_derived_freq_ratios %>% filter(populations %in% pop_pairs)
 tidy_derived_freq_ratios$populations <- as.factor(droplevels(tidy_derived_freq_ratios$populations))
 
+tidy_derived_freq_ratios$populations <- gsub('c_ll_ki', 'KIR', tidy_derived_freq_ratios$populations)
+tidy_derived_freq_ratios$populations <- gsub('c_ll_po', 'POL', tidy_derived_freq_ratios$populations)
+tidy_derived_freq_ratios$populations <- gsub('c_ll_no', 'NOR', tidy_derived_freq_ratios$populations)
+tidy_derived_freq_ratios$populations <- gsub('c_lp_sm', 'AND', tidy_derived_freq_ratios$populations)
+tidy_derived_freq_ratios$populations <- gsub('c_lp_do', 'DON', tidy_derived_freq_ratios$populations)
+
+tidy_derived_freq_ratios$populations = factor(tidy_derived_freq_ratios$populations,levels=c("DON/AND","AND/KIR","POL/NOR","POL/KIR","NOR/KIR"))
+
+
 tidy_derived_freq_ratios_simple <- tidy_derived_freq_ratios[grep("SYN_norm_ratio|NSYN_norm_ratio|LOF_norm_ratio",tidy_derived_freq_ratios$ratio_type),]
 tidy_derived_freq_ratios_complete <- tidy_derived_freq_ratios[grep("NSYN_norm_ratio",tidy_derived_freq_ratios$ratio_type,inv=T),]
 
@@ -1844,35 +1853,36 @@ derived_freq_ratios_complete_errors_ggplot <-
   geom_bar(stat='identity', position=position_dodge()) +
   geom_errorbar(aes(ymin=ratio_value_from1-error_value, ymax=ratio_value_from1+error_value), position=position_dodge()) +
   scale_x_discrete(limits = rev(levels(tidy_derived_freq_ratios$populations))) +
-  scale_y_continuous(breaks=seq(-0.4,0.4,by=0.1),labels=seq(-0.4,0.4,by=0.1)+1) +
+  scale_y_continuous(breaks=seq(-0.4,0.3,by=0.1),labels=seq(-0.4,0.3,by=0.1)+1) +
   #scale_y_continuous(breaks=seq(-2,2,by=0.25),labels=seq(-2,2,by=0.25)+1) +
-  scale_fill_manual("legend",values=c("LOF_norm_ratio"="red3","NDEL_norm_ratio"="orangered","NTOL_norm_ratio"="orange","SYN_norm_ratio"="yellow"),labels=c("SYN","NTOL","NDEL","LoF"),guide=guide_legend(reverse=TRUE)) +
-  coord_flip(ylim=c(-0.3,0.15),expand=T,clip = "on") +
+  scale_fill_manual("legend",values=c("LOF_norm_ratio"="red3","NDEL_norm_ratio"="orangered","NTOL_norm_ratio"="orange","SYN_norm_ratio"="yellow"),labels=c("synonymous","m. tolerated","m. deleterious","LoF"),guide=guide_legend(reverse=TRUE)) +
+  geom_hline(yintercept = 0) +
+  coord_flip(ylim=c(-0.45,0.35),expand=T,clip = "on") +
   #coord_cartesian(ylim=c(-0.3,0.2),expand=T,default=T,clip = "on") +
   xlab("Populations") +
   ylab(expression(bold(R["X/Y"]))) +
+  theme_bw() +
   theme(text=element_text(size=12,face="bold"),
       rect=element_rect(size=1),
-      #axis.line=element_line(colour="black"),
-      axis.title=element_text(size=14),
+      axis.line=element_blank(),
+      axis.title=element_text(size=16),
       axis.text.x=element_text(angle=30,hjust=1,size=12,colour="black"),
       axis.text.y=element_text(size=12,colour="black"),
-      #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
-      #panel.background=element_blank(),
-      #panel.border=element_rect(colour="black"),
+      panel.background=element_blank(),
+      panel.border=element_rect(colour="black",fill=NA,size=1.5),
       #panel.grid=element_blank(),
       #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
-      plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+      plot.margin=unit(c(0.5,1,0.5,0.2),"cm"),
       #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
       legend.background=element_rect(linetype="solid", colour="black", size=.5),
       #legend.justification=c(0,0),
       legend.key=element_rect(colour="white"),
       legend.key.size=unit(0.5,"cm"),
-      legend.position=c(0.12,0.12),
+      legend.position=c(0.84,0.60),
       legend.title=element_blank()
   )
 derived_freq_ratios_complete_errors_ggplot
-ggsave("c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_ALL_derived_freq_ratio_varssubs_SNP.complete_errors.pdf", width=15, height=10, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_ratio")
+ggsave("c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_ALL_derived_freq_ratio_varssubs_SNP.complete_errors.good.pdf", width=16, height=10, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_ratio")
 
 derived_freq_ratios_complete_errors_ugly_ggplot <-
   ggplot(data=tidy_derived_freq_ratios_complete,aes(x=populations,y=ratio_value_from1,fill=ratio_type)) +
@@ -1888,16 +1898,15 @@ derived_freq_ratios_complete_errors_ugly_ggplot <-
   ylab(expression(bold(R["X/Y"]))) +
   theme(text=element_text(size=12,face="bold"),
       rect=element_rect(size=1),
-      #axis.line=element_line(colour="black"),
-      axis.title=element_text(size=14),
+      axis.line=element_blank(),
+      axis.title=element_text(size=16),
       axis.text.x=element_text(angle=30,hjust=1,size=12,colour="black"),
       axis.text.y=element_text(size=12,colour="black"),
-      #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
-      #panel.background=element_blank(),
-      #panel.border=element_rect(colour="black"),
+      panel.background=element_blank(),
+      panel.border=element_rect(colour="black",fill=NA,size=1.5),
       #panel.grid=element_blank(),
       #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
-      plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+      plot.margin=unit(c(0.5,1,0.5,0.2),"cm"),
       #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
       legend.background=element_rect(linetype="solid", colour="black", size=.5),
       #legend.justification=c(0,0),
@@ -2130,7 +2139,7 @@ ggsave("c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_ALL_derived_freq_
 ```{r Calculate derived allele frequency ratio, eval=FALSE, engine='bash'}
 
 CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
-VAR=(varssubs) #varssubs #variants #substitutions
+VAR=(segregating) #varssubs #variants #substitutions #segregating
 TYPE=(SNP) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
 screen -S "${CALLING}-${VAR}-${TYPE}"
@@ -2143,17 +2152,6 @@ VAR=$(echo ${STY#*.} | cut -d'-' -f2)
 TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
 
 
-S_PATH=/opt/snpEff #software path
-C_PATH=/home/dkleinman/datos/snpEff #config file path
-O_PATH=/home/dkleinman/datos/snpEff #output path
-I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
-V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
-G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
-B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAM files path
-REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
-GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
-BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
-
 cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
 N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING)
 SPECIES=$(echo $CALLING | fold -w8 | cut -c1-4 | head -n$N_POPS | sort | uniq)
@@ -2161,42 +2159,64 @@ DATASETS=$(for i in ${SPECIES[@]}; do ls ${i}*_samples | cut -d'_' -f1,2,3; done
 COVERAGE=$(echo "${CALLING}" | rev | cut -d'_' -f1 | rev)
 NM_COV=$(echo "${CALLING}" | rev | cut -d'_' -f1,2 | rev)
 
-cd $V_PATH/$CALLING/annotation
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
 GREP=$(cat derived_allele_freq_ratio/features_derived_allele_freq_ratio.txt | cut -f1)
-POPS=($(ls `find . -name *'5x'*'_perpop_'*'.lr_ann.bed' ! -name '*vs*' -print` | rev | cut -d'/' -f1 | rev | cut -d'_' -f-6 | sort | uniq))
-echo "joining frequency files from each feature from each population"
+POP_VCFS=($(ls `find . -path *"_perpop/c_*5x*_perpop_"${VAR}"_"${TYPE}".lr_ann.vcf" -print`))
 rm ${CALLING}"_5x_perpop_ALL_features_"${VAR}"_"${TYPE}".lr_ann.af"
-for p in ${POPS[@]}
+rm ${CALLING}"_5x_perpop_ALL_features_"${VAR}"_"${TYPE}".lr_ann.maf.txt"
+echo -e "population\tfeature\tmaf" > ${CALLING}"_5x_perpop_ALL_features_"${VAR}"_"${TYPE}".lr_ann.maf.txt"
+for p in ${POP_VCFS[@]}
   do
-  echo "working with pop ${p}"
-  SHORT_POP=$(echo ${p} | cut -d'_' -f4-6)
+  SP_DATASET=$(echo ${p} | cut -d'/' -f3 | cut -d'_' -f1-3)
+  SHORT_POP=$(echo ${p} | cut -d'/' -f3 | cut -d'_' -f4-6)
+  echo "working with pop" $SHORT_POP "and vcf" $p
+  echo "extracting derived allele frequencies from" $SHORT_POP
   for g in ${GREP[@]}
     do
-    echo "grepping: ${g}"
+    #echo "grepping: ${g}"
     FEATURE=$(grep "${g}" derived_allele_freq_ratio/features_derived_allele_freq_ratio.txt | cut -f2)
-    echo "feature: $FEATURE"
-    cat $SHORT_POP"_"$NM_COV"_perpop"/${p}"_"$NM_COV"_perpop_"$VAR"_"$FEATURE"_"$TYPE".lr_ann.bed" | awk -v pop="$SHORT_POP" -v feat="$FEATURE" '{print pop,feat,$0}' OFS="\t" >> ${CALLING}"_5x_perpop_ALL_features_"${VAR}"_"${TYPE}".lr_ann.af"
+    echo "extracting from feature:" $FEATURE
+    grep "${g}" "${p}" | awk -F"\t|;|=" '{printf ("%s\t%s\t%s\t%s\n", $1,$2-1,$2,$13)}' > ${p/perpop_${VAR}_${TYPE}.lr_ann.vcf/perpop_${VAR}_${FEATURE}_${TYPE}.lr_ann.af}
+    N_SITES=$(wc -l < ${p/perpop_${VAR}_${TYPE}.lr_ann.vcf/perpop_${VAR}_${FEATURE}_${TYPE}.lr_ann.af})
+    SUM_AF=$(cut -f4 ${p/perpop_${VAR}_${TYPE}.lr_ann.vcf/perpop_${VAR}_${FEATURE}_${TYPE}.lr_ann.af} | paste -sd+ | bc)
+    AVG_AF=$(awk -v sum=$SUM_AF -v total=$N_SITES 'BEGIN{printf "%.3f\n", sum/total}')
+    echo -e "$SHORT_POP\t$FEATURE\t$AVG_AF" >> ${CALLING}"_5x_perpop_ALL_features_"${VAR}"_"${TYPE}".lr_ann.maf.txt"
+    echo "joining frequency files"
+    awk -v pop="$SHORT_POP" -v feat="$FEATURE" '{print pop,feat,$0}' OFS="\t" $SHORT_POP"_"$NM_COV"_perpop"/$SP_DATASET"_"$SHORT_POP"_"$NM_COV"_perpop_"$VAR"_"$FEATURE"_"$TYPE".lr_ann.af" >> ${CALLING}"_5x_perpop_ALL_features_"${VAR}"_"${TYPE}".lr_ann.af"
     if [ $FEATURE == "NSYN" ]
       then
       FEATURE2=(NTOL)
-      echo "feature: $FEATURE2"
-      cat $SHORT_POP"_"$NM_COV"_perpop"/${p}"_"$NM_COV"_perpop_"$VAR"_"$FEATURE2"_"$TYPE".lr_ann.bed" | awk -v pop="$SHORT_POP" -v feat="$FEATURE2" '{print pop,feat,$0}' OFS="\t" >> ${CALLING}"_5x_perpop_ALL_features_"${VAR}"_"${TYPE}".lr_ann.af"
+      echo "extracting from feature:" $FEATURE2
+      bedtools intersect -a <(awk -F"\t|_" '{printf ("%s\t%s\t%s\t%s\n", $1,$2,$3,$4)}' ${p/perpop_${VAR}_${TYPE}.lr_ann.vcf/perpop_${VAR}_${FEATURE}_${TYPE}.lr_ann.af}) -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/provean/missense_variants_provean_scores_tolerated.txt > ${p/perpop_${VAR}_${TYPE}.lr_ann.vcf/perpop_${VAR}_${FEATURE2}_${TYPE}.lr_ann.af}
+      N_SITES=$(wc -l < ${p/perpop_${VAR}_${TYPE}.lr_ann.vcf/perpop_${VAR}_${FEATURE2}_${TYPE}.lr_ann.af})
+      SUM_AF=$(cut -f4 ${p/perpop_${VAR}_${TYPE}.lr_ann.vcf/perpop_${VAR}_${FEATURE2}_${TYPE}.lr_ann.af} | paste -sd+ | bc)
+      AVG_AF=$(awk -v sum=$SUM_AF -v total=$N_SITES 'BEGIN{printf "%.3f\n", sum/total}')
+      echo -e "$SHORT_POP\t$FEATURE2\t$AVG_AF" >> ${CALLING}"_5x_perpop_ALL_features_"${VAR}"_"${TYPE}".lr_ann.maf.txt"
+      echo "joining frequency files"
+      awk -v pop="$SHORT_POP" -v feat="$FEATURE2" '{print pop,feat,$0}' OFS="\t" $SHORT_POP"_"$NM_COV"_perpop"/$SP_DATASET"_"$SHORT_POP"_"$NM_COV"_perpop_"$VAR"_"$FEATURE2"_"$TYPE".lr_ann.af" >> ${CALLING}"_5x_perpop_ALL_features_"${VAR}"_"${TYPE}".lr_ann.af"
       FEATURE2=(NDEL)
-      echo "feature: $FEATURE2"
-      cat $SHORT_POP"_"$NM_COV"_perpop"/${p}"_"$NM_COV"_perpop_"$VAR"_"$FEATURE2"_"$TYPE".lr_ann.bed" | awk -v pop="$SHORT_POP" -v feat="$FEATURE2" '{print pop,feat,$0}' OFS="\t" >> ${CALLING}"_5x_perpop_ALL_features_"${VAR}"_"${TYPE}".lr_ann.af"
+      echo "extracting from feature:" $FEATURE2
+      bedtools intersect -a <(awk -F"\t|_" '{printf ("%s\t%s\t%s\t%s\n", $1,$2,$3,$4)}' ${p/perpop_${VAR}_${TYPE}.lr_ann.vcf/perpop_${VAR}_${FEATURE}_${TYPE}.lr_ann.af}) -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/provean/missense_variants_provean_scores_deleterious.txt > ${p/perpop_${VAR}_${TYPE}.lr_ann.vcf/perpop_${VAR}_${FEATURE2}_${TYPE}.lr_ann.af}
+      N_SITES=$(wc -l < ${p/perpop_${VAR}_${TYPE}.lr_ann.vcf/perpop_${VAR}_${FEATURE2}_${TYPE}.lr_ann.af})
+      SUM_AF=$(cut -f4 ${p/perpop_${VAR}_${TYPE}.lr_ann.vcf/perpop_${VAR}_${FEATURE2}_${TYPE}.lr_ann.af} | paste -sd+ | bc)
+      AVG_AF=$(awk -v sum=$SUM_AF -v total=$N_SITES 'BEGIN{printf "%.3f\n", sum/total}')
+      echo -e "$SHORT_POP\t$FEATURE2\t$AVG_AF" >> ${CALLING}"_5x_perpop_ALL_features_"${VAR}"_"${TYPE}".lr_ann.maf.txt"
+      echo "joining frequency files"
+      awk -v pop="$SHORT_POP" -v feat="$FEATURE2" '{print pop,feat,$0}' OFS="\t" $SHORT_POP"_"$NM_COV"_perpop"/$SP_DATASET"_"$SHORT_POP"_"$NM_COV"_perpop_"$VAR"_"$FEATURE2"_"$TYPE".lr_ann.af" >> ${CALLING}"_5x_perpop_ALL_features_"${VAR}"_"${TYPE}".lr_ann.af"
     fi
     done
   done
 
 #From outside the server:
 CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
-VAR=(varssubs) #varssubs #variants #substitutions
+VAR=(segregating) #varssubs #variants #substitutions
 TYPE=(SNP) #write down SNP or INDEL
-scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/*5x_perpop_ALL_features*.lr_ann.af /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_spectrum/
+scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/*5x_perpop_ALL_features_${VAR}*.lr_ann.af /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_spectrum/
+#scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/*5x_perpop_ALL_features*.lr_ann.maf.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_spectrum/
 
 ```
 
-####Plot spectra:
+####Plot spectra (old):
 ```{r}
 
 library(readr)
@@ -2286,6 +2306,252 @@ for (type in var_type) {
       )
       feat_thick_ggplot
       ggsave(paste0(type,"_",f,"_derived_allele_frequency_spectrum_thick.pdf"), width=30, height=8, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_spectrum")
+  }
+}
+
+```
+
+####Combine per population and feature allele frequency files (only sites with no missingness):
+```{r Calculate derived allele frequency ratio, eval=FALSE, engine='bash'}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+VAR=(segregating) #varssubs #variants #substitutions #segregating
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+screen -S "${CALLING}-${VAR}-${TYPE}"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+script "${CALLING}_derived_freq_spectrum_nomissing_${VAR}_${TYPE}.lr_ann.log"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING)
+SPECIES=$(echo $CALLING | fold -w8 | cut -c1-4 | head -n$N_POPS | sort | uniq)
+DATASETS=$(for i in ${SPECIES[@]}; do ls ${i}*_samples | cut -d'_' -f1,2,3; done)
+COVERAGE=$(echo "${CALLING}" | rev | cut -d'_' -f1 | rev)
+NM_COV=$(echo "${CALLING}" | rev | cut -d'_' -f1,2 | rev)
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+GREP=$(cat derived_allele_freq_ratio/features_derived_allele_freq_ratio.txt | cut -f1)
+POP_VCFS=($(ls `find . -path *"_perpop/c_*5x*_perpop_"${VAR}"_"${TYPE}".lr_ann.vcf" -print`))
+rm ${CALLING}"_5x_perpop_ALL_features_nomissing_"${VAR}"_"${TYPE}".lr_ann.af"
+for p in ${POP_VCFS[@]}
+  do
+  SP_DATASET=$(echo ${p} | cut -d'/' -f3 | cut -d'_' -f1-3)
+  SHORT_POP=$(echo ${p} | cut -d'/' -f3 | cut -d'_' -f4-6)
+  N_IND=$(($(bcftools query -l $p | wc -l) *2))
+  echo "working with pop" $SHORT_POP "and vcf" $p
+  echo "extracting derived allele frequencies from" $SHORT_POP
+  for g in ${GREP[@]}
+    do
+    #echo "grepping: ${g}"
+    FEATURE=$(grep "${g}" derived_allele_freq_ratio/features_derived_allele_freq_ratio.txt | cut -f2)
+    echo "extracting from feature:" $FEATURE
+    grep "${g}" "${p}" | grep ";AN=${N_IND};" | awk -F"\t|;|=" '{printf ("%s\t%s\t%s\t%s\n", $1,$2-1,$2,$13)}' > ${p/perpop_${VAR}_${TYPE}.lr_ann.vcf/perpop_nomissing_${VAR}_${FEATURE}_${TYPE}.lr_ann.af}
+    echo "joining frequency files"
+    awk -v pop="$SHORT_POP" -v feat="$FEATURE" '{print pop,feat,$0}' OFS="\t" $SHORT_POP"_"$NM_COV"_perpop"/$SP_DATASET"_"$SHORT_POP"_"$NM_COV"_perpop_nomissing_"$VAR"_"$FEATURE"_"$TYPE".lr_ann.af" >> ${CALLING}"_5x_perpop_ALL_features_nomissing_"${VAR}"_"${TYPE}".lr_ann.af"
+    if [ $FEATURE == "NSYN" ]
+      then
+      FEATURE2=(NTOL)
+      echo "extracting from feature:" $FEATURE2
+      bedtools intersect -a <(awk -F"\t|_" '{printf ("%s\t%s\t%s\t%s\n", $1,$2,$3,$4)}' ${p/perpop_${VAR}_${TYPE}.lr_ann.vcf/perpop_nomissing_${VAR}_${FEATURE}_${TYPE}.lr_ann.af}) -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/provean/missense_variants_provean_scores_tolerated.txt > ${p/perpop_${VAR}_${TYPE}.lr_ann.vcf/perpop_nomissing_${VAR}_${FEATURE2}_${TYPE}.lr_ann.af}
+      echo "joining frequency files"
+      awk -v pop="$SHORT_POP" -v feat="$FEATURE2" '{print pop,feat,$0}' OFS="\t" $SHORT_POP"_"$NM_COV"_perpop"/$SP_DATASET"_"$SHORT_POP"_"$NM_COV"_perpop_nomissing_"$VAR"_"$FEATURE2"_"$TYPE".lr_ann.af" >> ${CALLING}"_5x_perpop_ALL_features_nomissing_"${VAR}"_"${TYPE}".lr_ann.af"
+      FEATURE2=(NDEL)
+      echo "extracting from feature:" $FEATURE2
+      bedtools intersect -a <(awk -F"\t|_" '{printf ("%s\t%s\t%s\t%s\n", $1,$2,$3,$4)}' ${p/perpop_${VAR}_${TYPE}.lr_ann.vcf/perpop_nomissing_${VAR}_${FEATURE}_${TYPE}.lr_ann.af}) -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/provean/missense_variants_provean_scores_deleterious.txt > ${p/perpop_${VAR}_${TYPE}.lr_ann.vcf/perpop_nomissing_${VAR}_${FEATURE2}_${TYPE}.lr_ann.af}
+      echo "joining frequency files"
+      awk -v pop="$SHORT_POP" -v feat="$FEATURE2" '{print pop,feat,$0}' OFS="\t" $SHORT_POP"_"$NM_COV"_perpop"/$SP_DATASET"_"$SHORT_POP"_"$NM_COV"_perpop_nomissing_"$VAR"_"$FEATURE2"_"$TYPE".lr_ann.af" >> ${CALLING}"_5x_perpop_ALL_features_nomissing_"${VAR}"_"${TYPE}".lr_ann.af"
+    fi
+    done
+  done
+
+#From outside the server:
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+VAR=(segregating) #varssubs #variants #substitutions
+TYPE=(SNP) #write down SNP or INDEL
+scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/*5x_perpop_ALL_features_nomissing_${VAR}*.lr_ann.af /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_spectrum/
+#scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/*5x_perpop_ALL_features*.lr_ann.maf.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_spectrum/
+
+```
+
+####Plot spectra (new):
+```{r}
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+
+callings_ac_files <- intersect(list.files("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_spectrum/", pattern="*ALL_features*"),list.files("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_spectrum/", pattern=".af$"))
+
+callings_ac_files <- callings_ac_files[grep("nomissing",callings_ac_files)]
+
+#var_type <- c("varssubs","variants","substitutions")
+var_type <- c("segregating")
+
+for (type in var_type) {
+  print(type)
+  all_plot_data <- data_frame("pop"=character(0),"feat"=factor(0),"ac"=double(0),"n"=numeric(0),"n_bis"=numeric(0))
+  calling_ac <- read_tsv(paste0("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_spectrum/",callings_ac_files[grep(type,callings_ac_files)]),col_names=c("pop","feat","sc","start","stop","ac"))
+  pop_size_data <- data_frame("pop"=unique(calling_ac$pop)) %>% mutate(size=ifelse(pop=="c_ll_ki" | pop=="c_lp_sm",12,8))
+  min_size <- min(pop_size_data$size)
+  for (p in unique(calling_ac$pop)) {
+    print(p)
+    p_size <- pop_size_data[which(pop_size_data$pop==p),2] %>% unlist(use.names=F)
+    pop_ac_data <- filter(calling_ac,pop==p)
+    #popsize=ifelse(p=="c_lp_sm"|p=="c_ll_ki",12,8)
+    pop_plot_data <- pop_ac_data %>% group_by(ac,feat) %>% summarize(n=n(),pop=pop[n]) %>% arrange(feat) %>% mutate(n_bis=n*p_size/min_size) %>% select(pop,feat,ac,n,n_bis) %>% as.data.frame(.)
+    #pop_ac_data %>% mutate(ac_groups=cut(ac,breaks=seq(0,1.1,by=1/(2*popsize)))) %>% group_by(ac_groups,feat) %>% summarize(n=n()) #problem with the binning due to rounded allele frequencies
+    all_plot_data <- rbind(all_plot_data,pop_plot_data)
+    }
+  all_plot_data$feat <- as.factor(all_plot_data$feat)
+  all_plot_data$feat = factor(all_plot_data$feat,levels=c("INTER","INTR","SYN","NSYN","NTOL","NDEL","LOF","UCNE")) #Reorder factor levels.
+  levels(all_plot_data$feat) <- c("intergenic","introns","syn.","missense","m. tol.","m. del.","LoF","UCNE")
+  all_plot_data$pop = factor(all_plot_data$pop,levels=c("c_ll_ki","c_ll_po","c_ll_no","c_lp_sm","c_lp_do")) #Reorder factor levels.
+  levels(all_plot_data$pop) <- c("KIR","POL","NOR","AND","DON")
+  all_plot_data <- all_plot_data %>% arrange(pop,feat,ac) %>% mutate(species=ifelse(pop=="KIR" | pop=="POL" | pop=="NOR","ll","lp"),size=ifelse(pop=="KIR" | pop=="AND","large","small"))
+  all_plot_data$species = factor(all_plot_data$species,levels=c("ll","lp"))
+  all_plot_data$size = factor(all_plot_data$size,levels=c("large","small"))
+  all_plot_data
+  
+  all_nbis_ggplot <- ggplot(data=all_plot_data,aes(ac,n_bis,fill=interaction(species,size),alpha=interaction(species,size))) +
+    geom_col() +
+    facet_grid(feat~pop,scales="free",space="free_x") +
+    #ggtitle(paste(type,"derived allele frequency spectrum")) +
+    ylab("Number of sites") +
+    xlab("Derived allele frequency") +
+    scale_fill_manual(values=c("steelblue4","indianred4","steelblue4","indianred4")) +
+    scale_alpha_manual(values=c(1,1,0.4,0.4)) +
+    scale_x_continuous(breaks=seq(0,1,by=0.2)) +
+    theme_bw() +
+    theme(text=element_text(size=9,face="bold"),
+          rect=element_rect(size=1),
+          axis.line=element_line(colour="black"),
+          axis.title=element_text(size=10),
+          axis.text.x=element_text(colour="black",face="bold"),
+          axis.text.y=element_text(colour="black",face="bold"),
+          #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+          panel.background=element_blank(),
+          panel.border=element_rect(colour="black"),
+          panel.spacing=unit(0.075,"cm"),
+          strip.background=element_rect(colour="black"),
+          strip.text=element_text(size=8),
+          panel.grid=element_blank(),
+          #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+          #plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+          #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+          legend.background=element_rect(linetype="solid", colour="black", size=.5),
+          #legend.justification=c(0,0),
+          legend.key=element_rect(colour="white"),
+          #legend.key.size=unit(1.3,"cm"),
+          legend.position="none",
+          legend.title=element_blank()
+    )
+    all_nbis_ggplot
+    ggsave(paste0(type,"_ALL_derived_allele_frequency_spectrum_nbis.pdf"), width=16.9, height=24, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_spectrum")
+
+    all_n_ggplot <- ggplot(data=all_plot_data,aes(ac,n,fill=interaction(species,size),alpha=interaction(species,size))) +
+    geom_col() +
+    facet_grid(feat~pop,scales="free",space="free_x") +
+    #ggtitle(paste(type,"derived allele frequency spectrum")) +
+    ylab("Number of sites") +
+    xlab("Derived allele frequency") +
+    scale_fill_manual(values=c("steelblue3","indianred3","steelblue3","indianred3")) +
+    scale_alpha_manual(values=c(1,1,0.5,0.5)) +
+    theme_bw() +
+    theme(text=element_text(size=14,face="bold"),
+          rect=element_rect(size=1),
+          axis.line=element_line(colour="black"),
+          axis.title=element_text(size=18),
+          axis.text.x=element_text(angle=30,hjust=1,size=14,colour="black"),
+          axis.text.y=element_text(size=14,colour="black"),
+          #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+          panel.background=element_blank(),
+          panel.border=element_rect(colour="black"),
+          strip.background=element_rect(colour="black",size=1.5),
+          strip.text=element_text(size=14),
+          panel.grid=element_blank(),
+          #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+          plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+          #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+          legend.background=element_rect(linetype="solid", colour="black", size=.5),
+          #legend.justification=c(0,0),
+          legend.key=element_rect(colour="white"),
+          #legend.key.size=unit(1.3,"cm"),
+          legend.position="none",
+          legend.title=element_blank()
+    )
+    all_n_ggplot
+    ggsave(paste0(type,"_ALL_derived_allele_frequency_spectrum_n.pdf"), width=30, height=40, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_spectrum")
+
+  for (f in unique(all_plot_data$feat)) {
+    feat_nbis_ggplot <- ggplot(data=filter(all_plot_data,feat==f),aes(ac,n_bis,fill=pop)) +
+      geom_col() +
+      facet_grid(~pop,scales="free_x",space="free_x") +
+      ggtitle(paste(type,f,"derived allele frequency spectrum")) +
+      ylab("N") +
+      xlab("AC") +
+      theme_bw() +
+      theme(text=element_text(size=14,face="bold"),
+            rect=element_rect(size=1),
+            axis.line=element_line(colour="black"),
+            axis.title=element_text(size=18),
+            axis.text.x=element_text(angle=30,hjust=1,size=14,colour="black"),
+            axis.text.y=element_text(size=14,colour="black"),
+            #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+            panel.background=element_blank(),
+            panel.border=element_rect(colour="black"),
+            strip.background=element_rect(colour="black",size=1.5),
+            strip.text=element_text(size=14),
+            panel.grid=element_blank(),
+            #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+            plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+            #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+            legend.background=element_rect(linetype="solid", colour="black", size=.5),
+            #legend.justification=c(0,0),
+            legend.key=element_rect(colour="white"),
+            #legend.key.size=unit(1.3,"cm"),
+            legend.position="none",
+            legend.title=element_blank()
+      )
+      feat_nbis_ggplot
+      ggsave(paste0(type,"_",f,"_derived_allele_frequency_spectrum_nbis.pdf"), width=30, height=8, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_spectrum")
+    
+    feat_n_ggplot <- ggplot(data=filter(all_plot_data,feat==f),aes(ac,n,fill=pop)) +
+      geom_col() +
+      facet_grid(~pop,scales="free_x",space="free_x") +
+      ggtitle(paste(type,f,"derived allele frequency spectrum")) +
+      ylab("N") +
+      xlab("AC") +
+      theme_bw() +
+      theme(text=element_text(size=14,face="bold"),
+            rect=element_rect(size=1),
+            axis.line=element_line(colour="black"),
+            axis.title=element_text(size=18),
+            axis.text.x=element_text(angle=30,hjust=1,size=14,colour="black"),
+            axis.text.y=element_text(size=14,colour="black"),
+            #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+            panel.background=element_blank(),
+            panel.border=element_rect(colour="black"),
+            strip.background=element_rect(colour="black",size=1.5),
+            strip.text=element_text(size=14),
+            panel.grid=element_blank(),
+            #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+            plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+            #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+            legend.background=element_rect(linetype="solid", colour="black", size=.5),
+            #legend.justification=c(0,0),
+            legend.key=element_rect(colour="white"),
+            #legend.key.size=unit(1.3,"cm"),
+            legend.position="none",
+            legend.title=element_blank()
+      )
+      feat_n_ggplot
+      ggsave(paste0(type,"_",f,"_derived_allele_frequency_spectrum_n.pdf"), width=30, height=8, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_spectrum")
   }
 }
 
@@ -3263,8 +3529,8 @@ ggsave("NSYN_SYN_ratio.pdf", width=15, height=10, units="cm", device="pdf", path
 ####Get counts (of variants, substitutions or vars+subs).
 ```{r Get annotation statistics, eval=FALSE, engine='bash'}
 
-CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
-VAR=(fixed) #varssubs #variants #substitutions #segregating #fixed #private
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov)
+VAR=(varssubs) #varssubs #variants #substitutions #segregating #fixed #private
 TYPE=(SNP) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
 screen -S "${CALLING}-${VAR}-${TYPE}"
@@ -3355,7 +3621,7 @@ rm ${VAR}_*.temp.borrar
 
 #From outside the server:
 export SSHPASS=$(cat /Users/dani/Documents/genomics_pass.txt)
-CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nmNnmN_origcov)
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov)
 VAR=(varssubs) #varssubs #variants #substitutions #segregating #fixed #private_segregating
 TYPE=(SNP) #write down SNP or INDEL
 sshpass -e scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/${CALLING}_ann_individual_summary_${VAR}_${TYPE}.lr_ann.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/
@@ -3517,6 +3783,71 @@ derived_allele_allele_ratio_ggplot <- ggplot(data=variants_and_subst_wg_alleleR,
   )
   derived_allele_allele_ratio_ggplot
 ggsave(paste0(type,"_derived_allele_allele_ratio.pdf"), width=15, height=20, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
+
+```
+
+#####Compare origcov vs. samecov.
+
+```{r Plot variant count results}
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+
+type="varssubs" #varssubs #variants #substitutions
+
+wd_path <- ("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
+origcov <- read_tsv(paste0(wd_path,"c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_ann_individual_summary_",type,"_SNP.lr_ann.txt")) %>% mutate(cov="origcov")
+samecov <- read_tsv(paste0(wd_path,"c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov_ann_individual_summary_",type,"_SNP.lr_ann.txt")) %>% mutate(cov="samecov")
+
+variants_and_subst_wg <- rbind(origcov,samecov)
+
+variants_and_subst_wg$dataset <- as.factor(variants_and_subst_wg$dataset)
+variants_and_subst_wg$dataset = factor(variants_and_subst_wg$dataset,levels=c("REF","GP","5x","MG")) #Reorder factor levels to: REF, GP, 5x, MG
+variants_and_subst_wg$population = factor(variants_and_subst_wg$population,levels=c("ki","no","po","sm","do"))
+levels(variants_and_subst_wg$population) <- c("KIR","POL","NOR","AND","DON")
+print.data.frame(variants_and_subst_wg)
+
+variants_and_subst_wg$cov <- as.factor(variants_and_subst_wg$cov)
+variants_and_subst_wg$cov = factor(variants_and_subst_wg$cov,levels=c("origcov","samecov")) #Reorder factor levels to: REF, GP, 5x, MG
+
+variants_and_subst_wg_varN <- variants_and_subst_wg %>% select(.,species,population,dataset,sample,cov,contains("_A"),-contains("/")) %>% gather(feature,N,-species,-population,-dataset,-sample,-cov,factor_key=T)
+levels(variants_and_subst_wg_varN$feature) <- gsub('.{2}$', '', levels(variants_and_subst_wg_varN$feature))
+variants_and_subst_wg_varN
+
+derived_allele_variant_counts_ggplot <- ggplot(data=filter(variants_and_subst_wg_varN,grepl('intergenic|intronic|synonymous|missense|nonsense',feature) & (!grepl('REF',dataset))), aes(interaction(dataset,population),N,colour=population,alpha=dataset)) +
+  facet_grid(feature ~ cov,scales="free",space="free_x") +
+  geom_point(position = position_jitter(width=0.2,height=0)) +
+  geom_vline(xintercept=4.5,colour="black") +
+  #ggtitle("Proportion of reads at different NM") +
+  xlab("Population x dataset") +
+  ylab("Derived allele count") +
+  scale_alpha_manual(values=c(1,0.2,1)) +
+  theme_bw() +
+  theme(strip.text=element_text(face="bold",size=9),
+        text=element_text(size=12,face="bold"),
+        rect=element_rect(size=1),
+        axis.line=element_line(colour="black"),
+        axis.title=element_text(size=16),
+        axis.text.x=element_text(angle=90,vjust=0.5),
+        #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+        #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+        panel.background=element_blank(),
+        panel.border=element_rect(colour="black"),
+        #panel.grid=element_blank(),
+        #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+        plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+        #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+        legend.background=element_rect(linetype="solid", colour="black", size=.5),
+        #legend.justification=c(0,0),
+        legend.key=element_rect(colour="white"),
+        #legend.key.size=unit(1.3,"cm"),
+        #legend.position=c(0.07,0.84),
+        legend.title=element_blank()
+  )
+derived_allele_variant_counts_ggplot
+ggsave(paste0(type,"_c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_depthtest_counts.pdf"), width=24, height=28, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
 
 ```
 
@@ -5902,6 +6233,17 @@ ggsave(paste0(type,"_LOF_INTR_ratio_IBD_and_notIBD_detailed.woutnm.pdf"), width=
 ```
 
 ###X-CHR (joint calling).
+####Define Xchr regions:
+```{bash}
+
+#The Xchr was already defined by Abascal. But it includes the pseudoautosomic region (PAR) which we don't want to include. In order to be more conservative, I'll follow María's criterion and exclude the telomeric regions from the X chromosome.
+
+cd /GRUPOS/grupolince/copia_fabascal/MAPPINGS/
+
+bedtools subtract -a lynx2cat_wTiger_Xchr.sorted.merged.bed -b /GRUPOS/grupolince/telomers_centromers_definition/tel0-10m_regions_based_on_synteny_1000bp.bed > lynx2cat_wTiger_Xchr_woutPAR.sorted.merged.bed
+
+```
+
 ####Create file with sex determination:
 ```{bash}
 
@@ -6007,7 +6349,7 @@ BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
 
 cd $V_PATH/$CALLING/annotation
 rm -f ${CALLING}"_ann_individual_summary_Xchr_"${VAR}"_"${TYPE}".lr_ann.txt"
-echo -e "species\tpopulation\tdataset\tsample\tsex\ttotal_V\ttotal_A\tintergenic_V\tintergenic_A\tintronic_V\tintronic_A\tcoding_V\tsynonymous_V\tsynonymous_A\tsyn_pref_V\tsyn_pref_A\tsyn_unpref_V\tsyn_unpref_A\tmissense_V\tmissense_A\tmissense_tol_V\tmissense_tol_A\tmissense_del_V\tmissense_del_A\tnonsense_V\tnonsense_A\tUCNE_V\tUCNE_A\tmissense/synonymous_V\tmissense/synonymous_A\tsynonymous/intronic_V\tmissense/intronic_V" > ${CALLING}"_ann_individual_summary_Xchr_"${VAR}"_"${TYPE}".lr_ann.txt"
+echo -e "species\tpopulation\tdataset\tsample\tsex\ttotal_V\ttotal_A\tintergenic_V\tintergenic_A\tintronic_V\tintronic_A\tcoding_V\tsynonymous_V\tsynonymous_A\tsyn_pref_V\tsyn_pref_A\tsyn_unpref_V\tsyn_unpref_A\tmissense_V\tmissense_A\tmissense_tol_V\tmissense_tol_A\tmissense_del_V\tmissense_del_A\tnonsense_V\tnonsense_A\tUCNE_V\tUCNE_A\tUCNE_low_V\tUCNE_low_A\tUCNE_mid_V\tUCNE_mid_A\tUCNE_high_V\tUCNE_high_A\tmissense/synonymous_V\tmissense/synonymous_A\tsynonymous/intronic_V\tmissense/intronic_V" > ${CALLING}"_ann_individual_summary_Xchr_"${VAR}"_"${TYPE}".lr_ann.txt"
 INDLIST=($(ls `find . -path *"_individuals/*_individual_"${VAR}"_"${TYPE}".lr_ann.vcf" -print`))
 for i in "${INDLIST[@]}"
   do
@@ -6019,7 +6361,7 @@ for i in "${INDLIST[@]}"
   DATASET=$(if [ $ind = "c_lp_sm_0221" ]; then echo "REF"; elif [ $ind = "c_ll_ki_0090" ]; then echo "MG"; elif [ $ind = "h_ll_pv_0223" ]; then echo "LD"; elif grep -Fxq $ind /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/c_lp_5x_samples || [ $SPECIES = "ll" ]; then echo "5x"; else echo "GP"; fi)
   SAMPLE=$(echo "${ind}" | cut -c9-12)
   SEX=$(grep ${ind} samples_sex.txt | cut -f2)
-  bedtools intersect -a ${i} -b /GRUPOS/grupolince/copia_fabascal/MAPPINGS/lynx2cat_wTiger_Xchr.sorted.merged.bed -header > ${i/_individual_${VAR}_${TYPE}.lr_ann.vcf/_individual_${VAR}_Xchr_${TYPE}.lr_ann.vcf}
+  bedtools intersect -a ${i} -b /GRUPOS/grupolince/copia_fabascal/MAPPINGS/lynx2cat_wTiger_Xchr_woutPAR.sorted.merged.bed -header > ${i/_individual_${VAR}_${TYPE}.lr_ann.vcf/_individual_${VAR}_Xchr_${TYPE}.lr_ann.vcf}
   j=(${i/_individual_${VAR}_${TYPE}.lr_ann.vcf/_individual_${VAR}_Xchr_${TYPE}.lr_ann.vcf})
   TOTAL_V=$(grep -v '#' ${j} | wc -l)
   TOTAL_A=$(grep -v '#' ${j} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
@@ -6030,29 +6372,38 @@ for i in "${INDLIST[@]}"
   CODING_V=$(grep 'CDS' ${j} | wc -l)
   SYNONYMOUS_V=$(grep 'synonymous_variant' ${j} | wc -l)
   SYNONYMOUS_A=$(grep 'synonymous_variant' ${j} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
-  bedtools intersect -a ${j} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/syn_pref/synonymous_variants_complete_info_0to1_lr.bed > ${VAR}_syn_pref.temp.borrar
-  SYN_PREF_V=$(wc -l < ${VAR}_syn_pref.temp.borrar)
-  SYN_PREF_A=$(cut -f8 ${VAR}_syn_pref.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
-  bedtools intersect -a ${j} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/syn_pref/synonymous_variants_complete_info_1to0_lr.bed > ${VAR}_syn_unpref.temp.borrar
-  SYN_UNPREF_V=$(wc -l < ${VAR}_syn_unpref.temp.borrar)
-  SYN_UNPREF_A=$(cut -f8 ${VAR}_syn_unpref.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  bedtools intersect -a ${j} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/syn_pref/synonymous_variants_complete_info_0to1_lr.bed > ${VAR}_Xchr_syn_pref.temp.borrar
+  SYN_PREF_V=$(wc -l < ${VAR}_Xchr_syn_pref.temp.borrar)
+  SYN_PREF_A=$(cut -f8 ${VAR}_Xchr_syn_pref.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  bedtools intersect -a ${j} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/syn_pref/synonymous_variants_complete_info_1to0_lr.bed > ${VAR}_Xchr_syn_unpref.temp.borrar
+  SYN_UNPREF_V=$(wc -l < ${VAR}_Xchr_syn_unpref.temp.borrar)
+  SYN_UNPREF_A=$(cut -f8 ${VAR}_Xchr_syn_unpref.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
   MISSENSE_V=$(grep 'missense_variant' ${j} | wc -l)
   MISSENSE_A=$(grep 'missense_variant' ${j} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
-  bedtools intersect -a ${j} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean/missense_variants_provean_scores_tolerated.txt > ${VAR}_mis_tol.temp.borrar
-  MISSENSE_TOL_V=$(wc -l < ${VAR}_mis_tol.temp.borrar)
-  MISSENSE_TOL_A=$(cut -f8 ${VAR}_mis_tol.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
-  bedtools intersect -a ${j} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean/missense_variants_provean_scores_deleterious.txt > ${VAR}_mis_del.temp.borrar
-  MISSENSE_DEL_V=$(wc -l < ${VAR}_mis_del.temp.borrar)
-  MISSENSE_DEL_A=$(cut -f8 ${VAR}_mis_del.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  bedtools intersect -a ${j} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean/missense_variants_provean_scores_tolerated.txt > ${VAR}_Xchr_mis_tol.temp.borrar
+  MISSENSE_TOL_V=$(wc -l < ${VAR}_Xchr_mis_tol.temp.borrar)
+  MISSENSE_TOL_A=$(cut -f8 ${VAR}_Xchr_mis_tol.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  bedtools intersect -a ${j} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean/missense_variants_provean_scores_deleterious.txt > ${VAR}_Xchr_mis_del.temp.borrar
+  MISSENSE_DEL_V=$(wc -l < ${VAR}_Xchr_mis_del.temp.borrar)
+  MISSENSE_DEL_A=$(cut -f8 ${VAR}_Xchr_mis_del.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
   NONSENSE_V=$(grep '|HIGH|' ${j} | wc -l)
   NONSENSE_A=$(grep '|HIGH|' ${j} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
   UCNE_V=$(grep 'UCNE' ${j} | wc -l)
   UCNE_A=$(grep 'UCNE' ${j} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+    bedtools intersect -a ${j} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_lt2.gerp.bed > ${VAR}_Xchr_ucne_low.temp.borrar
+  UCNE_LOW_V=$(wc -l < ${VAR}_Xchr_ucne_low.temp.borrar)
+  UCNE_LOW_A=$(cut -f8 ${VAR}_Xchr_ucne_low.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  bedtools intersect -a ${j} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_gt2lt5.gerp.bed > ${VAR}_Xchr_ucne_mid.temp.borrar
+  UCNE_MID_V=$(wc -l < ${VAR}_Xchr_ucne_mid.temp.borrar)
+  UCNE_MID_A=$(cut -f8 ${VAR}_Xchr_ucne_mid.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  bedtools intersect -a ${j} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_gt5.gerp.bed > ${VAR}_Xchr_ucne_high.temp.borrar
+  UCNE_HIGH_V=$(wc -l < ${VAR}_Xchr_ucne_high.temp.borrar)
+  UCNE_HIGH_A=$(cut -f8 ${VAR}_Xchr_ucne_high.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
   MISSENSE_SYNONYMOUS_V=$(echo "scale=4; $MISSENSE_V/$SYNONYMOUS_V" | bc)
   MISSENSE_SYNONYMOUS_A=$(echo "scale=4; $MISSENSE_A/$SYNONYMOUS_A" | bc)
   SYNONYMOUS_INTRONIC_V=$(echo "scale=4; $SYNONYMOUS_V/$INTRONIC_V" | bc)
   MISSENSE_INTRONIC_V=$(echo "scale=4; $MISSENSE_V/$INTRONIC_V" | bc)
-  echo -e "$SPECIES\t$POPULATION\t$DATASET\t$SAMPLE\t$SEX\t$TOTAL_V\t$TOTAL_A\t$INTERGENIC_V\t$INTERGENIC_A\t$INTRONIC_V\t$INTRONIC_A\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$SYN_PREF_V\t$SYN_PREF_A\t$SYN_UNPREF_V\t$SYN_UNPREF_A\t$MISSENSE_V\t$MISSENSE_A\t$MISSENSE_TOL_V\t$MISSENSE_TOL_A\t$MISSENSE_DEL_V\t$MISSENSE_DEL_A\t$NONSENSE_V\t$NONSENSE_A\t$UCNE_V\t$UCNE_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A\t$SYNONYMOUS_INTRONIC_V\t$MISSENSE_INTRONIC_V" >> ${CALLING}"_ann_individual_summary_Xchr_"${VAR}"_"${TYPE}".lr_ann.txt"
+  echo -e "$SPECIES\t$POPULATION\t$DATASET\t$SAMPLE\t$SEX\t$TOTAL_V\t$TOTAL_A\t$INTERGENIC_V\t$INTERGENIC_A\t$INTRONIC_V\t$INTRONIC_A\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$SYN_PREF_V\t$SYN_PREF_A\t$SYN_UNPREF_V\t$SYN_UNPREF_A\t$MISSENSE_V\t$MISSENSE_A\t$MISSENSE_TOL_V\t$MISSENSE_TOL_A\t$MISSENSE_DEL_V\t$MISSENSE_DEL_A\t$NONSENSE_V\t$NONSENSE_A\t$UCNE_V\t$UCNE_A\t$UCNE_LOW_V\t$UCNE_LOW_A\t$UCNE_MID_V\t$UCNE_MID_A\t$UCNE_HIGH_V\t$UCNE_HIGH_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A\t$SYNONYMOUS_INTRONIC_V\t$MISSENSE_INTRONIC_V" >> ${CALLING}"_ann_individual_summary_Xchr_"${VAR}"_"${TYPE}".lr_ann.txt"
   done
 rm ${VAR}_*.temp.borrar
 
@@ -6155,7 +6506,7 @@ average_relativised_all_data_tidy
 
 #Separate plots:
 twodecimalsFUN <- function(x) sprintf("%.2f", x)
-type_range <- data.frame("var_type"=c("varssubs","varssubs","fixed","fixed"),"plot"=c("main","other","main","other"),"min"=c(0.3,0.3,0.3,0.3),"max"=c(1.9,1.9,1.9,1.9),"breaks"=c(0.3,0.3,0.3,0.3))
+type_range <- data.frame("var_type"=c("varssubs","varssubs","fixed","fixed"),"plot"=c("main","other","main","other"),"min"=c(0.2,0.2,0.2,0.2),"max"=c(1.9,1.9,1.9,1.9),"breaks"=c(0.3,0.3,0.3,0.3))
 
 ggplot_up <- ggplot(data=filter(average_relativised_all_data_tidy,grepl('total|intergenic|introns|\\<synonymous\\>|\\<missense\\>|nonsense|\\<UCNE\\>',ratio)), aes(population,avg_ki_relative_value,colour=population,shape=sex)) +
   #facet_wrap(feature ~ species,nrow=6,ncol=2,scales="free") +
@@ -6771,7 +7122,7 @@ for i in "${INDLIST[@]}"
   POPULATION=$(echo "${ind}" | cut -c6-7)
   DATASET=$(if [ $ind = "c_lp_sm_0221" ]; then echo "REF"; elif [ $ind = "c_ll_ki_0090" ]; then echo "MG"; elif [ $ind = "h_ll_pv_0223" ]; then echo "LD"; elif grep -Fxq $ind /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/c_lp_5x_samples || [ $SPECIES = "ll" ]; then echo "5x"; else echo "GP"; fi)
   SAMPLE=$(echo "${ind}" | cut -c9-12)
-  bedtools intersect -a ${i} -b /GRUPOS/grupolince/telomers_centromers_definition/tel2m_regions_based_on_synteny_1000bp.bed -header > "ind_tel_"${VAR}"_"${TYPE}".temporary.vcf"
+  bedtools intersect -a ${i} -b /GRUPOS/grupolince/telomers_centromers_definition/tel0-10m_regions_based_on_synteny_1000bp.bed -header > "ind_tel_"${VAR}"_"${TYPE}".temporary.vcf"
   j=("ind_tel_"${VAR}"_"${TYPE}".temporary.vcf")
   TOTAL_V=$(grep -v '#' ${j} | wc -l)
   TOTAL_A=$(grep -v '#' ${j} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
@@ -6931,8 +7282,8 @@ average_relativised_derived_allele_allele_ratio_ggplot1 <- ggplot(data=filter(av
   geom_errorbar(aes(ymin=avg_ki_relative_value-se_ki_relative_value, ymax=avg_ki_relative_value+se_ki_relative_value), position=position_dodge(), width=0.5) +
   #ggtitle("Proportion of reads at different NM") +
   ylab("population mean ratio") +
-  scale_y_continuous(breaks = seq(0.8, 1.2, by = 0.05)) +
-  ylim(0.8,1.2) +
+  scale_y_continuous(breaks = seq(0.7, 1.2, by = 0.05)) +
+  ylim(0.7,1.2) +
   #ggtitle(paste0("ratio of ",type," relative to synonymous and Kirov")) +
   theme_bw() +
   theme(text=element_text(size=16,face="bold"),
@@ -7550,6 +7901,145 @@ for (i in levels(perpop_counts$population)) {
 ```
 
 #2B: Homozygous variant level.
+##At the individual level (no depth threshold)
+###Get derived allele homozygous counts.
+```{r Get heterozygous counts, eval=FALSE, engine='bash'}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+VAR=(varssubs) #varssubs #variants #substitutions #segregating #fixed #private
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+screen -S "${CALLING}-${VAR}-${TYPE}"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+if [ $VAR == "private" ]
+  then
+  VAR="private_segregating"
+fi
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+script "${CALLING}_ann_individual_summary_homozygous_${VAR}_${TYPE}.lr_ann.log"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+if [ $VAR == "private" ]
+  then
+  VAR="private_segregating"
+fi
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAM files path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+cd $V_PATH/$CALLING/annotation
+rm ${CALLING}"_ann_individual_summary_homozygous_"${VAR}"_"${TYPE}".lr_ann.txt"
+echo -e "species\tpopulation\tdataset\tsample\ttotal_H\tintergenic_H\tintronic_H\tcoding_H\tsynonymous_H\tsyn_pref_H\tsyn_unpref_H\tmissense_H\tmistol_H\tmisdel_H\tnonsense_H\tUCNE_H\tUCNE_low_H\tUCNE_mid_H\tUCNE_high_H" > ${CALLING}"_ann_individual_summary_homozygous_"${VAR}"_"${TYPE}".lr_ann.txt"
+INDLIST=($(ls `find . -name *"_individual_"${VAR}"_"${TYPE}".lr_ann.vcf" -print`))
+for i in "${INDLIST[@]}"
+  do
+  echo "${i}"
+  ind=$(echo "${i}" | awk -F'[/]' '{print $3}' | cut -c1-12)
+  echo "${ind}"
+  SPECIES=$(echo "${ind}" | cut -c3-4)
+  POPULATION=$(echo "${ind}" | cut -c6-7)
+  DATASET=$(if [ $ind = "c_lp_sm_0221" ]; then echo "REF"; elif [ $ind = "c_ll_ki_0090" ]; then echo "MG"; elif [ $ind = "h_ll_pv_0223" ]; then echo "LD"; elif grep -Fxq $ind /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/c_lp_5x_samples || [ $SPECIES = "ll" ]; then echo "5x"; else echo "GP"; fi)
+  SAMPLE=$(echo "${ind}" | cut -c9-12)
+  TOTAL_H=$(grep -v '#' ${i} | grep ';AF=1.00;' | wc -l)
+  INTERGENIC_H=$(grep 'intergenic' ${i} | grep ';AF=1.00;' | wc -l)
+  INTRONIC_H=$(grep 'intron_variant' ${i} | grep ';AF=1.00;' | wc -l)
+  CODING_H=$(grep 'CDS' ${i} | grep ';AF=1.00;' | wc -l)
+  SYNONYMOUS_H=$(grep 'synonymous_variant' ${i} | grep ';AF=1.00;' | wc -l)
+  SYN_PREF_H=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/syn_pref/synonymous_variants_complete_info_0to1_lr.bed | grep ';AF=1.00;' | wc -l)
+  SYN_UNPREF_H=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/syn_pref/synonymous_variants_complete_info_1to0_lr.bed | grep ';AF=1.00;' | wc -l)
+  MISSENSE_H=$(grep 'missense_variant' ${i} | grep ';AF=1.00;' | wc -l)
+  MISTOL_H=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean/missense_variants_provean_scores_tolerated.txt | grep ';AF=1.00;' | wc -l)
+  MISDEL_H=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean/missense_variants_provean_scores_deleterious.txt | grep ';AF=1.00;' | wc -l)
+  NONSENSE_H=$(grep '|HIGH|' ${i} | grep ';AF=1.00;' | wc -l)
+  UCNE_H=$(grep 'UCNE' ${i} | grep ';AF=1.00;' | wc -l)
+  UCNE_LOW_H=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_lt2.gerp.bed | grep ';AF=1.00;' | wc -l)
+  UCNE_MID_H=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_gt2lt5.gerp.bed | grep ';AF=1.00;' | wc -l)
+  UCNE_HIGH_H=$(bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_gt5.gerp.bed | grep ';AF=1.00;' | wc -l)
+  echo -e "$SPECIES\t$POPULATION\t$DATASET\t$SAMPLE\t$TOTAL_H\t$INTERGENIC_H\t$INTRONIC_H\t$CODING_H\t$SYNONYMOUS_H\t$SYN_PREF_H\t$SYN_UNPREF_H\t$MISSENSE_H\t$MISTOL_H\t$MISDEL_H\t$NONSENSE_H\t$UCNE_H\t$UCNE_LOW_H\t$UCNE_MID_H\t$UCNE_HIGH_H" >> ${CALLING}"_ann_individual_summary_homozygous_"${VAR}"_"${TYPE}".lr_ann.txt"
+  done
+
+#From outside the server:
+export SSHPASS=$(cat /Users/dani/Documents/genomics_pass.txt)
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+VAR=(varssubs) #varssubs #variants #substitutions #segregating #fixed #private_segregating
+TYPE=(SNP) #write down SNP or INDEL
+sshpass -e scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/${CALLING}_ann_individual_summary_homozygous_${VAR}_${TYPE}.lr_ann.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/
+unset SSHPASS
+
+```
+
+###Plot individual homozygous proportion.
+```{r}
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+
+path <- "/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/"
+
+homoz_df <- read_tsv(paste0(path,"c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_ann_individual_summary_homozygous_varssubs_SNP.lr_ann.txt"),col_names=T) %>% select(.,species,population,dataset,sample,contains("_H")) %>% rename_at(vars(ends_with("_H")),funs(gsub("_H","",.))) 
+
+all_df <- read_tsv(paste0(path,"c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_ann_individual_summary_varssubs_SNP.lr_ann.txt"),col_names=T) %>% select(.,species,population,dataset,sample,contains("_V"),-contains("/")) %>% rename_at(vars(ends_with("_V")),funs(gsub("_V","",.))) 
+
+homoz_prop_df <- cbind(homoz_df[c(1:4)],round(homoz_df[-c(1:4)]/all_df[-c(1:4)],3))
+homoz_prop_df
+
+homoz_prop_tidy <- homoz_prop_df %>% gather(feature,homoz_prop,-species,-population,-dataset,-sample,factor_key=T) %>% mutate(heteroz_prop = 1 - homoz_prop)
+homoz_prop_tidy
+
+all_prop_tidy <- homoz_prop_tidy %>% gather(proportion,value,-species,-population,-dataset,-sample,-feature,factor_key=T)
+
+all_prop_tidy$population = factor(all_prop_tidy$population,levels=c("ki","no","po","sm","do"))
+levels(all_prop_tidy$population)[levels(all_prop_tidy$population)=="sm"] <- "an"
+all_prop_tidy$feature = factor(all_prop_tidy$feature,levels=c("total","intergenic","intronic","coding","synonymous","syn_pref","syn_unpref","missense","mistol","misdel","nonsense","UCNE","UCNE_low","UCNE_mid","UCNE_high"))
+levels(all_prop_tidy$feature) <- c("total","intergenic","intronic","coding","synonymous","syn_pref","syn_unpref","missense","mistol","misdel","nonsense","UCNE","UCNE_low","UCNE_mid","UCNE_high")
+all_prop_tidy$proportion = factor(all_prop_tidy$proportion,levels=c("heteroz_prop","homoz_prop"))
+
+
+all_prop_tidy_subset <- filter(all_prop_tidy,feature=="intronic" | feature=="synonymous" | feature=="mistol" | feature=="misdel" | feature=="nonsense")
+
+
+ggplot_homoz_prop <- ggplot(data=filter(all_prop_tidy_subset,dataset=="5x"), aes(fill=proportion, y=value, x=feature)) + 
+  geom_bar(position="fill", stat="identity") +
+  facet_wrap(population ~ sample) +
+  ylab("Proportion of sites with a derived allele that are in homozygous state") +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+      rect=element_rect(size=1),
+      axis.line=element_line(colour="black"),
+      axis.title=element_text(size=16),
+      axis.text.x=element_text(angle=90,hjust=1,size=12,colour="black"),
+      axis.text.y=element_text(size=12,colour="black"),
+      #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+      panel.background=element_blank(),
+      panel.border=element_rect(colour="black"),
+      #panel.grid=element_blank(),
+      #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+      plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+      #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+      legend.background=element_rect(linetype="solid", colour="black", size=.5),
+      #legend.justification=c(0,0),
+      legend.key=element_rect(colour="white"),
+      legend.key.size=unit(0.5,"cm"),
+      #legend.position=c(0.9,0.84),
+      legend.title=element_blank()
+  )
+ggplot_homoz_prop
+ggsave("individual_homozygous_derived_proportion_new.pdf", width=40, height=50, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_homozygous")
+
+```
+
 ##At the individual level DD/(AA+AD+DD).
 ###Extract counts.
 ```{r Get annotation statistics, eval=FALSE, engine='bash'}
@@ -8331,30 +8821,39 @@ for (type in var_type) {
     }
   all_plot_data$feat <- as.factor(all_plot_data$feat)
   all_plot_data$feat = factor(all_plot_data$feat,levels=c("INTER","INTR","SYN","NSYN","NTOL","NDEL","LOF","UCNE")) #Reorder factor levels.
-  levels(all_plot_data$feat) <- c("intergenic","introns","synonymous","missense","missense_tol","missense_del","nonsense","UCNE")
-  all_plot_data$pop = factor(all_plot_data$pop,levels=c("c_ll_ki","c_ll_no","c_ll_po","c_lp_sm","c_lp_do")) #Reorder factor levels.
-  all_plot_data <- all_plot_data %>% arrange(pop,feat,ac)
+  levels(all_plot_data$feat) <- c("intergenic","introns","syn.","missense","m. tol.","m. del.","LoF","UCNE")
+  all_plot_data$pop = factor(all_plot_data$pop,levels=c("c_ll_ki","c_ll_po","c_ll_no","c_lp_sm","c_lp_do")) #Reorder factor levels.
+  levels(all_plot_data$pop) <- c("KIR","POL","NOR","AND","DON")
+  all_plot_data <- all_plot_data %>% arrange(pop,feat,ac) %>% mutate(species=ifelse(pop=="KIR" | pop=="POL" | pop=="NOR","ll","lp"),size=ifelse(pop=="KIR" | pop=="AND","large","small"))
+  all_plot_data$species = factor(all_plot_data$species,levels=c("ll","lp"))
+  all_plot_data$size = factor(all_plot_data$size,levels=c("large","small"))
   all_plot_data
   
-  all_nbis_ggplot <- ggplot(data=all_plot_data,aes(ac,n_bis,fill=pop)) +
+  all_nbis_ggplot <- ggplot(data=all_plot_data,aes(ac,n_bis,fill=interaction(species,size),alpha=interaction(species,size))) +
     geom_col() +
     facet_grid(feat~pop,scales="free",space="free_x") +
-    ggtitle(paste(type,"derived allele counts spectrum")) +
-    ylab("N") +
-    xlab("AC") +
+    #ggtitle(paste(type,"derived allele counts spectrum")) +
+    ylab("Number of sites") +
+    xlab("Derived allele count") +
+    scale_fill_manual(values=c("steelblue4","indianred4","steelblue4","indianred4")) +
+    scale_alpha_manual(values=c(1,1,0.4,0.4)) +
+    scale_x_continuous(breaks=seq(4,24,by=4)) +
     theme_bw() +
-    theme(text=element_text(size=12,face="bold"),
+    theme(text=element_text(size=9,face="bold"),
           rect=element_rect(size=1),
           axis.line=element_line(colour="black"),
-          axis.title=element_text(size=16),
-          #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
-          #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+          axis.title=element_text(size=10),
+          axis.text.x=element_text(colour="black",face="bold"),
+          axis.text.y=element_text(colour="black",face="bold"),
           #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
           panel.background=element_blank(),
           panel.border=element_rect(colour="black"),
-          #panel.grid=element_blank(),
+          panel.spacing=unit(0.075,"cm"),
+          strip.background=element_rect(colour="black"),
+          strip.text=element_text(size=8),
+          panel.grid=element_blank(),
           #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
-          plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+          #plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
           #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
           legend.background=element_rect(linetype="solid", colour="black", size=.5),
           #legend.justification=c(0,0),
@@ -8364,25 +8863,29 @@ for (type in var_type) {
           legend.title=element_blank()
     )
     all_nbis_ggplot
-    ggsave(paste0(type,"_ALL_derived_allele_counts_spectrum_nbis.pdf"), width=30, height=40, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_counts_spectrum")
+    ggsave(paste0(type,"_ALL_derived_allele_counts_spectrum_nbis.pdf"), width=16.9, height=24, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_counts_spectrum")
 
-    all_n_ggplot <- ggplot(data=all_plot_data,aes(ac,n,fill=pop)) +
+    all_n_ggplot <- ggplot(data=all_plot_data,aes(ac,n,fill=interaction(species,size),alpha=interaction(species,size))) +
     geom_col() +
     facet_grid(feat~pop,scales="free",space="free_x") +
-    ggtitle(paste(type,"derived allele counts spectrum")) +
-    ylab("N") +
-    xlab("AC") +
+    #ggtitle(paste(type,"derived allele counts spectrum")) +
+    ylab("Number of sites") +
+    xlab("Derived allele count") +
+    scale_fill_manual(values=c("steelblue3","indianred3","steelblue3","indianred3")) +
+    scale_alpha_manual(values=c(1,1,0.5,0.5)) +
     theme_bw() +
-    theme(text=element_text(size=12,face="bold"),
+    theme(text=element_text(size=14,face="bold"),
           rect=element_rect(size=1),
           axis.line=element_line(colour="black"),
-          axis.title=element_text(size=16),
-          #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
-          #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+          axis.title=element_text(size=18),
+          axis.text.x=element_text(angle=30,hjust=1,size=14,colour="black"),
+          axis.text.y=element_text(size=14,colour="black"),
           #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
           panel.background=element_blank(),
           panel.border=element_rect(colour="black"),
-          #panel.grid=element_blank(),
+          strip.background=element_rect(colour="black",size=1.5),
+          strip.text=element_text(size=14),
+          panel.grid=element_blank(),
           #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
           plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
           #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
@@ -8404,16 +8907,18 @@ for (type in var_type) {
       ylab("N") +
       xlab("AC") +
       theme_bw() +
-      theme(text=element_text(size=12,face="bold"),
+      theme(text=element_text(size=14,face="bold"),
             rect=element_rect(size=1),
             axis.line=element_line(colour="black"),
-            axis.title=element_text(size=16),
-            #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
-            #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+            axis.title=element_text(size=18),
+            axis.text.x=element_text(angle=30,hjust=1,size=14,colour="black"),
+            axis.text.y=element_text(size=14,colour="black"),
             #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
             panel.background=element_blank(),
             panel.border=element_rect(colour="black"),
-            #panel.grid=element_blank(),
+            strip.background=element_rect(colour="black",size=1.5),
+            strip.text=element_text(size=14),
+            panel.grid=element_blank(),
             #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
             plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
             #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
@@ -8434,16 +8939,18 @@ for (type in var_type) {
       ylab("N") +
       xlab("AC") +
       theme_bw() +
-      theme(text=element_text(size=12,face="bold"),
+      theme(text=element_text(size=14,face="bold"),
             rect=element_rect(size=1),
             axis.line=element_line(colour="black"),
-            axis.title=element_text(size=16),
-            #axis.text.x=element_text(angle=45, hjust=1, size=24,colour="black"),
-            #axis.text.y=element_text(size=24,colour="black",margin=margin(t=0.5,unit="cm")),
+            axis.title=element_text(size=18),
+            axis.text.x=element_text(angle=30,hjust=1,size=14,colour="black"),
+            axis.text.y=element_text(size=14,colour="black"),
             #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
             panel.background=element_blank(),
             panel.border=element_rect(colour="black"),
-            #panel.grid=element_blank(),
+            strip.background=element_rect(colour="black",size=1.5),
+            strip.text=element_text(size=14),
+            panel.grid=element_blank(),
             #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
             plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
             #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
@@ -8460,6 +8967,33 @@ for (type in var_type) {
 }
 
 ```
+
+#2D: generate table of deleterious variants.
+```{r Calculate derived allele frequency ratio, eval=FALSE, engine='bash'}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+VAR=(varssubs) #varssubs #variants #substitutions #segregating
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+
+
+grep '|HIGH|' ${CALLING}_polarized_filteredall_${VAR}_${TYPE}.lr_ann.vcf > ${CALLING}_polarized_filteredall_${VAR}_${TYPE}.LoF.lr_ann.vcf
+bedtools intersect -a <(grep -E '#|missense_variant' ${CALLING}_polarized_filteredall_${VAR}_${TYPE}.lr_ann.vcf) -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/provean/missense_variants_provean_scores_deleterious.txt > ${CALLING}_polarized_filteredall_${VAR}_${TYPE}.misDEL.lr_ann.vcf
+
+cat ${CALLING}_polarized_filteredall_${VAR}_${TYPE}.LoF.lr_ann.vcf ${CALLING}_polarized_filteredall_${VAR}_${TYPE}.misDEL.lr_ann.vcf | sort -k1,1 -k2,2n > ${CALLING}_polarized_filteredall_${VAR}_${TYPE}.mDEL_and_LoF.lr_ann.vcf
+
+awk -F"\t|;|=|\\\\|" '{printf ("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", $1,$2,$4,$5,$13,$18,$20,$27)}' ${CALLING}_polarized_filteredall_${VAR}_${TYPE}.mDEL_and_LoF.lr_ann.vcf > ${CALLING}_polarized_filteredall_${VAR}_${TYPE}.mDEL_and_LoF.lr_ann.table
+
+#From outside the server:
+export SSHPASS=$(cat /Users/dani/Documents/genomics_pass.txt)
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+VAR=(varssubs) #varssubs #variants #substitutions #segregating #fixed #private_segregating
+TYPE=(SNP) #write down SNP or INDEL
+sshpass -e scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/${CALLING}_polarized_filteredall_${VAR}_${TYPE}.mDEL_and_LoF.lr_ann.table /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/deleterious_db 
+unset SSHPASS
+
+```
+
 
 
 #3: Diversity approaches.
