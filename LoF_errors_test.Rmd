@@ -1,0 +1,21 @@
+---
+title: "LoF_errors_test"
+output: html_document
+
+#Check density of LoF mutations along genes.
+```{bash}
+
+LOF_GENES=$(awk -F"\t|\\\\|" '{printf ("%s\n", $11)}' /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.LoF.lr_ann.vcf | sort -u)
+
+echo -e "GENE\tN_MUTATIONS\tGENE_LENGTH\tN_MUT/LENGTH_RATIO" > LoF_per_gene_distribution.txt
+for gen in ${LOF_GENES[@]}
+  do
+  echo ${gen}
+  MUTATIONS=$(grep ${gen} /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.LoF.lr_ann.vcf | wc -l)
+  GENE_SEQUENCE=$(grep ${gen} /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/syn_pref/all_genes_sequence_combined.txt | cut -f3 )
+  GENE_LENGTH=${#GENE_SEQUENCE}
+  RATIO=$(echo "scale=4; $MUTATIONS/$GENE_LENGTH" | bc)
+  echo -e "$gen\t$MUTATIONS\t$GENE_LENGTH\t$RATIO" >> LoF_per_gene_distribution.txt
+  done
+
+```
