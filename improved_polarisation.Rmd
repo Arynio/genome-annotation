@@ -3,7 +3,7 @@ title: "improved_polarisation"
 output: html_document
 ---
 
-#1. Add bobcat state to the tiger-cat-lynx synteny file:
+#1. Infer tiger-cat-rufus-pardinus ancestral state by parsimony:
 ```{bash}
 
 cd /GRUPOS/grupolince/copia_fabascal/MAPPINGS/with_rufus_dani
@@ -11,7 +11,377 @@ cd /GRUPOS/grupolince/copia_fabascal/MAPPINGS/with_rufus_dani
 #First, retrieve only informative sites (i.e. variants in my VCF).
 bedtools intersect -a ../lynx2cat_wTiger.sorted.bed -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.lr_ann.vcf > lynx2cat_wTiger.sorted.dani_variants.bed
 
-Import Lynx rufus fasta sequence into the tiger-cat-lynx synteny.
+#Next, add the Lynx rufus state (the REF column in my VCF), and remove the last column of the Abascal file (his ancestral state summary codes).
+bedtools intersect -a lynx2cat_wTiger.sorted.dani_variants.bed -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.lr_ann.vcf -wb | awk -F"\t|:" '{printf ("%s\t%s\t%s\t%s:%s:%s\t%s\n", $1,$2,$3,$4,$5,$6,$11)}' > lynx2cat_wTiger_wRufusstep0.sorted.dani_variants.bed
+
+#Next, integrate the Lynx rufus state together with the others in a single column. Rename TCL (tiger, cat, lynx) as TCRP (tiger, cat, rufus, pardinus).
+awk -F"\t|=|:" '{printf ("%s\t%s\t%s\t%s=%s%s%s:%s:%s\n", $1,$2,$3,"TCRP",substr($5,1,2),$8,substr($5,3,3),$6,$7)}' lynx2cat_wTiger_wRufusstep0.sorted.dani_variants.bed > lynx2cat_wTiger_wRufusstep1.sorted.dani_variants.bed
+
+#Next, apply parsimony criteria to infer the ancestral state, and print the scaffold, position, new ancestral state and previous ancestral state (i.e. the Lynx rufus base).
+awk '{                                       
+split($0,a,":");
+split(a[1],b,"=");
+split(b[2],c,"");
+if (c[1]==c[2] && c[1]==c[3] && c[1]==c[4]) printf ("%s\t%s\t%s\t%s\t%s\t%s\n", $1,$2,$3,$4,c[4],c[3]);
+else if (c[1]==c[2] && c[1]==c[3] && c[1]!=c[4]) printf ("%s\t%s\t%s\t%s\t%s\t%s\n", $1,$2,$3,$4,c[3],c[3]);
+else if (c[1]==c[2] && c[1]==c[4] && c[1]!=c[3]) printf ("%s\t%s\t%s\t%s\t%s\t%s\n", $1,$2,$3,$4,c[4],c[3]);
+else if (c[1]==c[3] && c[1]==c[4] && c[1]!=c[2]) printf ("%s\t%s\t%s\t%s\t%s\t%s\n", $1,$2,$3,$4,c[4],c[3]);
+else if (c[2]==c[3] && c[2]==c[4] && c[2]!=c[1]) printf ("%s\t%s\t%s\t%s\t%s\t%s\n", $1,$2,$3,$4,c[4],c[3]);
+else if (c[1]==c[2] && c[3]==c[4] && c[1]!=c[4]) printf ("%s\t%s\t%s\t%s\t%s\t%s\n", $1,$2,$3,$4,c[2],c[3]);
+else if ((c[1]=="?" || c[1]=="-") && c[2]==c[3] && c[2]!=c[4]) printf ("%s\t%s\t%s\t%s\t%s\t%s\n", $1,$2,$3,$4,c[3],c[3]);
+else if ((c[1]=="?" || c[1]=="-") && c[2]==c[4] && c[2]!=c[3]) printf ("%s\t%s\t%s\t%s\t%s\t%s\n", $1,$2,$3,$4,c[4],c[3]);
+else printf ("%s\t%s\t%s\t%s\t%s\t%s\n", $1,$2,$3,$4,"N",c[3]);
+}' lynx2cat_wTiger_wRufusstep1.sorted.dani_variants.bed > ancestral_state_tiger_cat_rufus_pardinus.sorted.dani_variants.bed
+
+#Generate file with consistent sites (sites where the polarisation doesn't change).
+awk '$5==$6 {print $0}' ancestral_state_tiger_cat_rufus_pardinus.sorted.dani_variants.bed > consistent_ancestral_state_tiger_cat_rufus_pardinus.sorted.dani_variants.bed 
+
+#Generate file with inconsistent sites (wrongly polarised or unpolarisable).
+awk '$5!=$6 {print $0}' ancestral_state_tiger_cat_rufus_pardinus.sorted.dani_variants.bed > inconsistent_ancestral_state_tiger_cat_rufus_pardinus.sorted.dani_variants.bed 
+
+#Global checks:
+##Number of variants in my vcf:
+grep -v '#' /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.lr_ann.vcf | wc -l #4388391
+##Number of syntenic variants in the TCRP file:
+wc -l < ancestral_state_tiger_cat_rufus_pardinus.sorted.dani_variants.bed #3899717 (88.9% of all variants)
+##Of which inconsistent:
+wc -l < inconsistent_ancestral_state_tiger_cat_rufus_pardinus.sorted.dani_variants.bed #210730 (5.40% of the syntenic variants)
+###Of which wrongly polarised:
+awk '$5!="N" {print $0}' inconsistent_ancestral_state_tiger_cat_rufus_pardinus.sorted.dani_variants.bed | wc -l #124560 (3.19% of the syntenic variants)
+###And unsolvable:
+awk '$5=="N" {print $0}' inconsistent_ancestral_state_tiger_cat_rufus_pardinus.sorted.dani_variants.bed | wc -l #86170 (2.21% of the syntenic variants)
+
+#Misdel checks:
+##Number of misdel variants in my vcf:
+bedtools intersect -a /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.lr_ann.vcf -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean/missense_variants_provean_scores_deleterious.txt | wc -l #9193
+##Number of syntenic misdel variants in the TCRP file:
+bedtools intersect -a ancestral_state_tiger_cat_rufus_pardinus.sorted.dani_variants.bed -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean/missense_variants_provean_scores_deleterious.txt | wc -l #8532 (92.8% of all variants)
+##Of which inconsistent:
+bedtools intersect -a inconsistent_ancestral_state_tiger_cat_rufus_pardinus.sorted.dani_variants.bed -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean/missense_variants_provean_scores_deleterious.txt | wc -l #68 (0.8% of all variants)
+
 ```
 
-ÑAÑAÑAÑA!!!
+#2. Get counts (of variants, substitutions or vars+subs) for the consistent variants.
+##Of consistent syntenic variants.
+```{r Get annotation statistics, eval=FALSE, engine='bash'}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+VAR=(varssubs) #varssubs #variants #substitutions #segregating #fixed #private
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/copia_fabascal/MAPPINGS/with_rufus_dani
+screen -S "${CALLING}-${VAR}-${TYPE}"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+if [ $VAR == "private" ]
+  then
+  VAR="private_segregating"
+fi
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+script "${CALLING}_ann_individual_summary_consistent_${VAR}_${TYPE}.lr_ann.log"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+if [ $VAR == "private" ]
+  then
+  VAR="private_segregating"
+fi
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAM files path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+rm ${CALLING}"_ann_individual_summary_consistent_"${VAR}"_"${TYPE}".lr_ann.txt"
+echo -e "species\tpopulation\tdataset\tsample\ttotal_V\ttotal_A\tintergenic_V\tintergenic_A\tintronic_V\tintronic_A\tcoding_V\tsynonymous_V\tsynonymous_A\tsyn_pref_V\tsyn_pref_A\tsyn_unpref_V\tsyn_unpref_A\tmissense_V\tmissense_A\tmissense_tol_V\tmissense_tol_A\tmissense_del_V\tmissense_del_A\tnonsense_V\tnonsense_A\tUCNE_V\tUCNE_A\tUCNE_low_V\tUCNE_low_A\tUCNE_mid_V\tUCNE_mid_A\tUCNE_high_V\tUCNE_high_A\tmissense/synonymous_V\tmissense/synonymous_A\tsynonymous/intronic_V\tmissense/intronic_V" > ${CALLING}"_ann_individual_summary_consistent_"${VAR}"_"${TYPE}".lr_ann.txt"
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+INDLIST=($(ls `find . -name *"_individual_"${VAR}"_"${TYPE}".lr_ann.vcf" -print`))
+for file in "${INDLIST[@]}"
+  do
+  echo "${file}"
+  ind=$(echo "${file}" | awk -F'[/]' '{print $3}' | cut -c1-12)
+  echo "${ind}"
+  SPECIES=$(echo "${ind}" | cut -c3-4)
+  POPULATION=$(echo "${ind}" | cut -c6-7)
+  DATASET=$(if [ $ind = "c_lp_sm_0221" ]; then echo "REF"; elif [ $ind = "c_ll_ki_0090" ]; then echo "MG"; elif [ $ind = "h_ll_pv_0223" ]; then echo "LD"; elif grep -Fxq $ind /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/c_lp_5x_samples || [ $SPECIES = "ll" ]; then echo "5x"; else echo "GP"; fi)
+  SAMPLE=$(echo "${ind}" | cut -c9-12)
+  echo "grepping consistent sites"
+  bedtools intersect -a ${file} -b /GRUPOS/grupolince/copia_fabascal/MAPPINGS/with_rufus_dani/consistent_ancestral_state_tiger_cat_rufus_pardinus.sorted.dani_variants.bed -header > current_consistent.vcf
+  echo "counting variants"
+  i=current_consistent.vcf
+  TOTAL_V=$(grep -v '#' ${i} | wc -l)
+  TOTAL_A=$(grep -v '#' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  INTERGENIC_V=$(grep 'intergenic' ${i} | wc -l)
+  INTERGENIC_A=$(grep 'intergenic' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  INTRONIC_V=$(grep 'intron_variant' ${i} | wc -l)
+  INTRONIC_A=$(grep 'intron_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  CODING_V=$(grep 'CDS' ${i} | wc -l)
+  SYNONYMOUS_V=$(grep 'synonymous_variant' ${i} | wc -l)
+  SYNONYMOUS_A=$(grep 'synonymous_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/syn_pref/synonymous_variants_complete_info_0to1_lr.bed > ${VAR}_syn_pref.temp.borrar
+  SYN_PREF_V=$(wc -l < ${VAR}_syn_pref.temp.borrar)
+  SYN_PREF_A=$(cut -f8 ${VAR}_syn_pref.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/syn_pref/synonymous_variants_complete_info_1to0_lr.bed > ${VAR}_syn_unpref.temp.borrar
+  SYN_UNPREF_V=$(wc -l < ${VAR}_syn_unpref.temp.borrar)
+  SYN_UNPREF_A=$(cut -f8 ${VAR}_syn_unpref.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_V=$(grep 'missense_variant' ${i} | wc -l)
+  MISSENSE_A=$(grep 'missense_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean/missense_variants_provean_scores_tolerated.txt > ${VAR}_mis_tol.temp.borrar
+  MISSENSE_TOL_V=$(wc -l < ${VAR}_mis_tol.temp.borrar)
+  MISSENSE_TOL_A=$(cut -f8 ${VAR}_mis_tol.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean/missense_variants_provean_scores_deleterious.txt > ${VAR}_mis_del.temp.borrar
+  MISSENSE_DEL_V=$(wc -l < ${VAR}_mis_del.temp.borrar)
+  MISSENSE_DEL_A=$(cut -f8 ${VAR}_mis_del.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  NONSENSE_V=$(grep '|HIGH|' ${i} | wc -l)
+  NONSENSE_A=$(grep '|HIGH|' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  UCNE_V=$(grep 'UCNE' ${i} | wc -l)
+  UCNE_A=$(grep 'UCNE' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_lt2.gerp.bed > ${VAR}_ucne_low.temp.borrar
+  UCNE_LOW_V=$(wc -l < ${VAR}_ucne_low.temp.borrar)
+  UCNE_LOW_A=$(cut -f8 ${VAR}_ucne_low.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_gt2lt5.gerp.bed > ${VAR}_ucne_mid.temp.borrar
+  UCNE_MID_V=$(wc -l < ${VAR}_ucne_mid.temp.borrar)
+  UCNE_MID_A=$(cut -f8 ${VAR}_ucne_mid.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_gt5.gerp.bed > ${VAR}_ucne_high.temp.borrar
+  UCNE_HIGH_V=$(wc -l < ${VAR}_ucne_high.temp.borrar)
+  UCNE_HIGH_A=$(cut -f8 ${VAR}_ucne_high.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_SYNONYMOUS_V=$(echo "scale=4; $MISSENSE_V/$SYNONYMOUS_V" | bc)
+  MISSENSE_SYNONYMOUS_A=$(echo "scale=4; $MISSENSE_A/$SYNONYMOUS_A" | bc)
+  SYNONYMOUS_INTRONIC_V=$(echo "scale=4; $SYNONYMOUS_V/$INTRONIC_V" | bc)
+  MISSENSE_INTRONIC_V=$(echo "scale=4; $MISSENSE_V/$INTRONIC_V" | bc)
+  echo -e "$SPECIES\t$POPULATION\t$DATASET\t$SAMPLE\t$TOTAL_V\t$TOTAL_A\t$INTERGENIC_V\t$INTERGENIC_A\t$INTRONIC_V\t$INTRONIC_A\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$SYN_PREF_V\t$SYN_PREF_A\t$SYN_UNPREF_V\t$SYN_UNPREF_A\t$MISSENSE_V\t$MISSENSE_A\t$MISSENSE_TOL_V\t$MISSENSE_TOL_A\t$MISSENSE_DEL_V\t$MISSENSE_DEL_A\t$NONSENSE_V\t$NONSENSE_A\t$UCNE_V\t$UCNE_A\t$UCNE_LOW_V\t$UCNE_LOW_A\t$UCNE_MID_V\t$UCNE_MID_A\t$UCNE_HIGH_V\t$UCNE_HIGH_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A\t$SYNONYMOUS_INTRONIC_V\t$MISSENSE_INTRONIC_V" >> /GRUPOS/grupolince/copia_fabascal/MAPPINGS/with_rufus_dani/${CALLING}"_ann_individual_summary_consistent_"${VAR}"_"${TYPE}".lr_ann.txt"
+  done
+rm ${VAR}_*.temp.borrar
+rm current_consistent.vcf
+
+#From outside the server:
+export SSHPASS=$(cat /Users/dani/Documents/genomics_pass.txt)
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov)
+VAR=(varssubs) #varssubs #variants #substitutions #segregating #fixed #private_segregating
+TYPE=(SNP) #write down SNP or INDEL
+sshpass -e scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/${CALLING}_ann_individual_summary_${VAR}_${TYPE}.lr_ann.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/
+unset SSHPASS
+
+```
+
+##Of inconsistent syntenic variants.
+```{r Get annotation statistics, eval=FALSE, engine='bash'}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+VAR=(varssubs) #varssubs #variants #substitutions #segregating #fixed #private
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/copia_fabascal/MAPPINGS/with_rufus_dani
+screen -S "${CALLING}-${VAR}-${TYPE}"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+if [ $VAR == "private" ]
+  then
+  VAR="private_segregating"
+fi
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+script "${CALLING}_ann_individual_summary_inconsistent_${VAR}_${TYPE}.lr_ann.log"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+if [ $VAR == "private" ]
+  then
+  VAR="private_segregating"
+fi
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAM files path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+rm ${CALLING}"_ann_individual_summary_inconsistent_"${VAR}"_"${TYPE}".lr_ann.txt"
+echo -e "species\tpopulation\tdataset\tsample\ttotal_V\ttotal_A\tintergenic_V\tintergenic_A\tintronic_V\tintronic_A\tcoding_V\tsynonymous_V\tsynonymous_A\tsyn_pref_V\tsyn_pref_A\tsyn_unpref_V\tsyn_unpref_A\tmissense_V\tmissense_A\tmissense_tol_V\tmissense_tol_A\tmissense_del_V\tmissense_del_A\tnonsense_V\tnonsense_A\tUCNE_V\tUCNE_A\tUCNE_low_V\tUCNE_low_A\tUCNE_mid_V\tUCNE_mid_A\tUCNE_high_V\tUCNE_high_A\tmissense/synonymous_V\tmissense/synonymous_A\tsynonymous/intronic_V\tmissense/intronic_V" > ${CALLING}"_ann_individual_summary_inconsistent_"${VAR}"_"${TYPE}".lr_ann.txt"
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+INDLIST=($(ls `find . -name *"_individual_"${VAR}"_"${TYPE}".lr_ann.vcf" -print`))
+for file in "${INDLIST[@]}"
+  do
+  echo "${file}"
+  ind=$(echo "${file}" | awk -F'[/]' '{print $3}' | cut -c1-12)
+  echo "${ind}"
+  SPECIES=$(echo "${ind}" | cut -c3-4)
+  POPULATION=$(echo "${ind}" | cut -c6-7)
+  DATASET=$(if [ $ind = "c_lp_sm_0221" ]; then echo "REF"; elif [ $ind = "c_ll_ki_0090" ]; then echo "MG"; elif [ $ind = "h_ll_pv_0223" ]; then echo "LD"; elif grep -Fxq $ind /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/c_lp_5x_samples || [ $SPECIES = "ll" ]; then echo "5x"; else echo "GP"; fi)
+  SAMPLE=$(echo "${ind}" | cut -c9-12)
+  echo "grepping inconsistent sites"
+  bedtools intersect -a ${file} -b /GRUPOS/grupolince/copia_fabascal/MAPPINGS/with_rufus_dani/inconsistent_ancestral_state_tiger_cat_rufus_pardinus.sorted.dani_variants.bed -header > current_inconsistent.vcf
+  echo "counting variants"
+  i=current_inconsistent.vcf
+  TOTAL_V=$(grep -v '#' ${i} | wc -l)
+  TOTAL_A=$(grep -v '#' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  INTERGENIC_V=$(grep 'intergenic' ${i} | wc -l)
+  INTERGENIC_A=$(grep 'intergenic' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  INTRONIC_V=$(grep 'intron_variant' ${i} | wc -l)
+  INTRONIC_A=$(grep 'intron_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  CODING_V=$(grep 'CDS' ${i} | wc -l)
+  SYNONYMOUS_V=$(grep 'synonymous_variant' ${i} | wc -l)
+  SYNONYMOUS_A=$(grep 'synonymous_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/syn_pref/synonymous_variants_complete_info_0to1_lr.bed > ${VAR}_syn_pref.temp.borrar
+  SYN_PREF_V=$(wc -l < ${VAR}_syn_pref.temp.borrar)
+  SYN_PREF_A=$(cut -f8 ${VAR}_syn_pref.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/syn_pref/synonymous_variants_complete_info_1to0_lr.bed > ${VAR}_syn_unpref.temp.borrar
+  SYN_UNPREF_V=$(wc -l < ${VAR}_syn_unpref.temp.borrar)
+  SYN_UNPREF_A=$(cut -f8 ${VAR}_syn_unpref.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_V=$(grep 'missense_variant' ${i} | wc -l)
+  MISSENSE_A=$(grep 'missense_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean/missense_variants_provean_scores_tolerated.txt > ${VAR}_mis_tol.temp.borrar
+  MISSENSE_TOL_V=$(wc -l < ${VAR}_mis_tol.temp.borrar)
+  MISSENSE_TOL_A=$(cut -f8 ${VAR}_mis_tol.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean/missense_variants_provean_scores_deleterious.txt > ${VAR}_mis_del.temp.borrar
+  MISSENSE_DEL_V=$(wc -l < ${VAR}_mis_del.temp.borrar)
+  MISSENSE_DEL_A=$(cut -f8 ${VAR}_mis_del.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  NONSENSE_V=$(grep '|HIGH|' ${i} | wc -l)
+  NONSENSE_A=$(grep '|HIGH|' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  UCNE_V=$(grep 'UCNE' ${i} | wc -l)
+  UCNE_A=$(grep 'UCNE' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_lt2.gerp.bed > ${VAR}_ucne_low.temp.borrar
+  UCNE_LOW_V=$(wc -l < ${VAR}_ucne_low.temp.borrar)
+  UCNE_LOW_A=$(cut -f8 ${VAR}_ucne_low.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_gt2lt5.gerp.bed > ${VAR}_ucne_mid.temp.borrar
+  UCNE_MID_V=$(wc -l < ${VAR}_ucne_mid.temp.borrar)
+  UCNE_MID_A=$(cut -f8 ${VAR}_ucne_mid.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_gt5.gerp.bed > ${VAR}_ucne_high.temp.borrar
+  UCNE_HIGH_V=$(wc -l < ${VAR}_ucne_high.temp.borrar)
+  UCNE_HIGH_A=$(cut -f8 ${VAR}_ucne_high.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_SYNONYMOUS_V=$(echo "scale=4; $MISSENSE_V/$SYNONYMOUS_V" | bc)
+  MISSENSE_SYNONYMOUS_A=$(echo "scale=4; $MISSENSE_A/$SYNONYMOUS_A" | bc)
+  SYNONYMOUS_INTRONIC_V=$(echo "scale=4; $SYNONYMOUS_V/$INTRONIC_V" | bc)
+  MISSENSE_INTRONIC_V=$(echo "scale=4; $MISSENSE_V/$INTRONIC_V" | bc)
+  echo -e "$SPECIES\t$POPULATION\t$DATASET\t$SAMPLE\t$TOTAL_V\t$TOTAL_A\t$INTERGENIC_V\t$INTERGENIC_A\t$INTRONIC_V\t$INTRONIC_A\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$SYN_PREF_V\t$SYN_PREF_A\t$SYN_UNPREF_V\t$SYN_UNPREF_A\t$MISSENSE_V\t$MISSENSE_A\t$MISSENSE_TOL_V\t$MISSENSE_TOL_A\t$MISSENSE_DEL_V\t$MISSENSE_DEL_A\t$NONSENSE_V\t$NONSENSE_A\t$UCNE_V\t$UCNE_A\t$UCNE_LOW_V\t$UCNE_LOW_A\t$UCNE_MID_V\t$UCNE_MID_A\t$UCNE_HIGH_V\t$UCNE_HIGH_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A\t$SYNONYMOUS_INTRONIC_V\t$MISSENSE_INTRONIC_V" >> /GRUPOS/grupolince/copia_fabascal/MAPPINGS/with_rufus_dani/${CALLING}"_ann_individual_summary_inconsistent_"${VAR}"_"${TYPE}".lr_ann.txt"
+  done
+rm ${VAR}_*.temp.borrar
+rm current_inconsistent.vcf
+
+#From outside the server:
+export SSHPASS=$(cat /Users/dani/Documents/genomics_pass.txt)
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov)
+VAR=(varssubs) #varssubs #variants #substitutions #segregating #fixed #private_segregating
+TYPE=(SNP) #write down SNP or INDEL
+sshpass -e scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/${CALLING}_ann_individual_summary_${VAR}_${TYPE}.lr_ann.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/
+unset SSHPASS
+
+```
+
+##Of all syntenic variants.
+```{r Get annotation statistics, eval=FALSE, engine='bash'}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+VAR=(varssubs) #varssubs #variants #substitutions #segregating #fixed #private
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/copia_fabascal/MAPPINGS/with_rufus_dani
+screen -S "${CALLING}-${VAR}-${TYPE}"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+if [ $VAR == "private" ]
+  then
+  VAR="private_segregating"
+fi
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+script "${CALLING}_ann_individual_summary_syntenic_${VAR}_${TYPE}.lr_ann.log"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+if [ $VAR == "private" ]
+  then
+  VAR="private_segregating"
+fi
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAM files path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+rm ${CALLING}"_ann_individual_summary_syntenic_"${VAR}"_"${TYPE}".lr_ann.txt"
+echo -e "species\tpopulation\tdataset\tsample\ttotal_V\ttotal_A\tintergenic_V\tintergenic_A\tintronic_V\tintronic_A\tcoding_V\tsynonymous_V\tsynonymous_A\tsyn_pref_V\tsyn_pref_A\tsyn_unpref_V\tsyn_unpref_A\tmissense_V\tmissense_A\tmissense_tol_V\tmissense_tol_A\tmissense_del_V\tmissense_del_A\tnonsense_V\tnonsense_A\tUCNE_V\tUCNE_A\tUCNE_low_V\tUCNE_low_A\tUCNE_mid_V\tUCNE_mid_A\tUCNE_high_V\tUCNE_high_A\tmissense/synonymous_V\tmissense/synonymous_A\tsynonymous/intronic_V\tmissense/intronic_V" > ${CALLING}"_ann_individual_summary_syntenic_"${VAR}"_"${TYPE}".lr_ann.txt"
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+INDLIST=($(ls `find . -name *"_individual_"${VAR}"_"${TYPE}".lr_ann.vcf" -print`))
+for file in "${INDLIST[@]}"
+  do
+  echo "${file}"
+  ind=$(echo "${file}" | awk -F'[/]' '{print $3}' | cut -c1-12)
+  echo "${ind}"
+  SPECIES=$(echo "${ind}" | cut -c3-4)
+  POPULATION=$(echo "${ind}" | cut -c6-7)
+  DATASET=$(if [ $ind = "c_lp_sm_0221" ]; then echo "REF"; elif [ $ind = "c_ll_ki_0090" ]; then echo "MG"; elif [ $ind = "h_ll_pv_0223" ]; then echo "LD"; elif grep -Fxq $ind /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/c_lp_5x_samples || [ $SPECIES = "ll" ]; then echo "5x"; else echo "GP"; fi)
+  SAMPLE=$(echo "${ind}" | cut -c9-12)
+  echo "grepping syntenic sites"
+  bedtools intersect -a ${file} -b /GRUPOS/grupolince/copia_fabascal/MAPPINGS/with_rufus_dani/ancestral_state_tiger_cat_rufus_pardinus.sorted.dani_variants.bed -header > current_syntenic.vcf
+  echo "counting variants"
+  i=current_syntenic.vcf
+  TOTAL_V=$(grep -v '#' ${i} | wc -l)
+  TOTAL_A=$(grep -v '#' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  INTERGENIC_V=$(grep 'intergenic' ${i} | wc -l)
+  INTERGENIC_A=$(grep 'intergenic' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  INTRONIC_V=$(grep 'intron_variant' ${i} | wc -l)
+  INTRONIC_A=$(grep 'intron_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  CODING_V=$(grep 'CDS' ${i} | wc -l)
+  SYNONYMOUS_V=$(grep 'synonymous_variant' ${i} | wc -l)
+  SYNONYMOUS_A=$(grep 'synonymous_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/syn_pref/synonymous_variants_complete_info_0to1_lr.bed > ${VAR}_syn_pref.temp.borrar
+  SYN_PREF_V=$(wc -l < ${VAR}_syn_pref.temp.borrar)
+  SYN_PREF_A=$(cut -f8 ${VAR}_syn_pref.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/syn_pref/synonymous_variants_complete_info_1to0_lr.bed > ${VAR}_syn_unpref.temp.borrar
+  SYN_UNPREF_V=$(wc -l < ${VAR}_syn_unpref.temp.borrar)
+  SYN_UNPREF_A=$(cut -f8 ${VAR}_syn_unpref.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_V=$(grep 'missense_variant' ${i} | wc -l)
+  MISSENSE_A=$(grep 'missense_variant' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean/missense_variants_provean_scores_tolerated.txt > ${VAR}_mis_tol.temp.borrar
+  MISSENSE_TOL_V=$(wc -l < ${VAR}_mis_tol.temp.borrar)
+  MISSENSE_TOL_A=$(cut -f8 ${VAR}_mis_tol.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean/missense_variants_provean_scores_deleterious.txt > ${VAR}_mis_del.temp.borrar
+  MISSENSE_DEL_V=$(wc -l < ${VAR}_mis_del.temp.borrar)
+  MISSENSE_DEL_A=$(cut -f8 ${VAR}_mis_del.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  NONSENSE_V=$(grep '|HIGH|' ${i} | wc -l)
+  NONSENSE_A=$(grep '|HIGH|' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  UCNE_V=$(grep 'UCNE' ${i} | wc -l)
+  UCNE_A=$(grep 'UCNE' ${i} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_lt2.gerp.bed > ${VAR}_ucne_low.temp.borrar
+  UCNE_LOW_V=$(wc -l < ${VAR}_ucne_low.temp.borrar)
+  UCNE_LOW_A=$(cut -f8 ${VAR}_ucne_low.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_gt2lt5.gerp.bed > ${VAR}_ucne_mid.temp.borrar
+  UCNE_MID_V=$(wc -l < ${VAR}_ucne_mid.temp.borrar)
+  UCNE_MID_A=$(cut -f8 ${VAR}_ucne_mid.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  bedtools intersect -a ${i} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_gt5.gerp.bed > ${VAR}_ucne_high.temp.borrar
+  UCNE_HIGH_V=$(wc -l < ${VAR}_ucne_high.temp.borrar)
+  UCNE_HIGH_A=$(cut -f8 ${VAR}_ucne_high.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_SYNONYMOUS_V=$(echo "scale=4; $MISSENSE_V/$SYNONYMOUS_V" | bc)
+  MISSENSE_SYNONYMOUS_A=$(echo "scale=4; $MISSENSE_A/$SYNONYMOUS_A" | bc)
+  SYNONYMOUS_INTRONIC_V=$(echo "scale=4; $SYNONYMOUS_V/$INTRONIC_V" | bc)
+  MISSENSE_INTRONIC_V=$(echo "scale=4; $MISSENSE_V/$INTRONIC_V" | bc)
+  echo -e "$SPECIES\t$POPULATION\t$DATASET\t$SAMPLE\t$TOTAL_V\t$TOTAL_A\t$INTERGENIC_V\t$INTERGENIC_A\t$INTRONIC_V\t$INTRONIC_A\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$SYN_PREF_V\t$SYN_PREF_A\t$SYN_UNPREF_V\t$SYN_UNPREF_A\t$MISSENSE_V\t$MISSENSE_A\t$MISSENSE_TOL_V\t$MISSENSE_TOL_A\t$MISSENSE_DEL_V\t$MISSENSE_DEL_A\t$NONSENSE_V\t$NONSENSE_A\t$UCNE_V\t$UCNE_A\t$UCNE_LOW_V\t$UCNE_LOW_A\t$UCNE_MID_V\t$UCNE_MID_A\t$UCNE_HIGH_V\t$UCNE_HIGH_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A\t$SYNONYMOUS_INTRONIC_V\t$MISSENSE_INTRONIC_V" >> /GRUPOS/grupolince/copia_fabascal/MAPPINGS/with_rufus_dani/${CALLING}"_ann_individual_summary_syntenic_"${VAR}"_"${TYPE}".lr_ann.txt"
+  done
+rm ${VAR}_*.temp.borrar
+rm current_syntenic.vcf
+
+#From outside the server:
+export SSHPASS=$(cat /Users/dani/Documents/genomics_pass.txt)
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov)
+VAR=(varssubs) #varssubs #variants #substitutions #segregating #fixed #private_segregating
+TYPE=(SNP) #write down SNP or INDEL
+sshpass -e scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/${CALLING}_ann_individual_summary_${VAR}_${TYPE}.lr_ann.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/
+unset SSHPASS
+
+```
