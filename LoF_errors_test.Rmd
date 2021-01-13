@@ -3,7 +3,7 @@ title: "LoF_errors_test"
 output: html_document
 ---
 
-#1. Check behaviour of LoF after discarding WARNING sites.
+#1. Check behaviour of LoF after discarding WARNING sites. Summary: same behaviour as the whole dataset.
 ##Get counts of warning-less sites.
 ```{r Get annotation statistics, eval=FALSE, engine='bash'}
 
@@ -305,7 +305,7 @@ ggsave(paste0(type,"_genetic_load_relative2Kirov.NO_WARN.pdf"), width=26, height
 ```
 
 
-#2. Check density of LoF mutations along genes.
+#2. Check density of LoF mutations along genes. Summary: no gene accrues multiple mutations.
 ```{bash}
 
 LOF_GENES=$(awk -F"\t|\\\\|" '{printf ("%s\n", $11)}' /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.LoF.lr_ann.vcf | sort -u)
