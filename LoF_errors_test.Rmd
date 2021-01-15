@@ -304,8 +304,116 @@ ggsave(paste0(type,"_genetic_load_relative2Kirov.NO_WARN.pdf"), width=26, height
 
 ```
 
+#2. Check density of coding mutations along genes.
+##Obtain coordinates for all CDS from all genes in the list.
+```{bash}
 
-#2. Check density of LoF mutations along genes. Summary: no gene accrues multiple mutations.
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/
+
+#Obtain coordinates for all CDS from all genes in the list.
+GENES=$(awk -F"\t|=" '$3=="gene" {printf ("%s\n", $10)}' /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.all.fix.nr.gff3 | sort -u)
+COUNTER=0
+rm all_variants_cds_list.gff3
+for gen in ${GENES[@]}
+  do
+  #echo "${gen}"
+  grep "$gen" /GRUPOS/grupolince/Lyp_annotation_Apr14_final/LYPA23C.all.fix.nr.gff3 | awk -v gene_name=$gen '$3 == "CDS" {printf ("%s\t%s\n", $0,gene_name)}' >> all_variants_cds_list.gff3
+  ((COUNTER++))
+  if [ $(( $COUNTER % 10 )) == 0 ]
+    then
+    echo "processed $COUNTER genes out of $(echo "$GENES" | wc -l)"
+  fi
+  done
+
+```
+
+##Generate for each gene a fasta file with its protein sequence.
+```{bash}
+
+#Define reference individual:
+REF_SP="lr" #lr #lp #ll
+if [ $REF_SP == "lr" ]
+  then
+  REF_FA=/GRUPOS/grupolince/reference_genomes/lynx_rufus_genome/c_lr_zz_0001_recal1.fa
+elif [ $REF_SP == "lp" ]
+  then
+  REF_FA=/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa
+elif [ $REF_SP == "ll" ]
+  then
+  REF_FA=/GRUPOS/grupolince/reference_genomes/lynx_lynx_genome/LynxLynx_SNVsOnly.fa
+fi
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/
+
+#Retrieve reference sequences for all CDS (from the rufus reference fasta to account for polarisation).
+bedtools getfasta -fi $REF_FA -bed all_variants_cds_list.gff3 -fo all_variants_cds_sequence_${REF_SP}.fa
+
+#Paste each CDS' sequence with the rest of the information in the gff.
+paste all_variants_cds_list.gff3 <(grep -v '>' all_variants_cds_sequence_${REF_SP}.fa) > all_variants_cds_list_and_sequence_${REF_SP}.gff3
+
+#For partial genes, remove the non-coding SNPs at the flanks (to account for the reading frame). Complete genes will always start with reading frame = 0 so those are already correct, but many partial genes have different reading frames.
+awk '/partial_gene/ {printf ("%s\t%s\n", $0,NR)}' all_variants_cds_list_and_sequence_${REF_SP}.gff3 > all_variants_cds_list_and_sequence_partialgenes_${REF_SP}.gff3
+while read -r row; do
+  CUT_N=$(echo "$row" | cut -f 8)
+  CUT_N=$((CUT_N+1))
+  STRAND=$(echo "$row" | cut -f 7)
+  OLD_SEQUENCE=$(echo "$row" | cut -f 11)
+  ROW_N=$(echo "$row" | cut -f 12)
+  if [ $STRAND == "+" ]
+    then
+    CODING_SEQUENCE=$(echo $OLD_SEQUENCE | cut -c $CUT_N-)
+  elif [ $STRAND == "-" ]
+    then
+    CODING_SEQUENCE=$(echo $OLD_SEQUENCE | rev | cut -c $CUT_N- | rev)
+  fi
+  sed -i "${ROW_N}s/$OLD_SEQUENCE/$CODING_SEQUENCE/" all_variants_cds_list_and_sequence_${REF_SP}.gff3
+done < all_variants_cds_list_and_sequence_partialgenes_${REF_SP}.gff3  
+
+#Fuse all exons from each gene and store them in a file together with the gene name and the strand information.
+GENES=$(cat all_variants_cds_list_and_sequence_${REF_SP}.gff3 | cut -f 10 | uniq)
+COUNTER=0
+rm all_variants_cds_list_and_sequence_combined_${REF_SP}.txt
+for gen in ${GENES[@]}
+  do
+  #echo "${gen}"
+  STRAND=$(awk -F"\t" -v gen=$gen '$10 == gen' all_variants_cds_list_and_sequence_${REF_SP}.gff3 | shuf -n1 | cut -f 7)
+  CODING_SEQUENCE=$(awk -F"\t" -v gen=$gen '$10 == gen {print $11}' all_variants_cds_list_and_sequence_${REF_SP}.gff3 | tr -d '\n')
+  echo -e "$gen\t$STRAND\t$CODING_SEQUENCE" >> all_variants_cds_list_and_sequence_combined_${REF_SP}.txt
+  ((COUNTER++))
+  if [ $(( $COUNTER % 10 )) == 0 ]
+    then
+    echo "processed $COUNTER genes out of $(echo "$GENES" | wc -l)"
+  fi
+  done
+sort all_variants_cds_list_and_sequence_combined_${REF_SP}.txt -k1,1 | uniq > all_variants_cds_list_and_sequence_combined_sorted_${REF_SP}.txt
+mv all_variants_cds_list_and_sequence_combined_sorted_${REF_SP}.txt all_variants_cds_list_and_sequence_combined_${REF_SP}.txt
+
+```
+
+##Check density of CDS mutations along genes. Summary: no gene accrues multiple mutations.
+```{bash}
+
+grep -v '#' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.lr_ann.vcf | grep -E 'LOW|MODERATE|HIGH' > c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.CDS.lr_ann.vcf
+
+CDS_GENES=$(awk -F"\t|\\\\|" '{printf ("%s\n", $11)}' /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.CDS.lr_ann.vcf | sort -u)
+
+echo -e "GENE\tN_MUTATIONS\tGENE_LENGTH\tN_MUT/LENGTH_RATIO" > CDS_per_gene_distribution.txt
+for gen in ${CDS_GENES[@]}
+  do
+  echo ${gen}
+  MUTATIONS=$(grep ${gen} /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.CDS.lr_ann.vcf | wc -l)
+  GENE_SEQUENCE=$(grep ${gen} /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/all_variants_cds_list_and_sequence_combined_lr.txt | cut -f3 )
+  GENE_LENGTH=${#GENE_SEQUENCE}
+  RATIO=$(echo "scale=4; $MUTATIONS/$GENE_LENGTH" | bc)
+  echo -e "$gen\t$MUTATIONS\t$GENE_LENGTH\t$RATIO" >> CDS_per_gene_distribution.txt
+  done
+
+sort -k4,4nr CDS_per_gene_distribution.txt > CDS_per_gene_distribution_sorted.txt
+mv CDS_per_gene_distribution_sorted.txt CDS_per_gene_distribution.txt
+
+```
+
+#3. Check density of LoF mutations along genes. Summary: no gene accrues multiple mutations.
 ```{bash}
 
 LOF_GENES=$(awk -F"\t|\\\\|" '{printf ("%s\n", $11)}' /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.LoF.lr_ann.vcf | sort -u)
@@ -315,10 +423,333 @@ for gen in ${LOF_GENES[@]}
   do
   echo ${gen}
   MUTATIONS=$(grep ${gen} /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.LoF.lr_ann.vcf | wc -l)
-  GENE_SEQUENCE=$(grep ${gen} /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/syn_pref/all_genes_sequence_combined.txt | cut -f3 )
+  GENE_SEQUENCE=$(grep ${gen} /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/all_variants_cds_list_and_sequence_combined_lr.txt | cut -f3 )
   GENE_LENGTH=${#GENE_SEQUENCE}
   RATIO=$(echo "scale=4; $MUTATIONS/$GENE_LENGTH" | bc)
   echo -e "$gen\t$MUTATIONS\t$GENE_LENGTH\t$RATIO" >> LoF_per_gene_distribution.txt
   done
+  
+sort -k4,4nr LoF_per_gene_distribution.txt > LoF_per_gene_distribution_sorted.txt
+mv LoF_per_gene_distribution_sorted.txt LoF_per_gene_distribution.txt
+
+```
+
+#4. Check behaviour of derived alleles after discarding sites from HIGH MUTATION genes.
+##First, define high mutation genes and exclude those sites from the VCF.
+```{bash}
+
+HIGH_MUTATION_GENES=$(awk '$4 >= 0.01' CDS_per_gene_distribution.txt | cut -f1 | head -n -1)
+
+rm c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.HIGH_MUTATION_GENES.lr_ann.vcf
+for gen in ${HIGH_MUTATION_GENES[@]}
+  do
+  grep $gen c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.lr_ann.vcf | grep 'CDS' >> c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.HIGH_MUTATION_GENES.lr_ann.vcf
+  done
+
+awk -F"\t" '{printf ("%s\t%s\t%s\n", $1,$2-1,$2)}' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.HIGH_MUTATION_GENES.lr_ann.vcf | sort -k1,1 -k2,2n > c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.HIGH_MUTATION_GENES.lr_ann.bed
+
+bedtools subtract -a c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.lr_ann.vcf -b c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.HIGH_MUTATION_GENES.lr_ann.bed -header > c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.NO_HIGH_MUTATION_GENES.lr_ann.vcf
+
+grep -v '#' c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.NO_HIGH_MUTATION_GENES.lr_ann.vcf | awk -F"\t" '{printf ("%s\t%s\t%s\n", $1,$2-1,$2)}' > c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_polarized_filteredall_varssubs_SNP.NO_HIGH_MUTATION_GENES.lr_ann.bed
+
+```
+
+##Get counts of sites (excluding HIGH MUTATION genes).
+```{r Get annotation statistics, eval=FALSE, engine='bash'}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+VAR=(varssubs) #varssubs #variants #substitutions #segregating #fixed #private
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
+screen -S "${CALLING}-${VAR}-${TYPE}"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+if [ $VAR == "private" ]
+  then
+  VAR="private_segregating"
+fi
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+script "${CALLING}_ann_individual_summary_${VAR}_${TYPE}.NO_HIGH_MUTATION_GENES.lr_ann.log"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+if [ $VAR == "private" ]
+  then
+  VAR="private_segregating"
+fi
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAM files path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+cd $V_PATH/$CALLING/annotation
+rm ${CALLING}"_ann_individual_summary_"${VAR}"_"${TYPE}".NO_HIGH_MUTATION_GENES.lr_ann.txt"
+echo -e "species\tpopulation\tdataset\tsample\ttotal_V\ttotal_A\tintergenic_V\tintergenic_A\tintronic_V\tintronic_A\tcoding_V\tsynonymous_V\tsynonymous_A\tsyn_pref_V\tsyn_pref_A\tsyn_unpref_V\tsyn_unpref_A\tmissense_V\tmissense_A\tmissense_tol_V\tmissense_tol_A\tmissense_del_V\tmissense_del_A\tnonsense_V\tnonsense_A\tUCNE_V\tUCNE_A\tUCNE_low_V\tUCNE_low_A\tUCNE_mid_V\tUCNE_mid_A\tUCNE_high_V\tUCNE_high_A\tmissense/synonymous_V\tmissense/synonymous_A\tsynonymous/intronic_V\tmissense/intronic_V" > ${CALLING}"_ann_individual_summary_"${VAR}"_"${TYPE}".NO_HIGH_MUTATION_GENES.lr_ann.txt"
+INDLIST=($(ls `find . -name *"_individual_"${VAR}"_"${TYPE}".lr_ann.vcf" -print`))
+for i in "${INDLIST[@]}"
+  do
+  echo "${i}"
+  ind=$(echo "${i}" | awk -F'[/]' '{print $3}' | cut -c1-12)
+  echo "${ind}"
+  SPECIES=$(echo "${ind}" | cut -c3-4)
+  POPULATION=$(echo "${ind}" | cut -c6-7)
+  DATASET=$(if [ $ind = "c_lp_sm_0221" ]; then echo "REF"; elif [ $ind = "c_ll_ki_0090" ]; then echo "MG"; elif [ $ind = "h_ll_pv_0223" ]; then echo "LD"; elif grep -Fxq $ind /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/c_lp_5x_samples || [ $SPECIES = "ll" ]; then echo "5x"; else echo "GP"; fi)
+  SAMPLE=$(echo "${ind}" | cut -c9-12)
+  echo "grepping NO_HIGH_MUTATION_GENES sites"
+  bedtools intersect -a ${i} -b ${CALLING}_polarized_filteredall_${VAR}_${TYPE}.NO_HIGH_MUTATION_GENES.lr_ann.bed -header > NO_HIGH_MUTATION_GENES_${VAR}_${TYPE}.temporary.vcf
+  j=NO_HIGH_MUTATION_GENES_${VAR}_${TYPE}.temporary.vcf
+  echo "counting variants"
+  TOTAL_V=$(grep -v '#' ${j} | wc -l)
+  TOTAL_A=$(grep -v '#' ${j} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  INTERGENIC_V=$(grep 'intergenic' ${j} | wc -l)
+  INTERGENIC_A=$(grep 'intergenic' ${j} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  INTRONIC_V=$(grep 'intron_variant' ${j} | wc -l)
+  INTRONIC_A=$(grep 'intron_variant' ${j} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  CODING_V=$(grep 'CDS' ${j} | wc -l)
+  SYNONYMOUS_V=$(grep 'synonymous_variant' ${j} | wc -l)
+  SYNONYMOUS_A=$(grep 'synonymous_variant' ${j} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  bedtools intersect -a ${j} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/syn_pref/synonymous_variants_complete_info_0to1_lr.bed > ${VAR}_syn_pref.temp.borrar
+  SYN_PREF_V=$(wc -l < ${VAR}_syn_pref.temp.borrar)
+  SYN_PREF_A=$(cut -f8 ${VAR}_syn_pref.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  bedtools intersect -a ${j} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/syn_pref/synonymous_variants_complete_info_1to0_lr.bed > ${VAR}_syn_unpref.temp.borrar
+  SYN_UNPREF_V=$(wc -l < ${VAR}_syn_unpref.temp.borrar)
+  SYN_UNPREF_A=$(cut -f8 ${VAR}_syn_unpref.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_V=$(grep 'missense_variant' ${j} | wc -l)
+  MISSENSE_A=$(grep 'missense_variant' ${j} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  bedtools intersect -a ${j} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean/missense_variants_provean_scores_tolerated.txt > ${VAR}_mis_tol.temp.borrar
+  MISSENSE_TOL_V=$(wc -l < ${VAR}_mis_tol.temp.borrar)
+  MISSENSE_TOL_A=$(cut -f8 ${VAR}_mis_tol.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  bedtools intersect -a ${j} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/provean/missense_variants_provean_scores_deleterious.txt > ${VAR}_mis_del.temp.borrar
+  MISSENSE_DEL_V=$(wc -l < ${VAR}_mis_del.temp.borrar)
+  MISSENSE_DEL_A=$(cut -f8 ${VAR}_mis_del.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  NONSENSE_V=$(grep '|HIGH|' ${j} | wc -l)
+  NONSENSE_A=$(grep '|HIGH|' ${j} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  UCNE_V=$(grep 'UCNE' ${j} | wc -l)
+  UCNE_A=$(grep 'UCNE' ${j} | cut -f8 | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  bedtools intersect -a ${j} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_lt2.gerp.bed > ${VAR}_ucne_low.temp.borrar
+  UCNE_LOW_V=$(wc -l < ${VAR}_ucne_low.temp.borrar)
+  UCNE_LOW_A=$(cut -f8 ${VAR}_ucne_low.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  bedtools intersect -a ${j} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_gt2lt5.gerp.bed > ${VAR}_ucne_mid.temp.borrar
+  UCNE_MID_V=$(wc -l < ${VAR}_ucne_mid.temp.borrar)
+  UCNE_MID_A=$(cut -f8 ${VAR}_ucne_mid.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  bedtools intersect -a ${j} -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/annotation/ucne_database/gerp_analysis/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov.UCNE.derived_gt5.gerp.bed > ${VAR}_ucne_high.temp.borrar
+  UCNE_HIGH_V=$(wc -l < ${VAR}_ucne_high.temp.borrar)
+  UCNE_HIGH_A=$(cut -f8 ${VAR}_ucne_high.temp.borrar | cut -d';' -f2 | cut -d'=' -f2 | paste -sd+ | bc)
+  MISSENSE_SYNONYMOUS_V=$(echo "scale=4; $MISSENSE_V/$SYNONYMOUS_V" | bc)
+  MISSENSE_SYNONYMOUS_A=$(echo "scale=4; $MISSENSE_A/$SYNONYMOUS_A" | bc)
+  SYNONYMOUS_INTRONIC_V=$(echo "scale=4; $SYNONYMOUS_V/$INTRONIC_V" | bc)
+  MISSENSE_INTRONIC_V=$(echo "scale=4; $MISSENSE_V/$INTRONIC_V" | bc)
+  echo -e "$SPECIES\t$POPULATION\t$DATASET\t$SAMPLE\t$TOTAL_V\t$TOTAL_A\t$INTERGENIC_V\t$INTERGENIC_A\t$INTRONIC_V\t$INTRONIC_A\t$CODING_V\t$SYNONYMOUS_V\t$SYNONYMOUS_A\t$SYN_PREF_V\t$SYN_PREF_A\t$SYN_UNPREF_V\t$SYN_UNPREF_A\t$MISSENSE_V\t$MISSENSE_A\t$MISSENSE_TOL_V\t$MISSENSE_TOL_A\t$MISSENSE_DEL_V\t$MISSENSE_DEL_A\t$NONSENSE_V\t$NONSENSE_A\t$UCNE_V\t$UCNE_A\t$UCNE_LOW_V\t$UCNE_LOW_A\t$UCNE_MID_V\t$UCNE_MID_A\t$UCNE_HIGH_V\t$UCNE_HIGH_A\t$MISSENSE_SYNONYMOUS_V\t$MISSENSE_SYNONYMOUS_A\t$SYNONYMOUS_INTRONIC_V\t$MISSENSE_INTRONIC_V" >> ${CALLING}"_ann_individual_summary_"${VAR}"_"${TYPE}".NO_HIGH_MUTATION_GENES.lr_ann.txt"
+  done
+rm ${VAR}_*.temp.borrar
+rm NO_HIGH_MUTATION_GENES_${VAR}_${TYPE}.temporary.vcf
+
+#From outside the server:
+export SSHPASS=$(cat /Users/dani/Documents/genomics_pass.txt)
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+VAR=(varssubs) #varssubs #variants #substitutions #segregating #fixed #private_segregating
+TYPE=(SNP) #write down SNP or INDEL
+sshpass -e scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/${CALLING}_ann_individual_summary_${VAR}_${TYPE}.NO_HIGH_MUTATION_GENES.lr_ann.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/
+unset SSHPASS
+
+```
+
+##Plot per population results, relative to Kirov.
+```{r Plot variant count results}
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(grid)
+library(gridExtra)
+library(egg)
+
+type="varssubs" #varssubs #variants #substitutions #segregating #fixed #private_segregating
+
+wd_path <- ("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
+variants_and_subst_wg <- read_tsv(paste0(wd_path,"c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_ann_individual_summary_",type,"_SNP.NO_HIGH_MUTATION_GENES.lr_ann.txt")) %>% select(.,species,population,dataset,sample,contains("_A"),-contains("/")) %>% rename_at(vars(ends_with("_A")),funs(gsub("_A","",.))) 
+
+variants_and_subst_wg$dataset <- as.factor(variants_and_subst_wg$dataset)
+variants_and_subst_wg$dataset = factor(variants_and_subst_wg$dataset,levels=c("REF","GP","5x","MG")) #Reorder factor levels to: REF, GP, 5x, MG
+variants_and_subst_wg$population = factor(variants_and_subst_wg$population,levels=c("ki","no","po","sm","do"))
+print.data.frame(variants_and_subst_wg)
+
+variants_and_subst_wg_alleleR <- variants_and_subst_wg %>% gather(ratio,value,-species,-population,-dataset,-sample,factor_key=T)
+variants_and_subst_wg_alleleR
+
+r_average_vector <- c()
+for (r in unique(variants_and_subst_wg_alleleR$ratio)) {
+  print(r)
+  r_average <- filter(variants_and_subst_wg_alleleR,r==ratio & population=="ki") %>% select(value) %>% unlist(.,use.names=F) %>% mean()
+  r_average_vector <- c(r_average_vector,rep(r_average,nrow(filter(variants_and_subst_wg_alleleR,r==ratio))))
+}
+print(r_average_vector)
+
+relativised_variants_and_subst_wg_alleleR <- mutate(variants_and_subst_wg_alleleR, ki_relative_value=value/r_average_vector)
+
+#Obtain per population averages and standard errors:
+se <- function(x) sqrt(var(x)/length(x)) #first define the standard error function
+
+average_relativised_variants_and_subst_wg_alleleR <- data_frame("species"=character(0),"population"=character(0),"ratio"=character(0),"avg_ki_relative_value"=character(0),"se_ki_relative_value"=character(0)) #next, create the empty dataframe
+
+for (pop in unique(relativised_variants_and_subst_wg_alleleR$population)) { #then loop over each population and feature to get the (relativised) mean and standard error, and feed the dataframe
+  print(pop)
+  species <- filter(relativised_variants_and_subst_wg_alleleR,ratio==r & population==pop) %>% select(species) %>% unlist(.,use.names=F) %>% unique()
+  for (r in unique(relativised_variants_and_subst_wg_alleleR$ratio)) {
+    print(r)
+    pop_mean <- filter(relativised_variants_and_subst_wg_alleleR,ratio==r & population==pop) %>% select(ki_relative_value) %>% unlist(.,use.names=F) %>% mean()
+    #print(paste0(pop," feature ",r," average is ",pop_mean))
+    pop_se <- filter(relativised_variants_and_subst_wg_alleleR,ratio==r & population==pop) %>% select(ki_relative_value) %>% unlist(.,use.names=F) %>% se()
+    #print(paste0(pop," feature ",r," std error is ",pop_se))
+    row_data <- cbind(species,pop,r,pop_mean,pop_se)
+    colnames(row_data) <- c("species","population","ratio","avg_ki_relative_value","se_ki_relative_value")
+    average_relativised_variants_and_subst_wg_alleleR <- rbind(average_relativised_variants_and_subst_wg_alleleR,row_data,stringsAsFactors=F)
+  }
+}
+average_relativised_variants_and_subst_wg_alleleR$population = factor(average_relativised_variants_and_subst_wg_alleleR$population,levels=c("ki","no","po","sm","do"))
+average_relativised_variants_and_subst_wg_alleleR$ratio = factor(average_relativised_variants_and_subst_wg_alleleR$ratio,levels=c("total","intergenic","intronic","synonymous","syn_pref","syn_unpref","missense","missense_tol","missense_del","nonsense","UCNE","UCNE_low","UCNE_mid","UCNE_high"))
+average_relativised_variants_and_subst_wg_alleleR$ratio <- gsub('intronic', 'introns', average_relativised_variants_and_subst_wg_alleleR$ratio)
+average_relativised_variants_and_subst_wg_alleleR$ratio <- gsub('coding', 'CDS', average_relativised_variants_and_subst_wg_alleleR$ratio)
+average_relativised_variants_and_subst_wg_alleleR$ratio <- gsub('missense_tol', 'm. tolerated', average_relativised_variants_and_subst_wg_alleleR$ratio)
+average_relativised_variants_and_subst_wg_alleleR$ratio <- gsub('missense_del', 'm. deleterious', average_relativised_variants_and_subst_wg_alleleR$ratio)
+average_relativised_variants_and_subst_wg_alleleR$ratio <- gsub('nonsense', 'LoF', average_relativised_variants_and_subst_wg_alleleR$ratio)
+average_relativised_variants_and_subst_wg_alleleR$ratio <- gsub('UCNE_low', 'UCNE low', average_relativised_variants_and_subst_wg_alleleR$ratio)
+average_relativised_variants_and_subst_wg_alleleR$ratio <- gsub('UCNE_mid', 'UCNE moderate', average_relativised_variants_and_subst_wg_alleleR$ratio)
+average_relativised_variants_and_subst_wg_alleleR$ratio <- gsub('UCNE_high', 'UCNE high', average_relativised_variants_and_subst_wg_alleleR$ratio)
+average_relativised_variants_and_subst_wg_alleleR$population = factor(average_relativised_variants_and_subst_wg_alleleR$population,levels=c("ki","po","no","sm","do"))
+levels(average_relativised_variants_and_subst_wg_alleleR$population) <- c("KIR","POL","NOR","AND","DON")
+#levels(average_relativised_variants_and_subst_wg_alleleR$population)[levels(average_relativised_variants_and_subst_wg_alleleR$population)=="sm"] <- "an"
+average_relativised_variants_and_subst_wg_alleleR$ratio = factor(average_relativised_variants_and_subst_wg_alleleR$ratio,levels=c("total","intergenic","introns","CDS","synonymous","syn_pref","syn_unpref","missense","m. tolerated","m. deleterious","LoF","UCNE","UCNE low","UCNE moderate","UCNE high")) 
+average_relativised_variants_and_subst_wg_alleleR$avg_ki_relative_value <- as.numeric(average_relativised_variants_and_subst_wg_alleleR$avg_ki_relative_value)
+average_relativised_variants_and_subst_wg_alleleR$se_ki_relative_value <- as.numeric(average_relativised_variants_and_subst_wg_alleleR$se_ki_relative_value)
+average_relativised_variants_and_subst_wg_alleleR
+#(average_relativised_variants_and_subst_wg_alleleR,paste0("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/",type,"_derived_allele_allele_ratio_relative2introns_mean.csv"))
+
+#Separate plots:
+twodecimalsFUN <- function(x) sprintf("%.2f", x)
+type_range <- data.frame("var_type"=c("varssubs","varssubs","fixed","fixed"),"plot"=c("main","other","main","other"),"min"=c(0.60,0.95,0.75,0.5),"max"=c(1.1,1.2,1.75,3.5),"breaks"=c(0.05,0.1,0.2,0.5))
+
+average_relativised_derived_allele_allele_ratio_up <- ggplot(data=filter(average_relativised_variants_and_subst_wg_alleleR,grepl('total|intergenic|introns|\\<synonymous\\>',ratio)), aes(population,avg_ki_relative_value,colour=population)) +
+  #facet_wrap(feature ~ species,nrow=6,ncol=2,scales="free") +
+  facet_grid(. ~ ratio) +
+  geom_point() +
+  #geom_errorbar(aes(ymin=avg_ki_relative_value-se_ki_relative_value, ymax=avg_ki_relative_value+se_ki_relative_value), position=position_dodge(), width=0.5) +
+  #ggtitle("Proportion of reads at different NM") +
+  xlab("Population") +
+  ylab(ifelse(type=="varssubs","Average genetic load relative to ki",ifelse(type=="fixed","Derived fixation rate relative to ki", "Check code"))) +
+  scale_y_continuous(labels=twodecimalsFUN, breaks=seq(filter(type_range,var_type==type & plot=="main") %>% select(min) %>% unlist(.,use.names=F), filter(type_range,var_type==type & plot=="main") %>% select(max) %>% unlist(.,use.names=F), by = filter(type_range,var_type==type & plot=="main") %>% select(breaks) %>% unlist(.,use.names=F)), limits=c(filter(type_range,var_type==type & plot=="main") %>% select(min) %>% unlist(.,use.names=F),filter(type_range,var_type==type & plot=="main") %>% select(max) %>% unlist(.,use.names=F))) +
+  #ggtitle(paste0("ratio of ",type," relative to synonymous and Kirov")) +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+      rect=element_rect(size=1),
+      axis.line=element_blank(),
+      axis.title=element_text(size=16),
+      axis.text.x=element_text(angle=30,hjust=1,size=12,colour="black"),
+      axis.title.x=element_blank(),
+      axis.title.y=element_blank(),
+      axis.text.y=element_text(size=12,colour="black"),
+      #axis.title.y=element_text(margin=unit(c(0,0.5,0,0),"cm")),
+      panel.background=element_blank(),
+      panel.border=element_rect(colour="black",fill=NA,size=1.5),
+      strip.background=element_rect(colour="black",size=1.5),
+      #panel.grid=element_blank(),
+      #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+      plot.margin=unit(c(0.5,1,0.5,0.2),"cm"),
+      #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+      legend.background=element_rect(linetype="solid", colour="black", size=.5),
+      #legend.justification=c(0,0),
+      legend.key=element_rect(colour="white"),
+      legend.key.size=unit(0.5,"cm"),
+      legend.position="none",
+      legend.title=element_blank()
+  )
+average_relativised_derived_allele_allele_ratio_up
+
+average_relativised_derived_allele_allele_ratio_middle <- ggplot(data=filter(average_relativised_variants_and_subst_wg_alleleR,grepl('\\<missense\\>|LoF|^UCNE$',ratio)), aes(population,avg_ki_relative_value,colour=population)) +
+  #facet_wrap(feature ~ species,nrow=6,ncol=2,scales="free") +
+  facet_grid(. ~ ratio) +
+  geom_point() +
+  #geom_errorbar(aes(ymin=avg_ki_relative_value-se_ki_relative_value, ymax=avg_ki_relative_value+se_ki_relative_value), position=position_dodge(), width=0.5) +
+  #ggtitle("Proportion of reads at different NM") +
+  xlab("Population") +
+  ylab(ifelse(type=="varssubs","Average genetic load relative to ki",ifelse(type=="fixed","Derived fixation rate relative to ki", "Check code"))) +
+  scale_y_continuous(labels=twodecimalsFUN, breaks=seq(filter(type_range,var_type==type & plot=="main") %>% select(min) %>% unlist(.,use.names=F), filter(type_range,var_type==type & plot=="main") %>% select(max) %>% unlist(.,use.names=F), by = filter(type_range,var_type==type & plot=="main") %>% select(breaks) %>% unlist(.,use.names=F)), limits=c(filter(type_range,var_type==type & plot=="main") %>% select(min) %>% unlist(.,use.names=F),filter(type_range,var_type==type & plot=="main") %>% select(max) %>% unlist(.,use.names=F))) +
+  #ggtitle(paste0("ratio of ",type," relative to synonymous and Kirov")) +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+      rect=element_rect(size=1),
+      axis.line=element_blank(),
+      axis.title=element_text(size=16),
+      axis.text.x=element_text(angle=30,hjust=1,size=12,colour="black"),
+      axis.title.x=element_blank(),
+      axis.title.y=element_blank(),
+      axis.text.y=element_text(size=12,colour="black"),
+      #axis.title.y=element_text(margin=unit(c(0,0.5,0,0),"cm")),
+      panel.background=element_blank(),
+      panel.border=element_rect(colour="black",fill=NA,size=1.5),
+      strip.background=element_rect(colour="black",size=1.5),
+      #panel.grid=element_blank(),
+      #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+      plot.margin=unit(c(0.5,1,0.5,0.2),"cm"),
+      #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+      legend.background=element_rect(linetype="solid", colour="black", size=.5),
+      #legend.justification=c(0,0),
+      legend.key=element_rect(colour="white"),
+      legend.key.size=unit(0.5,"cm"),
+      legend.position="none",
+      legend.title=element_blank()
+  )
+average_relativised_derived_allele_allele_ratio_middle
+
+average_relativised_derived_allele_allele_ratio_down <- ggplot(filter(average_relativised_variants_and_subst_wg_alleleR,grepl('tolerated|deleterious|moderate|high',ratio)), aes(population,avg_ki_relative_value,colour=population)) +
+  #facet_wrap(feature ~ species,nrow=6,ncol=2,scales="free") +
+  facet_grid(. ~ ratio) +
+  geom_point() +
+  #geom_errorbar(aes(ymin=avg_ki_relative_value-se_ki_relative_value, ymax=avg_ki_relative_value+se_ki_relative_value), position=position_dodge(), width=0.5) +
+  #ggtitle("Proportion of reads at different NM") +
+  xlab("Population") +
+  #ylab("Average genetic load relative to ki") +
+  scale_y_continuous(labels=twodecimalsFUN, breaks=seq(filter(type_range,var_type==type & plot=="main") %>% select(min) %>% unlist(.,use.names=F), filter(type_range,var_type==type & plot=="main") %>% select(max) %>% unlist(.,use.names=F), by = filter(type_range,var_type==type & plot=="main") %>% select(breaks) %>% unlist(.,use.names=F)), limits=c(filter(type_range,var_type==type & plot=="main") %>% select(min) %>% unlist(.,use.names=F),filter(type_range,var_type==type & plot=="main") %>% select(max) %>% unlist(.,use.names=F))) +
+  #ggtitle(paste0("ratio of ",type," relative to synonymous and Kirov")) +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+      rect=element_rect(size=1),
+      axis.line=element_blank(),
+      axis.title=element_text(size=16),
+      axis.text.x=element_text(angle=30,hjust=1,size=12,colour="black"),
+      axis.title.x=element_blank(),
+      axis.title.y=element_blank(),
+      axis.text.y=element_text(size=12,colour="black"),
+      #axis.title.y=element_text(margin=unit(c(0,0.5,0,0),"cm")),
+      panel.background=element_blank(),
+      panel.border=element_rect(colour="black",fill=NA,size=1.5),
+      strip.background=element_rect(colour="black",size=1.5),
+      #panel.grid=element_blank(),
+      #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+      plot.margin=unit(c(0.5,1,0.5,0.2),"cm"),
+      #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+      legend.background=element_rect(linetype="solid", colour="black", size=.5),
+      #legend.justification=c(0,0),
+      legend.key=element_rect(colour="white"),
+      legend.key.size=unit(0.5,"cm"),
+      legend.position="none",
+      legend.title=element_blank()
+  )
+average_relativised_derived_allele_allele_ratio_down
+
+
+average_relativised_derived_allele_allele_ratio_combined <- grid.arrange(set_panel_size(average_relativised_derived_allele_allele_ratio_up,width=unit(4.5,"cm"),height=unit(10,"cm")), set_panel_size(average_relativised_derived_allele_allele_ratio_middle,width=unit(4.5,"cm"),height=unit(10,"cm")), set_panel_size(average_relativised_derived_allele_allele_ratio_down,width=unit(4.5,"cm"),height=unit(10,"cm")),bottom=textGrob(expression(bold("Population")),gp=gpar(fontsize=18,fontface="bold")),left=textGrob(expression(bold("Average genomic load relative to KIR")), rot=90,gp=gpar(fontsize=18,fontface="bold"),vjust=3))
+
+
+ggsave(paste0(type,"_genetic_load_relative2Kirov.NO_HIGH_MUTATION_GENES.pdf"), width=26, height=38, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios",average_relativised_derived_allele_allele_ratio_combined)
 
 ```
