@@ -1696,6 +1696,7 @@ scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/LyCaRef_gtlike/ngsF-HMM/
 library("readr")
 library("ggplot2")
 library("dplyr")
+library("tidyr")
 library("ggrepel")
 library("RColorBrewer")
 library ("viridis")
@@ -1709,8 +1710,8 @@ ibd_tract2 <- ibd_tract %>%
 ibd_tract_cumsumlength <- ibd_tract2 %>% 
   dplyr::group_by(ind,length_category, pop,sps) %>% 
   dplyr::summarise(sum_length = sum(length_ibd),n = n()) %>%
-  mutate(., Populations=ifelse(pop == "c_ll_ca", "Caucasus", ifelse(pop == "c_ll_ba", "Balkans", ifelse(pop == "c_ll_po", "NE-Poland", ifelse(pop == "c_ll_ur", "Urals", ifelse(pop == "c_ll_ki", "Kirov", ifelse(pop == "c_ll_la", "Latvia", ifelse(pop == "c_ll_mo", "Mongolia", ifelse(pop == "c_ll_no", "Norway", ifelse(pop == "c_ll_cr", "Carpathians",ifelse(pop == "c_ll_to", "Mongolia", ifelse(pop == "c_ll_tu", "Tuva", ifelse(pop == "c_ll_ka", "Mongolia", ifelse(pop == "c_ll_og", "Mongolia", ifelse(pop == "c_ll_vl", "Vladivostok", ifelse(pop == "c_ll_ya", "Yakutia", ifelse(pop == "c_lp_sm", "Sierra Morena", ifelse(pop == "c_lp_do", "Doñana", NA)))))))))))))))))) %>% 
-    mutate(., color=ifelse(Populations == "Caucasus", "#B8860b", ifelse(Populations == "Balkans", "#A035AF", ifelse(Populations == "NE-Poland", viridis_pal()(5)[3], ifelse(Populations == "Urals", "#0F4909", ifelse(Populations == "Carpathians", brewer.pal(12,"Paired")[9], ifelse(Populations == "Kirov", viridis_pal()(5)[1], ifelse(Populations == "Latvia", brewer.pal(12,"Paired")[3], ifelse(Populations == "Norway", viridis_pal()(5)[2], ifelse(Populations == "Tuva", brewer.pal(12,"Paired")[8], ifelse(Populations == "Mongolia", brewer.pal(12,"Paired")[7], ifelse(Populations == "Vladivostok", brewer.pal(12,"Paired")[5], ifelse(Populations == "Yakutia", brewer.pal(12,"Paired")[6], ifelse(Populations == "Sierra Morena", brewer.pal(8, "Greys")[5], ifelse(Populations == "Doñana", brewer.pal(8, "Greys")[8], NA)))))))))))))))
+  mutate(., Populations=ifelse(pop == "c_ll_ca", "Caucasus", ifelse(pop == "c_ll_ba", "Balkans", ifelse(pop == "c_ll_po", "NE-Poland", ifelse(pop == "c_ll_ur", "Urals", ifelse(pop == "c_ll_ki", "Kirov", ifelse(pop == "c_ll_la", "Latvia", ifelse(pop == "c_ll_mo", "Mongolia", ifelse(pop == "c_ll_no", "Norway", ifelse(pop == "c_ll_cr", "Carpathians",ifelse(pop == "c_ll_to", "Mongolia", ifelse(pop == "c_ll_tu", "Tuva", ifelse(pop == "c_ll_ka", "Mongolia", ifelse(pop == "c_ll_og", "Mongolia", ifelse(pop == "c_ll_vl", "Primorsky Krai", ifelse(pop == "c_ll_ya", "Yakutia", ifelse(pop == "c_lp_sm", "Sierra Morena", ifelse(pop == "c_lp_do", "Doñana", NA)))))))))))))))))) %>% 
+    mutate(., color=ifelse(Populations == "Caucasus", "#B8860b", ifelse(Populations == "Balkans", "#A035AF", ifelse(Populations == "NE-Poland", viridis_pal()(5)[3], ifelse(Populations == "Urals", "#0F4909", ifelse(Populations == "Carpathians", brewer.pal(12,"Paired")[9], ifelse(Populations == "Kirov", viridis_pal()(5)[1], ifelse(Populations == "Latvia", brewer.pal(12,"Paired")[3], ifelse(Populations == "Norway", viridis_pal()(5)[2], ifelse(Populations == "Tuva", brewer.pal(12,"Paired")[8], ifelse(Populations == "Mongolia", brewer.pal(12,"Paired")[7], ifelse(Populations == "Primorsky Krai", brewer.pal(12,"Paired")[5], ifelse(Populations == "Yakutia", brewer.pal(12,"Paired")[6], ifelse(Populations == "Sierra Morena", brewer.pal(8, "Greys")[5], ifelse(Populations == "Doñana", brewer.pal(8, "Greys")[8], NA)))))))))))))))
 
 ibd_tract_cumsumlength$Populations <- factor(ibd_tract_cumsumlength$Populations,levels=sort(unique(ibd_tract_cumsumlength$Populations)))
 
@@ -1726,13 +1727,27 @@ missing_ind <- missing_ind %>% mutate(length_category="1000-2000kb", pop=substri
 
 
 #Join both files and arrange populations and individuals:
-ibd_tract_cumsumlength_final <- full_join(ibd_tract_cumsumlength,missing_ind)
-ibd_tract_cumsumlength_final$Populations <- factor(ibd_tract_cumsumlength_final$Populations,levels=sort(unique(ibd_tract_cumsumlength_final$Populations)))
+ibd_tract_cumsumlength_joined <- full_join(ibd_tract_cumsumlength,missing_ind)
+ibd_tract_cumsumlength_joined$Populations <- factor(ibd_tract_cumsumlength_joined$Populations,levels=sort(unique(ibd_tract_cumsumlength_joined$Populations)))
 
-ibd_tract_cumsumlength_final <- arrange(ibd_tract_cumsumlength_final,Populations,ind)
+ibd_tract_cumsumlength_joined <- arrange(ibd_tract_cumsumlength_joined,Populations,ind)
 
-ibd_tract_cumsumlength_final$ind <- factor(ibd_tract_cumsumlength_final$ind,levels=arrange(ibd_tract_cumsumlength_final,Populations)[,1] %>% unlist(use.names=F) %>% unique())
+ibd_tract_cumsumlength_joined$ind <- factor(ibd_tract_cumsumlength_joined$ind,levels=arrange(ibd_tract_cumsumlength_joined,Populations)[,1] %>% unlist(use.names=F) %>% unique())
 
+#Complete cases of ind x length_category combinations so that all plots keep all individuals:
+ind_x_length_category <- complete(as.data.frame(ibd_tract_cumsumlength_joined), ind, length_category)[,c(1:2)]
+ibd_tract_cumsumlength_df <- as.data.frame(ibd_tract_cumsumlength_joined)[c(1:2)]
+
+require(sqldf)
+new_cases <- sqldf('SELECT * FROM ind_x_length_category EXCEPT SELECT * FROM ibd_tract_cumsumlength_df') %>% mutate(pop = substring(ind,1,7), sps = substring(ind,1,4), sum_length=0, n=0) %>% mutate(., Populations=ifelse(pop == "c_ll_ca", "Caucasus", ifelse(pop == "c_ll_ba", "Balkans", ifelse(pop == "c_ll_po", "NE-Poland", ifelse(pop == "c_ll_ur", "Urals", ifelse(pop == "c_ll_ki", "Kirov", ifelse(pop == "c_ll_la", "Latvia", ifelse(pop == "c_ll_mo", "Mongolia", ifelse(pop == "c_ll_no", "Norway", ifelse(pop == "c_ll_cr", "Carpathians",ifelse(pop == "c_ll_to", "Mongolia", ifelse(pop == "c_ll_tu", "Tuva", ifelse(pop == "c_ll_ka", "Mongolia", ifelse(pop == "c_ll_og", "Mongolia", ifelse(pop == "c_ll_vl", "Primorsky Krai", ifelse(pop == "c_ll_ya", "Yakutia", ifelse(pop == "c_lp_sm", "Sierra Morena", ifelse(pop == "c_lp_do", "Doñana", NA)))))))))))))))))) %>% mutate(., color=ifelse(Populations == "Caucasus", "#B8860b", ifelse(Populations == "Balkans", "#A035AF", ifelse(Populations == "NE-Poland", viridis_pal()(5)[3], ifelse(Populations == "Urals", "#0F4909", ifelse(Populations == "Carpathians", brewer.pal(12,"Paired")[9], ifelse(Populations == "Kirov", viridis_pal()(5)[1], ifelse(Populations == "Latvia", brewer.pal(12,"Paired")[3], ifelse(Populations == "Norway", viridis_pal()(5)[2], ifelse(Populations == "Tuva", brewer.pal(12,"Paired")[8], ifelse(Populations == "Mongolia", brewer.pal(12,"Paired")[7], ifelse(Populations == "Primorsky Krai", brewer.pal(12,"Paired")[5], ifelse(Populations == "Yakutia", brewer.pal(12,"Paired")[6], ifelse(Populations == "Sierra Morena", brewer.pal(8, "Greys")[5], ifelse(Populations == "Doñana", brewer.pal(8, "Greys")[8], NA)))))))))))))))
+
+new_cases$Populations <- factor(new_cases$Populations,levels=sort(unique(new_cases$Populations)))
+
+new_cases$ind <- factor(new_cases$ind,levels=arrange(new_cases,Populations)[,1] %>% unlist(use.names=F) %>% unique())
+
+ibd_tract_cumsumlength_final <- arrange(full_join(ibd_tract_cumsumlength_joined,new_cases),ind,length_category) %>% mutate(border=ifelse(n==0,color,"black"))
+
+#Assign colours:
 cols <- c("Caucasus"="#B8860b",
           "NE-Poland"=viridis_pal()(5)[3], 
           "Urals"="#0F4909", 
@@ -1743,24 +1758,30 @@ cols <- c("Caucasus"="#B8860b",
           "Norway"=viridis_pal()(5)[2], 
           "Tuva"=brewer.pal(12,"Paired")[8], 
           "Mongolia"=brewer.pal(12,"Paired")[7], 
-          "Vladivostok"=brewer.pal(12,"Paired")[5], 
+          "Primorsky Krai"=brewer.pal(12,"Paired")[5], 
           "Yakutia"=brewer.pal(12,"Paired")[6],
           "Sierra Morena"=brewer.pal(8, "Greys")[5],
           "Doñana"=brewer.pal(8, "Greys")[8])
 
 
-ggplot(ibd_tract_cumsumlength_final %>% filter(length_category==">5000kb"), aes(x=ind, y=sum_length, colour=Populations, fill=Populations)) +
-  geom_col(colour="black") +
+ggplot(ibd_tract_cumsumlength_final %>% filter(length_category==">5000kb"), aes(x=ind, y=sum_length, colour=ind, fill=Populations)) +
+  geom_col() +
   #facet_grid(~sps, scales="free_x") +
   #scale_colour_manual(values = cols) +
   scale_fill_manual(values = cols) +
-  theme (axis.text.x = element_text(size=6, angle=90, vjust=0.5)) +
+  scale_colour_manual(values = ibd_tract_cumsumlength_final[ibd_tract_cumsumlength_final$length_category==">5000kb",]$border) +
+  ylab("Cumulative length of ROHs larger than 5 Mb") +
+  xlab("Individual") +
+  guides(colour=FALSE) +
+  theme(axis.text.x = element_text(size=6, angle=90, vjust=0.5)) +
   ggsave("/Users/dani/ownCloud/backup/g-w_analysis/IBD_analysis/phylo2_analysis/ngsF-HMM/>5000kb_ibd_tract_cumsumlength.pdf", width=20, height=15, units="cm", device="pdf")
 ggplot(ibd_tract_cumsumlength_final %>% filter(length_category=="2000-5000kb" | length_category==">5000kb"), aes(x=ind, y=sum_length, colour=Populations, fill=Populations)) +
   geom_col() +
   #facet_grid(~sps, scales="free_x") +
   scale_colour_manual(values = cols) +
   scale_fill_manual(values = cols) +
+  ylab("Cumulative length of ROHs larger than 2 Mb") +
+  xlab("Individual") +
   theme (axis.text.x = element_text(size=6, angle=90, vjust=0.5)) +
   ggsave("/Users/dani/ownCloud/backup/g-w_analysis/IBD_analysis/phylo2_analysis/ngsF-HMM/>2000kb_ibd_tract_cumsumlength.pdf", width=20, height=15, units="cm", device="pdf")
 ggplot(ibd_tract_cumsumlength_final %>% filter(length_category=="1000-2000kb" | length_category=="2000-5000kb" | length_category==">5000kb"), aes(x=ind, y=sum_length, colour=Populations, fill=Populations)) +
@@ -1768,6 +1789,8 @@ ggplot(ibd_tract_cumsumlength_final %>% filter(length_category=="1000-2000kb" | 
   #facet_grid(~sps, scales="free_x") +
   scale_colour_manual(values = cols) +
   scale_fill_manual(values = cols) +
+  ylab("Cumulative length of ROHs larger than 1 Mb") +
+  xlab("Individual") +
   theme (axis.text.x = element_text(size=6, angle=90, vjust=0.5)) +
   ggsave("/Users/dani/ownCloud/backup/g-w_analysis/IBD_analysis/phylo2_analysis/ngsF-HMM/>1000kb_ibd_tract_cumsumlength.pdf", width=20, height=15, units="cm", device="pdf")
 
