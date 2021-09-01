@@ -1023,7 +1023,7 @@ for (f in unique(all_plot_data$feat)) {
 
 ```
 
-##Joint calling:
+##Joint calling (rufus polarisation):
 ###Define desired features.
 ```{r Define desired features, eval=FALSE, engine='bash'}
 
@@ -1492,8 +1492,7 @@ scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dan
 
 ```
 
-
-####Pseudo-values approach:
+####Pseudo-values approach (obsolete):
 #####Remove blocks of constant size:
 ```{r Calculate derived allele frequency ratio, eval=FALSE, engine='bash'}
 
@@ -2557,6 +2556,476 @@ for (type in var_type) {
 
 ```
 
+##Joint calling (TCRLP_outerparsimony polarisation):
+###Define desired features.
+```{r Define desired features, eval=FALSE, engine='bash'}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/TCRLP_outerparsimony/
+mkdir -p derived_allele_freq_ratio
+cd derived_allele_freq_ratio/
+rm features_derived_allele_freq_ratio.txt
+echo -e "intron_variant\tINTR" >> features_derived_allele_freq_ratio.txt
+echo -e "synonymous_variant\tSYN" >> features_derived_allele_freq_ratio.txt
+echo -e "missense_variant\tNSYN" >> features_derived_allele_freq_ratio.txt
+echo -e "|HIGH|\tLOF" >> features_derived_allele_freq_ratio.txt
+cat features_derived_allele_freq_ratio.txt
+
+```
+
+###Calculate derived allele frequency ratio (joint callings).
+####Global ratios referred to INTR:
+```{r Calculate derived allele frequency ratio, eval=FALSE, engine='bash'}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+VAR=(varssubs) #varssubs #variants #substitutions
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/TCRLP_outerparsimony
+screen -S "${CALLING}-${VAR}-${TYPE}"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+script "${CALLING}_derived_freq_ratio_${VAR}_${TYPE}.anc_ann.log"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAM files path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+cd /GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final/BAM_nm_filtered
+N_POPS=$(awk -F"_" '{print (NF-2)/3}' <<< $CALLING)
+SPECIES=$(echo $CALLING | fold -w8 | cut -c1-4 | head -n$N_POPS | sort | uniq)
+DATASETS=$(for i in ${SPECIES[@]}; do ls ${i}*_samples | cut -d'_' -f1,2,3; done)
+COVERAGE=$(echo "${CALLING}" | rev | cut -d'_' -f1 | rev)
+NM_COV=$(echo "${CALLING}" | rev | cut -d'_' -f1,2 | rev)
+cd $V_PATH/$CALLING/TCRLP_outerparsimony
+GREP=$(cat derived_allele_freq_ratio/features_derived_allele_freq_ratio.txt | cut -f1)
+POP_VCFS=($(ls `find . -path *"_perpop/*_perpop_"${VAR}"_"${TYPE}".anc_ann.vcf" -print`))
+echo "retrieving variants from each feature from each population"
+for g in ${GREP[@]}
+  do
+  echo "feature: ${g}"
+  FEATURE=$(grep "${g}" derived_allele_freq_ratio/features_derived_allele_freq_ratio.txt | cut -f2)
+  echo $FEATURE
+  for p in ${POP_VCFS[@]}
+    do
+    echo "working with vcf ${p}"
+    grep "${g}" "${p}" | awk -F"\t|;|=" '{printf ("%s_%s_%s\t%s\n", $1,$2-1,$2,$13)}' > ${p/perpop_${VAR}_${TYPE}.anc_ann.vcf/perpop_${VAR}_${FEATURE}_${TYPE}.anc_ann.bed}
+    if [ $FEATURE == "NSYN" ]
+      then
+      echo "NTOL"
+      bedtools intersect -a <(awk -F"\t|_" '{printf ("%s\t%s\t%s\t%s\n", $1,$2,$3,$4)}' ${p/perpop_${VAR}_${TYPE}.anc_ann.vcf/perpop_${VAR}_${FEATURE}_${TYPE}.anc_ann.bed}) -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/TCRLP_outerparsimony/provean/missense_variants_provean_scores_tolerated.txt | awk -F"\t" '{printf ("%s_%s_%s\t%s\n", $1,$2,$3,$4)}' > ${p/perpop_${VAR}_${TYPE}.anc_ann.vcf/perpop_${VAR}_NTOL_${TYPE}.anc_ann.bed}
+      echo "NDEL"
+      bedtools intersect -a <(awk -F"\t|_" '{printf ("%s\t%s\t%s\t%s\n", $1,$2,$3,$4)}' ${p/perpop_${VAR}_${TYPE}.anc_ann.vcf/perpop_${VAR}_${FEATURE}_${TYPE}.anc_ann.bed}) -b /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov/TCRLP_outerparsimony/provean/missense_variants_provean_scores_deleterious.txt | awk -F"\t" '{printf ("%s_%s_%s\t%s\n", $1,$2,$3,$4)}' > ${p/perpop_${VAR}_${TYPE}.anc_ann.vcf/perpop_${VAR}_NDEL_${TYPE}.anc_ann.bed}
+    fi
+    done
+  done
+#Prepare file that will contain population and INTR ratio data:
+mkdir -p derived_allele_freq_ratio
+rm derived_allele_freq_ratio/${CALLING}_INTR_derived_freq_ratio_${VAR}_${TYPE}.txt
+echo -e "population_1\tpopulation_2\tINTR_ratio" > derived_allele_freq_ratio/${CALLING}_INTR_derived_freq_ratio_${VAR}_${TYPE}.txt
+DEL_FEATURES=(SYN NSYN NTOL NDEL LOF) #cat /GRUPOS/grupolince/lynx_genomes_5x/genetic_load_analysis/derived_allele_freq_ratio/features_derived_allele_freq_ratio.txt | grep -Ev 'synonymous_variant|intron_variant' | cut -f2
+#Prepare files that will contain DEL categories ratio data:
+for f in ${DEL_FEATURES[@]}
+  do
+  rm derived_allele_freq_ratio/${CALLING}_${f}_derived_freq_ratio_${VAR}_${TYPE}.txt
+  echo -e "${f}_ratio\t${f}_norm_ratio" > derived_allele_freq_ratio/${CALLING}_${f}_derived_freq_ratio_${VAR}_${TYPE}.txt
+  done
+POPS=($(ls `find . -name *'_perpop_'$VAR'_'$TYPE'.anc_ann.vcf' -print` | cut -d'/' -f3 | cut -d'_' -f1,2,3,4,5,6))
+echo "calculating ratio for each pair of populations"
+for p1 in ${POPS[@]}
+  do
+  for p2 in ${POPS[@]}
+    do
+    echo "${p1} vs ${p2}"
+    echo "feature: INTR"
+    LANG=en_EN join -a1 -a2 -e 0.00 -o auto -j 1 <(LANG=en_EN sort -k1 ./*/${p1}_${NM_COV}_perpop_${VAR}_INTR_${TYPE}.anc_ann.bed) <(LANG=en_EN sort -k1 ./*/${p2}_${NM_COV}_perpop_${VAR}_INTR_${TYPE}.anc_ann.bed) | awk -F"\t|_" '{print $1,$2,$3,$4,$5}' OFS="\t" | LANG=en_EN sort -k1,1 -k2,2n | awk '{printf "%s\t%s\t%s\t%.3f\t%.3f\t%.3f\t%.3f\n", $1,$2,$3,$4,$5,$4*(1-$5),$5*(1-$4)}' > derived_allele_freq_ratio/${p1}_vs_${p2}_${NM_COV}_perpop_${VAR}_INTR_${TYPE}.anc_ann.bed #col1: scaffold, col2: pos_start, col3: pos_end, col4: p1_af, col5: p2_af, col6: p1_af*(1-p2_af), col7: p2_af*(1-p1_af)
+    SUM_P1=$(cut -f6 derived_allele_freq_ratio/${p1}_vs_${p2}_${NM_COV}_perpop_${VAR}_INTR_${TYPE}.anc_ann.bed | paste -sd+ | bc)
+    SUM_P2=$(cut -f7 derived_allele_freq_ratio/${p1}_vs_${p2}_${NM_COV}_perpop_${VAR}_INTR_${TYPE}.anc_ann.bed | paste -sd+ | bc)
+    RATIO=$(echo "scale=6; $SUM_P1/$SUM_P2" | bc)
+    echo -e "$p1\t$p2\t$RATIO" >> derived_allele_freq_ratio/${CALLING}_INTR_derived_freq_ratio_${VAR}_${TYPE}.txt
+    for f in ${DEL_FEATURES[@]}
+      do
+      echo "feature: ${f}"
+      LANG=en_EN join -a1 -a2 -e 0.00 -o auto -j 1 <(LANG=en_EN sort -k1 ./*/${p1}_${NM_COV}_perpop_${VAR}_${f}_${TYPE}.anc_ann.bed) <(LANG=en_EN sort -k1 ./*/${p2}_${NM_COV}_perpop_${VAR}_${f}_${TYPE}.anc_ann.bed) | awk -F"\t|_" '{print $1,$2,$3,$4,$5}' OFS="\t" | LANG=en_EN sort -k1,1 -k2,2n | awk '{printf "%s\t%s\t%s\t%.3f\t%.3f\t%.3f\t%.3f\n", $1,$2,$3,$4,$5,$4*(1-$5),$5*(1-$4)}' > derived_allele_freq_ratio/${p1}_vs_${p2}_${NM_COV}_perpop_${VAR}_${f}_${TYPE}.anc_ann.bed
+      SUM_P1=$(cut -f6 derived_allele_freq_ratio/${p1}_vs_${p2}_${NM_COV}_perpop_${VAR}_${f}_${TYPE}.anc_ann.bed | paste -sd+ | bc)
+      SUM_P2=$(cut -f7 derived_allele_freq_ratio/${p1}_vs_${p2}_${NM_COV}_perpop_${VAR}_${f}_${TYPE}.anc_ann.bed | paste -sd+ | bc)
+      RATIO=$(echo "scale=6; $SUM_P1/$SUM_P2" | bc)
+      echo -e "$RATIO" >> derived_allele_freq_ratio/${CALLING}_${f}_derived_freq_ratio_${VAR}_${TYPE}.txt
+      done
+    done
+  done
+cd $V_PATH/$CALLING/TCRLP_outerparsimony/derived_allele_freq_ratio
+#Make an ALL features file storing the population and INTR data
+cat ${CALLING}_INTR_derived_freq_ratio_${VAR}_${TYPE}.txt > ${CALLING}_ALL_derived_freq_ratio_${VAR}_${TYPE}.txt
+for f in ${DEL_FEATURES[@]}
+  do
+  #First build a file with the feature's ratio and normalised ratio (i.e. divided by the INTR ratio):
+  head ${CALLING}_${f}_derived_freq_ratio_${VAR}_${TYPE}.txt -n1 > ${CALLING}_temp_derived_freq_ratio_${VAR}_${TYPE}.borrar
+  paste ${CALLING}_INTR_derived_freq_ratio_${VAR}_${TYPE}.txt ${CALLING}_${f}_derived_freq_ratio_${VAR}_${TYPE}.txt | awk 'FNR == 1 {next}{print $4,$4/$3}' OFS="\t" >> ${CALLING}_temp_derived_freq_ratio_${VAR}_${TYPE}.borrar
+  #Now join the ALL and the current DEL feature data
+  paste <(head ${CALLING}_ALL_derived_freq_ratio_${VAR}_${TYPE}.txt -n1) <(head ${CALLING}_temp_derived_freq_ratio_${VAR}_${TYPE}.borrar -n1) > "${CALLING}"_joint_derived_freq_ratio_${VAR}_${TYPE}.borrar
+  paste ${CALLING}_ALL_derived_freq_ratio_${VAR}_${TYPE}.txt ${CALLING}_temp_derived_freq_ratio_${VAR}_${TYPE}.borrar | awk 'FNR == 1 {next}{print $0}' OFS="\t" >> ${CALLING}_joint_derived_freq_ratio_${VAR}_${TYPE}.borrar
+  #Replace the ALL table with the updated one
+  mv ${CALLING}_joint_derived_freq_ratio_${VAR}_${TYPE}.borrar ${CALLING}_ALL_derived_freq_ratio_${VAR}_${TYPE}.txt
+  rm ${CALLING}_temp_derived_freq_ratio_${VAR}_${TYPE}.borrar
+  done
+
+#From outside the server:
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+VAR=(varssubs) #varssubs #variants #substitutions
+TYPE=(SNP) #write down SNP or INDEL
+scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/TCRLP_outerparsimony/derived_allele_freq_ratio/${CALLING}_ALL_derived_freq_ratio_${VAR}_${TYPE}.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_ratio/TCRLP_outerparsimony
+
+```
+
+###Perform block-jackknife to estimate derived allele frequency ratio variance.
+####Direct approach:
+#####Remove blocks of constant size (referred to INTR):
+```{r Calculate derived allele frequency ratio, eval=FALSE, engine='bash'}
+
+#Block-jackknife method was performed following: https://www.math.wustl.edu/~sawyer/handouts/Jackknife.pdf
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+VAR=(varssubs) #varssubs #variants #substitutions
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/TCRLP_outerparsimony/derived_allele_freq_ratio
+screen -S "${CALLING}-${VAR}-${TYPE}"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+script "${CALLING}_${VAR}_derived_freq_ratio_jackknife.anc_ann.log"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+
+#Prepare output file:
+rm ${CALLING}"_"${VAR}"_derived_freq_ratio_variance_"${TYPE}".anc_ann.txt"
+echo -e "population_pair\tintronic_ratio\tfeature\tglobal_ratio\tglobal_ratio_norm\tmean_subsample_ratio_norm\tvariance_subsample_ratio_norm\t±2SD_subsample_ratio_norm" > ${CALLING}"_"${VAR}"_derived_freq_ratio_variance_"${TYPE}".anc_ann.txt"
+FILES=$(realpath *_vs_*${VAR}_*_SNP.anc_ann.bed | grep -Ev '_INTR_') #Only perform jackknife for deleterious categories.
+for FILE in ${FILES[@]}
+  do
+  #Define comparison file related variables:
+  echo $FILE
+  rm -f ${FILE/.bed/.jack1.temp}
+  POP_PAIR=$(echo $FILE | rev | cut -d'/' -f1 | rev | cut -d'_' -f1-13)
+  FEATURE=$(echo $FILE | rev | cut -d'/' -f1 | cut -d'_' -f3 | rev)
+  echo "Working with comparison" $POP_PAIR "and feature" $FEATURE
+  #Compute the ratio for all variants:
+  DEL_SUM_P1=$(cut -f6  ${FILE} | paste -sd+ | bc)
+  DEL_SUM_P2=$(cut -f7  ${FILE} | paste -sd+ | bc)
+  DEL_RATIO_ALL=$(if [ $DEL_SUM_P1 == 0 ] || [ $DEL_SUM_P2 == 0 ]; then echo 0.00; else echo "scale=6; $DEL_SUM_P1/$DEL_SUM_P2" | bc | awk '{printf "%f", $0}'; fi)
+  #Compute the ratio for INTR variants:
+  INTR_FILE=$(ls ${POP_PAIR}_nm2nm3_origcov_perpop_${VAR}_INTR_${TYPE}.anc_ann.bed)
+  INTR_SUM_P1=$(cut -f6  ${INTR_FILE} | paste -sd+ | bc)
+  INTR_SUM_P2=$(cut -f7  ${INTR_FILE} | paste -sd+ | bc)
+  INTR_RATIO_ALL=$(if [ $INTR_SUM_P1 == 0 ] || [ $INTR_SUM_P2 == 0 ]; then echo 0.00; else echo "scale=6; $INTR_SUM_P1/$INTR_SUM_P2" | bc | awk '{printf "%f", $0}'; fi)
+  DEL_RATIO_ALL_NORM=$(echo "scale=6; $DEL_RATIO_ALL/$INTR_RATIO_ALL" | bc | awk '{printf "%f", $0}')
+  #Define jackknife block related variables:
+  #if [[ $FEATURE == "LOF" ]]
+    #then
+    #BLOCK_SIZE=(50)
+    #else
+    #BLOCK_SIZE=(1000)
+  #fi
+  VARIANT_N=$(cat $FILE | wc -l)
+  echo $VARIANT_N
+  #MODULE=$(($VARIANT_N % $BLOCK_SIZE))
+  #BLOCK_N=$((($VARIANT_N-$MODULE)/$BLOCK_SIZE))
+  ROUND_N=$(($VARIANT_N+50)) #NEW
+  echo $ROUND_N
+  BLOCK_SIZE=$(echo "scale=0; $ROUND_N"/100 | bc) #NEW
+  echo $BLOCK_SIZE
+  #MODULE=$(($VARIANT_N % $BLOCK_SIZE))
+  #BLOCK_N=$((($VARIANT_N-$MODULE)/$BLOCK_SIZE))
+  BLOCK_N=$(echo "scale=0; $VARIANT_N/$BLOCK_SIZE" | bc)
+  echo $BLOCK_N
+  #Compute the ratio for all block-less subsamples:
+  echo "Performing jackknife"
+  for i in $(seq 1 $BLOCK_N)
+    do
+    #echo ${i}
+    START=$((${i}*$BLOCK_SIZE-($BLOCK_SIZE-1)))
+    #echo $START
+    END=$((${i}*$BLOCK_SIZE))
+    #echo $END
+    sed $START','$END'd' $FILE > ${FILE/.bed/.temp}
+    DEL_SUM_SUBSAMPLE_P1=$(cut -f6  ${FILE/.bed/.temp} | paste -sd+ | bc)
+    DEL_SUM_SUBSAMPLE_P2=$(cut -f7  ${FILE/.bed/.temp} | paste -sd+ | bc)
+    DEL_RATIO_SUBSAMPLE=$(if [ $DEL_SUM_SUBSAMPLE_P1 == 0 ] || [ $DEL_SUM_SUBSAMPLE_P2 == 0 ]; then echo 0.00; else echo "scale=6; $DEL_SUM_SUBSAMPLE_P1/$DEL_SUM_SUBSAMPLE_P2" | bc | awk '{printf "%f", $0}'; fi)
+    DEL_RATIO_SUBSAMPLE_NORM=$(echo "scale=6; $DEL_RATIO_SUBSAMPLE/$INTR_RATIO_ALL" | bc | awk '{printf "%f", $0}')
+    echo $DEL_RATIO_SUBSAMPLE_NORM >> ${FILE/.bed/.jack1.temp} #store all subsample ratios in a file
+    done
+  echo "Computing jackknife variance"
+  #Compute the subsamples average ratio:
+  DEL_RATIO_SUBSAMPLE_SUM=$(cut -f1 ${FILE/.bed/.jack1.temp} | paste -sd+ | bc)
+  DEL_RATIO_SUBSAMPLE_MEAN=$(echo "scale=6; $DEL_RATIO_SUBSAMPLE_SUM/$BLOCK_N" | bc | awk '{printf "%f", $0}')
+  #Compute variance of the subsamples:
+  awk -v mean_psv="$DEL_RATIO_SUBSAMPLE_MEAN" -F "\t" '{printf "%.6f\t%.6f\n", $1, ($1-mean_psv)*($1-mean_psv)}' ${FILE/.bed/.jack1.temp} > ${FILE/.bed/.jack} #col1: ratio for the block, col2: numerator of the variance
+  VARIANCE_NUMERATOR_SUM=$(cut -f2 ${FILE/.bed/.jack} | paste -sd+ | bc)
+  VARIANCE=$(echo "scale=6; $VARIANCE_NUMERATOR_SUM*($BLOCK_N-1)/($BLOCK_N)" | bc | awk '{printf "%f", $0}')
+  TWO_SD=$(echo "scale=6; sqrt ($VARIANCE)" | bc | awk '{printf "%f", $0*2}')
+  #Compile summary table:
+  echo -e "$POP_PAIR\t$INTR_RATIO_ALL\t$FEATURE\t$DEL_RATIO_ALL\t$DEL_RATIO_ALL_NORM\t$DEL_RATIO_SUBSAMPLE_MEAN\t$VARIANCE\t$TWO_SD" >> ${CALLING}"_"${VAR}"_derived_freq_ratio_variance_"${TYPE}".anc_ann.txt"
+  #rm *.temp 
+  done
+  
+POP1=($(cat ${CALLING}"_"${VAR}"_derived_freq_ratio_variance_"${TYPE}".anc_ann.txt" | grep 'NSYN' | cut -f1 | awk 'BEGIN {FS="_vs_"} {print $1}'))
+POP2=($(cat ${CALLING}"_"${VAR}"_derived_freq_ratio_variance_"${TYPE}".anc_ann.txt" | grep 'NSYN' | cut -f1 | awk 'BEGIN {FS="_vs_"} {print $2}'))
+SYN_TWO_SD=($(cat ${CALLING}"_"${VAR}"_derived_freq_ratio_variance_"${TYPE}".anc_ann.txt" | grep -w 'SYN' | cut -f8))
+NSYN_TWO_SD=($(cat ${CALLING}"_"${VAR}"_derived_freq_ratio_variance_"${TYPE}".anc_ann.txt" | grep 'NSYN' | cut -f8))
+NTOL_TWO_SD=($(cat ${CALLING}"_"${VAR}"_derived_freq_ratio_variance_"${TYPE}".anc_ann.txt" | grep 'NTOL' | cut -f8))
+NDEL_TWO_SD=($(cat ${CALLING}"_"${VAR}"_derived_freq_ratio_variance_"${TYPE}".anc_ann.txt" | grep 'NDEL' | cut -f8))
+LOF_TWO_SD=($(cat ${CALLING}"_"${VAR}"_derived_freq_ratio_variance_"${TYPE}".anc_ann.txt" | grep 'LOF' | cut -f8))
+
+echo -e "population_1\tpopulation_2\tSYN_norm_ratio_2SD\tNSYN_norm_ratio_2SD\tNTOL_norm_ratio_2SD\tNDEL_norm_ratio_2SD\tLOF_norm_ratio_2SD" > ${CALLING}"_"${VAR}"_derived_freq_ratio_2SD_"${TYPE}".anc_ann.txt"
+for ((i=0; i<=${#POP1[@]}; i++))
+  do
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "${POP1[i]}" "${POP2[i]}" "${SYN_TWO_SD[i]}" "${NSYN_TWO_SD[i]}" "${NTOL_TWO_SD[i]}" "${NDEL_TWO_SD[i]}" "${LOF_TWO_SD[i]}" >> ${CALLING}"_"${VAR}"_derived_freq_ratio_2SD_"${TYPE}".anc_ann.txt"
+done
+
+#From outside the server:
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+VAR=(varssubs) #varssubs #variants #substitutions
+TYPE=(SNP) #write down SNP or INDEL
+scp dkleinman@genomics-b.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/${CALLING}/TCRLP_outerparsimony/derived_allele_freq_ratio/${CALLING}_${VAR}_derived_freq_ratio_*_${TYPE}.anc_ann.txt /Users/Dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_ratio/TCRLP_outerparsimony
+
+```
+
+###Plot derived allele frequency ratio.
+####Referred to INTR:
+```{r}
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+
+global_derived_freq_ratios <- read_tsv("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_ratio/TCRLP_outerparsimony/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_ALL_derived_freq_ratio_varssubs_SNP.txt",col_names=T,col_types=c("ffddddddddddd")) %>% dplyr::filter(., grepl('5x', population_1),grepl('5x', population_2))
+
+global_derived_freq_ratios_errors <- read_tsv("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_ratio/TCRLP_outerparsimony/c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_varssubs_derived_freq_ratio_2SD_SNP.anc_ann.txt",col_names=T,col_types=c("ffddddd")) %>% dplyr::filter(., grepl('5x', population_1),grepl('5x', population_2))
+
+global_derived_freq_ratios <- left_join(global_derived_freq_ratios,global_derived_freq_ratios_errors,by=c("population_1","population_2"))
+global_derived_freq_ratios$population_1 <- factor(global_derived_freq_ratios$population_1,levels=unique(global_derived_freq_ratios$population_1))
+global_derived_freq_ratios$population_2 <- factor(global_derived_freq_ratios$population_2,levels=unique(global_derived_freq_ratios$population_2))
+global_derived_freq_ratios
+
+filtered_derived_freq_ratios = data_frame()
+levels <- c("c_lp_5x_c_lp_do","c_lp_5x_c_lp_sm","c_ll_5x_c_ll_po","c_ll_5x_c_ll_no","c_ll_5x_c_ll_ki")
+counter=0
+for (i in levels) {
+  counter=which(levels==i)
+  if (counter < length(levels)) {
+    for (j in levels[c((counter+1):length(levels))]) {
+    print(paste0(i," vs ",j))
+    filtered_derived_freq_ratios <- rbind(filtered_derived_freq_ratios,filter(global_derived_freq_ratios,population_1==i&population_2==j))
+    }
+  }
+}
+filtered_derived_freq_ratios[] <- as.data.frame(lapply(filtered_derived_freq_ratios, function(x) gsub("c_lp_5x_|c_ll_5x_", "", x)),stringsAsFactors=F)
+filtered_derived_freq_ratios
+tidy_derived_freq_ratios <- filtered_derived_freq_ratios %>% mutate(populations=paste(population_1,population_2,sep="/")) %>% select(contains("_norm_"),populations,-contains("_2SD")) %>% gather(ratio_type,ratio_value,-populations)
+tidy_derived_freq_ratios_errors <- filtered_derived_freq_ratios %>% mutate(populations=paste(population_1,population_2,sep="/")) %>%
+select(populations,contains("_2SD")) %>% gather(error_type,error_value,-populations)
+tidy_derived_freq_ratios_errors <- as_tibble(lapply(tidy_derived_freq_ratios_errors, function(x) {gsub("_2SD", "", x)}))
+tidy_derived_freq_ratios <- left_join(tidy_derived_freq_ratios,tidy_derived_freq_ratios_errors,by=c("populations","ratio_type"="error_type"))
+tidy_derived_freq_ratios$populations <- factor(tidy_derived_freq_ratios$populations,levels=unique(tidy_derived_freq_ratios$populations))
+tidy_derived_freq_ratios$ratio_type <- factor(tidy_derived_freq_ratios$ratio_type,levels=c("SYN_norm_ratio","NSYN_norm_ratio","NTOL_norm_ratio","NDEL_norm_ratio","LOF_norm_ratio"))
+tidy_derived_freq_ratios$ratio_value <- as.double(tidy_derived_freq_ratios$ratio_value)
+tidy_derived_freq_ratios$error_value <- as.double(tidy_derived_freq_ratios$error_value)
+tidy_derived_freq_ratios <- tidy_derived_freq_ratios %>% mutate(ratio_value_from1=ratio_value-1)
+pop_pairs <- c("c_lp_do/c_lp_sm","c_lp_sm/c_ll_ki","c_ll_po/c_ll_no","c_ll_po/c_ll_ki","c_ll_no/c_ll_ki")
+tidy_derived_freq_ratios <- tidy_derived_freq_ratios %>% filter(populations %in% pop_pairs)
+tidy_derived_freq_ratios$populations <- as.factor(droplevels(tidy_derived_freq_ratios$populations))
+
+tidy_derived_freq_ratios$populations <- gsub('c_ll_ki', 'KIR', tidy_derived_freq_ratios$populations)
+tidy_derived_freq_ratios$populations <- gsub('c_ll_po', 'POL', tidy_derived_freq_ratios$populations)
+tidy_derived_freq_ratios$populations <- gsub('c_ll_no', 'NOR', tidy_derived_freq_ratios$populations)
+tidy_derived_freq_ratios$populations <- gsub('c_lp_sm', 'AND', tidy_derived_freq_ratios$populations)
+tidy_derived_freq_ratios$populations <- gsub('c_lp_do', 'DON', tidy_derived_freq_ratios$populations)
+
+tidy_derived_freq_ratios$populations = factor(tidy_derived_freq_ratios$populations,levels=c("DON/AND","AND/KIR","POL/NOR","POL/KIR","NOR/KIR"))
+
+
+tidy_derived_freq_ratios_simple <- tidy_derived_freq_ratios[grep("SYN_norm_ratio|NSYN_norm_ratio|LOF_norm_ratio",tidy_derived_freq_ratios$ratio_type),]
+tidy_derived_freq_ratios_complete <- tidy_derived_freq_ratios[grep("NSYN_norm_ratio",tidy_derived_freq_ratios$ratio_type,inv=T),]
+
+derived_freq_ratios_simple_ggplot <- ggplot(data=tidy_derived_freq_ratios_simple,aes(x=populations,y=ratio_value_from1,fill=ratio_type)) +
+  geom_bar(stat='identity', position=position_dodge()) +
+  scale_x_discrete(limits = rev(levels(tidy_derived_freq_ratios$populations))) +
+  scale_y_continuous(breaks=seq(-0.6,0.2,by=0.1),labels=seq(-0.6,0.2,by=0.1)+1) +
+  scale_fill_manual("legend",values=c("LOF_norm_ratio"="red3","NSYN_norm_ratio"="orange","SYN_norm_ratio"="yellow"),labels=c("SYN","NSYN","LoF"),guide=guide_legend(reverse=TRUE)) +
+  coord_flip(ylim=c(-0.3,0.15),expand=T,clip = "on") +
+  xlab("Populations") +
+  ylab(expression(bold(R["X/Y"]))) +
+  theme(text=element_text(size=12,face="bold"),
+      rect=element_rect(size=1),
+      #axis.line=element_line(colour="black"),
+      axis.title=element_text(size=14),
+      axis.text.x=element_text(angle=30,hjust=1,size=12,colour="black"),
+      axis.text.y=element_text(size=12,colour="black"),
+      #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+      #panel.background=element_blank(),
+      #panel.border=element_rect(colour="black"),
+      #panel.grid=element_blank(),
+      #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+      plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+      #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+      legend.background=element_rect(linetype="solid", colour="black", size=.5),
+      #legend.justification=c(0,0),
+      legend.key=element_rect(colour="white"),
+      legend.key.size=unit(0.5,"cm"),
+      legend.position=c(0.12,0.12),
+      legend.title=element_blank()) 
+derived_freq_ratios_simple_ggplot
+ggsave("c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_ALL_derived_freq_ratio_varssubs_SNP.simple.pdf", width=15, height=10, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_ratio/TCRLP_outerparsimony")
+
+derived_freq_ratios_simple_errors_ggplot <-
+  ggplot(data=tidy_derived_freq_ratios_simple,aes(x=populations,y=ratio_value_from1,fill=ratio_type)) +
+  geom_bar(stat='identity', position=position_dodge()) +
+  geom_errorbar(aes(ymin=ratio_value_from1-error_value, ymax=ratio_value_from1+error_value), position=position_dodge()) +
+  scale_x_discrete(limits = rev(levels(tidy_derived_freq_ratios$populations))) +
+  scale_y_continuous(breaks=seq(-0.6,0.2,by=0.1),labels=seq(-0.6,0.2,by=0.1)+1) +
+  scale_fill_manual("legend",values=c("LOF_norm_ratio"="red3","NSYN_norm_ratio"="orange","SYN_norm_ratio"="yellow"),labels=c("SYN","NSYN","LoF"),guide=guide_legend(reverse=TRUE)) +
+  coord_flip(ylim=c(-0.3,0.15),expand=T,clip = "on") +
+  xlab("Populations") +
+  ylab(expression(bold(R["X/Y"]))) +
+  theme(text=element_text(size=12,face="bold"),
+      rect=element_rect(size=1),
+      #axis.line=element_line(colour="black"),
+      axis.title=element_text(size=14),
+      axis.text.x=element_text(angle=30,hjust=1,size=12,colour="black"),
+      axis.text.y=element_text(size=12,colour="black"),
+      #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+      #panel.background=element_blank(),
+      #panel.border=element_rect(colour="black"),
+      #panel.grid=element_blank(),
+      #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+      plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+      #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+      legend.background=element_rect(linetype="solid", colour="black", size=.5),
+      #legend.justification=c(0,0),
+      legend.key=element_rect(colour="white"),
+      legend.key.size=unit(0.5,"cm"),
+      legend.position=c(0.12,0.12),
+      legend.title=element_blank()
+  )
+derived_freq_ratios_simple_errors_ggplot
+ggsave("c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_ALL_derived_freq_ratio_varssubs_SNP.simple_errors.pdf", width=15, height=10, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_ratio/TCRLP_outerparsimony")
+
+
+derived_freq_ratios_complete_ggplot <- ggplot(data=tidy_derived_freq_ratios_complete,aes(x=populations,y=ratio_value_from1,fill=ratio_type)) +
+  geom_bar(stat='identity', position=position_dodge()) +
+  scale_x_discrete(limits = rev(levels(tidy_derived_freq_ratios$populations))) +
+  scale_y_continuous(breaks=seq(-0.4,0.2,by=0.1),labels=seq(-0.4,0.2,by=0.1)+1) +
+  scale_fill_manual("legend",values=c("LOF_norm_ratio"="red3","NDEL_norm_ratio"="orangered","NTOL_norm_ratio"="orange","SYN_norm_ratio"="yellow"),labels=c("SYN","NTOL","NDEL","LoF"),guide=guide_legend(reverse=TRUE)) +
+  coord_flip(ylim=c(-0.3,0.15),expand=T,clip = "on") +
+  xlab("Populations") +
+  ylab(expression(bold(R["X/Y"]))) +
+  theme(text=element_text(size=12,face="bold"),
+      rect=element_rect(size=1),
+      #axis.line=element_line(colour="black"),
+      axis.title=element_text(size=14),
+      axis.text.x=element_text(angle=30,hjust=1,size=12,colour="black"),
+      axis.text.y=element_text(size=12,colour="black"),
+      #axis.title.y=element_text(size=30,margin=margin(r=0.5,unit="cm")),
+      #panel.background=element_blank(),
+      #panel.border=element_rect(colour="black"),
+      #panel.grid=element_blank(),
+      #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+      plot.margin=unit(c(0.5,1,0.5,0.5),"cm"),
+      #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+      legend.background=element_rect(linetype="solid", colour="black", size=.5),
+      #legend.justification=c(0,0),
+      legend.key=element_rect(colour="white"),
+      legend.key.size=unit(0.5,"cm"),
+      legend.position=c(0.12,0.12),
+      legend.title=element_blank()) 
+derived_freq_ratios_complete_ggplot
+ggsave("c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_ALL_derived_freq_ratio_varssubs_SNP.complete.pdf", width=15, height=10, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_ratio/TCRLP_outerparsimony")
+
+derived_freq_ratios_complete_errors_ggplot <-
+  ggplot(data=tidy_derived_freq_ratios_complete,aes(x=populations,y=ratio_value_from1,fill=ratio_type)) +
+  geom_bar(stat='identity', position=position_dodge()) +
+  geom_errorbar(aes(ymin=ratio_value_from1-error_value, ymax=ratio_value_from1+error_value), position=position_dodge()) +
+  scale_x_discrete(limits = rev(levels(tidy_derived_freq_ratios$populations))) +
+  scale_y_continuous(breaks=seq(-0.4,0.3,by=0.1),labels=seq(-0.4,0.3,by=0.1)+1) +
+  #scale_y_continuous(breaks=seq(-2,2,by=0.25),labels=seq(-2,2,by=0.25)+1) +
+  scale_fill_manual("legend",values=c("LOF_norm_ratio"="red3","NDEL_norm_ratio"="orangered","NTOL_norm_ratio"="orange","SYN_norm_ratio"="yellow"),labels=c("synonymous","m. tolerated","m. deleterious","LoF"),guide=guide_legend(reverse=TRUE)) +
+  geom_hline(yintercept = 0) +
+  coord_flip(ylim=c(-0.45,0.35),expand=T,clip = "on") +
+  #coord_cartesian(ylim=c(-0.3,0.2),expand=T,default=T,clip = "on") +
+  xlab("Populations") +
+  ylab(expression(bold(R["X/Y"]))) +
+  theme_bw() +
+  theme(text=element_text(size=12,face="bold"),
+      rect=element_rect(size=1),
+      axis.line=element_blank(),
+      axis.title=element_text(size=16),
+      axis.text.x=element_text(angle=30,hjust=1,size=12,colour="black"),
+      axis.text.y=element_text(size=12,colour="black"),
+      panel.background=element_blank(),
+      panel.border=element_rect(colour="black",fill=NA,size=1.5),
+      #panel.grid=element_blank(),
+      #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+      plot.margin=unit(c(0.5,1,0.5,0.2),"cm"),
+      #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+      legend.background=element_rect(linetype="solid", colour="black", size=.5),
+      #legend.justification=c(0,0),
+      legend.key=element_rect(colour="white"),
+      legend.key.size=unit(0.5,"cm"),
+      legend.position=c(0.84,0.60),
+      legend.title=element_blank()
+  )
+derived_freq_ratios_complete_errors_ggplot
+ggsave("c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_ALL_derived_freq_ratio_varssubs_SNP.complete_errors.good.pdf", width=16, height=10, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_ratio/TCRLP_outerparsimony")
+
+derived_freq_ratios_complete_errors_ugly_ggplot <-
+  ggplot(data=tidy_derived_freq_ratios_complete,aes(x=populations,y=ratio_value_from1,fill=ratio_type)) +
+  geom_bar(stat='identity', position=position_dodge()) +
+  geom_errorbar(aes(ymin=ratio_value_from1-error_value, ymax=ratio_value_from1+error_value), position=position_dodge()) +
+  scale_x_discrete(limits = rev(levels(tidy_derived_freq_ratios$populations))) +
+  scale_y_continuous(breaks=seq(-0.4,0.4,by=0.1),labels=seq(-0.4,0.4,by=0.1)+1) +
+  #scale_y_continuous(breaks=seq(-2,2,by=0.25),labels=seq(-2,2,by=0.25)+1) +
+  scale_fill_manual("legend",values=c("LOF_norm_ratio"="red3","NDEL_norm_ratio"="orangered","NTOL_norm_ratio"="orange"),labels=c("NTOL","NDEL","LoF"),guide=guide_legend(reverse=TRUE)) +
+  coord_flip() +
+  #coord_cartesian(ylim=c(-0.3,0.2),expand=T,default=T,clip = "on") +
+  xlab("Populations") +
+  ylab(expression(bold(R["X/Y"]))) +
+  theme(text=element_text(size=12,face="bold"),
+      rect=element_rect(size=1),
+      axis.line=element_blank(),
+      axis.title=element_text(size=16),
+      axis.text.x=element_text(angle=30,hjust=1,size=12,colour="black"),
+      axis.text.y=element_text(size=12,colour="black"),
+      panel.background=element_blank(),
+      panel.border=element_rect(colour="black",fill=NA,size=1.5),
+      #panel.grid=element_blank(),
+      #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+      plot.margin=unit(c(0.5,1,0.5,0.2),"cm"),
+      #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+      legend.background=element_rect(linetype="solid", colour="black", size=.5),
+      #legend.justification=c(0,0),
+      legend.key=element_rect(colour="white"),
+      legend.key.size=unit(0.5,"cm"),
+      legend.position=c(0.12,0.12),
+      legend.title=element_blank()
+  )
+derived_freq_ratios_complete_errors_ugly_ggplot
+ggsave("c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov_ALL_derived_freq_ratio_varssubs_SNP.complete_errors_ugly.pdf", width=15, height=10, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/derived_allele_freq_ratio/TCRLP_outerparsimony")
+
+```
+
+
 #2: Derived allele counts approaches.
 #2A: Variant and allele level.
 ##At the individual level.
@@ -3529,7 +3998,7 @@ ggsave("NSYN_SYN_ratio.pdf", width=15, height=10, units="cm", device="pdf", path
 ####Get counts (of variants, substitutions or vars+subs).
 ```{r Get annotation statistics, eval=FALSE, engine='bash'}
 
-CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_samecov)
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
 VAR=(varssubs) #varssubs #variants #substitutions #segregating #fixed #private
 TYPE=(SNP) #write down SNP or INDEL
 cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation
@@ -3805,6 +4274,7 @@ variants_and_subst_wg <- rbind(origcov,samecov)
 
 variants_and_subst_wg$dataset <- as.factor(variants_and_subst_wg$dataset)
 variants_and_subst_wg$dataset = factor(variants_and_subst_wg$dataset,levels=c("REF","GP","5x","MG")) #Reorder factor levels to: REF, GP, 5x, MG
+levels(variants_and_subst_wg$dataset) <- c("REF","ILH","LOW","ELH")
 variants_and_subst_wg$population = factor(variants_and_subst_wg$population,levels=c("ki","no","po","sm","do"))
 levels(variants_and_subst_wg$population) <- c("KIR","POL","NOR","AND","DON")
 print.data.frame(variants_and_subst_wg)
@@ -11478,6 +11948,7 @@ scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dan
 ```
 
 ###Get πN and πS per site.
+####Rufus polarisation:
 ```{r Get heterozygous counts, eval=FALSE, engine='bash'}
 
 CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
@@ -11545,6 +12016,197 @@ unset SSHPASS
 
 ```
 
+####TCRLP polarisation:
+```{r Get heterozygous counts, eval=FALSE, engine='bash'}
+
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov)
+VAR=(varssubs) #varssubs #variants #substitutions
+TYPE=(SNP) #write down SNP or INDEL
+cd /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/TCRLP_outerparsimony
+screen -S "${CALLING}-${VAR}-${TYPE}"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+script "${CALLING}_ann_population_summary_πNπSdNdS_${VAR}_${TYPE}.lr_ann.log"
+CALLING=$(echo ${STY#*.} | cut -d'-' -f1)
+VAR=$(echo ${STY#*.} | cut -d'-' -f2)
+TYPE=$(echo ${STY#*.} | cut -d'-' -f3)
+
+S_PATH=/opt/snpEff #software path
+C_PATH=/home/dkleinman/datos/snpEff #config file path
+O_PATH=/home/dkleinman/datos/snpEff #output path
+I_PATH=/home/GRUPOS/grupolince/immunocapture/prueba_highdiv #immunocapture path
+V_PATH=/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs #VCFs path
+G_PATH=/GRUPOS/grupolince/lynx_genomes_5x/gVCFs #gVCFs path
+B_PATH=/home/GRUPOS/grupolince/lynx_genomes_5x/BAM_files_final #BAM files path
+REF=/home/GRUPOS/grupolince/reference_genomes/lynx_pardinus_genome/lp23.fa #path to reference genome
+GATK=/opt/GATK-3.7/GenomeAnalysisTK.jar #GATK software path
+BCF=/opt/bcftools-1.6/bcftools #BCFtools software path
+
+
+ALL_SITES_FILE=$(echo /GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/complete_category_sites_total_counts_percategoryfilter_corrected.lr_ann.txt) 
+rm ${CALLING}"_ann_population_summary_πNπS_"${TYPE}".anc_ann.txt"
+echo -e "species\tpopulation\tdataset\tsize\tsynonymous_PI_AVG\tmissense_PI_AVG\tPI_NS_S" > ${CALLING}"_ann_population_summary_πNπS_"${TYPE}".anc_ann.txt"
+POPLIST=($(ls `find . -path *"_perpop/*_perpop_segregating_"${TYPE}".anc_ann.vcf" -print`))
+for pop in "${POPLIST[@]}"
+  do
+  echo "${pop}"
+  grep -E '#|synonymous_variant' ${pop} | vcftools --vcf - --site-pi --out ${pop/.vcf/.synonymous}
+  grep -E '#|missense_variant' ${pop} | vcftools --vcf - --site-pi --out ${pop/.vcf/.missense}
+  vcf=$(echo ${pop} | rev | cut -d'/' -f1 | rev)
+  echo ${vcf}
+  SPECIES=$(echo ${vcf} | cut -c3-4)
+  POPULATION=$(echo ${vcf} | cut -c14-15)
+  DATASET=$(echo ${vcf} | cut -c6-7)
+  SIZE=$(bcftools query -l ${pop} | wc -l)
+  SYNONYMOUS_N_SITES=$(grep "synonymous" $ALL_SITES_FILE | cut -f6)
+  SYNONYMOUS_PI_SUM=$(tail -n+2 ${pop/.vcf/.synonymous.sites.pi} | cut -f3 | paste -sd+ | bc)
+  SYNONYMOUS_PI_AVG=$(echo "scale=8; $SYNONYMOUS_PI_SUM/$SYNONYMOUS_N_SITES" | bc)
+  SYNONYMOUS_SUBS_N=$(grep "synonymous_variant" ${pop/_segregating_/_substitutions_} | wc -l)
+  SYNONYMOUS_SUBS_PROP=$(echo "scale=8; $SYNONYMOUS_SUBS_N/$SYNONYMOUS_N_SITES" | bc)
+  
+  MISSENSE_N_SITES=$(grep "missense" $ALL_SITES_FILE | cut -f6)
+  MISSENSE_PI_SUM=$(tail -n+2 ${pop/.vcf/.missense.sites.pi} | cut -f3 | paste -sd+ | bc)
+  MISSENSE_PI_AVG=$(echo "scale=8; $MISSENSE_PI_SUM/$MISSENSE_N_SITES" | bc)
+  MISSENSE_SUBS_N=$(grep "missense_variant" ${pop/_segregating_/_substitutions_} | wc -l)
+  MISSENSE_SUBS_PROP=$(echo "scale=8; $MISSENSE_SUBS_N/$MISSENSE_N_SITES" | bc)
+
+  PI_NS_S=$(echo "scale=5; $MISSENSE_PI_AVG/$SYNONYMOUS_PI_AVG" | bc)
+  D_NS_S=$(echo "scale=5; $MISSENSE_SUBS_PROP/$SYNONYMOUS_SUBS_PROP" | bc)
+  echo -e "$SPECIES\t$POPULATION\t$DATASET\t$SIZE\t$SYNONYMOUS_PI_AVG\t$MISSENSE_PI_AVG\t$SYNONYMOUS_SUBS_PROP\t$MISSENSE_SUBS_PROP\t$PI_NS_S\t$D_NS_S" >> ${CALLING}"_ann_population_summary_πNπSdNdS_"${TYPE}".anc_ann.txt"
+  done
+
+#From outside the server:
+CALLING=(c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov) #c_lp_sm_c_lp_do_nm2_origcov #c_ll_ki_c_ll_no_c_ll_po_nm3_origcov #c_lp_sm_c_lp_do_c_ll_ki_c_ll_no_c_ll_po_nm2nm3_origcov
+export SSHPASS=$(cat /Users/dani/Documents/genomics_pass.txt)
+sshpass -e scp dkleinman@genomics-a.ebd.csic.es:/GRUPOS/grupolince/lynx_genomes_5x/VCFs_Dani/nmVCFs/$CALLING/annotation/*_ann_population_summary_PI_SNP.anc_ann.txt /Users/dani/ownCloud/backup/g-w_analysis/genetic_load/genetic_load_vs_diversity
+unset SSHPASS
+
+```
+
+###Plot PN/PS and πN/πS.
+####TCRLP outer parsimony:
+```{r Plot variant count results}
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(grid)
+library(gridExtra)
+library(egg)
+
+
+wd_path <- ("/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/")
+
+pnpsπnπs_summary <- read_tsv(paste0(wd_path,"PNPSπNπS_TCRLP_outerparsimony_summary.txt")) %>% mutate(species=ifelse(population=="KIR" | population=="POL" | population=="NOR","EL","IL"),size=ifelse(population=="KIR" | population=="AND","large","small"))
+pnpsπnπs_summary$population = factor(pnpsπnπs_summary$population,levels=c("KIR","NOR","POL","AND","DON"))
+pnpsπnπs_summary$species = factor(pnpsπnπs_summary$species,levels=c("EL","IL"))
+pnpsπnπs_summary$size = factor(pnpsπnπs_summary$size,levels=c("large","small"))
+print.data.frame(pnpsπnπs_summary)
+
+pnpsπnπs_tidy <- pnpsπnπs_summary %>% gather(ratio,value,-population,-species,-size,factor_key=T)
+pnpsπnπs_tidy
+
+#Separate plots:
+twodecimalsFUN <- function(x) sprintf("%.2f", x)
+type_range <- data.frame("var_type"=c("varssubs","varssubs","fixed","fixed"),"plot"=c("main","other","main","other"),"min"=c(0.6,0.6,0.5,0.5),"max"=c(1.2,1.5,2,4),"breaks"=c(0.1,0.1,0.2,0.5))
+
+πnπs_ggplot <- ggplot(data=filter(pnpsπnπs_tidy, ratio=="πN_πS"), aes(population,value,fill=interaction(species,size),alpha=interaction(species,size))) +
+  geom_bar(stat="identity",position="dodge") +
+  #ggtitle("Proportion of reads at different NM") +
+  xlab("Population") +
+  ylab(expression(bold(pi[N]/pi[S]))) +
+  #ylab(ifelse(type=="varssubs","Average genetic load relative to ki",ifelse(type=="fixed","Derived fixation rate relative to ki", "Check code"))) +
+  coord_cartesian(ylim=c(0.300,0.350)) +
+  #scale_y_continuous(limits=c(0.300,0.350)) +
+  scale_fill_manual(values=c("steelblue4","indianred4","steelblue4","indianred4")) +
+  scale_alpha_manual(values=c(1,1,0.4,0.4)) +
+  #scale_colour_manual(values=c("steelblue4","indianred4","steelblue4","indianred4")) +
+  #scale_alpha_manual(values=c(1,1,0.4,0.4)) +
+  #ggtitle(paste0("ratio of ",type," relative to synonymous and Kirov")) +
+  theme_bw() +
+  theme(text=element_text(size=10,face="bold"),
+      rect=element_rect(size=1),
+      axis.line=element_blank(),
+      axis.title=element_text(size=16),
+      axis.text.x=element_text(angle=45,hjust=1,colour="black",face="bold"),
+      axis.title.x=element_text(size=16),
+      axis.title.y=element_text(size=16),
+      axis.text.y=element_text(colour="black",face="bold"),
+      #axis.title.y=element_text(margin=unit(c(0,0.5,0,0),"cm")),
+      panel.background=element_blank(),
+      panel.border=element_rect(colour="black",fill=NA),
+      panel.spacing.x=unit(0.075,"cm"),
+      strip.background=element_rect(colour="black"),
+      strip.text=element_text(size=8),
+      #panel.grid=element_blank(),
+      #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+      #plot.margin=unit(c(0.5,1,0.5,0.2),"cm"),
+      #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+      legend.background=element_rect(linetype="solid", colour="black", size=.5),
+      #legend.justification=c(0,0),
+      legend.key=element_rect(colour="white"),
+      legend.key.size=unit(0.5,"cm"),
+      legend.position="none",
+      legend.title=element_blank()
+  )
+πnπs_ggplot
+
+pnps_ggplot <- ggplot(data=filter(pnpsπnπs_tidy, ratio=="pn_ps"), aes(population,value,fill=interaction(species,size),alpha=interaction(species,size))) +
+  geom_bar(stat="identity",position="dodge") +
+  #ggtitle("Proportion of reads at different NM") +
+  xlab("Population") +
+  #ylab("PN/PS") +
+  ylab(expression(bold(P[N]/P[S]))) +
+  #ylab(ifelse(type=="varssubs","Average genetic load relative to ki",ifelse(type=="fixed","Derived fixation rate relative to ki", "Check code"))) +
+  coord_cartesian(ylim=c(0.720,0.780)) +
+  #scale_y_continuous(limits=c(0.300,0.350)) +
+  scale_fill_manual(values=c("steelblue4","indianred4","steelblue4","indianred4")) +
+  scale_alpha_manual(values=c(1,1,0.4,0.4)) +
+  #scale_alpha_manual(values=c(1,1,0.4,0.4)) +
+  #ggtitle(paste0("ratio of ",type," relative to synonymous and Kirov")) +
+  theme_bw() +
+  theme(text=element_text(size=10,face="bold"),
+      rect=element_rect(size=1),
+      axis.line=element_blank(),
+      axis.title=element_text(size=16),
+      axis.text.x=element_text(angle=45,hjust=1,colour="black",face="bold"),
+      axis.title.x=element_text(size=16),
+      axis.title.y=element_text(size=16),
+      axis.text.y=element_text(colour="black",face="bold"),
+      #axis.title.y=element_text(margin=unit(c(0,0.5,0,0),"cm")),
+      panel.background=element_blank(),
+      panel.border=element_rect(colour="black",fill=NA),
+      panel.spacing.x=unit(0.075,"cm"),
+      strip.background=element_rect(colour="black"),
+      strip.text=element_text(size=8),
+      #panel.grid=element_blank(),
+      #panel.grid.major=element_line(colour="grey", linetype="dashed", size=0.4),
+      #plot.margin=unit(c(0.5,1,0.5,0.2),"cm"),
+      #plot.title=element_text(size=36, face="bold", margin=margin(b=0.5, unit="cm")),
+      legend.background=element_rect(linetype="solid", colour="black", size=.5),
+      #legend.justification=c(0,0),
+      legend.key=element_rect(colour="white"),
+      legend.key.size=unit(0.5,"cm"),
+      legend.position="none",
+      legend.title=element_blank()
+  )
+pnps_ggplot
+
+
+#New:
+ggplot_combined <- grid.arrange(ncol=2,set_panel_size(πnπs_ggplot,width=unit(6,"cm"),height=unit(4,"cm")), set_panel_size(pnps_ggplot,width=unit(6,"cm"),height=unit(4,"cm")))
+ggsave("PNPSπNπS_TCRLP_outerparsimony_summary.pdf", width=16, height=6, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/",ggplot_combined)
+
+#New:
+#ggsave("PNPS_TCRLP_outerparsimony_summary.pdf", width=8.2, height=8, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/",pnps_ggplot)
+#ggsave("πNπS_TCRLP_outerparsimony_summary.pdf", width=8.2, height=8, units="cm", device="pdf", path="/Users/dani/ownCloud/backup/g-w_analysis/genetic_load/snpeff_summary_ratios/",πnπs_ggplot)
+
+#Stop
+STOP
+
+```
 
 #KAKA
 ```{r}
